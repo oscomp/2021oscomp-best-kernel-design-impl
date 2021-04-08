@@ -97,7 +97,7 @@ impl SuperBlock {
 
 }
 
-#[derive(PartialEq,Copy,Clone)]
+#[derive(PartialEq,Copy,Clone,Debug)]
 pub enum DiskInodeType {
     File,
     Directory,

@@ -45,6 +45,12 @@ impl Inode {
         self.fs.clone()
     }
 
+    pub fn get_type(&self) -> DiskInodeType{
+        self.read_disk_inode(|disk_inode: & DiskInode|{
+            disk_inode.type_
+        })
+    }
+
     fn read_disk_inode<V>(&self, f: impl FnOnce(&DiskInode) -> V) -> V {
         get_block_cache(
             self.block_id,
@@ -125,37 +131,84 @@ impl Inode {
         Some((curr_inode.clone(), curr_offset))
     }
 
-    // TODO
-    pub fn fcopy(src_path: Vec<&str>, dst_path: Vec<&str>)->bool{
-        false
-    }
+    // TODO:暂时只能复制文件，不具备递归复制目录的功能DEBUG
+    // DEBUG
+    pub fn fcopy(&self, mut src_path: Vec<&str>, mut dst_path: Vec<&str>)->bool{
+        // 每次读一个块，写一个块，参照readall
+        let dst_name = dst_path.pop().unwrap();
+        if let Some((src_ino, _)) = self.find_path(src_path){
+            let type_ = src_ino.get_type();
+            assert_eq!(type_, DiskInodeType::File, "sorry, cannot copy dir!");
+            if let Some(( dst_par_ino, _)) = self.find_path(dst_path){
+                if let Some(dst_ino) =  dst_par_ino.create(dst_name, type_){
+                    // TODO: 此处用循环边读边写。
 
-    // TODO
-    pub fn fmove(src_path: Vec<&str>, dst_path: Vec<&str>)->bool{
-        false
-    }
 
-    /* 
-    pub fn ch_dir(&self, path: Vec<&str>)->Option<Vec<Arc<Inode>>>{
-        // 切换工作目录时调用，返回路径目录的所有Inode
-        // QUES: 修改策略后，似乎没用了...
-        let mut curr_inode:Arc<Inode> = Arc::new(self.clone());
-        let mut inode_vec = Vec::new();
-        let len = path.len();
-        if len == 0 {
-            return None;
-        }
-        for i in 0 .. len {
-            if let Some(inode) = curr_inode.find(path[i]){
-                inode_vec.push(inode.clone());
-                curr_inode = inode;
+                }else{
+                    return false;
+                }
             }else{
-                return None;
+                return false;
             }
+        }else{
+            return false;
         }
-        Some(inode_vec)
+        false
     }
-    */
+
+    // DEBUG
+    pub fn fmove(&self, mut src_path: Vec<&str>, mut dst_path: Vec<&str>)->bool{
+        // 直接修改目录项
+        let src_name = src_path.pop().unwrap();
+        let dst_name = dst_path.pop().unwrap();
+        if let Some((src_par_ino, _)) = self.find_path(src_path){
+            if let Some(( dst_par_ino, _)) = self.find_path(dst_path){
+                if let Some((src_ino, offset)) = src_par_ino.find(src_name){
+                    let mut fs = self.fs.lock();
+                    let src_id = src_ino.get_id();
+                    // 将src的目录项无气泡删除
+                    src_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
+                        let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+                        let new_size = (file_count - 1) * DIRENT_SZ;
+                        // 移动目录项
+                        let mut dirent = DirEntry::empty();
+                        // 读出最后一个目录项
+                        disk_inode.read_at(
+                            new_size,
+                            dirent.as_bytes_mut(),
+                            &self.block_device,
+                        );
+                        // 写入被删除的位置
+                        disk_inode.write_at(
+                            offset as usize,
+                            dirent.as_bytes(),
+                            &self.block_device,
+                        );
+                        dst_par_ino.decrease_size(new_size as u32, disk_inode, &mut fs);
+                    });
+                    // 在dst新建目录项，并与源inode_id绑定
+                    dst_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
+                        let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+                        let new_size = (file_count + 1) * DIRENT_SZ;
+                        self.increase_size(new_size as u32, disk_inode, &mut fs);
+                        let dirent = DirEntry::new(dst_name, src_ino.get_type(),src_id);
+                        disk_inode.write_at(
+                            file_count * DIRENT_SZ,
+                            dirent.as_bytes(),
+                            &self.block_device,
+                        );
+                    });
+                    return true;
+                }else{
+                    return false;
+                }
+            }else{
+                return false;
+            }
+        }else{
+            return false;
+        }
+    }
 
     fn remove_file(&self)->bool{
         // 删除当前Inode对应的文件
@@ -221,9 +274,10 @@ impl Inode {
         let result:bool;
         let name = path.pop().unwrap();
         // 获取上级目录
-        if let Some((par_inode, offset)) = self.find_path(path){
+        // ?
+        if let Some((par_inode, _)) = self.find_path(path){
             // 搜索目标文件/目录
-            if let Some((tar_inode,_)) = par_inode.find(name){
+            if let Some((tar_inode,offset)) = par_inode.find(name){
                 if type_ == DiskInodeType::File{
                     result = tar_inode.remove_file();
                 } else if type_ == DiskInodeType::Directory{
@@ -234,34 +288,33 @@ impl Inode {
                 if result == false {
                     return false;
                 }
+                // DEBUG: 修改目录项，调整目录大小
+                // 对fs上锁，避免修改途中有进程对其操作
+                let mut fs = self.fs.lock();
+                // 修改上级目录的目录项，调整大小
+                par_inode.modify_disk_inode(|curr_inode| {
+                    let file_count = (curr_inode.size as usize) / DIRENT_SZ;
+                    let new_size = (file_count - 1) * DIRENT_SZ;
+                    // 移动目录项
+                    let mut dirent = DirEntry::empty();
+                    // 读出最后一个目录项
+                    curr_inode.read_at(
+                        new_size,
+                        dirent.as_bytes_mut(),
+                        &self.block_device,
+                    );
+                    // 写入被删除的位置
+                    curr_inode.write_at(
+                        offset as usize,
+                        dirent.as_bytes(),
+                        &self.block_device,
+                    );
+                    par_inode.decrease_size(new_size as u32, curr_inode, &mut fs);
+                });
+            return result;
             } else{
                 return false;
             }
-            // DEBUG: 修改目录项，调整目录大小
-            // 对fs上锁，避免修改途中有进程对其操作
-            let mut fs = self.fs.lock();
-            // 修改目录项，调整目录大小
-            self.modify_disk_inode(|curr_inode| {
-                // append file in the dirent
-                let file_count = (curr_inode.size as usize) / DIRENT_SZ;
-                let new_size = (file_count - 1) * DIRENT_SZ;
-                // 移动目录项
-                let mut dirent = DirEntry::empty();
-                // 读出最后一个目录项
-                curr_inode.read_at(
-                    new_size,
-                    dirent.as_bytes_mut(),
-                    &self.block_device,
-                );
-                // 写入被删除的位置
-                curr_inode.write_at(
-                    offset as usize,
-                    dirent.as_bytes(),
-                    &self.block_device,
-                );
-                self.decrease_size(new_size as u32, curr_inode, &mut fs);
-            });
-            return result;
         }else{
             false
         }
