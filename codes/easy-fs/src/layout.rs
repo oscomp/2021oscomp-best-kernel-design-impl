@@ -258,7 +258,7 @@ impl DiskInode {
         .lock()
         .modify(0, |indirect2: &mut IndirectBlock| {
             while (a0 < a1) || (a0 == a1 && b0 < b1) {
-                // TODO
+                // DEBUG
                 if b0 == 0 { // 一级间接块需要回收
                     blk_vec.push(indirect2[a0]);
                 }

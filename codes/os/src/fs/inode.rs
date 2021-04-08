@@ -15,6 +15,13 @@ use spin::Mutex;
 use super::File;
 use crate::mm::UserBuffer;
 
+#[derive(PartialEq,Copy,Clone)]
+pub enum SeekWhence{
+    SEEK_SET, // 将offset设为新的读写位置 
+    SEEK_CUR, // 将当前读写位置往后增加offset个偏移量
+    SEEK_END, // 将读写位置设为末尾，然后增加offset偏移量(此时offset可以<0)
+}
+
 // 此inode实际被当作文件
 pub struct OSInode {
     readable: bool,
@@ -47,6 +54,7 @@ impl OSInode {
             }),
         }
     }
+    
     pub fn read_all(&self) -> Vec<u8> {
         let mut inner = self.inner.lock();
         let mut buffer = [0u8; 512];
@@ -60,6 +68,32 @@ impl OSInode {
             v.extend_from_slice(&buffer[..len]);
         }
         v
+    }
+
+    pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
+        let inner = self.inner.lock();
+        if whence == SeekWhence::SEEK_END {
+            if inner.offset as isize - offset < 0 {
+                return -1;
+            }
+        } else {
+            if offset < 0{
+                return -1;
+            }
+        }
+        match whence{
+            SeekWhence::SEEK_CUR=>{
+                inner.offset += offset as usize;
+            }   
+            SeekWhence::SEEK_END=>{
+                let size = inner.inode.get_size();
+                inner.offset = (size as isize + offset - 1) as usize;
+            }
+            SeekWhence::SEEK_SET=>{
+                inner.offset = offset as usize;
+            }
+        }
+        inner.offset as isize
     }
 }
 

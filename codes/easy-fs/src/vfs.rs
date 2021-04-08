@@ -111,6 +111,10 @@ impl Inode {
         let mut curr_inode:Arc<Inode> = Arc::new(self.clone());
         let mut curr_offset:u32 = 0;
         for i in 0 .. len {
+            // DEBUG
+            if path[i] == ""{
+                continue;
+            }
             if let Some((inode,offset)) = curr_inode.find(path[i]){
                 curr_inode = inode;
                 curr_offset = offset;
@@ -119,6 +123,16 @@ impl Inode {
             }
         }
         Some((curr_inode.clone(), curr_offset))
+    }
+
+    // TODO
+    pub fn fcopy(src_path: Vec<&str>, dst_path: Vec<&str>)->bool{
+        false
+    }
+
+    // TODO
+    pub fn fmove(src_path: Vec<&str>, dst_path: Vec<&str>)->bool{
+        false
     }
 
     /* 
@@ -260,8 +274,7 @@ impl Inode {
         disk_inode: &mut DiskInode,
         fs: &mut MutexGuard<EasyFileSystem>,
     ){
-        // TODO: 删除文件后检测是否需要回收块
-        // TODO: 修改文件后也要检测是否需要回收块
+        // TODO: 修改文件后也要检测是否需要回收块？
         // 因为无气泡压缩删除的设计，目录的大小很好判断
         if new_size > disk_inode.size {
             return;
@@ -281,7 +294,7 @@ impl Inode {
         disk_inode: &mut DiskInode,
         fs: &mut MutexGuard<EasyFileSystem>,
     ) {
-        if new_size < disk_inode.size {
+        if new_size <= disk_inode.size {
             //println!("new_size < disk_inode.size");
             return;
         }
@@ -291,6 +304,12 @@ impl Inode {
             v.push(fs.alloc_data());
         }
         disk_inode.increase_size(new_size, v, &self.block_device);
+    }
+
+    pub fn get_size(&self)->u32{
+        self.read_disk_inode(|disk_inode: &DiskInode|{
+            disk_inode.size
+        })
     }
 
     pub fn create(&self, name: &str , type_: DiskInodeType) -> Option<Arc<Inode>> {
@@ -315,8 +334,7 @@ impl Inode {
             Arc::clone(&self.block_device)
         ).lock().modify(new_inode_block_offset, |new_dskinode: &mut DiskInode| {
             new_dskinode.initialize(type_.clone());
-            // TODO: 为新目录分配一个块并简历.和..两个目录项
-            // DEBUG
+            // DEBUG: 为新目录分配一个块并建立.和..两个目录项
             if type_ == DiskInodeType::Directory {
                 let new_size = 2 * DIRENT_SZ;
                 //println!("0.0._");
@@ -392,7 +410,6 @@ impl Inode {
                     ),
                     DIRENT_SZ,
                 );
-                // TODO: 获取类型
                 v.push( (String::from(dirent.name()), dirent.type_()) );
             }
             v.sort_by(|a, b| a.0.cmp(&b.0));
