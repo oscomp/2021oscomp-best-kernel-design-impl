@@ -2,6 +2,7 @@ use easy_fs::{
     BlockDevice,
     EasyFileSystem,
     DiskInodeType,
+    Inode,
 };
 use std::fs::{File, OpenOptions, read_dir};
 use std::io::{Read, Write, Seek, SeekFrom};
@@ -133,7 +134,7 @@ fn efs_test() -> std::io::Result<()> {
     let efs = EasyFileSystem::open(block_file.clone());
     println!("freeblk = {}", efs.lock().free_blocks());
     println!("freeinode = {}", efs.lock().free_inodes());
-    let root_inode = EasyFileSystem::get_inode(&efs,0);
+    let root_inode = Arc::new(EasyFileSystem::get_inode(&efs,0));
     root_inode.create("filea",DiskInodeType::File);
     root_inode.create("fileb",DiskInodeType::File);
     for name in root_inode.ls() {
@@ -150,10 +151,55 @@ fn efs_test() -> std::io::Result<()> {
         core::str::from_utf8(&buffer[..len]).unwrap(),
     );
 
+    // 简易读写测试
+    let simple_rwtest = |file_ino: Arc<Inode>, name: &str|{
+        println!("*** simple r/w test");
+        println!("  name = {}",name);
+        println!("  1: write file. wlen={}", file_ino.write_at(0, greet_str.as_bytes()));
+        let mut buffer = [0u8; 256];
+        let len = file_ino.read_at(0, &mut buffer);
+        println!("  2: read file. rlen = {}",len);
+        assert_eq!(
+            greet_str,
+            core::str::from_utf8(&buffer[..len]).unwrap(),
+        );
+        println!("*** simple r/w test pass");
+    };
+
+    let list_apps = |dir_ino: Arc<Inode>, name:&str|{
+        println!("list files in {}:",name);
+        let file_vec = dir_ino.ls();
+        for i in 0..file_vec.len(){
+            if file_vec[i].1 == DiskInodeType::File{
+                print!("{} ", file_vec[i].0);
+            } else {
+                // TODO: 统一配色！
+             print!("{} ", color_text!(file_vec[i].0, 96));
+            }
+        }
+        println!("");
+        println!("");
+    };
+
+
     // TODO:目录功能测试
     // 0.1 根目录下文件删除
-    
+    println!("*** after create filea fileb");
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    assert_eq!(root_inode.remove(vec!["filea"], DiskInodeType::File), true, "fail to remove filea");
+    println!("*** after delete filea");
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    list_apps(root_inode.clone(),"root");
+    assert_eq!(root_inode.remove(vec!["fileb"], DiskInodeType::File), true, "fail to remove fileb");
+    println!("*** after delete filea fileb, before create dira");
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    list_apps(root_inode.clone(),"root");
+
     // 1.1 根目录下目录创建
+    println!("\n-----------------------------------------");  
     println!("0: rw in /dir ... start");
     let dira_inode_id = {
         println!("0.0: create dir");
@@ -161,13 +207,8 @@ fn efs_test() -> std::io::Result<()> {
         // 1.2 根目录下目录内文件创建/读写/删除
         println!("0.1: create file in dir");
         let filec = dira_inode.create("filec",DiskInodeType::File).unwrap();
-        println!("0.2: write file. wlen={}", filec.write_at(0, greet_str.as_bytes()));
-        let len = filec.read_at(0, &mut buffer);
-        println!("0.3: read file. rlen = {}",len);
-        assert_eq!(
-            greet_str,
-            core::str::from_utf8(&buffer[..len]).unwrap(),
-        );
+        dira_inode.create("filed",DiskInodeType::File).unwrap();
+        simple_rwtest(filec, "filec");
         dira_inode.get_id()
         // 到这里，filec和dira_inode被释放
     };
@@ -175,34 +216,41 @@ fn efs_test() -> std::io::Result<()> {
     let dira_inode = Arc::new(EasyFileSystem::get_inode(&efs.clone(), dira_inode_id));
     println!("0.5: read from file");
     let (filec,_) = dira_inode.find_path(vec!["filec"]).unwrap();
-    let mut buffer = [0u8; 233];
     let len = filec.read_at(0, &mut buffer);
     assert_eq!(
         greet_str,
         core::str::from_utf8(&buffer[..len]).unwrap(),
     );
     // 打印根目录内容
-    println!("list files in root:");
-    let file_vec = root_inode.ls();
+    list_apps(root_inode.clone(), "root");
+    println!("before create /dira/dir1");
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    println!("0: rw in /dir ... pass");  
     
-    for i in 0..file_vec.len(){
-        if file_vec[i].1 == DiskInodeType::File{
-            print!("{} ", file_vec[i].0);
-        } else {
-            // TODO: 统一配色！
-            print!("{} ", color_text!(file_vec[i].0, 96));
-        }
-    }
-    println!("");
-    println!("0: rw in /dir ... pass");
-
-    // 1.3 根目录下目录删除
-    
-    
+    println!("\n-----------------------------------------");  
+    println!("1: rwd in multi-dir ... start");
     // 2.1 多级目录创建
-    // 2.2 多级目录下文件创建/读写/删除
-    // 2.3 多级目录删除
+    let dira_dir1 = dira_inode.create("dir1",DiskInodeType::Directory).unwrap();
+    // 打印dira内容
+    list_apps(dira_inode.clone(), "dira");
     
+    // 2.2 多级目录下文件创建/读写/删除
+    {
+        dira_dir1.create("file0", DiskInodeType::File).unwrap();
+    }
+    let (dira_dir1_file0,_) = root_inode.find_path(vec!["dira","dir1","file0"]).unwrap();
+    simple_rwtest(dira_dir1_file0.clone(), "/dira/dir1/file0");
+    list_apps(dira_dir1.clone(), "dir1");
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    // 2.3 多级目录删除
+    println!("1.1: remove /dira/dir1");
+    assert_eq!(root_inode.remove(vec!["dira","dir1"], DiskInodeType::Directory), true, "fail to remove dir1");
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    simple_rwtest(dira_dir1_file0, "/dira/dir1/file0");
+    println!("1: rwd in multi-dir ... pass\n");
     // 3.1 目录切换测试: cd ./..
     // 3.2 目录切换测试: 绝对路径
     // 3.3 目录切换测试: 相对路径

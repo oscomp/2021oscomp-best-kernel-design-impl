@@ -119,6 +119,8 @@ pub fn list_apps() {
     println!("**************/")
 }
 
+// TODO: 对所有的Inode加锁！
+// 在这一层实现互斥访问
 pub fn list_files(inode_id: u32){
     let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
     let file_vec = curr_inode.ls();

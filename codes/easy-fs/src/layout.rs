@@ -108,8 +108,8 @@ type DataBlock = [u8; BLOCK_SZ];
 
 #[repr(C)]
 pub struct DiskInode {
+    // disk_inode的大小为
     // 最大16540个数据块
-    // 
     pub size: u32, // Byte
     pub direct: [u32; INODE_DIRECT_COUNT], //28*512 = 14KB
     pub indirect1: u32,  // 128*512 = 64KB

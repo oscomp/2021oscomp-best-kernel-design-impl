@@ -10,6 +10,7 @@ use super::{
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
+use alloc::vec;
 use spin::{Mutex, MutexGuard};
 
 #[derive(Clone)]
@@ -114,6 +115,9 @@ impl Inode {
         // 调用find逐级搜索
         // shell应当保证path有内容!!!这里不对len进行检查以提高效率。
         let len = path.len();
+        if len == 0{
+            return Some((Arc::new(self.clone()),0));
+        }
         let mut curr_inode:Arc<Inode> = Arc::new(self.clone());
         let mut curr_offset:u32 = 0;
         for i in 0 .. len {
@@ -134,16 +138,30 @@ impl Inode {
     // TODO:暂时只能复制文件，不具备递归复制目录的功能DEBUG
     // DEBUG
     pub fn fcopy(&self, mut src_path: Vec<&str>, mut dst_path: Vec<&str>)->bool{
-        // 每次读一个块，写一个块，参照readall
+        // 每次读一个块(512B)，写一个块
         let dst_name = dst_path.pop().unwrap();
         if let Some((src_ino, _)) = self.find_path(src_path){
             let type_ = src_ino.get_type();
             assert_eq!(type_, DiskInodeType::File, "sorry, cannot copy dir!");
             if let Some(( dst_par_ino, _)) = self.find_path(dst_path){
                 if let Some(dst_ino) =  dst_par_ino.create(dst_name, type_){
-                    // TODO: 此处用循环边读边写。
-
-
+                    // 此处用循环边读边写。
+                    let mut buffer = [0u8; 512];
+                    let mut offset = 0;
+                    loop{
+                        let rlen = src_ino.read_at(offset, &mut buffer);
+                        if rlen == 0 {
+                            break;
+                        }
+                        let wlen = dst_ino.write_at(offset, &buffer);
+                        if wlen != rlen {
+                            // 写入失败，直接删
+                            dst_par_ino.remove(vec![dst_name], type_);
+                            return false;
+                        }
+                        offset += rlen;
+                    }
+                    return true;
                 }else{
                     return false;
                 }
@@ -153,7 +171,6 @@ impl Inode {
         }else{
             return false;
         }
-        false
     }
 
     // DEBUG
@@ -227,6 +244,7 @@ impl Inode {
             assert!(disk_inode.is_dir());
             let file_count = (disk_inode.size as usize) / DIRENT_SZ;
             let mut dirent = DirEntry::empty();
+            println!("  rmdir: filecount = {}",file_count);
             // 删除目录下的每一项
             for i in 0..file_count {
                 assert_eq!(
@@ -242,16 +260,17 @@ impl Inode {
                     self.fs.clone(), 
                     self.block_device.clone()
                 );
-                let type_:DiskInodeType =  temp_inode.read_disk_inode(
-                    |disk_inode|{
-                        disk_inode.type_
-                    }
-                );
+                // 是的，死锁了
+                let type_:DiskInodeType = temp_inode.get_type();
                 let result:bool;
                 // 根据类别删除
                 if type_ == DiskInodeType::File{
+                    println!("  rmdir:type file");
+                    // 是的，死锁了
                     result = temp_inode.remove_file();
                 } else if type_ == DiskInodeType::Directory {
+                    println!("  rmdir:type dir");
+                    // 是的，死锁了
                     result = temp_inode.remove_dir();
                 } else {
                     return false;
@@ -264,6 +283,7 @@ impl Inode {
             self.clear();
             // 释放inode
             let mut fs = self.fs.lock();
+            println!("  rmdir:finish rm");
             fs.dealloc_inode(self.inode_id);
             true
         })
@@ -274,10 +294,10 @@ impl Inode {
         let result:bool;
         let name = path.pop().unwrap();
         // 获取上级目录
-        // ?
         if let Some((par_inode, _)) = self.find_path(path){
             // 搜索目标文件/目录
             if let Some((tar_inode,offset)) = par_inode.find(name){
+                println!("  rm: name = {},offset = {}", name, offset);
                 if type_ == DiskInodeType::File{
                     result = tar_inode.remove_file();
                 } else if type_ == DiskInodeType::Directory{
@@ -295,6 +315,11 @@ impl Inode {
                 par_inode.modify_disk_inode(|curr_inode| {
                     let file_count = (curr_inode.size as usize) / DIRENT_SZ;
                     let new_size = (file_count - 1) * DIRENT_SZ;
+                    let de_offset = offset as usize * DIRENT_SZ ;
+                    if new_size == de_offset {
+                        par_inode.decrease_size(new_size as u32, curr_inode, &mut fs);
+                        return;
+                    }
                     // 移动目录项
                     let mut dirent = DirEntry::empty();
                     // 读出最后一个目录项
@@ -305,17 +330,19 @@ impl Inode {
                     );
                     // 写入被删除的位置
                     curr_inode.write_at(
-                        offset as usize,
+                        de_offset as usize,
                         dirent.as_bytes(),
                         &self.block_device,
                     );
                     par_inode.decrease_size(new_size as u32, curr_inode, &mut fs);
                 });
-            return result;
+                return result;
             } else{
+                println!("remove: 未找到目标");
                 return false;
             }
         }else{
+            println!("remove: 未找到上级目录");
             false
         }
     }

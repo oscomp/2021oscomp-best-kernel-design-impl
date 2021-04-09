@@ -130,5 +130,6 @@ pub fn get_block_cache(
     block_id: usize,
     block_device: Arc<dyn BlockDevice>
 ) -> Arc<Mutex<BlockCache>> {
+    //println!("get_block_cache id = {}",block_id);
     BLOCK_CACHE_MANAGER.lock().get_block_cache(block_id, block_device)
 }
