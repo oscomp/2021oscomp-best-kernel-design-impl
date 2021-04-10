@@ -118,6 +118,7 @@ impl Inode {
         if len == 0{
             return Some((Arc::new(self.clone()),0));
         }
+        //println!("find_path: len = {}, path = {:?}",len,path);
         let mut curr_inode:Arc<Inode> = Arc::new(self.clone());
         let mut curr_offset:u32 = 0;
         for i in 0 .. len {
@@ -190,11 +191,13 @@ impl Inode {
         }else{
             dst_name = dst_path.pop().unwrap();
         }
+        
         if let Some((src_par_ino, _)) = self.find_path(src_path){
             if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path){
                 if let Some((src_ino, offset)) = src_par_ino.find(src_name){
                     let mut fs = self.fs.lock();
                     let src_id = src_ino.get_id();
+                    let type_ = src_ino.get_type();
                     // 将src的目录项无气泡删除
                     src_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
                         let file_count = (disk_inode.size as usize) / DIRENT_SZ;
@@ -224,8 +227,8 @@ impl Inode {
                     dst_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
                         let file_count = (disk_inode.size as usize) / DIRENT_SZ;
                         let new_size = (file_count + 1) * DIRENT_SZ;
-                        self.increase_size(new_size as u32, disk_inode, &mut fs);
-                        let dirent = DirEntry::new(dst_name, src_ino.get_type(),src_id);
+                        dst_par_ino.increase_size(new_size as u32, disk_inode, &mut fs);
+                        let dirent = DirEntry::new(dst_name, type_,src_id);
                         disk_inode.write_at(
                             file_count * DIRENT_SZ,
                             dirent.as_bytes(),
