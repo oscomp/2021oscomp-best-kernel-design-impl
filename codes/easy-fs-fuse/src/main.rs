@@ -247,9 +247,10 @@ fn efs_test() -> std::io::Result<()> {
     // 2.3 多级目录删除
     println!("1.1: remove /dira/dir1");
     assert_eq!(root_inode.remove(vec!["dira","dir1"], DiskInodeType::Directory), true, "fail to remove dir1");
+    list_apps(dira_inode.clone(), "dira");
     println!("freeblk = {}", efs.lock().free_blocks());
     println!("freeinode = {}", efs.lock().free_inodes());
-    simple_rwtest(dira_dir1_file0, "/dira/dir1/file0");
+    //simple_rwtest(dira_dir1_file0, "/dira/dir1/file0");
     println!("1: rwd in multi-dir ... pass\n");
     
     // 3.1 目录切换测试: cd ./..
@@ -306,6 +307,8 @@ fn efs_test() -> std::io::Result<()> {
     // 5.2 目录复制
 
     // 6 鲁棒性测试
+    println!("\n-----------------------------------------");  
+    println!("5: Robust test ... start");
     // 6.1 尝试操作不存在的文件/目录
     if dira_inode.find_path(vec!["dir1"]).is_some() {
         panic!("find unexist dir!");
@@ -315,9 +318,14 @@ fn efs_test() -> std::io::Result<()> {
         panic!("find unexist file!");
     }
     // 6.2上级目录复制到子目录
-
+    let dirn = dirm.create("dirn",DiskInodeType::Directory).unwrap();
+    assert_eq!( root_inode.fmove(vec!["dirm"],0,vec!["dirm","dirn"]), false);
+    // 目录复制到原地
+    assert_eq!( root_inode.fmove(vec!["dirm"],0,vec!["dirm"]), false);
+    // 文件复制到原地
+    assert_eq!( root_inode.fmove(vec!["filec"],0,vec!["filec"]), false);
     // 6.3 大小超出限制
-
+    println!("5: Robust test ... to be continue\n");
 
     // 文件数据块分配回收测试(superblock/inode的size是否及时增减)
 

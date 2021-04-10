@@ -141,7 +141,7 @@ impl EasyFileSystem {
         })        
     }
 
-    pub fn get_inode( efs: &Arc<Mutex<Self>>, inode_id :u32) -> Inode {
+    pub fn get_inode(efs: &Arc<Mutex<Self>>, inode_id :u32) -> Inode {
         let block_device = Arc::clone(&efs.lock().block_device);
         Inode::new(
             inode_id,

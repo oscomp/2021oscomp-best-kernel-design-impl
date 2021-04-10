@@ -38,6 +38,23 @@ impl Inode {
         }
     }
 
+    fn nlock_new (
+        &self,
+        mutex_fs: &mut MutexGuard<EasyFileSystem>,
+        inode_id: u32,
+        fs: Arc<Mutex<EasyFileSystem>>,
+        block_device: Arc<dyn BlockDevice>,
+    )->Self{
+        let (block_id, block_offset) = mutex_fs.get_disk_inode_pos(inode_id);
+        Self {
+            inode_id,
+            block_id: block_id as usize,
+            block_offset,
+            fs,
+            block_device,
+        }
+    }
+
     pub fn get_id(&self) -> u32{
         self.inode_id
     }
@@ -136,12 +153,59 @@ impl Inode {
         Some((curr_inode.clone(), curr_offset))
     }
 
+    fn nlock_find_path(&self, path: Vec<&str>, fs: &mut MutexGuard<EasyFileSystem>)-> Option<(Arc<Inode>, u32)>{
+        // 不会主动上锁
+        let len = path.len();
+        if len == 0{
+            return Some((Arc::new(self.clone()),0));
+        }
+        //println!("find_path: len = {}, path = {:?}",len,path);
+        let mut curr_inode:Arc<Inode> = Arc::new(self.clone());
+        let mut curr_offset:u32 = 0;
+        for i in 0 .. len {
+            // DEBUG
+            if path[i] == ""{
+                continue;
+            }
+            if let Some((inode,offset)) = curr_inode.nlock_find(path[i], fs){
+                curr_inode = inode;
+                curr_offset = offset;
+            }else{
+                return None;
+            }
+        }
+        Some((curr_inode.clone(), curr_offset))
+    }
+
+    fn nlock_find(&self, name: &str, fs: &mut MutexGuard<EasyFileSystem>)-> Option<(Arc<Inode>, u32)>{
+        // 不会主动上锁
+        self.read_disk_inode(|disk_inode| {
+            // find_inode_id会检查是否是目录
+            self.find_inode_id(name, disk_inode)// 获取Inode编号
+            .map(|(inode_id,offset)| { //转换为Inode
+                (   Arc::new(self.nlock_new(
+                        fs,
+                        inode_id,
+                        self.fs.clone(),
+                        self.block_device.clone(),
+                    )),
+                    offset
+                )
+            })
+        })
+    }
+
+    // TODO 但凡涉及修改，一律对fs上锁！
+    // 有损性能
+
     // TODO:暂时只能复制文件，不具备递归复制目录的功能DEBUG
+    // TODO 锁
     // DEBUG
     pub fn fcopy(&self, src_path: Vec<&str>, dst_ino_id: u32,mut dst_path: Vec<&str>)->bool{
         // 每次读一个块(512B)，写一个块
         let dst_name = dst_path.pop().unwrap();
         let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
+        //let fs_lock = self.fs.lock();
         if let Some((src_ino, _)) = self.find_path(src_path){
             let type_ = src_ino.get_type();
             assert_eq!(type_, DiskInodeType::File, "sorry, cannot copy dir!");
@@ -177,6 +241,7 @@ impl Inode {
 
     // DEBUG
     pub fn fmove(&self, mut src_path: Vec<&str>, dst_ino_id: u32,mut dst_path: Vec<&str>)->bool{
+        // self应当在源路径上
         // 直接修改目录项
         let src_name = src_path.pop().unwrap();
         let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
@@ -190,18 +255,16 @@ impl Inode {
         }else{
             dst_name = dst_path.pop().unwrap();
         }
-        if self.find_path(dst_path.clone()).is_some(){
-            // DEBUG: 上级目录不能复制到子目录
-            // 如果dstpath = ""，那么直接返回self
-            // 只要保证就src_inode(self)和dst_inode不是同一个就没问题
-            return false;
-        }
         if let Some((src_par_ino, _)) = self.find_path(src_path){
-            if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path){
+            if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path.clone()){
                 if let Some((src_ino, offset)) = src_par_ino.find(src_name){
                     let mut fs = self.fs.lock();
                     let src_id = src_ino.get_id();
                     let type_ = src_ino.get_type();
+                    if  type_ == DiskInodeType::Directory
+                        && (dst_path.contains(&src_name)) {
+                        return false;
+                    }
                     // 将src的目录项无气泡删除
                     src_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
                         let file_count = (disk_inode.size as usize) / DIRENT_SZ;
@@ -251,21 +314,20 @@ impl Inode {
         }
     }
 
-    fn remove_file(&self)->bool{
+    fn remove_file(&self, fs: &mut MutexGuard<EasyFileSystem>)->bool{
         // 删除当前Inode对应的文件
         // 清空文件内容
-        self.clear();
+        self.nlock_clear(fs);
         // 释放inode
-        let mut fs = self.fs.lock();
+        //let mut fs = self.fs.lock();
         fs.dealloc_inode(self.inode_id);
         true
     }
 
-    fn remove_dir(&self)->bool{
+    fn remove_dir(&self, fs: &mut MutexGuard<EasyFileSystem>)->bool{
         // 递归删除当前Inode对应的目录
         // DEBUG
         // 获取目录下的所有inode_id
-        
         // locked
         let vec_inoid:Vec<u32> = self.read_disk_inode(|disk_inode: &DiskInode|{
             let mut v:Vec<u32> = Vec::new();
@@ -286,9 +348,12 @@ impl Inode {
             v
         });
         // release
+        // QUES: 如果此处有其他CPU动了目录项，那么就不一致！
         // println!("rm: vec_inode = {:?}",vec_inoid);
         for inode_id in vec_inoid {
-            let temp_inode = Inode::new(
+            // new包含lock
+            let temp_inode = self.nlock_new(
+                fs,
                 inode_id,
                 self.fs.clone(), 
                 self.block_device.clone()
@@ -300,10 +365,10 @@ impl Inode {
             // 根据类别递归删除
             if type_ == DiskInodeType::File{
                 //println!("  rmdir:type file");
-                result = temp_inode.remove_file();
+                result = temp_inode.remove_file(fs);
             } else if type_ == DiskInodeType::Directory {
                 //println!("  rmdir:type dir");
-                result = temp_inode.remove_dir();
+                result = temp_inode.remove_dir(fs);
             } else {
                 return false;
             }
@@ -312,10 +377,10 @@ impl Inode {
             }
         }
         // 清除所有目录项
-        self.clear();
+        self.nlock_clear(fs);
         // 释放inode
-        let mut fs = self.fs.lock();
-        println!("  rmdir:finish rm");
+        //println!("  rmdir:finish rm");
+        //let mut fs = self.fs.lock();
         fs.dealloc_inode(self.inode_id);
         true
     }
@@ -324,15 +389,18 @@ impl Inode {
         // 删除文件/目录
         let result:bool;
         let name = path.pop().unwrap();
+        // find本身会上锁，但find完之后可能发生修改，因此开始就要锁
+        // 这里均采用无锁find
+        let mut fs = self.fs.lock();
         // 获取上级目录
-        if let Some((par_inode, _)) = self.find_path(path){
+        if let Some((par_inode, _)) = self.nlock_find_path(path, &mut fs){
             // 搜索目标文件/目录
-            if let Some((tar_inode,offset)) = par_inode.find(name){
+            if let Some((tar_inode,offset)) = par_inode.nlock_find(name, &mut fs){        
                 println!("  rm: name = {},offset = {}", name, offset);
                 if type_ == DiskInodeType::File{
-                    result = tar_inode.remove_file();
+                    result = tar_inode.remove_file(&mut fs);
                 } else if type_ == DiskInodeType::Directory{
-                    result = tar_inode.remove_dir();
+                    result = tar_inode.remove_dir(&mut fs);
                 } else {
                     return false;
                 }
@@ -341,7 +409,7 @@ impl Inode {
                 }
                 // DEBUG: 修改目录项，调整目录大小
                 // 对fs上锁，避免修改途中有进程对其操作
-                let mut fs = self.fs.lock();
+                // let mut fs = self.fs.lock();
                 // 修改上级目录的目录项，调整大小
                 par_inode.modify_disk_inode(|curr_inode| {
                     let file_count = (curr_inode.size as usize) / DIRENT_SZ;
@@ -546,6 +614,17 @@ impl Inode {
 
     pub fn clear(&self) {
         let mut fs = self.fs.lock();
+        self.modify_disk_inode(|disk_inode| {
+            let size = disk_inode.size;
+            let data_blocks_dealloc = disk_inode.clear_size(&self.block_device);
+            assert!(data_blocks_dealloc.len() == DiskInode::total_blocks(size) as usize);
+            for data_block in data_blocks_dealloc.into_iter() {
+                fs.dealloc_data(data_block);
+            }
+        });
+    }
+
+    fn nlock_clear(&self, fs:&mut MutexGuard<EasyFileSystem>){
         self.modify_disk_inode(|disk_inode| {
             let size = disk_inode.size;
             let data_blocks_dealloc = disk_inode.clear_size(&self.block_device);
