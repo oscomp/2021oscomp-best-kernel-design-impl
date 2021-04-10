@@ -201,27 +201,33 @@ impl Inode {
     // TODO:暂时只能复制文件，不具备递归复制目录的功能DEBUG
     // TODO 锁
     // DEBUG
-    pub fn fcopy(&self, src_path: Vec<&str>, dst_ino_id: u32,mut dst_path: Vec<&str>)->bool{
+    pub fn fcopy(&self, src_path: Vec<&str>, dst_ino_id: u32,dst_path: Vec<&str>)->bool{
         // 每次读一个块(512B)，写一个块
-        let dst_name = dst_path.pop().unwrap();
+        // dsp_path不含文件名
+        let dst_name = src_path[src_path.len()-1];
         let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
-        //let fs_lock = self.fs.lock();
-        if let Some((src_ino, _)) = self.find_path(src_path){
+        let mut fs = self.fs.lock();
+        if let Some((src_ino, _)) = self.nlock_find_path(src_path, &mut fs){
             let type_ = src_ino.get_type();
             assert_eq!(type_, DiskInodeType::File, "sorry, cannot copy dir!");
-            if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path){
-                if let Some(dst_ino) =  dst_par_ino.create(dst_name, type_){
+            if let Some(( dst_par_ino, _)) = dst_inode.nlock_find_path(dst_path, &mut fs){
+                if dst_par_ino.get_type() != DiskInodeType::Directory {
+                    return false;
+                }
+                if let Some(dst_ino) =  dst_par_ino.nlock_create(dst_name, type_, &mut fs){     
                     // 此处用循环边读边写。
                     let mut buffer = [0u8; 512];
                     let mut offset = 0;
                     loop{
-                        let rlen = src_ino.read_at(offset, &mut buffer);
+                        let rlen = src_ino.nlock_read_at(offset, &mut buffer);
                         if rlen == 0 {
                             break;
                         }
-                        let wlen = dst_ino.write_at(offset, &buffer);
+                        let wlen = dst_ino.nlock_write_at(offset, &buffer[0..rlen], &mut fs);
                         if wlen != rlen {
                             // 写入失败，直接删
+                            println!("write fail, wlen = {}, rlen = {}", wlen, rlen);
+                            drop(fs);
                             dst_par_ino.remove(vec![dst_name], type_);
                             return false;
                         }
@@ -246,8 +252,9 @@ impl Inode {
         let src_name = src_path.pop().unwrap();
         let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
         let mut dst_name:&str = src_name;
+        let mut fs = self.fs.lock();
         // 首先看dst_name是否存在
-        if let Some((inode,_))  = dst_inode.find_path(dst_path.clone()){
+        if let Some((inode,_))  = dst_inode.nlock_find_path(dst_path.clone(), &mut fs){
             // 存在，则看是否是目录
             if inode.get_type() == DiskInodeType::File{
                 return false;
@@ -255,10 +262,9 @@ impl Inode {
         }else{
             dst_name = dst_path.pop().unwrap();
         }
-        if let Some((src_par_ino, _)) = self.find_path(src_path){
-            if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path.clone()){
-                if let Some((src_ino, offset)) = src_par_ino.find(src_name){
-                    let mut fs = self.fs.lock();
+        if let Some((src_par_ino, _)) = self.nlock_find_path(src_path, &mut fs){
+            if let Some(( dst_par_ino, _)) = dst_inode.nlock_find_path(dst_path.clone(), &mut fs){
+                if let Some((src_ino, offset)) = src_par_ino.nlock_find(src_name, &mut fs){
                     let src_id = src_ino.get_id();
                     let type_ = src_ino.get_type();
                     if  type_ == DiskInodeType::Directory
@@ -491,8 +497,9 @@ impl Inode {
         })
     }
 
-    pub fn create(&self, name: &str , type_: DiskInodeType) -> Option<Arc<Inode>> {
-        let mut fs = self.fs.lock();
+    fn nlock_create(&self, name: &str, type_: DiskInodeType,
+        fs: &mut MutexGuard<EasyFileSystem>
+    )->Option<Arc<Inode>>{
         if self.modify_disk_inode(|curr_inode| {
             // assert it is a directory
             assert!(curr_inode.is_dir());
@@ -529,7 +536,7 @@ impl Inode {
                 };
                 // increase_size自身不会获取锁，因此不会死锁
                 //println!("0.0.0");
-                new_inode.increase_size(new_size as u32, new_dskinode, &mut fs);
+                new_inode.increase_size(new_size as u32, new_dskinode, fs);
                 let dirent_self = DirEntry::new(".", DiskInodeType::Directory,new_inode_id);
                 let dirent_parent = DirEntry::new("..", DiskInodeType::Directory,self.get_id());
                 //println!("0.0.1");
@@ -553,7 +560,7 @@ impl Inode {
             let file_count = (curr_inode.size as usize) / DIRENT_SZ;
             let new_size = (file_count + 1) * DIRENT_SZ;
             // increase size
-            self.increase_size(new_size as u32, curr_inode, &mut fs);
+            self.increase_size(new_size as u32, curr_inode, fs);
             // write dirent
             let dirent = DirEntry::new(name, type_,new_inode_id);
             curr_inode.write_at(
@@ -563,14 +570,17 @@ impl Inode {
             );
         });
 
-        // release efs lock manually because we will acquire it again in Inode::new
-        drop(fs);
-        // return inode
-        Some(Arc::new(Self::new(
+        Some(Arc::new(self.nlock_new(
+            fs,
             new_inode_id,
             self.fs.clone(),
             self.block_device.clone(),
         )))
+    }
+
+    pub fn create(&self, name: &str , type_: DiskInodeType) -> Option<Arc<Inode>> {
+        let mut fs = self.fs.lock();
+        self.nlock_create(name, type_, &mut fs)
     }
 
     pub fn ls(&self) -> Vec<(String, DiskInodeType)> {
@@ -603,11 +613,25 @@ impl Inode {
         })
     }
 
+    fn nlock_read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
+        self.read_disk_inode(|disk_inode| {
+            disk_inode.read_at(offset, buf, &self.block_device)
+        })
+    }
+
     pub fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
         let mut fs = self.fs.lock();
         self.modify_disk_inode(|disk_inode| {
             //println!("buflen = {}",buf.len());
             self.increase_size((offset + buf.len()) as u32, disk_inode, &mut fs);
+            disk_inode.write_at(offset, buf, &self.block_device)
+        })
+    }
+
+    fn nlock_write_at(&self, offset: usize, buf: &[u8], fs:&mut MutexGuard<EasyFileSystem>) -> usize {
+        self.modify_disk_inode(|disk_inode| {
+            //println!("buflen = {}",buf.len());
+            self.increase_size((offset + buf.len()) as u32, disk_inode, fs);
             disk_inode.write_at(offset, buf, &self.block_device)
         })
     }

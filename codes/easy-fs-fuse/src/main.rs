@@ -226,7 +226,7 @@ fn efs_test() -> std::io::Result<()> {
     println!("before create /dira/dir1");
     println!("freeblk = {}", efs.lock().free_blocks());
     println!("freeinode = {}", efs.lock().free_inodes());
-    println!("0: rw in /dir ... pass");  
+    println!("0: rw in /dir ... {}",color_text!("pass",92));  
     
     println!("\n-----------------------------------------");  
     println!("1: rwd in multi-dir ... start");
@@ -251,7 +251,7 @@ fn efs_test() -> std::io::Result<()> {
     println!("freeblk = {}", efs.lock().free_blocks());
     println!("freeinode = {}", efs.lock().free_inodes());
     //simple_rwtest(dira_dir1_file0, "/dira/dir1/file0");
-    println!("1: rwd in multi-dir ... pass\n");
+    println!("1: rwd in multi-dir ... {}\n",color_text!("pass",92));
     
     // 3.1 目录切换测试: cd ./..
     // 3.2 目录切换测试: 绝对路径
@@ -300,11 +300,41 @@ fn efs_test() -> std::io::Result<()> {
         greet_str,
         core::str::from_utf8(&buffer[..len]).unwrap(),
     );
-    println!("3: move test ... pass\n");
+    println!("3: move test ... {}\n",color_text!("pass",92));
 
     // 5 复制
+    println!("\n-----------------------------------------");  
+    println!("4: copy test ... start");
     // 5.1 文件复制
+    println!("4.1 copy file");
+    // 打印块分配情况
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    // 复制
+    root_inode.fcopy(vec!["filec"], 0, vec!["dirm"]);
+    // 打印块分配情况
+    println!("freeblk = {}", efs.lock().free_blocks());
+    println!("freeinode = {}", efs.lock().free_inodes());
+    // 检查复制后的原文件，打印所在目录
+    list_apps(root_inode.clone(), "root");
+    let (filec,_) = root_inode.find_path(vec!["filec"]).unwrap();
+    let len = filec.read_at(0, &mut buffer);
+    assert_eq!(
+        greet_str,
+        core::str::from_utf8(&buffer[..len]).unwrap(),
+    );
+    // 检查复制后的新文件，打印所在目录
+    list_apps(dirm.clone(), "dirm");
+    let (filec,_) = root_inode.find_path(vec!["dirm","filec"]).unwrap();
+    let len = filec.read_at(0, &mut buffer);
+    assert_eq!(
+        greet_str,
+        core::str::from_utf8(&buffer[..len]).unwrap(),
+    );
+
     // 5.2 目录复制
+    println!("4: copy test ... {}\n",color_text!("to be continue",33));
+    //println!("4: move test ... {}\n",color_text!("pass",92));
 
     // 6 鲁棒性测试
     println!("\n-----------------------------------------");  
@@ -368,6 +398,6 @@ fn efs_test() -> std::io::Result<()> {
     random_str_test(400 * BLOCK_SZ);
     random_str_test(1000 * BLOCK_SZ);
     random_str_test(2000 * BLOCK_SZ);
-    println!("random str rw test ... pass");
+    println!("random str rw test ... {}",color_text!("pass",92));
     Ok(())
 }
