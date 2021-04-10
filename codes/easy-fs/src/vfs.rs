@@ -240,13 +240,15 @@ impl Inode {
     fn remove_dir(&self)->bool{
         // 递归删除当前Inode对应的目录
         // DEBUG
-        self.read_disk_inode(|disk_inode| {
-            assert!(disk_inode.is_dir());
+        // 获取目录下的所有inode_id
+        
+        // locked
+        let vec_inoid:Vec<u32> = self.read_disk_inode(|disk_inode: &DiskInode|{
+            let mut v:Vec<u32> = Vec::new();
             let file_count = (disk_inode.size as usize) / DIRENT_SZ;
             let mut dirent = DirEntry::empty();
-            println!("  rmdir: filecount = {}",file_count);
-            // 删除目录下的每一项
-            for i in 0..file_count {
+            for i in 2..file_count {
+                // 需要跳过./..
                 assert_eq!(
                     disk_inode.read_at(
                         DIRENT_SZ * i,
@@ -255,38 +257,43 @@ impl Inode {
                     ),
                     DIRENT_SZ,
                 );
-                let temp_inode = Inode::new(
-                    dirent.inode_number(),
-                    self.fs.clone(), 
-                    self.block_device.clone()
-                );
-                // 是的，死锁了
-                let type_:DiskInodeType = temp_inode.get_type();
-                let result:bool;
-                // 根据类别删除
-                if type_ == DiskInodeType::File{
-                    println!("  rmdir:type file");
-                    // 是的，死锁了
-                    result = temp_inode.remove_file();
-                } else if type_ == DiskInodeType::Directory {
-                    println!("  rmdir:type dir");
-                    // 是的，死锁了
-                    result = temp_inode.remove_dir();
-                } else {
-                    return false;
-                }
-                if result == false{
-                    return false;
-                }
+                v.push(dirent.inode_number());
             }
-            // 清除所有目录项
-            self.clear();
-            // 释放inode
-            let mut fs = self.fs.lock();
-            println!("  rmdir:finish rm");
-            fs.dealloc_inode(self.inode_id);
-            true
-        })
+            v
+        });
+        // release
+        // println!("rm: vec_inode = {:?}",vec_inoid);
+        for inode_id in vec_inoid {
+            let temp_inode = Inode::new(
+                inode_id,
+                self.fs.clone(), 
+                self.block_device.clone()
+            );
+            // locked
+            let type_:DiskInodeType = temp_inode.get_type();
+            // release
+            let result:bool;
+            // 根据类别递归删除
+            if type_ == DiskInodeType::File{
+                //println!("  rmdir:type file");
+                result = temp_inode.remove_file();
+            } else if type_ == DiskInodeType::Directory {
+                //println!("  rmdir:type dir");
+                result = temp_inode.remove_dir();
+            } else {
+                return false;
+            }
+            if result == false{
+                return false;
+            }
+        }
+        // 清除所有目录项
+        self.clear();
+        // 释放inode
+        let mut fs = self.fs.lock();
+        println!("  rmdir:finish rm");
+        fs.dealloc_inode(self.inode_id);
+        true
     }
 
     pub fn remove(&self, mut path: Vec<&str>, type_: DiskInodeType)->bool{
