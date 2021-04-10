@@ -178,7 +178,6 @@ impl Inode {
     // DEBUG
     pub fn fmove(&self, mut src_path: Vec<&str>, dst_ino_id: u32,mut dst_path: Vec<&str>)->bool{
         // 直接修改目录项
-        // TODO: 移动但不重命名
         let src_name = src_path.pop().unwrap();
         let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
         let mut dst_name:&str = src_name;
@@ -191,7 +190,12 @@ impl Inode {
         }else{
             dst_name = dst_path.pop().unwrap();
         }
-        
+        if self.find_path(dst_path.clone()).is_some(){
+            // DEBUG: 上级目录不能复制到子目录
+            // 如果dstpath = ""，那么直接返回self
+            // 只要保证就src_inode(self)和dst_inode不是同一个就没问题
+            return false;
+        }
         if let Some((src_par_ino, _)) = self.find_path(src_path){
             if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path){
                 if let Some((src_ino, offset)) = src_par_ino.find(src_name){
