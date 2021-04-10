@@ -280,7 +280,8 @@ fn efs_test() -> std::io::Result<()> {
     assert_eq!(dir1.fmove(vec!["dirm"], 0, vec![""]),true,"move failed");
     let (dirm,_) = root_inode.find_path(vec!["dirm"]).unwrap();
     list_apps(dir1.clone(), "/dir1");
-    list_apps(dirm.clone(), "/dir1/dirm");
+    list_apps(root_inode.clone(), "root");
+    list_apps(dirm.clone(), "/dirm");
     let (filec,_) = root_inode.find_path(vec!["dirm","filec"]).unwrap();
     let len = filec.read_at(0, &mut buffer);
     assert_eq!(
