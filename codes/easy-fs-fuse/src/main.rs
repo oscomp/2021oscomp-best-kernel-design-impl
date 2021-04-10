@@ -251,13 +251,71 @@ fn efs_test() -> std::io::Result<()> {
     println!("freeinode = {}", efs.lock().free_inodes());
     simple_rwtest(dira_dir1_file0, "/dira/dir1/file0");
     println!("1: rwd in multi-dir ... pass\n");
+    
     // 3.1 目录切换测试: cd ./..
     // 3.2 目录切换测试: 绝对路径
     // 3.3 目录切换测试: 相对路径
+    // (需要通过内核测试)
 
-    // 4 鲁棒性测试
-    // 4.1 尝试操作不存在的文件/目录
-    // 4.2 大小超出限制
+    // 4 移动
+    println!("\n-----------------------------------------");  
+    println!("3: move test ... start");
+    // 4.1 目录移动: 将/dira移动至/dir1/dirm(rename)
+    let dir1 = root_inode.create("dir1",DiskInodeType::Directory).unwrap();
+    list_apps(dira_inode.clone(), "/dira");
+    assert_eq!(root_inode.fmove(vec!["dira"], 0, vec!["dir1","dirm"]),true,"move failed");
+    println!("3.1: move /dira to /dir1/dirm (rename)");
+    list_apps(dir1.clone(), "/dir1");
+    let (dirm,_) = dir1.find_path(vec!["dirm"]).unwrap();
+    list_apps(dirm.clone(), "/dir1/dirm");
+    list_apps(root_inode.clone(), "root");
+    let (filec,_) = root_inode.find_path(vec!["dir1","dirm","filec"]).unwrap();
+    let len = filec.read_at(0, &mut buffer);
+    assert_eq!(
+        greet_str,
+        core::str::from_utf8(&buffer[..len]).unwrap(),
+    );
+    // 4.2 目录移动：将/dir1/dirm移动至/(不重命名)
+    println!("3.2: move /dir1/dirm to / (without rename)");
+    assert_eq!(dir1.fmove(vec!["dirm"], 0, vec![""]),true,"move failed");
+    let (dirm,_) = root_inode.find_path(vec!["dirm"]).unwrap();
+    list_apps(dir1.clone(), "/dir1");
+    list_apps(dirm.clone(), "/dir1/dirm");
+    let (filec,_) = root_inode.find_path(vec!["dirm","filec"]).unwrap();
+    let len = filec.read_at(0, &mut buffer);
+    assert_eq!(
+        greet_str,
+        core::str::from_utf8(&buffer[..len]).unwrap(),
+    );
+    // 4.3 文件移动: 将filec移动至/
+    println!("3.3: move /dirm/filec to /");
+    assert_eq!(dirm.fmove(vec!["filec"], 0, vec![""]),true,"move failed");
+    list_apps(dirm.clone(), "dirm");
+    list_apps(root_inode.clone(), "root");
+    let (filec,_) = root_inode.find_path(vec!["filec"]).unwrap();
+    let len = filec.read_at(0, &mut buffer);
+    assert_eq!(
+        greet_str,
+        core::str::from_utf8(&buffer[..len]).unwrap(),
+    );
+    println!("3: move test ... pass\n");
+
+    // 5 复制
+    // 5.1 文件复制
+    // 5.2 目录复制
+
+    // 6 鲁棒性测试
+    // 6.1 尝试操作不存在的文件/目录
+    if dira_inode.find_path(vec!["dir1"]).is_some() {
+        panic!("find unexist dir!");
+    }
+    
+    if root_inode.find_path(vec!["filea"]).is_some(){
+        panic!("find unexist file!");
+    }
+    // 6.2上级目录复制到子目录
+
+    // 6.3 大小超出限制
 
 
     // 文件数据块分配回收测试(superblock/inode的size是否及时增减)

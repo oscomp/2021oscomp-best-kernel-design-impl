@@ -236,6 +236,22 @@ pub fn read_dir(inode_id: u32) -> Option<Arc<OSDirEntry>> {
     // 从目录中读取下一个目录项
 }*/
 
+// 复制文件/目录
+pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
+    let mut spathv:Vec<&str> = src_path.split('/').collect();
+    let mut dpathv:Vec<&str> = dst_path.split('/').collect();
+    let src_ino = EasyFileSystem::get_inode(ROOT_INODE.get_fs(), src_inode_id);
+    src_ino.fcopy(spathv, dst_inode_id,dpathv)
+}
+
+// 移动文件/目录
+pub fn fmove(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool(){
+    let mut spathv:Vec<&str> = src_path.split('/').collect();
+    let mut dpathv:Vec<&str> = dst_path.split('/').collect();
+    let src_ino = EasyFileSystem::get_inode(ROOT_INODE.get_fs(), src_inode_id);
+    src_ino.fmove(spathv, dst_inode_id,dpathv)
+    
+}
 
 pub fn remove(inode_id: u32, path: &str, type_: DiskInodeType)->bool{
     // type_确认要删除的文件类型，如果是目录，递归删除

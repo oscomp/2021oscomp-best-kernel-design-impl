@@ -137,13 +137,14 @@ impl Inode {
 
     // TODO:暂时只能复制文件，不具备递归复制目录的功能DEBUG
     // DEBUG
-    pub fn fcopy(&self, mut src_path: Vec<&str>, mut dst_path: Vec<&str>)->bool{
+    pub fn fcopy(&self, src_path: Vec<&str>, dst_ino_id: u32,mut dst_path: Vec<&str>)->bool{
         // 每次读一个块(512B)，写一个块
         let dst_name = dst_path.pop().unwrap();
+        let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
         if let Some((src_ino, _)) = self.find_path(src_path){
             let type_ = src_ino.get_type();
             assert_eq!(type_, DiskInodeType::File, "sorry, cannot copy dir!");
-            if let Some(( dst_par_ino, _)) = self.find_path(dst_path){
+            if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path){
                 if let Some(dst_ino) =  dst_par_ino.create(dst_name, type_){
                     // 此处用循环边读边写。
                     let mut buffer = [0u8; 512];
@@ -174,12 +175,23 @@ impl Inode {
     }
 
     // DEBUG
-    pub fn fmove(&self, mut src_path: Vec<&str>, mut dst_path: Vec<&str>)->bool{
+    pub fn fmove(&self, mut src_path: Vec<&str>, dst_ino_id: u32,mut dst_path: Vec<&str>)->bool{
         // 直接修改目录项
+        // TODO: 移动但不重命名
         let src_name = src_path.pop().unwrap();
-        let dst_name = dst_path.pop().unwrap();
+        let dst_inode = EasyFileSystem::get_inode(&self.fs, dst_ino_id);
+        let mut dst_name:&str = src_name;
+        // 首先看dst_name是否存在
+        if let Some((inode,_))  = dst_inode.find_path(dst_path.clone()){
+            // 存在，则看是否是目录
+            if inode.get_type() == DiskInodeType::File{
+                return false;
+            }
+        }else{
+            dst_name = dst_path.pop().unwrap();
+        }
         if let Some((src_par_ino, _)) = self.find_path(src_path){
-            if let Some(( dst_par_ino, _)) = self.find_path(dst_path){
+            if let Some(( dst_par_ino, _)) = dst_inode.find_path(dst_path){
                 if let Some((src_ino, offset)) = src_par_ino.find(src_name){
                     let mut fs = self.fs.lock();
                     let src_id = src_ino.get_id();
@@ -187,6 +199,11 @@ impl Inode {
                     src_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
                         let file_count = (disk_inode.size as usize) / DIRENT_SZ;
                         let new_size = (file_count - 1) * DIRENT_SZ;
+                        let de_offset = offset as usize * DIRENT_SZ ;
+                        if new_size == de_offset {
+                            src_par_ino.decrease_size(new_size as u32, disk_inode, &mut fs);
+                            return;
+                        }
                         // 移动目录项
                         let mut dirent = DirEntry::empty();
                         // 读出最后一个目录项
@@ -197,11 +214,11 @@ impl Inode {
                         );
                         // 写入被删除的位置
                         disk_inode.write_at(
-                            offset as usize,
+                            de_offset as usize,
                             dirent.as_bytes(),
                             &self.block_device,
                         );
-                        dst_par_ino.decrease_size(new_size as u32, disk_inode, &mut fs);
+                        src_par_ino.decrease_size(new_size as u32, disk_inode, &mut fs);
                     });
                     // 在dst新建目录项，并与源inode_id绑定
                     dst_par_ino.modify_disk_inode( |disk_inode: &mut DiskInode|{
