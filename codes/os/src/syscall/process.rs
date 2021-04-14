@@ -13,6 +13,7 @@ use crate::mm::{
 };
 use crate::fs::{
     open,
+    find_par_inode_id,
     OpenFlags,
 };
 use alloc::sync::Arc;
@@ -66,10 +67,11 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         unsafe { args = args.add(1); }
     }
     if let Some(app_inode) = open(0,path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
+        let par_inode_id:u32 = find_par_inode_id(path.as_str());
         let all_data = app_inode.read_all();
         let task = current_task().unwrap();
         let argc = args_vec.len();
-        task.exec(all_data.as_slice(), args_vec);
+        task.exec(all_data.as_slice(), args_vec, par_inode_id);
         // return argc because cx.x[10] will be covered with it later
         argc as isize
     } else {

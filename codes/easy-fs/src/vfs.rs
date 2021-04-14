@@ -226,7 +226,7 @@ impl Inode {
                         let wlen = dst_ino.nlock_write_at(offset, &buffer[0..rlen], &mut fs);
                         if wlen != rlen {
                             // 写入失败，直接删
-                            println!("write fail, wlen = {}, rlen = {}", wlen, rlen);
+                            //println!("write fail, wlen = {}, rlen = {}", wlen, rlen);
                             drop(fs);
                             dst_par_ino.remove(vec![dst_name], type_);
                             return false;
@@ -402,7 +402,7 @@ impl Inode {
         if let Some((par_inode, _)) = self.nlock_find_path(path, &mut fs){
             // 搜索目标文件/目录
             if let Some((tar_inode,offset)) = par_inode.nlock_find(name, &mut fs){        
-                println!("  rm: name = {},offset = {}", name, offset);
+                //println!("  rm: name = {},offset = {}", name, offset);
                 if type_ == DiskInodeType::File{
                     result = tar_inode.remove_file(&mut fs);
                 } else if type_ == DiskInodeType::Directory{
@@ -443,11 +443,11 @@ impl Inode {
                 });
                 return result;
             } else{
-                println!("remove: 未找到目标");
+                //println!("remove: 未找到目标");
                 return false;
             }
         }else{
-            println!("remove: 未找到上级目录");
+            //println!("remove: 未找到上级目录");
             false
         }
     }

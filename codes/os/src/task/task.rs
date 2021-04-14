@@ -34,6 +34,7 @@ pub struct TaskControlBlockInner {
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub current_inode: u32,
 }
 
 impl TaskControlBlockInner {
@@ -107,6 +108,7 @@ impl TaskControlBlock {
                     // 2 -> stderr
                     Some(Arc::new(Stdout)),
                 ],
+                current_inode: 0, // 只有initproc在此建立，其他进程均为fork出
             }),
         };
         // prepare TrapContext in user space
@@ -120,7 +122,7 @@ impl TaskControlBlock {
         );
         task_control_block
     }
-    pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
+    pub fn exec(&self, elf_data: &[u8], args: Vec<String>, par_inode_id: u32) {
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, mut user_sp, entry_point) = MemorySet::from_elf(elf_data);
         let trap_cx_ppn = memory_set
@@ -163,6 +165,7 @@ impl TaskControlBlock {
         // **** hold current PCB lock
         let mut inner = self.acquire_inner_lock();
         // substitute memory_set
+        inner.current_inode = par_inode_id;
         inner.memory_set = memory_set;
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
@@ -218,6 +221,7 @@ impl TaskControlBlock {
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table: new_fd_table,
+                current_inode: parent_inner.current_inode,
             }),
         });
         // add child

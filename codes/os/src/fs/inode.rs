@@ -158,6 +158,14 @@ impl OpenFlags {
     }
 }
 
+pub fn find_par_inode_id(path: &str) -> u32{
+    let mut pathv:Vec<&str> = path.split('/').collect();
+    pathv.pop();
+    let (inode,_) = ROOT_INODE.find_path(pathv).unwrap();
+    inode.get_id()
+}
+
+
 pub fn open(inode_id: u32, path: &str, flags: OpenFlags, type_: DiskInodeType) -> Option<Arc<OSInode>> {
     // DEBUG: 相对路径
     let cur_inode = {
@@ -240,17 +248,16 @@ pub fn read_dir(inode_id: u32) -> Option<Arc<OSDirEntry>> {
 pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
     let mut spathv:Vec<&str> = src_path.split('/').collect();
     let mut dpathv:Vec<&str> = dst_path.split('/').collect();
-    let src_ino = EasyFileSystem::get_inode(ROOT_INODE.get_fs(), src_inode_id);
+    let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
     src_ino.fcopy(spathv, dst_inode_id,dpathv)
 }
 
 // 移动文件/目录
-pub fn fmove(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool(){
+pub fn fmove(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
     let mut spathv:Vec<&str> = src_path.split('/').collect();
     let mut dpathv:Vec<&str> = dst_path.split('/').collect();
-    let src_ino = EasyFileSystem::get_inode(ROOT_INODE.get_fs(), src_inode_id);
+    let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
     src_ino.fmove(spathv, dst_inode_id,dpathv)
-    
 }
 
 pub fn remove(inode_id: u32, path: &str, type_: DiskInodeType)->bool{

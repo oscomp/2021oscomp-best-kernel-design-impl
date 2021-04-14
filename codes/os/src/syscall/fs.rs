@@ -5,7 +5,7 @@ use crate::mm::{
     translated_str,
 };
 use crate::task::{current_user_token, current_task};
-use crate::fs::{make_pipe, OpenFlags, open};
+use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files};
 use alloc::sync::Arc;
 use alloc::vec;
 use easy_fs::DiskInodeType;
@@ -113,4 +113,27 @@ pub fn sys_dup(fd: usize) -> isize {
     let new_fd = inner.alloc_fd();
     inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
     new_fd as isize
+}
+
+pub fn sys_chdir(path: *const u8) -> isize{
+    let task = current_task().unwrap();
+    let mut inner = task.acquire_inner_lock();
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    let new_ino_id = ch_dir(inner.current_inode, path.as_str()) as isize;
+    if new_ino_id >= 0 {
+        inner.current_inode = new_ino_id as u32;
+        new_ino_id
+    }else{
+        new_ino_id
+    }
+}
+
+pub fn sys_ls(path: *const u8) -> isize{
+    let task = current_task().unwrap();
+    let mut inner = task.acquire_inner_lock();
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    list_files(inner.current_inode);
+    0
 }
