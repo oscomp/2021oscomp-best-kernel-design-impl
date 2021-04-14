@@ -70,31 +70,31 @@ impl OSInode {
         v
     }
 
-    pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
-        let inner = self.inner.lock();
-        if whence == SeekWhence::SEEK_END {
-            if inner.offset as isize - offset < 0 {
-                return -1;
-            }
-        } else {
-            if offset < 0{
-                return -1;
-            }
-        }
-        match whence{
-            SeekWhence::SEEK_CUR=>{
-                inner.offset += offset as usize;
-            }   
-            SeekWhence::SEEK_END=>{
-                let size = inner.inode.get_size();
-                inner.offset = (size as isize + offset - 1) as usize;
-            }
-            SeekWhence::SEEK_SET=>{
-                inner.offset = offset as usize;
-            }
-        }
-        inner.offset as isize
-    }
+    // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
+    //     let inner = self.inner.lock();
+    //     if whence == SeekWhence::SEEK_END {
+    //         if inner.offset as isize - offset < 0 {
+    //             return -1;
+    //         }
+    //     } else {
+    //         if offset < 0{
+    //             return -1;
+    //         }
+    //     }
+    //     match whence{
+    //         SeekWhence::SEEK_CUR=>{
+    //             inner.offset += offset as usize;
+    //         }   
+    //         SeekWhence::SEEK_END=>{
+    //             let size = inner.inode.get_size();
+    //             inner.offset = (size as isize + offset - 1) as usize;
+    //         }
+    //         SeekWhence::SEEK_SET=>{
+    //             inner.offset = offset as usize;
+    //         }
+    //     }
+    //     inner.offset as isize
+    // }
 }
 
 lazy_static! {
