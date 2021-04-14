@@ -80,7 +80,7 @@ impl MemorySet {
     }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
-        println!("*** trampoline = {:X}",TRAMPOLINE);
+        //println!("*** trampoline = {:X}",TRAMPOLINE);
         self.page_table.map(
             VirtAddr::from(TRAMPOLINE).into(),
             PhysAddr::from(strampoline as usize).into(),

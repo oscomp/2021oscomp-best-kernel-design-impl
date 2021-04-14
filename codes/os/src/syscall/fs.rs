@@ -116,9 +116,9 @@ pub fn sys_dup(fd: usize) -> isize {
 }
 
 pub fn sys_chdir(path: *const u8) -> isize{
+    let token = current_user_token();
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
-    let token = current_user_token();
     let path = translated_str(token, path);
     let new_ino_id = ch_dir(inner.current_inode, path.as_str()) as isize;
     if new_ino_id >= 0 {
@@ -130,9 +130,9 @@ pub fn sys_chdir(path: *const u8) -> isize{
 }
 
 pub fn sys_ls(path: *const u8) -> isize{
+    let token = current_user_token();
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
-    let token = current_user_token();
     let path = translated_str(token, path);
     list_files(inner.current_inode);
     0

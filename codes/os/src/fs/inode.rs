@@ -125,13 +125,18 @@ pub fn list_files(inode_id: u32){
     let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
     let file_vec = curr_inode.ls();
     for i in 0 .. file_vec.len() {
+        if i != 0 && i % 6 == 0{
+            println!("");
+        }
         if file_vec[i].1 == DiskInodeType::File{
-            print!("{} ", file_vec[i].0);
+            print!("{}  ", file_vec[i].0);
         } else {
             // TODO: 统一配色！
-            print!("{} ", color_text!(file_vec[i].0, 96));
+            print!("{}  ", color_text!(file_vec[i].0, 96));
         }
+        
     }
+    println!("");
 }
 
 bitflags! {
@@ -162,6 +167,7 @@ pub fn find_par_inode_id(path: &str) -> u32{
     let mut pathv:Vec<&str> = path.split('/').collect();
     pathv.pop();
     let (inode,_) = ROOT_INODE.find_path(pathv).unwrap();
+    //println!("find par ok");
     inode.get_id()
 }
 
