@@ -11,6 +11,11 @@ use user_lib::ls;
 
 #[no_mangle]
 pub fn main(argc: usize, argv: &[&str]) -> i32 {
-    ls(argv[0]);
+    if argv.is_empty(){
+        ls("l\0");
+    }
+    else{
+        ls(argv[0]);
+    }
     0
 }
