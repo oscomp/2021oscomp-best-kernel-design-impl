@@ -6,7 +6,7 @@ use super::{
 };
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use riscv::interrupt::free;
+//use riscv::interrupt::free;
 
 const EFS_MAGIC: u32 = 0x3b800001;
 const INODE_DIRECT_COUNT: usize = 28;

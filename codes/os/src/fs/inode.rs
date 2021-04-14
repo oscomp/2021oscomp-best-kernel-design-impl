@@ -2,7 +2,7 @@ use easy_fs::{
     EasyFileSystem,
     Inode,
     DiskInodeType,
-    NAME_LENGTH_LIMIT,
+    //NAME_LENGTH_LIMIT,
 };
 use crate::drivers::BLOCK_DEVICE;
 use crate::color_text;
@@ -17,9 +17,9 @@ use crate::mm::UserBuffer;
 
 #[derive(PartialEq,Copy,Clone)]
 pub enum SeekWhence{
-    SEEK_SET, // 将offset设为新的读写位置 
-    SEEK_CUR, // 将当前读写位置往后增加offset个偏移量
-    SEEK_END, // 将读写位置设为末尾，然后增加offset偏移量(此时offset可以<0)
+    SeekSet, // 将offset设为新的读写位置 
+    SeekCur, // 将当前读写位置往后增加offset个偏移量
+    SeekEnd, // 将读写位置设为末尾，然后增加offset偏移量(此时offset可以<0)
 }
 
 // 此inode实际被当作文件
@@ -252,16 +252,16 @@ pub fn read_dir(inode_id: u32) -> Option<Arc<OSDirEntry>> {
 
 // 复制文件/目录
 pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
-    let mut spathv:Vec<&str> = src_path.split('/').collect();
-    let mut dpathv:Vec<&str> = dst_path.split('/').collect();
+    let spathv:Vec<&str> = src_path.split('/').collect();
+    let dpathv:Vec<&str> = dst_path.split('/').collect();
     let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
     src_ino.fcopy(spathv, dst_inode_id,dpathv)
 }
 
 // 移动文件/目录
 pub fn fmove(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
-    let mut spathv:Vec<&str> = src_path.split('/').collect();
-    let mut dpathv:Vec<&str> = dst_path.split('/').collect();
+    let spathv:Vec<&str> = src_path.split('/').collect();
+    let dpathv:Vec<&str> = dst_path.split('/').collect();
     let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
     src_ino.fmove(spathv, dst_inode_id,dpathv)
 }

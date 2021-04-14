@@ -7,7 +7,7 @@ use crate::mm::{
 use crate::task::{current_user_token, current_task};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files};
 use alloc::sync::Arc;
-use alloc::vec;
+//use alloc::vec;
 use easy_fs::DiskInodeType;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
@@ -132,7 +132,7 @@ pub fn sys_chdir(path: *const u8) -> isize{
 pub fn sys_ls(path: *const u8) -> isize{
     let token = current_user_token();
     let task = current_task().unwrap();
-    let mut inner = task.acquire_inner_lock();
+    let inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     list_files(inner.current_inode);
     0
