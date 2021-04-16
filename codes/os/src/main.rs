@@ -36,10 +36,24 @@ fn clear_bss() {
     });
 }
 
+pub fn id() -> usize {
+    let cpu_id;
+    unsafe {
+        llvm_asm!("mv $0, tp" : "=r"(cpu_id));
+    }
+    cpu_id
+}
+
+
 #[no_mangle]
 pub fn rust_main() -> ! {
+    if id() == 1 {
+        println!("[core 2] Hello, world!");
+    }else{
+        println!("[kernel] Hello, world!");
+    }
+    loop{}
     clear_bss();
-    println!("[kernel] Hello, world!");
     mm::init();
     mm::remap_test();
     trap::init();
