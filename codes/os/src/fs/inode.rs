@@ -105,12 +105,12 @@ lazy_static! {
         Arc::new(EasyFileSystem::get_inode(&efs, 0))
     };
 }
-
+/* 
 lazy_static! {
     // 目录栈 
     pub static ref DIR_STACK: Vec<Arc<Inode>> = vec![ROOT_INODE.clone()];
 }
-
+*/
 pub fn list_apps() {
     println!("/**** APPS ****");
     for app in ROOT_INODE.ls() {

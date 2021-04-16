@@ -6,6 +6,11 @@
 #![feature(const_in_array_repeat_expressions)]
 #![feature(alloc_error_handler)]
 
+use lazy_static::lazy_static;
+use sbi::sbi_send_ipi;
+use spin::*;
+use alloc::sync::Arc;
+
 extern crate alloc;
 
 #[macro_use]
@@ -44,23 +49,49 @@ pub fn id() -> usize {
     cpu_id
 }
 
+struct Core2flag{
+    is_in: bool,
+}
+
+impl Core2flag{
+    pub fn is_in(&self)->bool{
+        self.is_in
+    }
+    pub fn set_in(&mut self){
+        self.is_in = true;
+    }
+}
+
+
+lazy_static! {
+    static ref CORE2_FLAG: Arc<Mutex<Core2flag>> = Arc::new(Mutex::new(
+        Core2flag{
+            is_in:false,
+        }
+    ));
+}
 
 #[no_mangle]
 pub fn rust_main() -> ! {
     if id() == 1 {
         println!("[core 2] Hello, world!");
+        //CORE2_FLAG.lock().set_in();
+        loop{}
     }else{
-        println!("[kernel] Hello, world!");
+        clear_bss();
+        mm::init();
+        mm::remap_test();
+        trap::init();
+        trap::enable_timer_interrupt();
+        timer::set_next_trigger();
+        fs::list_apps();
+        task::add_initproc();
+        let mask:usize = 1 << 1;
+        unsafe {
+            sbi_send_ipi(&mask as *const usize as usize);
+        }
+        loop{}
+        task::run_tasks();
+        panic!("Unreachable in rust_main!");
     }
-    loop{}
-    clear_bss();
-    mm::init();
-    mm::remap_test();
-    trap::init();
-    trap::enable_timer_interrupt();
-    timer::set_next_trigger();
-    fs::list_apps();
-    task::add_initproc();
-    task::run_tasks();
-    panic!("Unreachable in rust_main!");
 }
