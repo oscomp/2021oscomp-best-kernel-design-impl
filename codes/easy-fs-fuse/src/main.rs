@@ -80,6 +80,11 @@ fn easy_fs_pack() -> std::io::Result<()> {
     );
     let root_inode = Arc::new(EasyFileSystem::get_inode(&efs,0));
     
+    let dir0 = root_inode.create("dir0", DiskInodeType::Directory).unwrap();
+    let file0 = dir0.create("file0", DiskInodeType::File).unwrap();     
+    let test_str = "hello world!";
+    file0.write_at(0, test_str.as_bytes());
+
     // 从host获取应用名
     let apps: Vec<_> = read_dir(src_path)
         .unwrap()

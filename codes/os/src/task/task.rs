@@ -209,7 +209,7 @@ impl TaskControlBlock {
                 new_fd_table.push(None);
             }
         }
-        println!("fork: parent_inner.current_inode = {}",parent_inner.current_inode);
+        //println!("fork: parent_inner.current_inode = {}",parent_inner.current_inode);
         let task_control_block = Arc::new(TaskControlBlock {
             pid: pid_handle,
             kernel_stack,

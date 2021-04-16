@@ -120,8 +120,13 @@ pub fn sys_chdir(path: *const u8) -> isize{
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
-    let new_ino_id = ch_dir(inner.current_inode, path.as_str()) as isize;
-    println!("new inode id = {}", new_ino_id);
+    let mut curr_inode_id = inner.current_inode;
+    if path.chars().nth(0).unwrap() == '/' {
+        curr_inode_id = 0;
+    }
+    //println!("curr inode id = {}", curr_inode_id);
+    let new_ino_id = ch_dir(curr_inode_id, path.as_str()) as isize;
+    //println!("new inode id = {}", new_ino_id);
     if new_ino_id >= 0 {
         inner.current_inode = new_ino_id as u32;
         new_ino_id
