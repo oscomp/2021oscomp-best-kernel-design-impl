@@ -165,7 +165,8 @@ impl TaskControlBlock {
         // **** hold current PCB lock
         let mut inner = self.acquire_inner_lock();
         // substitute memory_set
-        inner.current_inode = par_inode_id;
+        // QUES
+        //inner.current_inode = par_inode_id;
         inner.memory_set = memory_set;
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
@@ -208,6 +209,7 @@ impl TaskControlBlock {
                 new_fd_table.push(None);
             }
         }
+        println!("fork: parent_inner.current_inode = {}",parent_inner.current_inode);
         let task_control_block = Arc::new(TaskControlBlock {
             pid: pid_handle,
             kernel_stack,

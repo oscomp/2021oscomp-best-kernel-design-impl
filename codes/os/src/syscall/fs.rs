@@ -121,6 +121,7 @@ pub fn sys_chdir(path: *const u8) -> isize{
     let mut inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     let new_ino_id = ch_dir(inner.current_inode, path.as_str()) as isize;
+    println!("new inode id = {}", new_ino_id);
     if new_ino_id >= 0 {
         inner.current_inode = new_ino_id as u32;
         new_ino_id
@@ -135,5 +136,6 @@ pub fn sys_ls(path: *const u8) -> isize{
     let inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     list_files(inner.current_inode);
+    //list_files(inner.current_inode);
     0
 }
