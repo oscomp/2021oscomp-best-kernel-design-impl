@@ -86,6 +86,9 @@ pub fn rust_main() -> ! {
     let core = id();
     if core != 0 {
         mm::init_othercore();
+        trap::init();
+        trap::enable_timer_interrupt();
+        timer::set_next_trigger();
         task::run_tasks();
     }
     clear_bss();

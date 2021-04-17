@@ -2,16 +2,25 @@ use super::File;
 use crate::mm::{UserBuffer};
 use crate::sbi::console_getchar;
 use crate::task::suspend_current_and_run_next;
+use lazy_static::*;
+use spin::Mutex;
+use crate::task::get_core_id;
 
 pub struct Stdin;
 
 pub struct Stdout;
+
+lazy_static!{
+    pub static ref STDOUTLOCK:Mutex<usize> = Mutex::new(0);
+    pub static ref STDINLOCK:Mutex<usize> = Mutex::new(0);
+}
 
 impl File for Stdin {
     fn readable(&self) -> bool { true }
     fn writable(&self) -> bool { false }
     fn read(&self, mut user_buf: UserBuffer) -> usize {
         assert_eq!(user_buf.len(), 1);
+        let lock = STDINLOCK.lock();
         // busy loop
         let mut c: usize;
         loop {
@@ -39,9 +48,17 @@ impl File for Stdout {
         panic!("Cannot read from stdout!");
     }
     fn write(&self, user_buf: UserBuffer) -> usize {
+        let lock = STDOUTLOCK.lock();
+        // print!("!LOCK!");
+        // unsafe {
+        //     let addr = &STDOUTLOCK as *const STDOUTLOCK as usize;
+        //     println!("STDOUTLOCK.as_ptr():{}, coreid={}",addr,get_core_id());
+
+        // }
         for buffer in user_buf.buffers.iter() {
             print!("{}", core::str::from_utf8(*buffer).unwrap());
         }
+        // println!("!RELEASE!");
         user_buf.len()
     }
 }

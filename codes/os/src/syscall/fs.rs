@@ -11,6 +11,7 @@ use alloc::sync::Arc;
 use easy_fs::DiskInodeType;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+    // print!("!sys_write!");
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();

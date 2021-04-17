@@ -16,6 +16,11 @@ const BS: u8 = 0x08u8;
 const CSI:u8 = 0x1bu8;
 const DEL:u8 = 0x7eu8;
 
+macro_rules! color_text {
+    ($text:expr, $color:expr) => {{
+        format_args!("\x1b[{}m{}\x1b[0m", $color, $text)
+    }};
+}
 
 macro_rules! cursor_move_left {
     ($x:literal ) => {
@@ -205,7 +210,7 @@ pub struct ArgMachine{
 impl ArgMachine{
 
     fn print_root(&mut self){
-        print!("root@UltraOS: /");
+        print!("{}@UltraOS: /",color_text!("root",32));
         self.path.iter().for_each(|string|
             print!("{}/", string)
         );
