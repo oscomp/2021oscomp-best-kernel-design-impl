@@ -3,6 +3,7 @@ use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use spin::Mutex;
 use lazy_static::*;
+use super::processor::*;
 
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
@@ -30,5 +31,6 @@ pub fn add_task(task: Arc<TaskControlBlock>) {
 }
 
 pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
+    // println!("core{}:fetch task",get_core_id());
     TASK_MANAGER.lock().fetch()
 }

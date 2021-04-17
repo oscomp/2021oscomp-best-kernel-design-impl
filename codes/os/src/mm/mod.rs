@@ -26,3 +26,7 @@ pub fn init() {
     frame_allocator::init_frame_allocator();
     KERNEL_SPACE.lock().activate();
 }
+
+pub fn init_othercore(){
+    KERNEL_SPACE.lock().activate();
+}

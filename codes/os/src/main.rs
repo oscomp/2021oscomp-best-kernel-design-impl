@@ -73,25 +73,34 @@ lazy_static! {
 
 #[no_mangle]
 pub fn rust_main() -> ! {
-    if id() == 1 {
-        println!("[core 2] Hello, world!");
-        //CORE2_FLAG.lock().set_in();
-        loop{}
-    }else{
-        clear_bss();
-        mm::init();
-        mm::remap_test();
-        trap::init();
-        trap::enable_timer_interrupt();
-        timer::set_next_trigger();
-        fs::list_apps();
-        task::add_initproc();
-        let mask:usize = 1 << 1;
-        unsafe {
-            sbi_send_ipi(&mask as *const usize as usize);
-        }
-        loop{}
+    // let mut sp:usize;
+    // let mut tp:usize;
+    // unsafe {
+    //     llvm_asm!("mv $0, sp" : "=r"(sp));
+        // llvm_asm!("mv $0, tp" : "=r"(tp));
+    // }
+    // println!("sp:{:x}",sp);
+    // println!("tp:{:x}",tp);
+    
+        // println!("[core 2] Hello, world!");
+    let core = id();
+    if core != 0 {
+        mm::init_othercore();
         task::run_tasks();
-        panic!("Unreachable in rust_main!");
     }
+    clear_bss();
+    mm::init();
+    mm::remap_test();
+    trap::init();
+    trap::enable_timer_interrupt();
+    timer::set_next_trigger();
+    fs::list_apps();
+    task::add_initproc();
+    let mask:usize = 1 << 1;
+    unsafe {
+        sbi_send_ipi(&mask as *const usize as usize);
+    }
+    // CORE2_FLAG.lock().set_in();
+    task::run_tasks();
+    panic!("Unreachable in rust_main!");
 }

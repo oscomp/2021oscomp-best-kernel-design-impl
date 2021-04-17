@@ -18,6 +18,7 @@ use crate::task::{
     suspend_current_and_run_next,
     current_user_token,
     current_trap_cx,
+    get_core_id,
 };
 use crate::timer::set_next_trigger;
 use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
@@ -95,6 +96,7 @@ pub fn trap_handler() -> ! {
 #[no_mangle]
 pub fn trap_return() -> ! {
     set_user_trap_entry();
+    // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
     let user_satp = current_user_token();
     extern "C" {
