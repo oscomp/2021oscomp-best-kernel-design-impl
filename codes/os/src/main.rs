@@ -87,15 +87,16 @@ pub fn rust_main() -> ! {
     if core != 0 {
         mm::init_othercore();
         trap::init();
-        trap::enable_timer_interrupt();
+        // trap::enable_timer_interrupt();
         timer::set_next_trigger();
         task::run_tasks();
+        panic!("Unreachable in rust_main!");
     }
     clear_bss();
     mm::init();
     mm::remap_test();
     trap::init();
-    trap::enable_timer_interrupt();
+    // trap::enable_timer_interrupt();
     timer::set_next_trigger();
     fs::list_apps();
     task::add_initproc();

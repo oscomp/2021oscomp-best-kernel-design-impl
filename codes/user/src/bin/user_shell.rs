@@ -279,6 +279,9 @@ impl ArgMachine{
         }
         self.print_state();
         // \0 indicates the end of str while rust doesn't do so
+        if self.args.is_empty(){
+            return false;
+        }
         if self.args[0].clone().as_str() == "cd\0" {
             if self.argc != 2 {
                 println!("cd: Arg expression not right, should be: cd <addr>");

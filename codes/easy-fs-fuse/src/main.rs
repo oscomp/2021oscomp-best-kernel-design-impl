@@ -55,10 +55,17 @@ fn easy_fs_pack() -> std::io::Result<()> {
             .takes_value(true)
             .help("Executable target dir(with backslash)")    
         )
+        .arg(Arg::with_name("testsuites")
+            .short("test")
+            .long("testsuites")
+            .takes_value(true)
+            .help("Executable testsuites dir(with backslash)")    
+        )
         .get_matches();
     let src_path = matches.value_of("source").unwrap();
     let target_path = matches.value_of("target").unwrap();
-    println!("src_path = {}\ntarget_path = {}", src_path, target_path);
+    let test_path = matches.value_of("testsuites").unwrap();
+    println!("src_path = {}\ntarget_path = {}\n test_path = {}", src_path, target_path, test_path);
     
     // 创建fs.img
     let block_file = Arc::new(BlockFile(Mutex::new({
@@ -67,7 +74,7 @@ fn easy_fs_pack() -> std::io::Result<()> {
             .write(true)
             .create(true)
             .open(format!("{}{}", target_path, "fs.img"))?;
-        f.set_len(8192 * 512).unwrap();
+        f.set_len(16000 * 512).unwrap();
         f
     })));
     
@@ -75,7 +82,7 @@ fn easy_fs_pack() -> std::io::Result<()> {
     // 512*8 = 4095 * file_inode + 1 * root_inode
     let efs = EasyFileSystem::create(
         block_file.clone(),
-        8192,//只有4MB。。。
+        16000,//只有4MB。。。
         1,
     );
     let root_inode = Arc::new(EasyFileSystem::get_inode(&efs,0));
@@ -93,10 +100,12 @@ fn easy_fs_pack() -> std::io::Result<()> {
             let mut name_with_ext = dir_entry.unwrap().file_name().into_string().unwrap();
             // 丢弃后缀 从'.'到末尾(len-1)
             name_with_ext.drain(name_with_ext.find('.').unwrap()..name_with_ext.len());
+            // println!("dir_entry({})",name_with_ext);
             name_with_ext
         })
         .collect();
     for app in apps {
+        // println!("app({})",app);
         // load app data from host file system
         let mut host_file = File::open(format!("{}{}", target_path, app)).unwrap();
         let mut all_data: Vec<u8> = Vec::new();
@@ -111,6 +120,38 @@ fn easy_fs_pack() -> std::io::Result<()> {
     for app in root_inode.ls() {
         println!("{}", app.0);
     }
+
+    // 获取test suites 应用
+    let apps: Vec<_> = read_dir(test_path)
+        .unwrap()
+        .into_iter()
+        .map(|dir_entry| {
+            let name_with_ext = dir_entry.unwrap().file_name().into_string().unwrap();
+            // 丢弃后缀 从'.'到末尾(len-1)
+            // name_with_ext.drain(name_with_ext.find('.').unwrap()..name_with_ext.len());
+            // println!("dir_entry({})",name_with_ext);
+            name_with_ext
+        })
+        .collect();
+    for app in apps {
+        // load app data from host file system
+        let mut host_file = File::open(format!("{}{}", test_path, app)).unwrap();
+        let mut all_data: Vec<u8> = Vec::new();
+        host_file.read_to_end(&mut all_data).unwrap();
+        // create a file in easy-fs
+        let mut app_suites = app;
+        app_suites.insert_str(0,"testsuites_");
+        println!("app({})",app_suites.as_str());
+        let inode = root_inode.create(app_suites.as_str(), DiskInodeType::File).unwrap();
+        // write data to easy-fs
+        inode.write_at(0, all_data.as_slice());
+        println!("write finish");
+    }
+
+    for app in root_inode.ls() {
+        println!("{}", app.0);
+    }
+
     Ok(())
 }
 

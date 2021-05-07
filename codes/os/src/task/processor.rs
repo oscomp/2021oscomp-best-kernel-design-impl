@@ -7,6 +7,7 @@ use lazy_static::*;
 use super::{fetch_task, TaskStatus};
 use super::__switch;
 use crate::trap::TrapContext;
+use crate::task::manager::add_task;
 
 pub fn get_core_id() -> usize{
     let tp:usize;
@@ -41,28 +42,66 @@ impl Processor {
         &inner.idle_task_cx_ptr as *const usize
     }
     pub fn run(&self) {
-        let core = get_core_id();
-        // println!("core:{} run tasks",core);
-        // if core == 1{
-        //     loop{}
-        // }
-        loop {
-            if let Some(task) = fetch_task() {
-                // println!("core:{} exec tasks",get_core_id());
+        loop{
+            // True: Not first time to fetch a task 
+            if let Some(current_task) = take_current_task(){
+                let mut current_task_inner = current_task.acquire_inner_lock();
+                let task_cx_ptr2 = current_task_inner.get_task_cx_ptr2();
                 let idle_task_cx_ptr2 = self.get_idle_task_cx_ptr2();
-                // acquire
-                let mut task_inner = task.acquire_inner_lock();
-                let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
-                task_inner.task_status = TaskStatus::Running;
-                drop(task_inner);
-                // release
-                self.inner.borrow_mut().current = Some(task);
-                // println!("core:{} switch tasks",get_core_id());
-                unsafe {
-                    __switch(
-                        idle_task_cx_ptr2,
-                        next_task_cx_ptr2,
-                    );
+                // True: switch
+                // False: return to current task, don't switch
+                if let Some(task) = fetch_task() {
+                    let mut task_inner = task.acquire_inner_lock();
+                    let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
+                    task_inner.task_status = TaskStatus::Running;
+                    drop(task_inner);
+                    // release
+                    self.inner.borrow_mut().current = Some(task);
+                    ////////// current task  /////////
+                    // Change status to Ready
+                    current_task_inner.task_status = TaskStatus::Ready;
+                    drop(current_task_inner);
+                    // push back to ready queue.
+                    add_task(current_task);
+                    ////////// current task  /////////
+                    unsafe {
+                        __switch(
+                            idle_task_cx_ptr2,
+                            next_task_cx_ptr2,
+                        );
+                    }
+                }
+                else{
+                    drop(current_task_inner);
+                    self.inner.borrow_mut().current = Some(current_task);
+                    
+                    unsafe {
+                        __switch(
+                            idle_task_cx_ptr2,
+                            task_cx_ptr2,
+                        );
+                    }
+                }
+            // False: First time to fetch a task
+            } else {
+                // Keep fetching
+                if let Some(task) = fetch_task() {
+                    // acquire
+                    let idle_task_cx_ptr2 = self.get_idle_task_cx_ptr2();
+                    // println!("*1");
+                    let mut task_inner = task.acquire_inner_lock();
+                    // println!("*2");
+                    let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
+                    task_inner.task_status = TaskStatus::Running;
+                    drop(task_inner);
+                    // release
+                    self.inner.borrow_mut().current = Some(task);
+                    unsafe {
+                        __switch(
+                            idle_task_cx_ptr2,
+                            next_task_cx_ptr2,
+                        );
+                    }
                 }
             }
         }

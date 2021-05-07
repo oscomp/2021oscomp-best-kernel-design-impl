@@ -9,6 +9,7 @@ use riscv::register::{
         Exception,
         Interrupt,
     },
+    sepc,
     stval,
     sie,
 };
@@ -113,7 +114,7 @@ pub fn trap_return() -> ! {
 
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
-    panic!("a trap {:?} from kernel!", scause::read().cause());
+    panic!("a trap {:?} from kernel! Stvec:{:x}", scause::read().cause(), stvec::read().bits());
 }
 
 pub use context::{TrapContext};
