@@ -35,7 +35,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 DISASM ?= -x
 
 # build: env $(KERNEL_BIN) $(FS_IMG) fat32
-build: env $(KERNEL_BIN) $(FS_IMG) 
+build: env $(KERNEL_BIN) 
 
 env:
 	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
@@ -93,7 +93,6 @@ ifeq ($(BOARD),qemu)
 		-nographic \
 		-bios $(BOOTLOADER) \
 		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
-		# -drive file=$(FS_IMG),if=none,format=raw,id=x0 \
 		-drive file=$(U_FAT32),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0\
 		-smp threads=2
