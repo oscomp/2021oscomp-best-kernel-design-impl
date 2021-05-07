@@ -1,9 +1,3 @@
-use easy_fs::{
-    EasyFileSystem,
-    Inode,
-    DiskInodeType,
-    //NAME_LENGTH_LIMIT,
-};
 use crate::drivers::BLOCK_DEVICE;
 use crate::color_text;
 use alloc::sync::Arc;
@@ -14,6 +8,14 @@ use alloc::vec;
 use spin::Mutex;
 use super::File;
 use crate::mm::UserBuffer;
+use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, FatBS, VFile};
+
+#[derive(PartialEq,Copy,Clone,Debug)]
+pub enum DiskInodeType {
+    File,
+    Directory,
+}
+
 
 #[derive(PartialEq,Copy,Clone)]
 pub enum SeekWhence{
@@ -36,14 +38,14 @@ pub struct OSDirEntry {
 
 pub struct OSInodeInner {
     offset: usize, // 当前读写的位置
-    inode: Arc<Inode>, // inode引用
+    inode: Arc<VFile>, // inode引用
 }
 
 impl OSInode {
     pub fn new(
         readable: bool,
         writable: bool,
-        inode: Arc<Inode>,
+        inode: Arc<VFile>,
     ) -> Self {
         Self {
             readable,
@@ -99,10 +101,11 @@ impl OSInode {
 
 lazy_static! {
     // 通过ROOT_INODE可以实现对efs的操作
-    pub static ref ROOT_INODE: Arc<Inode> = {
+    pub static ref ROOT_INODE: Arc<VFile> = {
         // 此处载入文件系统
-        let efs = EasyFileSystem::open(BLOCK_DEVICE.clone());
-        Arc::new(EasyFileSystem::get_inode(&efs, 0))
+        let fat32_manager = FAT32Manager::open(BLOCK_DEVICE.clone());
+        let manager_reader = fat32_manager.read();
+        Arc::new( manager_reader.get_root_vfile(& fat32_manager) )
     };
 }
 /* 
@@ -113,7 +116,7 @@ lazy_static! {
 */
 pub fn list_apps() {
     println!("/**** APPS ****");
-    for app in ROOT_INODE.ls() {
+    for app in ROOT_INODE.ls_lite().unwrap() {
         println!("{}", app.0);
     }
     println!("**************/")
@@ -121,23 +124,23 @@ pub fn list_apps() {
 
 // TODO: 对所有的Inode加锁！
 // 在这一层实现互斥访问
-pub fn list_files(inode_id: u32){
-    let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
-    let file_vec = curr_inode.ls();
-    for i in 0 .. file_vec.len() {
-        if i != 0 && i % 6 == 0{
-            println!("");
-        }
-        if file_vec[i].1 == DiskInodeType::File{
-            print!("{}  ", file_vec[i].0);
-        } else {
-            // TODO: 统一配色！
-            print!("{}  ", color_text!(file_vec[i].0, 96));
-        }
-        
-    }
-    println!("");
-}
+//pub fn list_files(inode_id: u32){
+//    let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
+//    let file_vec = curr_inode.ls();
+//    for i in 0 .. file_vec.len() {
+//        if i != 0 && i % 6 == 0{
+//            println!("");
+//        }
+//        if file_vec[i].1 == DiskInodeType::File{
+//            print!("{}  ", file_vec[i].0);
+//        } else {
+//            // TODO: 统一配色！
+//            print!("{}  ", color_text!(file_vec[i].0, 96));
+//        }
+//        
+//    }
+//    println!("");
+//}
 
 bitflags! {
     pub struct OpenFlags: u32 {
@@ -163,32 +166,30 @@ impl OpenFlags {
     }
 }
 
-pub fn find_par_inode_id(path: &str) -> u32{
-    let mut pathv:Vec<&str> = path.split('/').collect();
-    pathv.pop();
-    let (inode,_) = ROOT_INODE.find_path(pathv).unwrap();
-    //println!("find par ok");
-    inode.get_id()
-}
+//pub fn find_par_inode_id(path: &str) -> u32{
+//    let mut pathv:Vec<&str> = path.split('/').collect();
+//    pathv.pop();
+//    let inode = ROOT_INODE.find_vfile_bypath(pathv).unwrap();
+//    //println!("find par ok");
+//    inode.get_id()
+//}
 
 
-pub fn open(inode_id: u32, path: &str, flags: OpenFlags, type_: DiskInodeType) -> Option<Arc<OSInode>> {
+pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType) -> Option<Arc<OSInode>> {
     // DEBUG: 相对路径
     let cur_inode = {
-        if inode_id == 0 {
+        if work_path == "/" {
             ROOT_INODE.clone()
-        }else{
-            Arc::new(EasyFileSystem::get_inode(
-                &ROOT_INODE.get_fs(), 
-                inode_id
-            ))
+        } else {
+            let wpath:Vec<&str> = work_path.split('/').collect();
+            ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
         }
     };
     let mut pathv:Vec<&str> = path.split('/').collect();
     // shell应当保证此处输入的path不为空
     let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
-        if let Some((inode,_)) = cur_inode.find_path(pathv.clone()) {
+        if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // clear size
             inode.clear();
             Some(Arc::new(OSInode::new(
@@ -199,8 +200,14 @@ pub fn open(inode_id: u32, path: &str, flags: OpenFlags, type_: DiskInodeType) -
         } else {
             // create file
             let name = pathv.pop().unwrap();
-            if let Some((temp_inode,_)) = cur_inode.find_path(pathv.clone()){
-                temp_inode.create( name, type_)
+            if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
+                let attribute = {
+                    match type_ {
+                        DiskInodeType::Directory=>{ ATTRIBUTE_DIRECTORY }
+                        DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
+                    }
+                };
+                temp_inode.create( name, attribute)
                 .map(|inode| {
                     Arc::new(OSInode::new(
                         readable,
@@ -213,8 +220,9 @@ pub fn open(inode_id: u32, path: &str, flags: OpenFlags, type_: DiskInodeType) -
             }
         }
     } else {
-        cur_inode.find_path(pathv)
-            .map(|(inode, _)| {
+        //println!("pathv = {:?}", pathv);
+        cur_inode.find_vfile_bypath(pathv)
+            .map(|inode| {
                 if flags.contains(OpenFlags::TRUNC) {
                     inode.clear();
                 }
@@ -228,21 +236,21 @@ pub fn open(inode_id: u32, path: &str, flags: OpenFlags, type_: DiskInodeType) -
 }
 
 
-pub fn ch_dir(inode_id: u32, path: &str) -> i32{
-    // 切换工作路径
-    // 切换成功，返回inode_id，否则返回-1
-    let pathv:Vec<&str> = path.split('/').collect();
-    let cur_inode = EasyFileSystem::get_inode(
-        &ROOT_INODE.get_fs(), 
-        inode_id
-    );
-    if let Some((tar_inode,_)) = cur_inode.find_path(pathv){
-        // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
-        tar_inode.get_id() as i32
-    }else{
-        -1
-    }
-}
+//pub fn ch_dir(inode_id: u32, path: &str) -> i32{
+//    // 切换工作路径
+//    // 切换成功，返回inode_id，否则返回-1
+//    let pathv:Vec<&str> = path.split('/').collect();
+//    let cur_inode = EasyFileSystem::get_inode(
+//        &ROOT_INODE.get_fs(), 
+//        inode_id
+//    );
+//    if let Some((tar_inode,_)) = cur_inode.find_path(pathv){
+//        // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
+//        tar_inode.get_id() as i32
+//    }else{
+//        -1
+//    }
+//}
  
 // TODO: 不急
 /* 
@@ -251,30 +259,30 @@ pub fn read_dir(inode_id: u32) -> Option<Arc<OSDirEntry>> {
 }*/
 
 // 复制文件/目录
-pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
-    let spathv:Vec<&str> = src_path.split('/').collect();
-    let dpathv:Vec<&str> = dst_path.split('/').collect();
-    let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
-    src_ino.fcopy(spathv, dst_inode_id,dpathv)
-}
+//pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
+//    let spathv:Vec<&str> = src_path.split('/').collect();
+//    let dpathv:Vec<&str> = dst_path.split('/').collect();
+//    let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
+//    src_ino.fcopy(spathv, dst_inode_id,dpathv)
+//}
 
 // 移动文件/目录
-pub fn fmove(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
-    let spathv:Vec<&str> = src_path.split('/').collect();
-    let dpathv:Vec<&str> = dst_path.split('/').collect();
-    let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
-    src_ino.fmove(spathv, dst_inode_id,dpathv)
-}
+//pub fn fmove(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
+//    let spathv:Vec<&str> = src_path.split('/').collect();
+//    let dpathv:Vec<&str> = dst_path.split('/').collect();
+//    let src_ino = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), src_inode_id);
+//    src_ino.fmove(spathv, dst_inode_id,dpathv)
+//}
 
-pub fn remove(inode_id: u32, path: &str, type_: DiskInodeType)->bool{
-    // type_确认要删除的文件类型，如果是目录，递归删除
-    let curr_inode = EasyFileSystem::get_inode(
-        &ROOT_INODE.get_fs().clone(), 
-        inode_id
-    );
-    let pathv:Vec<&str> = path.split('/').collect();
-    curr_inode.remove(pathv,type_)
-}
+// pub fn remove(inode_id: u32, path: &str, type_: DiskInodeType)->bool{
+//     // type_确认要删除的文件类型，如果是目录，递归删除
+//     let curr_inode = EasyFileSystem::get_inode(
+//         &ROOT_INODE.get_fs().clone(), 
+//         inode_id
+//     );
+//     let pathv:Vec<&str> = path.split('/').collect();
+//     curr_inode.remove(pathv,type_)
+// }
 
 impl File for OSInode {
     fn readable(&self) -> bool { self.readable }

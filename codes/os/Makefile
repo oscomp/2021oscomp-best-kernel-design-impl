@@ -5,6 +5,7 @@ KERNEL_ELF := target/$(TARGET)/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
+U_FAT32 := ../fat32-fuse/fat32.img
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../K210.bin
@@ -33,7 +34,8 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 # Disassembly
 DISASM ?= -x
 
-build: env $(KERNEL_BIN) $(FS_IMG)
+# build: env $(KERNEL_BIN) $(FS_IMG) fat32
+build: env $(KERNEL_BIN) $(FS_IMG) 
 
 env:
 	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
@@ -58,6 +60,10 @@ $(FS_IMG): $(APPS)
 	@cd ../easy-fs-fuse &&  cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/ --testsuites ../user/riscv64/
 
 $(APPS):
+
+fat32: 
+    #    @cd ../fat32-fuse && sh mnt.sh
+    #    @cd ../fat32-fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release
 
 kernel:
 	@echo Platform: $(BOARD)
@@ -87,7 +93,8 @@ ifeq ($(BOARD),qemu)
 		-nographic \
 		-bios $(BOOTLOADER) \
 		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
-		-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
+		# -drive file=$(FS_IMG),if=none,format=raw,id=x0 \
+		-drive file=$(U_FAT32),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0\
 		-smp threads=2
 else

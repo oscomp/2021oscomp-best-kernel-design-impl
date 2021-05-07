@@ -34,7 +34,7 @@ pub struct TaskControlBlockInner {
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
-    pub current_inode: u32,
+    pub current_path: String,
 }
 
 impl TaskControlBlockInner {
@@ -66,6 +66,9 @@ impl TaskControlBlockInner {
         unsafe{ 
             println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
         }
+    }
+    pub fn get_work_path(&self)->String{
+        self.current_path.clone()
     }
 }
 
@@ -108,7 +111,7 @@ impl TaskControlBlock {
                     // 2 -> stderr
                     Some(Arc::new(Stdout)),
                 ],
-                current_inode: 0, // 只有initproc在此建立，其他进程均为fork出
+                current_path: String::from("/"), // 只有initproc在此建立，其他进程均为fork出
             }),
         };
         // prepare TrapContext in user space
@@ -122,7 +125,7 @@ impl TaskControlBlock {
         );
         task_control_block
     }
-    pub fn exec(&self, elf_data: &[u8], args: Vec<String>, par_inode_id: u32) {
+    pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, mut user_sp, entry_point) = MemorySet::from_elf(elf_data);
         let trap_cx_ppn = memory_set
@@ -223,7 +226,7 @@ impl TaskControlBlock {
                 children: Vec::new(),
                 exit_code: 0,
                 fd_table: new_fd_table,
-                current_inode: parent_inner.current_inode,
+                current_path: parent_inner.current_path.clone(),
             }),
         });
         // add child

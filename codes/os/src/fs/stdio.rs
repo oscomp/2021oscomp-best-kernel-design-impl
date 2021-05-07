@@ -49,16 +49,9 @@ impl File for Stdout {
     }
     fn write(&self, user_buf: UserBuffer) -> usize {
         let lock = STDOUTLOCK.lock();
-        // print!("!LOCK!");
-        // unsafe {
-        //     let addr = &STDOUTLOCK as *const STDOUTLOCK as usize;
-        //     println!("STDOUTLOCK.as_ptr():{}, coreid={}",addr,get_core_id());
-
-        // }
         for buffer in user_buf.buffers.iter() {
             print!("{}", core::str::from_utf8(*buffer).unwrap());
         }
-        // println!("!RELEASE!");
         user_buf.len()
     }
 }

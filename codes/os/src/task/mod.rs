@@ -5,8 +5,8 @@ mod manager;
 mod processor;
 mod pid;
 
-use crate::fs::{open, OpenFlags};
-use easy_fs::DiskInodeType;
+use crate::fs::{open, OpenFlags, DiskInodeType};
+//use easy_fs::DiskInodeType;
 use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
 use alloc::sync::Arc;
@@ -70,7 +70,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
 
 lazy_static! {
     pub static ref INITPROC: Arc<TaskControlBlock> = Arc::new({
-        let inode = open(0,"initproc", OpenFlags::RDONLY, DiskInodeType::File).unwrap();
+        let inode = open("/","initproc", OpenFlags::RDONLY, DiskInodeType::File).unwrap();
         let v = inode.read_all();
         TaskControlBlock::new(v.as_slice())
     });

@@ -1,0 +1,12 @@
+[package]
+name = "simple-fat32-fuse"
+version = "0.1.0"
+authors = ["Haochen Gong <1527198893@qq.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33.3"
+simple-fat32 = { path = "../simple_fat32" }
+rand = "0.8.0"
