@@ -9,7 +9,7 @@ U_FAT32_DIR := ../fat32-fuse
 U_FAT32 := ${U_FAT32_DIR}/fat32.img
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
-TOP := ../../K210.bin
+TOP := ../../k210.bin
 
 # BOARD
 BOARD ?= qemu
@@ -106,7 +106,7 @@ gdb:
 	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=2 -S -s
 
 
-all: build
+release: build
 	@cp $(BOOTLOADER) $(BOOTLOADER).copy
 	@dd if=$(KERNEL_BIN) of=$(BOOTLOADER).copy bs=$(K210_BOOTLOADER_SIZE) seek=1
 	@mv $(BOOTLOADER).copy $(TOP)

@@ -1,3 +1,2 @@
 all: 
-	cd codes/os
-	make all
+	cd codes/os/ && make release
