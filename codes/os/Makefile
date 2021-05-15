@@ -5,7 +5,8 @@ KERNEL_ELF := target/$(TARGET)/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
-U_FAT32 := ../fat32-fuse/fat32.img
+U_FAT32_DIR := ../fat32-fuse
+U_FAT32 := ${U_FAT32_DIR}/fat32.img
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../K210.bin
@@ -35,17 +36,17 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 DISASM ?= -x
 
 # build: env $(KERNEL_BIN) $(FS_IMG) fat32
-build: env $(KERNEL_BIN) 
+build: env $(KERNEL_BIN)
 
 env:
 	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
-	# cargo install cargo-binutils
+	cargo install cargo-binutils
 	rustup component add rust-src
 	rustup component add llvm-tools-preview
 	@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 # dev/zero永远输出0
-sdcard: $(FS_IMG)
+sdcard: 
 	@echo "Are you sure write to $(SDCARD) ? [y/N] " && read ans && [ $${ans:-N} = y ]
 	@sudo dd if=/dev/zero of=$(SDCARD) bs=1048576 count=16
 	@sudo dd if=$(FS_IMG) of=$(SDCARD)
@@ -53,17 +54,10 @@ sdcard: $(FS_IMG)
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
-# Temporarily change user app from rust app to official testsuits
-$(FS_IMG): $(APPS)
-	@cd ../user && make build
-	# @cd ../easy-fs-fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/
-	@cd ../easy-fs-fuse &&  cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/ --testsuites ../user/riscv64/
-
 $(APPS):
 
 fat32: 
-    #    @cd ../fat32-fuse && sh mnt.sh
-    #    @cd ../fat32-fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release
+	./buildfs.sh
 
 kernel:
 	@echo Platform: $(BOARD)
@@ -74,19 +68,9 @@ kernel:
 clean:
 	@cargo clean
 
-disasm: kernel
-	@$(OBJDUMP) $(DISASM) $(KERNEL_ELF) | less
-
-disasm-vim: kernel
-	@$(OBJDUMP) $(DISASM) $(KERNEL_ELF) > $(DISASM_TMP)
-	@vim $(DISASM_TMP)
-	@rm $(DISASM_TMP)
-
 run: run-inner
 
-	
-
-run-inner: build
+run-inner: build 
 ifeq ($(BOARD),qemu)
 	@qemu-system-riscv64 \
 		-machine virt \
@@ -118,10 +102,9 @@ monitor:
 gdb:
 	@qemu-system-riscv64 -machine virt -nographic -bios ../bootloader/rustsbi-qemu.bin -device loader,\
 	file=target/riscv64gc-unknown-none-elf/release/os,addr=0x80200000 -drive \
-	file=../user/target/riscv64gc-unknown-none-elf/release/fs.img,if=none,format=raw,id=x0 \
+	file=$(U_FAT32),if=none,format=raw,id=x0 \
 	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=2 -S -s
 
-.PHONY: build env kernel clean disasm disasm-vim run-inner
 
 all: build
 	@cp $(BOOTLOADER) $(BOOTLOADER).copy
