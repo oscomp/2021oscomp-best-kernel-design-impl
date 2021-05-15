@@ -1,8 +1,0 @@
-codes
-doc
-k210.bin
-LICENSE
-Makefile
-README.en.md
-README.md
-test.txt
