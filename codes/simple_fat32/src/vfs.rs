@@ -602,10 +602,6 @@ impl VFile{
                     &self.block_device
                 )
             });
-            // 检测是否结束或被删除
-            if offset > 2000 {
-                loop{}
-            }
             if read_sz != DIRENT_SZ || long_ent.is_empty() { 
                 return Some(list)
             }

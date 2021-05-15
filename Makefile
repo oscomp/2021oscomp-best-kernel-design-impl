@@ -1,3 +1,3 @@
 all: 
 	echo "hello"
-	# cd codes/os/ && make release
+	cd codes/os/ && make release

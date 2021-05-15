@@ -116,7 +116,7 @@ lazy_static! {
 */
 pub fn list_apps() {
     println!("/**** APPS ****");
-    for app in ROOT_INODE.ls().unwrap() {
+    for app in ROOT_INODE.ls_lite().unwrap() {
         println!("{}", app.0);
     }
     println!("**************/")

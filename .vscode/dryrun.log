@@ -1,0 +1,6 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/ubuntu/rust/ultra-os'
+echo "hello"
+# cd codes/os/ && make release
+make: Leaving directory '/home/ubuntu/rust/ultra-os'
+ 
