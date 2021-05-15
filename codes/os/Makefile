@@ -39,11 +39,11 @@ DISASM ?= -x
 build: env $(KERNEL_BIN)
 
 env:
-	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
-	cargo install cargo-binutils
+	# (rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
+	# cargo install cargo-binutils
 	rustup component add rust-src
 	rustup component add llvm-tools-preview
-	@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
+	# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 # dev/zero永远输出0
 sdcard: 
