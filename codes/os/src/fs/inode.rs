@@ -1,6 +1,7 @@
 use crate::drivers::BLOCK_DEVICE;
 use crate::color_text;
 use alloc::sync::Arc;
+use k210_hal::cache::Uncache;
 use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
@@ -116,7 +117,7 @@ lazy_static! {
 */
 pub fn list_apps() {
     println!("/**** APPS ****");
-    for app in ROOT_INODE.ls().unwrap() {
+    for app in ROOT_INODE.ls_lite().unwrap() {
         println!("{}", app.0);
     }
     println!("**************/")
@@ -124,23 +125,35 @@ pub fn list_apps() {
 
 // TODO: 对所有的Inode加锁！
 // 在这一层实现互斥访问
-//pub fn list_files(inode_id: u32){
-//    let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
-//    let file_vec = curr_inode.ls();
-//    for i in 0 .. file_vec.len() {
-//        if i != 0 && i % 6 == 0{
-//            println!("");
-//        }
-//        if file_vec[i].1 == DiskInodeType::File{
-//            print!("{}  ", file_vec[i].0);
-//        } else {
-//            // TODO: 统一配色！
-//            print!("{}  ", color_text!(file_vec[i].0, 96));
-//        }
-//        
-//    }
-//    println!("");
-//}
+pub fn list_files(work_path: &str, path: &str){
+    //let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
+    let work_inode = {
+        if work_path == "/" || path.chars().nth(0).uncache().unwrap() == '/' {
+            println!("curr is root");
+            ROOT_INODE.clone()
+        } else {
+            let wpath:Vec<&str> = work_path.split('/').collect();
+            ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
+        }
+    };
+    
+    println!("path  = {}, len = {}", path, path.len());
+    let mut pathv:Vec<&str> = path.split('/').collect();
+    println!("pathv.len = {}", path.len());
+    let cur_inode = work_inode.find_vfile_bypath(pathv).unwrap();
+
+    let file_vec = cur_inode.ls_lite().unwrap();
+    for i in 0 .. file_vec.len() {
+        if file_vec[i].1 & ATTRIBUTE_DIRECTORY != 0 {
+            println!("{}  ", color_text!(file_vec[i].0, 96));
+        } else {
+            // TODO: 统一配色！
+            println!("{}  ", file_vec[i].0);
+        }
+        
+    }
+    println!("");
+}
 
 bitflags! {
     pub struct OpenFlags: u32 {
@@ -236,21 +249,25 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
 }
 
 
-//pub fn ch_dir(inode_id: u32, path: &str) -> i32{
-//    // 切换工作路径
-//    // 切换成功，返回inode_id，否则返回-1
-//    let pathv:Vec<&str> = path.split('/').collect();
-//    let cur_inode = EasyFileSystem::get_inode(
-//        &ROOT_INODE.get_fs(), 
-//        inode_id
-//    );
-//    if let Some((tar_inode,_)) = cur_inode.find_path(pathv){
-//        // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
-//        tar_inode.get_id() as i32
-//    }else{
-//        -1
-//    }
-//}
+pub fn ch_dir(work_path: &str, path: &str) -> isize{
+    // 切换工作路径
+    // 切换成功，返回inode_id，否则返回-1
+    let cur_inode = {
+        if work_path == "/" || path.chars().nth(0).uncache().unwrap() == '/' {
+            ROOT_INODE.clone()
+        } else {
+            let wpath:Vec<&str> = work_path.split('/').collect();
+            ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
+        }
+    };
+    let pathv:Vec<&str> = path.split('/').collect();
+    if let Some(tar_dir) = cur_inode.find_vfile_bypath(pathv){
+        // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
+        0
+    }else{
+        -1
+    }
+}
  
 // TODO: 不急
 /* 

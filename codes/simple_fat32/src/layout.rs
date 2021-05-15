@@ -1061,6 +1061,9 @@ impl FAT{
     }
 
     pub fn count_claster_num(&self, start_cluster:u32, block_device: Arc<dyn BlockDevice>)->u32{
+        if start_cluster == 0{
+            return 0;
+        }
         let mut curr_cluster = start_cluster;
         let mut count:u32 = 0; 
         loop{

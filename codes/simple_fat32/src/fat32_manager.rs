@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use super::{
     BlockDevice,
     get_info_cache,
+    get_block_cache,
     write_to_dev,
     CacheMode,
     FSInfo, 
@@ -142,6 +143,7 @@ impl FAT32Manager {
     }
 
     /* 分配簇，会填写FAT，成功返回第一个簇号，失败返回None */
+    // TODO:分配的时候清零
     pub fn alloc_cluster(&self, num: u32)->Option<u32> {
         let free_clusters = self.free_clusters();
         if num > free_clusters {
@@ -160,12 +162,14 @@ impl FAT32Manager {
         // 搜索可用簇，同时写表项
         #[allow(unused)]
         for i in 1..num {
+            self.clear_cluster(current_cluster);
             let next_cluster = fat_writer.next_free_cluster(current_cluster, self.block_device.clone());
             fat_writer.set_next_cluster(current_cluster, next_cluster, self.block_device.clone());
             //cluster_vec.push(next_cluster);
             //println!("alloc: next = {}", fat_writer.get_next_cluster(current_cluster, self.block_device.clone()));
             current_cluster = next_cluster;
         }
+        self.clear_cluster(current_cluster);
         // 填写最后一个表项
         fat_writer.set_end(current_cluster, self.block_device.clone());
         // 修改FSINFO
@@ -198,6 +202,23 @@ impl FAT32Manager {
             }
         }
     }    
+
+    pub fn clear_cluster(&self,  cluster_id: u32 ){
+        let start_sec = self.first_sector_of_cluster(cluster_id);
+        for i in 0..self.sectors_per_cluster {
+            get_block_cache(
+                start_sec + i as usize,
+                self.block_device.clone(),
+                CacheMode::WRITE
+            )
+            .write()
+            .modify(0, |blk: &mut [u8; 512]|{
+                for j in 0..512 {
+                    blk[j] = 0;
+                }        
+            });
+        }
+    }
 
     pub fn get_fat(&self)->Arc<RwLock<FAT>>{
         Arc::clone(&self.fat)
@@ -280,7 +301,11 @@ impl FAT32Manager {
 
     /* 将短文件名格式化为目录项存储的内容 */
     pub fn short_name_format(&self, name: &str)->([u8;8],[u8;3]){
-        let (name_,ext_) = self.split_name_ext(name);
+        let (mut name_,mut ext_) = self.split_name_ext(name);
+        if name == "." || name == ".." {
+            name_ = name;
+            ext_ = ""
+        }
         let name_bytes = name_.as_bytes();
         let ext_bytes = ext_.as_bytes();
         let mut f_name = [0u8;8];

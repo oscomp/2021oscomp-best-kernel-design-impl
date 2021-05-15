@@ -15,7 +15,11 @@ pub fn main(argc: usize, argv: &[&str]) -> i32 {
         ls("l\0");
     }
     else{
-        ls(argv[0]);
+        if argc == 1 {
+            ls("\0");
+        } else{
+            ls(argv[1]);
+        }
     }
     0
 }

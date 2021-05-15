@@ -75,7 +75,8 @@ fn fat32_pack() -> std::io::Result<()> {
             .read(true)
             .write(true)
             .create(true)
-            .open("fat32.img")?;
+            .open("/dev/sdb1")?;
+            //            .open("fat32.img")?;
         f
     })));
     
@@ -151,20 +152,22 @@ fn ufs_test() -> std::io::Result<()> {
 
 
     let print_flist = |flist:&mut Vec<(String,u8)>|{
+        println!("### list:");
         #[allow(unused)]
         for i in 0..flist.len(){
             let part = flist.pop().unwrap();
             let name = part.0;
             let attri = part.1;
             if (attri & ATTRIBUTE_DIRECTORY) != 0 {
-                println!("{} ", name);
-            } else {
                 println!("{} ", color_text!(name, 96));
+            } else {
+                println!("{} ", name);
             }
         }
+        println!("### end list")
     };
 
-    let simple_rwtest = |vfile: &mut VFile|{
+    let simple_rwtest = |vfile: & VFile|{
         let greet_str = "hello world!\n";
         println!("*** simple r/w test");
         println!("  name = {}",vfile.get_name());
@@ -184,15 +187,15 @@ fn ufs_test() -> std::io::Result<()> {
     let fs_reader = fs_manager.read();
     println!("{:X}",fs_reader.get_fat().read().get_next_cluster(2, block_file.clone()));
     //loop{}
-    let mut root_vfile = fs_reader.get_root_vfile(&fs_manager);
+    let root_vfile = fs_reader.get_root_vfile(&fs_manager);
     drop(fs_reader);
     let mut flist = root_vfile.ls_lite().unwrap();
     print_flist(&mut flist);
     root_vfile.create("hello2", ATTRIBUTE_ARCHIVE).unwrap();
     fs_manager.read().cache_write_back();
     println!("*** after create");
-    let mut hello = root_vfile.find_vfile_byname("hello2").unwrap();
-    simple_rwtest(&mut hello);
+    let hello = root_vfile.find_vfile_byname("hello2").unwrap();
+    simple_rwtest(& hello);
     fs_manager.read().cache_write_back();
     let hello = root_vfile.find_vfile_byname("hello2").unwrap();
     let mut buffer = [0u8; 256];
@@ -206,6 +209,31 @@ fn ufs_test() -> std::io::Result<()> {
     print_flist(&mut flist);
     //simple_rwtest(&hello);
 
+    // dirtest
+    println!("directory test ... start");
+    let dir0 = root_vfile.create("dir0", ATTRIBUTE_DIRECTORY).unwrap();
+    
+    println!("list root:");
+    let mut flist = root_vfile.ls_lite().unwrap();
+    print_flist(&mut flist);
+    
+    println!("list dir0:");
+    let mut flist = dir0.ls_lite().unwrap();
+    print_flist(&mut flist);
+    
+    dir0.create("file1", ATTRIBUTE_ARCHIVE).unwrap();
+    let dir0_dir1 = dir0.create("dir1", ATTRIBUTE_DIRECTORY).unwrap();
+    dir0_dir1.create("file2", ATTRIBUTE_ARCHIVE);
+
+    let file1 = root_vfile.find_vfile_bypath(vec!["dir0", "file1"]).unwrap(); 
+    let file2 = root_vfile.find_vfile_bypath(vec!["dir0", "dir1", "file2"]).unwrap(); 
+    simple_rwtest(&file1);
+    simple_rwtest(&file2);
+    fs_manager.read().cache_write_back();
+
+    println!("directory test ... end");
+    // random str rw test
+    
     println!("random str rw test ... start");
     let filea = root_vfile.create("filea", ATTRIBUTE_ARCHIVE).unwrap();
     fs_manager.read().cache_write_back();

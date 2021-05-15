@@ -477,8 +477,13 @@ impl VFile{
         let vfile = self.find_vfile_byname(name).unwrap();
         //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
         if attribute & ATTRIBUTE_DIRECTORY != 0 {
-            let mut self_dir = ShortDirEntry::new(".".as_bytes(),"".as_bytes(), ATTRIBUTE_DIRECTORY);
-            let mut par_dir = ShortDirEntry::new("..".as_bytes(),"".as_bytes(), ATTRIBUTE_DIRECTORY);
+            //println!("");
+            let manager_reader = self.fs.read();
+            let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
+            let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
+            let (name_bytes,ext_bytes) = manager_reader.short_name_format("..");
+            let mut par_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
+            drop(manager_reader);
             par_dir.set_first_cluster(self.first_cluster());
             
             vfile.write_at(0, self_dir.as_bytes_mut());
@@ -489,7 +494,6 @@ impl VFile{
             self_dir.set_first_cluster(first_cluster);
             vfile.write_at(0, self_dir.as_bytes_mut());
         }
-
         Some(Arc::new(vfile))
     }
 
@@ -603,9 +607,9 @@ impl VFile{
                 )
             });
             // 检测是否结束或被删除
-            if offset > 2000 {
-                loop{}
-            }
+            //if offset > 2000 {
+            //    loop{}
+            //}
             if read_sz != DIRENT_SZ || long_ent.is_empty() { 
                 return Some(list)
             }
