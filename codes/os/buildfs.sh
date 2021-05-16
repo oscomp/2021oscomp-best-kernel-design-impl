@@ -1,5 +1,6 @@
 U_FAT32_DIR="../fat32-fuse"
-U_FAT32="${U_FAT32_DIR}/fat32.img"
+#U_FAT32="${U_FAT32_DIR}/fat32.img"
+U_FAT32="/dev/sdb1"
 
 if test -e ${U_FAT32_DIR}/fs
 then 

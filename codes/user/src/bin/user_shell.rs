@@ -58,7 +58,8 @@ use user_lib::{
     OpenFlags,
     close,
     dup,
-    chdir
+    chdir,
+    ls
 };
 use user_lib::console::getchar;
 
@@ -290,6 +291,19 @@ impl ArgMachine{
                 self.change_dir();
             }
             return false;
+        }
+        if self.args[0].clone().as_str() == "ls\0" {
+            if !(self.argc == 2 || self.argc == 1) {
+                println!("ls: Arg expression not right");
+                return false
+            }
+            
+            if self.argc == 1 {
+                ls("\0");
+            } else{
+                ls(self.args[1].clone().as_str());
+            }
+            return false
         }
         return true;
     }

@@ -7,8 +7,8 @@ use crate::mm::{
 use crate::task::{current_user_token, current_task};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
-use k210_hal::cache::Uncache;
-//use alloc::vec;
+use alloc::vec::Vec;
+use alloc::string::String;
 //use easy_fs::DiskInodeType;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
@@ -123,6 +123,8 @@ pub fn sys_chdir(path: *const u8) -> isize{
     let mut inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     let mut work_path = inner.current_path.clone();
+    println!("work path = {}", work_path);
+    println!("path  = {}, len = {}", path, path.len());
     //println!("curr inode id = {}", curr_inode_id);
     let new_ino_id = ch_dir(work_path.as_str(), path.as_str()) as isize;
     //println!("new inode id = {}", new_ino_id);
@@ -134,8 +136,25 @@ pub fn sys_chdir(path: *const u8) -> isize{
         } else {
             work_path.push('/');
             work_path.push_str(path.as_str());
-            println!("after cd workpath = {}", work_path);
-            inner.current_path = work_path.clone();
+            let mut path_vec: Vec<&str> = work_path.as_str().split('/').collect();
+            let mut new_pathv: Vec<&str> = Vec::new(); 
+            for i in 0..path_vec.len(){
+                if path_vec[i] == "" || path_vec[i] == "." {
+                    continue;
+                }
+                if path_vec[i] == ".." {
+                    new_pathv.pop();
+                    continue;
+                } 
+                new_pathv.push(path_vec[i]);
+            }
+            let mut new_wpath = String::new();
+            for i in 0..new_pathv.len(){
+                new_wpath.push('/');
+                new_wpath.push_str(new_pathv[i]);
+            }
+            println!("after cd workpath = {}", new_wpath);
+            inner.current_path = new_wpath.clone();
         }
         new_ino_id
     }else{
@@ -150,6 +169,7 @@ pub fn sys_ls(path: *const u8) -> isize{
     let path = translated_str(token, path);
     let work_path = inner.current_path.clone();
     println!("work path = {}", work_path);
+    println!("path  = {}, len = {}", path, path.len());
     list_files(work_path.as_str(), path.as_str());
     //list_files(inner.current_inode);
     //list_files(inner.current_inode);

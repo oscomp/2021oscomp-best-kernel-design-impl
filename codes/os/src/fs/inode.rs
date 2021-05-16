@@ -1,11 +1,11 @@
-use crate::drivers::BLOCK_DEVICE;
+use crate::{drivers::BLOCK_DEVICE, println};
 use crate::color_text;
 use alloc::sync::Arc;
 use k210_hal::cache::Uncache;
 use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
-use alloc::vec;
+//use alloc::vec;
 use spin::Mutex;
 use super::File;
 use crate::mm::UserBuffer;
@@ -127,8 +127,9 @@ pub fn list_apps() {
 // 在这一层实现互斥访问
 pub fn list_files(work_path: &str, path: &str){
     //let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
+    println!("enter list files");
     let work_inode = {
-        if work_path == "/" || path.chars().nth(0).uncache().unwrap() == '/' {
+        if work_path == "/" || (path.len()>0 && path.chars().nth(0).unwrap() == '/') {
             println!("curr is root");
             ROOT_INODE.clone()
         } else {
@@ -252,15 +253,18 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
 pub fn ch_dir(work_path: &str, path: &str) -> isize{
     // 切换工作路径
     // 切换成功，返回inode_id，否则返回-1
+    println!("enter cd");
     let cur_inode = {
-        if work_path == "/" || path.chars().nth(0).uncache().unwrap() == '/' {
+        if work_path == "/" || ( path.len() > 0 && path.chars().nth(0).unwrap() == '/' ) {
             ROOT_INODE.clone()
         } else {
             let wpath:Vec<&str> = work_path.split('/').collect();
+            println!("in cd, work_pathv = {:?}", wpath);
             ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
         }
     };
     let pathv:Vec<&str> = path.split('/').collect();
+    println!("in cd, pathv = {:?}", pathv);
     if let Some(tar_dir) = cur_inode.find_vfile_bypath(pathv){
         // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
         0
