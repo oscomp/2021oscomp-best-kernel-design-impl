@@ -29,6 +29,9 @@ impl BlockDevice for BlockFile {
         file.seek(SeekFrom::Start((block_id * BLOCK_SZ) as u64))
             .expect("Error when seeking!");
         assert_eq!(file.read(buf).unwrap(), BLOCK_SZ, "Not a complete block!");
+        //println!("****** read blk: {}, *0x1c6 = {}{}{}{}", block_id, buf[0x1c6],buf[0x1c7],buf[0x1c8],buf[0x1c9],);
+        //println!("{:?}", buf);
+        //println!("***********************");
     }
 
     fn write_block(&self, block_id: usize, buf: &[u8]) {
@@ -75,7 +78,7 @@ fn fat32_pack() -> std::io::Result<()> {
             .read(true)
             .write(true)
             .create(true)
-            .open("/dev/sdb1")?;
+            .open("/dev/sdb")?;
             //            .open("fat32.img")?;
         f
     })));

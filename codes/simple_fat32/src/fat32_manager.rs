@@ -4,6 +4,7 @@ use super::{
     get_info_cache,
     get_block_cache,
     write_to_dev,
+    set_start_sec,
     CacheMode,
     FSInfo, 
     FatBS, 
@@ -65,6 +66,25 @@ impl FAT32Manager {
 
     /* 打开现有的FAT32  */
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>>{
+        // 读入分区偏移
+        let start_sector:u32 = get_info_cache(
+            0, 
+            Arc::clone(&block_device),
+            CacheMode::READ )
+        .read()
+        .read(0x1c6, |ssec_bytes:&[u8;4]|{
+            // DEBUG
+            let mut start_sec:u32 = 0;
+            for i in 0..4 {
+                let tmp = ssec_bytes[i] as u32;
+                start_sec = start_sec + (tmp << (8*i));
+                //println!("start sec = {}, buf = {}", start_sec , ssec_bytes[i])
+            }
+            start_sec
+        });
+        
+        set_start_sec(start_sector as usize);
+        
         // 读入 Boot Sector
         let boot_sec:FatBS = get_info_cache(
             0, 
@@ -76,7 +96,7 @@ impl FAT32Manager {
             *bs
         });
 
-        //println!("{:?}", boot_sec);
+        // println!("{:?}", boot_sec);
         // 读入 Extended Boot Sector
         let ext_boot_sec:FatExtBS = get_info_cache(
             0, 
@@ -121,6 +141,7 @@ impl FAT32Manager {
             total_sectors: boot_sec.total_sectors(), 
             vroot_dirent: Arc::new(RwLock::new(root_dirent)),
         };
+        
         Arc::new(RwLock::new(fat32_manager))
     }
 

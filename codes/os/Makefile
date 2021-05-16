@@ -7,7 +7,7 @@ DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
 U_FAT32_DIR := ../fat32-fuse
 #U_FAT32 := ${U_FAT32_DIR}/fat32.img
-U_FAT32 := /dev/sdb1
+U_FAT32 := /dev/sdb
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../k210.bin
@@ -40,11 +40,12 @@ DISASM ?= -x
 build: env $(KERNEL_BIN)
 
 env:
-	# (rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
-	# cargo install cargo-binutils
 	rustup component add rust-src
 	rustup component add llvm-tools-preview
-	# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
+#(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
+#cargo install cargo-binutils
+	
+# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 # dev/zero永远输出0
 sdcard: 

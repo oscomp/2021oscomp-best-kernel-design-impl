@@ -123,8 +123,8 @@ pub fn sys_chdir(path: *const u8) -> isize{
     let mut inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     let mut work_path = inner.current_path.clone();
-    println!("work path = {}", work_path);
-    println!("path  = {}, len = {}", path, path.len());
+    //println!("work path = {}", work_path);
+    //println!("path  = {}, len = {}", path, path.len());
     //println!("curr inode id = {}", curr_inode_id);
     let new_ino_id = ch_dir(work_path.as_str(), path.as_str()) as isize;
     //println!("new inode id = {}", new_ino_id);
@@ -168,8 +168,8 @@ pub fn sys_ls(path: *const u8) -> isize{
     let inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     let work_path = inner.current_path.clone();
-    println!("work path = {}", work_path);
-    println!("path  = {}, len = {}", path, path.len());
+    //println!("work path = {}", work_path);
+    //println!("path  = {}, len = {}", path, path.len());
     list_files(work_path.as_str(), path.as_str());
     //list_files(inner.current_inode);
     //list_files(inner.current_inode);

@@ -118,7 +118,9 @@ lazy_static! {
 pub fn list_apps() {
     println!("/**** APPS ****");
     for app in ROOT_INODE.ls_lite().unwrap() {
-        println!("{}", app.0);
+        if app.1 & ATTRIBUTE_DIRECTORY == 0 {
+            println!("{}", app.0);
+        }
     }
     println!("**************/")
 }
@@ -127,10 +129,10 @@ pub fn list_apps() {
 // 在这一层实现互斥访问
 pub fn list_files(work_path: &str, path: &str){
     //let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
-    println!("enter list files");
+    //println!("enter list files");
     let work_inode = {
         if work_path == "/" || (path.len()>0 && path.chars().nth(0).unwrap() == '/') {
-            println!("curr is root");
+            //println!("curr is root");
             ROOT_INODE.clone()
         } else {
             let wpath:Vec<&str> = work_path.split('/').collect();
@@ -138,9 +140,9 @@ pub fn list_files(work_path: &str, path: &str){
         }
     };
     
-    println!("path  = {}, len = {}", path, path.len());
+    //println!("path  = {}, len = {}", path, path.len());
     let mut pathv:Vec<&str> = path.split('/').collect();
-    println!("pathv.len = {}", path.len());
+    //println!("pathv.len = {}", path.len());
     let cur_inode = work_inode.find_vfile_bypath(pathv).unwrap();
 
     let file_vec = cur_inode.ls_lite().unwrap();
@@ -253,18 +255,18 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
 pub fn ch_dir(work_path: &str, path: &str) -> isize{
     // 切换工作路径
     // 切换成功，返回inode_id，否则返回-1
-    println!("enter cd");
+    //println!("enter cd");
     let cur_inode = {
         if work_path == "/" || ( path.len() > 0 && path.chars().nth(0).unwrap() == '/' ) {
             ROOT_INODE.clone()
         } else {
             let wpath:Vec<&str> = work_path.split('/').collect();
-            println!("in cd, work_pathv = {:?}", wpath);
+            //println!("in cd, work_pathv = {:?}", wpath);
             ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
         }
     };
     let pathv:Vec<&str> = path.split('/').collect();
-    println!("in cd, pathv = {:?}", pathv);
+    //println!("in cd, pathv = {:?}", pathv);
     if let Some(tar_dir) = cur_inode.find_vfile_bypath(pathv){
         // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
         0

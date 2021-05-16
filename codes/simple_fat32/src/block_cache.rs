@@ -91,12 +91,24 @@ impl Drop for BlockCache {
 const BLOCK_CACHE_SIZE: usize = 10;
 //const DIRENT_CACHE_SIZE: usize = 4;
 pub struct BlockCacheManager {
+    start_sec: usize,
     queue: VecDeque<(usize, Arc<RwLock<BlockCache>>)>,
 }
 
 impl BlockCacheManager {
     pub fn new() -> Self {
-        Self { queue: VecDeque::new() }
+        Self { 
+            start_sec: 0,
+            queue: VecDeque::new() 
+        }
+    }
+
+    pub fn set_start_sec(&mut self, new_start_sec: usize){
+        self.start_sec = new_start_sec;
+    }
+
+    pub fn get_start_sec(&self)->usize {
+        self.start_sec
     }
 
     pub fn read_block_cache(
@@ -175,12 +187,13 @@ pub fn get_block_cache(
     block_device: Arc<dyn BlockDevice>,
     rw_mode: CacheMode,
 ) -> Arc<RwLock<BlockCache>> {
+    let phy_blk_id = DATA_BLOCK_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
-        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(block_id, block_device);
-        DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(block_id).unwrap()
+        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
+        DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
-        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(block_id, block_device)
+        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }
 
@@ -190,13 +203,19 @@ pub fn get_info_cache(
     block_device: Arc<dyn BlockDevice>,
     rw_mode: CacheMode,
 ) -> Arc<RwLock<BlockCache>> {
+    let phy_blk_id = INFO_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
-        INFO_CACHE_MANAGER.write().get_block_cache(block_id, block_device);
-        INFO_CACHE_MANAGER.read().read_block_cache(block_id).unwrap()
+        INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
+        INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
-        INFO_CACHE_MANAGER.write().get_block_cache(block_id, block_device)
+        INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
+}
+
+pub fn set_start_sec(start_sec: usize){
+    INFO_CACHE_MANAGER.write().set_start_sec(start_sec);
+    DATA_BLOCK_CACHE_MANAGER.write().set_start_sec(start_sec);
 }
 
 pub fn write_to_dev(){  
