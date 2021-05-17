@@ -7,6 +7,7 @@
 #include "riscv.h"
 #include "spinlock.h"
 #include "file.h"
+#include "trap.h"
 
 // Saved registers for kernel context switches.
 struct context {
@@ -28,25 +29,41 @@ struct context {
 	uint64 s11;
 };
 
+enum procstate {
+	RUNNABLE, RUNNING, 
+	SLEEPING, ZOMBIE, 
+};
+
 // Process Control Block 
 struct proc {
-	// these two member is protected by locks in `scheduler.c`
-	struct proc *next;
-	int timer;
-
 	struct spinlock lk;
 
 	// basic information 
-	struct proc *parent;
+	// these fields MUST be protected by lk 
 	void *chan;
-	int killed;				// if non-zero, have been killed 
+	enum procstate state;	// process state 
+	int killed;				// if non-zero, have been killed
 	int xstate;				// Exit status to be returned to parent's wait()
 	int pid;				// Process ID 
+	int timer;
 
-	// memory map 
-	pagetable_t pagetable;	// user pagetable 
-	pagetable_t kpagetable;	// kernel pagetable 
-	// some other member required here 
+	// next and prev are protected by queue's lock 
+	struct proc *next;		// point to next proc 
+	struct proc **prev;
+
+	// parenting
+	// these fields MUST be protected by lk 
+	struct proc *child;			// point to first child 
+
+	// parent and sibling are protected by parent's lock 
+	struct proc *parent;		// point to its parent, NULL if it's `init`
+	struct proc *sibling;		// point to first sibling 
+
+	// trap handling 
+	struct trapframe *tp;	// trapframe 
+
+	// memory 
+	// TODO: pagetable 
 
 	// file system 
 	struct file *ofile[NOFILE];	// open files 
@@ -74,9 +91,19 @@ void exit(int xstatus);
 	to user space (see usertrap() in trap.c) */
 int kill(int pid);
 
+
+/* Scheduling */
+
+void enqueue_irq(struct proc *p);
+void enqueue_normal(struct proc *p);
+void proc_tick(void);
+
 /* Wait for a child process to exit and return its pid. 
 	Return -1 if this process has no children. */
 int wait(uint64 addr);
+
+/* Give up CPU and enter scheduler */
+void yield(void);
 
 /* Atomically release lock and sleep on chan. 
 	Reacquires lock when awakened */
@@ -85,6 +112,15 @@ void sleep(void *chan, struct spinlock *lk);
 /* Wake up all processes sleeping on chan. 
 	Must be called without any p->lock. */
 void wakeup(void *chan);
+
+/* Select next proc to run */
+void scheduler(void) __attribute__((noreturn))
+
+/* Return to schduler() */
+void sched(void);
+
+
+/* Memory-Management Related */
 
 /* Grow or shrink user memory by `n` bytes. 
 	Return 0 on success, -1 on failure. */
@@ -97,6 +133,21 @@ pagetable_t proc_pagetable(struct proc *p);
 /* Free a process's pagetable, and free the physical 
 	memory it refers to. */
 void proc_freepagetable(pagetable_t pagetable, uint64 sz);
+
+
+/* CPU */
+
+/* Per-CPU state */
+struct cpu {
+	struct proc *proc;		// The process running on this cpu, or NULL 
+	struct context context;	// swtch() here to enter scheduler() 
+	int noff;				// Depth of push_off() nesting 
+	int intena;				// Were interrupts enabled before push_off()?
+};
+
+int cpuid(void);
+struct cpu *mycpu(void);
+struct proc *myproc(void);
 
 /* Initialization */
 void procinit(void);

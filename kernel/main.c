@@ -60,8 +60,6 @@ main(unsigned long hartid, unsigned long dtb_pa)
     userinit();      // first user process
     printf("hart 0 init done\n");
 
-	__test_module(kmtest);
-    
 	// is ipi necessary here?
 	for(int i = 1; i < NCPU; i++) {
 	  unsigned long mask = 1 << i;
@@ -83,8 +81,6 @@ main(unsigned long hartid, unsigned long dtb_pa)
     trapinithart();
     plicinithart();  // ask PLIC for device interrupts
     printf("hart 1 init done\n");
-
-	__test_module(kmtest);
   }
   scheduler();
 }
