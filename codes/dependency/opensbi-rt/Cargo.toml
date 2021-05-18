@@ -1,0 +1,15 @@
+[package]
+name = "riscv-sbi-rt"
+version = "0.1.0"
+authors = ["Runji Wang <wangrunji0408@163.com>"]
+edition = "2018"
+# Ref: cortex-m-rt/Cargo.toml
+links = "riscv-sbi-rt" # Prevent multiple versions of riscv-sbi-rt being linked
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+riscv = "0.6"
+r0 = "1.0"
+riscv-sbi = { version = "0.1", path = "../riscv-sbi" }
+riscv-sbi-rt-macros = { path = "macros", version = "0.1.0" }
