@@ -146,6 +146,7 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 
 pub fn schedule(switched_task_cx_ptr2: *const usize) {
     let core_id: usize = get_core_id();
+    println!("core {} still alive", core_id);    
     let idle_task_cx_ptr2 = PROCESSOR_LIST[core_id].get_idle_task_cx_ptr2();
     unsafe {
         __switch(

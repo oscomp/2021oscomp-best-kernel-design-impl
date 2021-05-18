@@ -128,12 +128,19 @@ impl InputMachine{
                         }
                     }
                     _ =>{
-                        self.cmd.insert(self.p, c);
-                        cursor_move_left!(self.p);
-                        
-                        // cursor_move_right!(1);
-                        print!("{}",self.cmd.as_str());
-                        cursor_move_left!(self.cmd.len() - self.p - 1);//assert len>p
+                        if(self.cmd.len() == self.p){
+                            self.cmd.insert(self.p, c);
+                            print!("{}",c);
+
+                        }
+                        else{
+                            self.cmd.insert(self.p, c);
+                            cursor_move_left!(self.p);
+                            
+                            // cursor_move_right!(1);
+                            print!("{}",self.cmd.as_str());
+                            cursor_move_left!(self.cmd.len() - self.p - 1);//assert len>p
+                        }
                         self.p += 1;
                     }
                 }
@@ -278,7 +285,7 @@ impl ArgMachine{
         if self.state == STATE_ARGS{
             self.args[self.argc-1].push(0 as char);
         }
-        self.print_state();
+        // self.print_state();
         // \0 indicates the end of str while rust doesn't do so
         if self.args.is_empty(){
             return false;
@@ -384,16 +391,16 @@ impl ArgMachine{
 
 #[no_mangle]
 pub fn main() -> i32 {
-    println!("Rust user shell");
+    // println!("Rust user shell");
     // println!("听说能输出中文?");
     let mut line: String;
     let left = 3;
-    cursor_move_right!(left);
+    // cursor_move_right!(left);
     // cursor_move_right!(3);
-    println!("{}","TTTTTTTTTTTTTTTTTTEST  test start");
-    print!("{}{}{}","hello", " ", "delete");
+    // println!("{}","TTTTTTTTTTTTTTTTTTEST  test start");
+    // print!("{}{}{}","hello", " ", "delete");
     // cursor_move_left!(3);
-    cursor_move_left!(left);
+    // cursor_move_left!(left);
     // print!("{}{}K",CSI as char, 2u8 as char);
     // print!("\r");
     // println!("{}{}{}","hello", KEY_LEFT, "left");
@@ -402,7 +409,7 @@ pub fn main() -> i32 {
     // println!("{}{}{}","hello", KEY_UP, "up");
     // println!("sth_in:{}",sth_in);
     // let mut sth = 3;
-    println!("{}","TTTTTTTTTTTTTTTTTTEST  test end");
+    // println!("{}","TTTTTTTTTTTTTTTTTTEST  test end");
     // print!("Password:");
     // loop{
     //     let c = getchar();
@@ -429,7 +436,7 @@ pub fn main() -> i32 {
                 arg_machine.clear();
                 continue;
             }
-            println!("Input:{}",line);
+            // println!("Input:{}",line);
             let (args_copy,input,output) = arg_machine.get_args();
             
             let mut args_addr: Vec<*const u8> = args_copy
