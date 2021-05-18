@@ -89,7 +89,7 @@ pub fn rust_main() -> ! {
         //println!("other core");
         mm::init_othercore();
         trap::init();
-        //trap::enable_timer_interrupt();
+        trap::enable_timer_interrupt();
         timer::set_next_trigger();
         task::run_tasks();
         panic!("Unreachable in rust_main!");

@@ -22,7 +22,8 @@ pub use processor::{
     current_trap_cx,
     take_current_task,
     schedule,
-    get_core_id
+    get_core_id,
+    print_core_info
 };
 pub use manager::add_task;
 pub use pid::{PidHandle, pid_alloc, KernelStack};

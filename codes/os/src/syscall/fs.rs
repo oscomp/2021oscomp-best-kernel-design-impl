@@ -1,15 +1,18 @@
-use crate::mm::{
+use core::usize;
+
+use crate::{fs::OSInode, mm::{
     UserBuffer,
     translated_byte_buffer,
     translated_refmut,
     translated_str,
-};
-use crate::task::{current_user_token, current_task};
+}};
+use crate::task::{current_user_token, current_task, print_core_info};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;
 //use easy_fs::DiskInodeType;
+const AT_FDCWD:isize = -100;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = current_user_token();
@@ -55,7 +58,34 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 
-pub fn sys_open(path: *const u8, flags: u32) -> isize {
+// TODO:文件所有权
+pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isize {
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
+    let path = translated_str(token, path);
+    let mut inner = task.acquire_inner_lock();
+    if dirfd == AT_FDCWD {
+        if let Some(inode) = open(
+            inner.get_work_path().as_str(),
+            path.as_str(),
+            OpenFlags::from_bits(flags).unwrap(),
+            DiskInodeType::File
+        ) {
+            let fd = inner.alloc_fd();
+            inner.fd_table[fd] = Some(inode);
+            fd as isize
+        } else {
+            -1
+        }
+    } else {    
+        // TODO
+        -1
+    }
+}
+
+// TODO
+pub fn sys_open( path: *const u8, flags: u32 ) -> isize {
     let task = current_task().unwrap();
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
@@ -118,6 +148,7 @@ pub fn sys_dup(fd: usize) -> isize {
 }
 
 pub fn sys_chdir(path: *const u8) -> isize{
+    //print_core_info();
     let token = current_user_token();
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
@@ -153,7 +184,10 @@ pub fn sys_chdir(path: *const u8) -> isize{
                 new_wpath.push('/');
                 new_wpath.push_str(new_pathv[i]);
             }
-            println!("after cd workpath = {}", new_wpath);
+            if new_pathv.len() == 0 {
+                new_wpath.push('/');
+            }
+            //println!("after cd workpath = {}", new_wpath);
             inner.current_path = new_wpath.clone();
         }
         new_ino_id
@@ -175,3 +209,85 @@ pub fn sys_ls(path: *const u8) -> isize{
     //list_files(inner.current_inode);
     0
 }
+
+/*
+* buf：用于保存当前工作目录的字符串。当buf设为NULL，由系统来分配缓存区。
+*/
+pub fn sys_getcwd(buf: *mut u8, len: usize)->isize{
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    let mut buf_vec = translated_byte_buffer(token, buf, len);
+    let mut current_offset:usize = 0;
+    if buf as usize == 0 {
+        return 0
+    } else {
+        // TODO:目前假设长度不超过一页
+        for slice_ptr2 in buf_vec.iter_mut() {
+            //let wlen = slice_ptr.len().min(len - current_offset);
+            unsafe{
+                let cwd = inner.current_path.as_bytes();
+                for i in 0..cwd.len(){
+                    (*slice_ptr2)[i] = cwd[i];
+                }
+            }
+        }
+        return buf as isize
+    }
+}
+
+pub fn sys_dup3(){
+
+}
+
+pub fn sys_getdents64(){
+
+}
+
+// TODO: mode需要研究
+pub fn sys_mkdir(dirfd:isize, path:*const u8, mode:u32)->isize{
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    let path = translated_str(token, path);
+    
+    if dirfd == AT_FDCWD {
+        let work_path = inner.current_path.clone();
+        if let Some(inode) = open(
+            inner.get_work_path().as_str(),
+            path.as_str(),
+            OpenFlags::CREATE,
+            DiskInodeType::Directory
+        ) {
+            return 0
+        } else {
+            return -1
+        }
+    } else {
+        // TODO: 获取dirfd的OSInode
+        //let work_dir = inner.fd_table[dirfd as usize].unwrap() as OSInode;
+        if let Some(inode) = open(
+            "/",
+            path.as_str(),
+            OpenFlags::CREATE,
+            DiskInodeType::Directory
+        ) {
+            return 0
+        } else {
+            return -1
+        }
+    }
+}
+
+pub fn sys_mount(){
+
+}
+
+pub fn sys_umount(){
+
+}
+
+pub fn sys_fstat(){
+
+}
+

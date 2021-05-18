@@ -145,7 +145,8 @@ pub fn list_files(work_path: &str, path: &str){
     //println!("pathv.len = {}", path.len());
     let cur_inode = work_inode.find_vfile_bypath(pathv).unwrap();
 
-    let file_vec = cur_inode.ls_lite().unwrap();
+    let mut file_vec = cur_inode.ls_lite().unwrap();
+    file_vec.sort();
     for i in 0 .. file_vec.len() {
         if file_vec[i].1 & ATTRIBUTE_DIRECTORY != 0 {
             println!("{}  ", color_text!(file_vec[i].0, 96));
@@ -163,8 +164,9 @@ bitflags! {
         const RDONLY = 0;
         const WRONLY = 1 << 0;
         const RDWR = 1 << 1;
-        const CREATE = 1 << 9;
+        const CREATE = 1 << 6;
         const TRUNC = 1 << 10;
+        const DIRECTROY = 0x0200000;
     }
 }
 
