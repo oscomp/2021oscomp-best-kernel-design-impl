@@ -28,6 +28,58 @@ static int allopid(void) {
 	return ret;
 }
 
+struct cpu cpus[NCPU];
+
+// lists for scheduling 
+
+#define TIMER_IRQ 			5
+#define TIMER_NORMAL 		10 
+
+#define PRIORITY_TIMEOUT 	0
+#define PRIORITY_IRQ 		1
+#define PRIORITY_NORMAL 	2
+#define PRIORITY_NUMBER 	3 
+struct proc *proc_runnable[PRIORITY_NUMBER];
+struct proc *proc_sleep;
+struct proc *proc_zombie;
+struct spinlock proc_lock;
+
+#define __enter_proc_cs \
+	acquire(&proc_lock);
+#define __leave_proc_cs \
+	release(&proc_lock);
+
+// before modifying proc_list, lock should be acquired 
+static void proc_list_insert(struct proc **head, struct proc *p) {
+	__debug_assert("proc", NULL != p, "insert NULL into list\n");
+
+	struct proc *tmp = *head;
+	while (NULL != tmp) {
+		head = &(tmp->next);
+		tmp = tmp->next;
+	}
+	*head = p;
+	p->prev = head;
+	p->next = NULL;
+}
+static void proc_list_remove(struct proc *p) {
+	__debug_assert("proc", NULL != p, "remove NULL from list\n");
+
+	*(p->prev) = p->next;
+	p->next->prev = p->prev;
+	p->prev = NULL;
+	p->next = NULL;
+}
+
+#define __insert_runnable(priority, p) \
+	proc_list_insert(&proc_runnable[priority], p)
+#define __insert_sleep(p) \
+	proc_list_insert(&proc_sleep, p)
+#define __insert_zombie(p) \
+	proc_list_insert(&proc_zombie, p)
+#define __remove(p) \
+	proc_list_remove(p) 
+
 // alloc a proc ready for running 
 static struct proc *allocproc(void) {
 	struct proc *p = kmalloc(sizeof(struct proc));
@@ -64,7 +116,6 @@ static struct proc *allocproc(void) {
 	return p;
 }
 
-// `p` is guaranteed with every component 
 static void freeproc(struct proc *p) {
 	// file system fields were freed in exit() 
 
@@ -124,56 +175,15 @@ int fork(void) {
 	safestrcpy(np->name, p->name, sizeof(p->name));
 
 	int pid = np->pid;
-	enqueue_normal(np);
+
+	__enter_proc_cs 
+	// init timer 
+	np->timer = TIMER_NORMAL;
+	// set runnable 
+	__insert_runnable(PRIORITY_NORMAL, np);
+	__leave_proc_cs 
+
 	return pid;
-}
-
-// `zombie` are procs that have exited or been killed, waiting for 
-// parent to get `xstate`
-struct proc *zombie;
-struct spinlock zombie_lock;
-// turn p into ZOMBIE!!! Trying to eat your brain!
-static void turn_zombie(struct proc *p) {
-	acquire(&zombie_lock);	// enter cs 
-
-	if (NULL == zombie) {
-		zombie = p;
-		p->prev = &zombie;
-	}
-	else {
-		struct proc *tmp = zombie;
-		while (NULL != tmp->next) 
-			tmp = tmp->next;
-		tmp->next = p;
-		p->prev = &(tmp->next);
-	}
-	p->next = NULL;
-	p->state = ZOMBIE;
-
-	release(&zombie_lock);	// leave cs 
-}
-// find parent's zombie child 
-static struct proc *corrupt_zombie(struct proc *parent) {
-	struct proc *tmp = NULL;
-
-	acquire(&zombie_lock);	// enter cs 
-
-	tmp = zombie;
-	while (NULL != tmp) {
-		if (parent == tmp->parent) {
-			// find it! remove the corrupt from zombies 
-			*(tmp->prev) = tmp->next;
-			tmp->next->prev = tmp->prev;
-			break;
-		}
-		else {
-			tmp = tmp->next;
-		}
-	}
-
-	release(&zombie_lock);	// leave cs 
-
-	return tmp;
 }
 
 void exit(int xstate) {
@@ -188,16 +198,18 @@ void exit(int xstate) {
 	}
 	eput(p->cwd);
 
+	// write in xstate 
+	p->xstate = xstate;
+
 	// TODO: memory 
 
-	// remove itself from proc queue 
-	acquire(&proc_lock);	// enter cs proc 
-	*(p->prev) = p->next;
-	p->next->prev = p->prev;
-	release(&proc_lock);	// leave cs proc 
+	__enter_proc_cs 
 
-	p->xstate = xstate;
-	turn_zombie(p);
+	__remove(p);		// remove p from its list 
+	p->state = ZOMBIE;
+	__insert_zombie(p);	// re-insert p into `proc_zombie`
+
+	__leave_proc_cs 
 
 	// remove itself from parent's child list 
 	// concurrency safety of sibling list is protected by p->parent->lk 
@@ -240,271 +252,269 @@ void exit(int xstate) {
 	panic("exit(): zombie exit\n");
 }
 
-struct cpu cpus[NCPU];
+int wait(uint64 addr) {
+	struct proc *np;
+	struct proc *p = myproc();
 
-// queue for scheduling 
-struct proc *timeout;
-struct proc *irq;
-struct proc *normal;
-struct spinlock *proc_lock;
-// lock should be acquired before 
-static void _enqueue(struct proc **head, struct proc *p) {
-	struct proc *tmp = *head;
-	while (NULL != tmp) {
-		head = &(tmp->next);
-		tmp = tmp->next;
-	}
-	*head = p;
-	p->next = NULL;
-	p->prev = head;
-}
-// search for the first proc that fits func(p, value) != 0
-// proc_lock must be acquired before 
-static struct proc *search_proc(
-	int (*func)(struct proc*, void*), 
-	void *value
-) {
-	struct proc *tmp;
+	__enter_proc_cs 
+	while(1) {
+		np = proc_zombie;
+		while (NULL != np) {
+			if (np->parent == p) {
+				// find one 
+				int pid = np->pid;
+				// TODO: copy xstate out 
+				__remove(np);
+				freeproc(np);
+				__leave_proc_cs 
+				return pid;
+			}
+			else {
+				np = np->next;
+			}
+		}
 
-	tmp = timeout;
-	while (NULL != tmp) {
-		if (func(tmp, value)) return tmp;
-		else {
-			tmp = tmp->next;
+		// if not found in zombie, maybe child proc is still 
+		// runnable or sleeping? 
+		int has_child = 0;
+		for (int i = 0; i < PRIORITY_NUMBER; i ++) {
+			np = proc_runnable[i];
+			while (NULL != np) {
+				if (np->parent == p) {
+					has_child = 1;
+					goto end_search;
+				}
+			}
+		}
+		// search sleeping list 
+		np = proc_sleep;
+		while (NULL != np) {
+			if (np->parent == p) {
+				has_child = 1;
+				goto end_search;
+			}
+		}
+		end_search: if (has_child) {
+			// wait for child to exit 
+			sleep(p, &proc_lock);
+		}
+		else {	// the child(cake) is a lie!
+			__leave_proc_cs 
+			return -1;
 		}
 	}
-
-	tmp = irq;
-	while (NULL != tmp) {
-		if (func(tmp, value)) return tmp;
-		else {
-			tmp = tmp->next;
-		}
-	}
-
-	tmp = normal;
-	while (NULL != tmp) {
-		if (func(tmp, value)) return tmp;
-		else {
-			tmp = tmp->next;
-		}
-	}
-
-	return NULL;
-}
-// do the same thing for every proc that meets the condition 
-// also proc_lock should be held 
-static void foreach_proc(
-	int (*func)(struct proc*, void*), 
-	void *value, 
-	void (*handler)(struct proc*, void*), 
-	void *hvalue
-) {
-	struct proc *tmp;
-
-	tmp = timeout;
-	while (NULL != tmp) {
-		if (func(tmp, value)) {
-			handler(tmp, hvalue);
-		}
-		else {
-			tmp = tmp->next;
-		}
-	}
-
-	tmp = irq;
-	while (NULL != tmp) {
-		if (func(tmp, value)) {
-			handler(tmp, hvalue);
-		}
-		else {
-			tmp = tmp->next;
-		}
-	}
-
-	tmp = normal;
-	while (NULL != tmp) {
-		if (func(tmp, value)) {
-			handler(tmp, hvalue);
-		}
-		else {
-			tmp = tmp->next;
-		}
-	}
-}
-
-#define IRQ_TIMER 	5
-void enqueue_irq(struct proc *p) {
-	acquire(&p->lk);		// enter cs p 
-	// update state and timer 
-	p->state = RUNNABLE;
-	p->timer = IRQ_TIMER;
-	// enqueue to irq 
-	acquire(&proc_lock);	// enter cs proc 
-	_enqueue(&irq, p);
-	release(&proc_lock);	// leave cs proc 
-	release(&p->lk);		// leave cs p 
-}
-
-#define NORMAL_TIMER 	10 
-void enqueue_normal(struct proc *p) {
-	acquire(&p->lk);		// enter cs p 
-	// update state and timer 
-	p->state = RUNNABLE;
-	p->timer = NORMAL_TIMER;
-	// enqueue to normal 
-	acquire(&proc_lock);	// enter cs proc 
-	_enqueue(&normal, p);
-	release(&proc_lock);	// leave cs proc 
-	release(&p->lk);		// leave cs proc 
 }
 
 void proc_tick(void) {
-	struct proc *tmp;
+	__enter_proc_cs 
 
-	acquire(&proc_lock);	// enter cs proc 
-
-	tmp = normal;
-	while (NULL != tmp) {
-		acquire(&tmp->lk);
-		if (RUNNABLE != tmp->state) {
-			release(&tmp->lk);
-			continue;
+	for (int i = PRIORITY_IRQ; i < PRIORITY_NUMBER; i ++) {
+		struct proc *p = proc_runnable[i];
+		while (NULL != p) {
+			if (RUNNING != p->state) {
+				struct proc *next = p->next;
+				p->timer = p->timer - 1;
+				if (0 == p->timer) {	// timeout 
+					__remove(p);
+					__insert_runnable(PRIORITY_TIMEOUT, p);
+				}
+				p = next;
+			}
 		}
-		if (0 == tmp->timer) {
-			struct proc *next = tmp->next;
-			// remove tmp from normal 
-			*(tmp->prev) = tmp->next;
-			tmp->next->prev = tmp->prev;
-			// re-enqueue tmp to timeout 
-			_enqueue(&timeout, tmp);
+	} 
 
-			tmp = next;
-		}
-		else {
-			tmp->timer = tmp->timer - 1;
-			tmp = tmp->next;
-		}
-		release(&tmp->lk);
-	}
-
-	tmp = irq;
-	while (NULL != tmp) {
-		acquire(&tmp->lk);
-		if (RUNNABLE != tmp->state) {
-			release(&tmp->lk);
-			continue;
-		}
-		if (0 == tmp->timer) {
-			struct proc *next = tmp->next;
-			// remove tmp from irq 
-			*(tmp->prev) = tmp->next;
-			tmp->next->prev = tmp->prev;
-			// re-enqueue tmp to timeout 
-			_enqueue(&timeout, tmp);
-
-			tmp = next;
-		}
-		else {
-			tmp->timer = tmp->timer - 1;
-			tmp = tmp->next;
-		}
-		release(&tmp->lk);
-	}
-
-	release(&proc_lock);	// leave cs proc 
-}
-
-int wait(uint64 addr) {
-	struct proc *p = myproc();
-
-	#ifdef DEBUG 
-	if (NULL == p) {
-		__debug_error("wait", "init calls wait()\n");
-		return -1;
-	}
-	#endif 
-
-	// hold p->lk for the whole time to avoid lost 
-	// wakeups from a child's exit() 
-	acquire(&p->lk);
-
-	struct proc *tmp;
-	while (1) {
-		acquire(&zombie_lock);	// enter cs zombie 
-		tmp = corrupt_zombie(p);
-		release(&zombie_lock);	// leave cs zombie 
-		if (NULL != tmp) {
-			int ret = tmp->pid;
-			freeproc(tmp);
-			return ret;
-		}
-		// if not in zombie, then check if p has any child 
-		if (NULL == p->child) {	// if no child 
-			release(&p->lk);
-			return -1;
-		}
-		// wait for child to exit 
-		sleep(p, &p->lk);
-	}
+	__leave_proc_cs 
 }
 
 int kill(int pid) {
 	struct proc *tmp;
 
-	#ifdef DEBUG 
-	if (1 == pid) {
-		__debug_warn("kill", "try to kill init\n");
-	}
-	#endif 
+	__enter_proc_cs 
 
-	// search proc queue 
-	acquire(&proc_lock);	// enter cs proc 
-	// define nested function to search list 
-	// nested function is GNU C extension, may not be supported 
-	// by other compilers 
-	int func(struct proc *p, void *value) {
-		int pid = (int)value;
-		int ret;
-		acquire(&p->lk);
-		ret = (p->pid == pid);
-		release(&p->lk);
-		return ret;
+	// search runnable 
+	for (int i = 0; i < PRIORITY_NUMBER; i ++) {
+		tmp = proc_runnable[i];
+		while (NULL != tmp) {
+			if (pid == tmp->pid) {
+				// found 
+				tmp->killed = 1;
+				__leave_proc_cs 
+				return 0;
+			}
+		}
 	}
-	int handle(struct proc *p, void *value) {
-		acquire(&p->lk);
-		p->killed = 1;
-		release(&p->lk);
-	}
-	search_proc(func, (void*)pid, handle, NULL);
-	release(&proc_lock);	// leave cs proc 
+	// search sleep 
+	tmp = proc_sleep;
+	while (NULL != tmp) {
+		if (pid == tmp->pid) {
+			// found 
+			tmp->killed = 1;
+			// wakeup the proc 
+			tmp->state = RUNNABLE;
+			__remove(tmp);
+			__insert_runnable(tmp, PRIORITY_NORMAL);
 
-	return 0;
+			__leave_proc_cs 
+			return 0;
+		}
+	}
+
+	__leave_proc_cs 
+	return -1;
 }
 
-void yield(void) {}
+// turn current proc into `RUNNABLE`
+// and switch to scheduler 
+void yield(void) {
+	struct proc *p = myproc();
 
-void sleep(void *chan, struct spinlock *lk) {}
+	__enter_proc_cs 
 
-void wakeup(void *chan) {}
+	p->state = RUNNABLE;
+	p->timer = TIMER_NORMAL;
+	__remove(p);
+	__insert_runnable(PRIORITY_NORMAL, p);
 
-void scheduler(void) __attribute__((noreturn)) {}
+	// swtch to scheduler 
+	sched();
 
-void sched(void);
+	__leave_proc_cs 
+}
+
+void sleep(void *chan, struct spinlock *lk) {
+	struct proc *p = myproc();
+
+	release(lk);
+	__enter_proc_cs 
+
+	p->chan = chan;
+	p->state = SLEEPING;
+	__remove(p);	// remove p from runnable 
+	__insert_sleep(p);
+
+	sched();
+	p->chan = NULL;
+
+	__leave_proc_cs 
+	acquire(lk);
+}
+
+void wakeup(void *chan) {
+	__enter_proc_cs 
+
+	struct proc *p = proc_sleep;
+	while (NULL != p) {
+		struct proc *next = p->next;
+		if (chan == p->chan) {
+			__remove(p);
+			p->state = RUNNABLE;
+			p->timer = TIMER_IRQ;
+			__insert_runnable(PRIORITY_IRQ, p);
+		}
+		p = next;
+	}
+
+	__leave_proc_cs 
+}
+
+// idle proc is the implied proc running when there's 
+// no proc available in runnable list. 
+// idle_proc should run STRICTLY with proc_lock ACQUIRED 
+int shell_pid;		// the pid of the first shell process 
+static void idle_proc(void) {
+	static char *argv[] = {"sh", 0};
+	struct proc *tmp = proc_zombie;
+	
+	while (NULL != tmp) {
+		
+	}
+}
+
+#define TIMER_IDLE 		15
+void scheduler(void) __attribute__((noreturn)) {
+	struct proc *tmp;
+	struct cpu *c = mycpu();
+	// `idle_timer` is used to make sure that `idle` codes will 
+	// be executed from time to time, to avoid starvation 
+	int idle_timer = TIMER_IDLE;
+
+	// it should never returns!
+	while (1) {
+		scheduler_start: 
+		__enter_proc_cs 
+		if (0 == idle_timer) {
+			// if no proc found, run implied `idle` proc, 
+			// it will clean up zombie procs whose parents are dead 
+			idle_proc();
+			__leave_proc_cs 
+			intr_on();
+			idle_timer = TIMER_IDLE;
+		}
+		else {
+			for (int i = PRIORITY_TIMEOUT; i < PRIORITY_NUMBER; i ++) {
+				tmp = proc_runnable[i];
+				while (NULL != tmp) {
+					if (RUNNABLE == tmp->state) {
+						tmp->state = RUNNING;
+						c->proc = tmp;
+						// TODO: switch pagetable 
+						swtch(&c->context, &p->context);
+						// TODO: switch pagetable 
+						__leave_proc_cs 
+						intr_on();
+						idle_timer -= 1;
+						goto scheduler_start;
+					} 
+					else {
+						tmp = tmp->next;
+					} 
+				}
+			}
+			__leave_proc_cs 
+			intr_on();
+			idle_timer = 0;
+		}
+	} 
+
+	__debug_error("scheduler", "scheduler returns!\n");
+	panic("critical problem\n");
+}
+
+// sched() is the only way back to scheduler() 
+void sched(void) {
+	int intena;
+	struct proc *p = myproc();
+
+	if (!holding(&proc_lock)) 
+		panic("sched proc_lock\n");
+	if (1 != mycpu()->noff) 
+		panic("sched locks\n");
+	if (RUNNING == p->state) 
+		panic("sched running\n");
+	if (intr_get()) 
+		panic("sched interruptible\n");
+
+	intena = mycpu()->intena;
+	swtch(&p->context, &mycpu()->context);
+	mycpu()->intena = intena;
+}
 
 void procinit(void) {
 	// init pid 
 	pid = 2;	// 1 is reserved for in-kernel process `init`
 	initlock(&pid_lock, "pid_lock");
 
-	// init zombie 
-	zombie = NULL;
-	initlock(&zombie_lock, "zombie_lock");
-
 	// init cpus 
 	memset(cpus, 0, sizeof(cpus));
 
 	// init queue 
-	timeout = irq = normal = NULL;
+	for (int i = 0; i < NUM; i ++) 
+		proc_runnable[i] = NULL;
+	proc_sleep = NULL;
+	proc_zombie = NULL;
 	initlock(&proc_lock, "proc_lock");
+}
+
+void userinit(void) {
+	
 }

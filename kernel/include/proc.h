@@ -40,16 +40,16 @@ struct proc {
 
 	// basic information 
 	// these fields MUST be protected by lk 
-	void *chan;
-	enum procstate state;	// process state 
 	int killed;				// if non-zero, have been killed
 	int xstate;				// Exit status to be returned to parent's wait()
 	int pid;				// Process ID 
-	int timer;
 
-	// next and prev are protected by queue's lock 
+	// next and prev are protected by proc_lock 
 	struct proc *next;		// point to next proc 
 	struct proc **prev;
+	int timer;				// timer 
+	enum procstate state;	// process state 
+	void *chan;				// the reason this proc is sleeping for 
 
 	// parenting
 	// these fields MUST be protected by lk 
@@ -94,8 +94,7 @@ int kill(int pid);
 
 /* Scheduling */
 
-void enqueue_irq(struct proc *p);
-void enqueue_normal(struct proc *p);
+// update each proc's timer 
 void proc_tick(void);
 
 /* Wait for a child process to exit and return its pid. 

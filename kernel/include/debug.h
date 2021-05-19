@@ -25,7 +25,19 @@
 #define __debug_warn(mod, ...) \
 	__debug_msg(__WARN(mod)": "__VA_ARGS__) 
 #define __debug_error(mod, ...) \
-	__debug_msg(__ERROR(mod)": "__VA_ARGS__)
+	__debug_msg(__ERROR(mod)": "__VA_ARGS__) 
+
+#ifdef DEBUG 
+	#define __debug_assert(mod, cond, ...) do {\
+		if (!(cond)) {\
+			__debug_error(mod, __VA_ARGS__);\
+			panic("panic!");\
+		}\
+	} while (0)
+#else 
+	#define __debug_assert(mod, cond, ...) \
+		do {} while(0)
+#endif 
 
 // use this to add want-to-test functions 
 // to anywhere you like!
