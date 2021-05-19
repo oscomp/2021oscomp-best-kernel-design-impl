@@ -433,8 +433,11 @@ impl ShortDirEntry{
 
     /* 设置文件起始簇 */
     pub fn set_first_cluster(&mut self, cluster: u32){
-        self.cluster_high = ((cluster & 0xFF00)>>16) as u16;
-        self.cluster_low = (cluster & 0x00FF) as u16;
+        //println!("set first cluster: {:X}",cluster);
+        self.cluster_high = ((cluster & 0xFFFF0000)>>16) as u16;
+        self.cluster_low = (cluster & 0x0000FFFF) as u16;
+        //println!("high = 0x{:X}", self.cluster_high);
+        //println!("low = 0x{:X}", self.cluster_low);
     }
 
     /* 清空文件，删除时使用 */

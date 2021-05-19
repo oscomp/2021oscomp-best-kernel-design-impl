@@ -321,7 +321,7 @@ impl VFile{
         let mut current_vfile = self.clone();
         for i in 0 .. len {
             // DEBUG
-            if path[i] == ""{
+            if path[i] == "" || path[i] == "."{
                 continue;
             }
             if let Some(vfile) = current_vfile.find_vfile_byname(path[i]) {
@@ -349,7 +349,7 @@ impl VFile{
         new_size: u32,
     ) {  // TODO: return sth when cannot increase
         //println!("===================== in increase =======================");
-        //println!("file: {}", self.get_name());
+        //println!("file: {}, newsz = {}", self.get_name(), new_size);
         //println!("try lock");
         let first_cluster = self.first_cluster();
         let old_sz = self.get_size();
@@ -357,6 +357,7 @@ impl VFile{
         //println!("get lock");
         let old_size = self.size;
         if new_size <= old_size {
+            //println!("oldsz > newsz");
             return;
         }
         let needed = manager_writer.cluster_num_needed(old_sz, new_size, self.is_dir(), first_cluster);

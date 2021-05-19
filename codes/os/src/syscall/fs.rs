@@ -13,6 +13,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 //use easy_fs::DiskInodeType;
 const AT_FDCWD:isize = -100;
+const FD_LIMIT:usize = 128;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = current_user_token();
@@ -236,8 +237,23 @@ pub fn sys_getcwd(buf: *mut u8, len: usize)->isize{
     }
 }
 
-pub fn sys_dup3(){
-
+pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
+    let task = current_task().unwrap();
+    let mut inner = task.acquire_inner_lock();
+    if  old_fd >= inner.fd_table.len() || new_fd > FD_LIMIT {
+        return -1;
+    }
+    if inner.fd_table[old_fd].is_none() {
+        return -1;
+    }
+    if new_fd >= inner.fd_table.len() {
+        for i in inner.fd_table.len()..(new_fd + 1) {
+            inner.fd_table.push(None);
+        }
+    }
+    //let new_fd = inner.alloc_fd();
+    inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[old_fd].as_ref().unwrap()));
+    new_fd as isize
 }
 
 pub fn sys_getdents64(){
@@ -279,15 +295,17 @@ pub fn sys_mkdir(dirfd:isize, path:*const u8, mode:u32)->isize{
     }
 }
 
-pub fn sys_mount(){
-
+pub fn sys_mount( special:*const u8, dir:*const u8, fstype: *const u8, flags:usize, data: *const u8 )->isize{
+    // TODO
+    0
 }
 
-pub fn sys_umount(){
-
+pub fn sys_umount( special:*const u8, flags:usize )->isize{
+    // TODO
+    0
 }
 
 pub fn sys_fstat(){
 
-}
+}   
 
