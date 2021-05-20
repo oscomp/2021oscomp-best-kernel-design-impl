@@ -1,9 +1,16 @@
 mod pipe;
 mod stdio;
 mod inode;
-mod util;
+mod mount;
 
 use crate::mm::UserBuffer;
+use alloc::sync::Arc; 
+
+#[derive(Clone)]
+pub enum FileClass {
+    File (Arc<OSInode>),
+    Abstr (Arc<dyn File + Send + Sync>),
+}
 
 pub trait File : Send + Sync {
     fn readable(&self) -> bool;

@@ -1,15 +1,13 @@
 use crate::{drivers::BLOCK_DEVICE, println};
 use crate::color_text;
 use alloc::sync::Arc;
-use k210_hal::cache::Uncache;
 use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
-//use alloc::vec;
 use spin::Mutex;
 use super::File;
 use crate::mm::UserBuffer;
-use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, FatBS, VFile};
+use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
 
 #[derive(PartialEq,Copy,Clone,Debug)]
 pub enum DiskInodeType {
@@ -73,6 +71,21 @@ impl OSInode {
         v
     }
 
+    pub fn find(&self, path:&str, flags:OpenFlags)->Option<Arc<OSInode>>{
+        let inner = self.inner.lock();
+        let mut pathv:Vec<&str> = path.split('/').collect();
+        let vfile = inner.inode.find_vfile_bypath(pathv);
+        if vfile.is_none(){
+            return None
+        } else {
+            let (readable, writable) = flags.read_write();
+            return Some(Arc::new(OSInode::new(
+                readable,
+                writable,
+                vfile.unwrap()
+            )))
+        }
+    }
     // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
     //     let inner = self.inner.lock();
     //     if whence == SeekWhence::SEEK_END {
@@ -139,7 +152,6 @@ pub fn list_files(work_path: &str, path: &str){
             ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
         }
     };
-    
     //println!("path  = {}, len = {}", path, path.len());
     let mut pathv:Vec<&str> = path.split('/').collect();
     //println!("pathv.len = {}", path.len());
@@ -204,6 +216,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
         }
     };
     let mut pathv:Vec<&str> = path.split('/').collect();
+    //println!("pathv = {:?}", pathv);
     // shell应当保证此处输入的path不为空
     let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
@@ -238,7 +251,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
             }
         }
     } else {
-        //println!("pathv = {:?}", pathv);
+        println!("pathv = {:?}", pathv);
         cur_inode.find_vfile_bypath(pathv)
             .map(|inode| {
                 if flags.contains(OpenFlags::TRUNC) {

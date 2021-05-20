@@ -1,6 +1,8 @@
 use core::usize;
 
-use crate::{fs::OSInode, mm::{
+use crate::{
+    fs::{OSInode, FileClass, File}, 
+    mm::{
     UserBuffer,
     translated_byte_buffer,
     translated_refmut,
@@ -11,6 +13,7 @@ use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;
+
 //use easy_fs::DiskInodeType;
 const AT_FDCWD:isize = -100;
 const FD_LIMIT:usize = 128;
@@ -23,13 +26,16 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         return -1;
     }
     if let Some(file) = &inner.fd_table[fd] {
-        if !file.writable() {
+        let f: Arc<dyn File + Send + Sync> = match file {
+            FileClass::Abstr(f)=> {f.clone()},
+            FileClass::File(f)=>{f.clone()},
+            _ => return -1,
+        };
+        if !f.writable() {
             return -1;
         }
-        let file = file.clone();
-        // release Task lock manually to avoid deadlock
         drop(inner);
-        file.write(
+        f.write(
             UserBuffer::new(translated_byte_buffer(token, buf, len))
         ) as isize
     } else {
@@ -45,7 +51,11 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         return -1;
     }
     if let Some(file) = &inner.fd_table[fd] {
-        let file = file.clone();
+        let file: Arc<dyn File + Send + Sync> = match file {
+            FileClass::Abstr(f)=> {f.clone()},
+            FileClass::File(f)=>{f.clone()},
+            _ => return -1,
+        };
         if !file.readable() {
             return -1;
         }
@@ -66,7 +76,9 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
     let mut inner = task.acquire_inner_lock();
+    println!("openat: fd = {}", dirfd);
     if dirfd == AT_FDCWD {
+        println!("cwd = {}", inner.get_work_path().as_str());
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
             path.as_str(),
@@ -74,15 +86,35 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             DiskInodeType::File
         ) {
             let fd = inner.alloc_fd();
-            inner.fd_table[fd] = Some(inode);
+            inner.fd_table[fd] = Some(FileClass::File(inode));
             fd as isize
         } else {
             -1
         }
     } else {    
-        // TODO
-        -1
+        let fd_usz = dirfd as usize;
+        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
+            return -1
+        }
+        if let Some(file) = &inner.fd_table[fd_usz] {
+            // TODO
+            match file {
+                FileClass::File(f) => {
+                    if let Some(tar_f) = f.find(path.as_str(), OpenFlags::from_bits(flags).unwrap()){
+                        let fd = inner.alloc_fd();
+                        inner.fd_table[fd] = Some(FileClass::File(tar_f));
+                        fd as isize
+                    }else{
+                        return -1;
+                    }
+                },
+                _ => return -1,
+            }
+        } else {
+            return -1
+        }
     }
+    
 }
 
 // TODO
@@ -98,9 +130,8 @@ pub fn sys_open( path: *const u8, flags: u32 ) -> isize {
         OpenFlags::from_bits(flags).unwrap(),
         DiskInodeType::File
     ) {
-        
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(inode);
+        inner.fd_table[fd] = Some(FileClass::File(inode));
         fd as isize
     } else {
         -1
@@ -126,9 +157,9 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
     let mut inner = task.acquire_inner_lock();
     let (pipe_read, pipe_write) = make_pipe();
     let read_fd = inner.alloc_fd();
-    inner.fd_table[read_fd] = Some(pipe_read);
+    inner.fd_table[read_fd] = Some(FileClass::Abstr(pipe_read));
     let write_fd = inner.alloc_fd();
-    inner.fd_table[write_fd] = Some(pipe_write);
+    inner.fd_table[write_fd] = Some(FileClass::Abstr(pipe_write));
     *translated_refmut(token, pipe) = read_fd;
     *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd;
     0
@@ -144,7 +175,7 @@ pub fn sys_dup(fd: usize) -> isize {
         return -1;
     }
     let new_fd = inner.alloc_fd();
-    inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[fd].as_ref().unwrap()));
+    inner.fd_table[new_fd] = Some(inner.fd_table[fd].as_ref().unwrap().clone());
     new_fd as isize
 }
 
@@ -252,7 +283,7 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
         }
     }
     //let new_fd = inner.alloc_fd();
-    inner.fd_table[new_fd] = Some(Arc::clone(inner.fd_table[old_fd].as_ref().unwrap()));
+    inner.fd_table[new_fd] = Some(inner.fd_table[old_fd].as_ref().unwrap().clone());
     new_fd as isize
 }
 

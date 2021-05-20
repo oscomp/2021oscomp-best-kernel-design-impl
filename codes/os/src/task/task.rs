@@ -14,7 +14,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::{Mutex, MutexGuard};
-use crate::fs::{File, Stdin, Stdout};
+use crate::fs::{File, Stdin, Stdout, FileClass};
 
 pub struct TaskControlBlock {
     // immutable
@@ -33,7 +33,7 @@ pub struct TaskControlBlockInner {
     pub parent: Option<Weak<TaskControlBlock>>,
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
-    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub fd_table: Vec<Option<FileClass>>,
     pub current_path: String,
 }
 
@@ -105,11 +105,11 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: vec![
                     // 0 -> stdin
-                    Some(Arc::new(Stdin)),
+                    Some( FileClass::Abstr(Arc::new(Stdin)) ),
                     // 1 -> stdout
-                    Some(Arc::new(Stdout)),
+                    Some( FileClass::Abstr(Arc::new(Stdout)) ),
                     // 2 -> stderr
-                    Some(Arc::new(Stdout)),
+                    Some( FileClass::Abstr(Arc::new(Stdout)) ),
                 ],
                 current_path: String::from("/"), // 只有initproc在此建立，其他进程均为fork出
             }),
@@ -204,10 +204,10 @@ impl TaskControlBlock {
         // push a goto_trap_return task_cx on the top of kernel stack
         let task_cx_ptr = kernel_stack.push_on_top(TaskContext::goto_trap_return());
         // copy fd table
-        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        let mut new_fd_table: Vec<Option<FileClass>> = Vec::new();
         for fd in parent_inner.fd_table.iter() {
             if let Some(file) = fd {
-                new_fd_table.push(Some(file.clone()));
+                new_fd_table.push(Some( file.clone() ));
             } else {
                 new_fd_table.push(None);
             }
