@@ -1,3 +1,4 @@
 all: 
 	echo "hello"
-	cd codes/os/ && make release
+	cd codes/user && make build
+	cd codes/os && make release
