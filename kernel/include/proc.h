@@ -63,7 +63,11 @@ struct proc {
 	struct trapframe *tp;	// trapframe 
 
 	// memory 
-	// TODO: pagetable 
+	uint64 kstack;					// virtual address of kernel stack 
+	uint64 sz;						// size of process memory 
+	pagetable_t pagetable;			// user pagetable 
+	pagetable_t kpagetable;			// kernel pagetable 
+	struct trapframe *trapframe;	// data page for trampoline.S 
 
 	// file system 
 	struct file *ofile[NOFILE];	// open files 
@@ -111,6 +115,9 @@ void sleep(void *chan, struct spinlock *lk);
 /* Wake up all processes sleeping on chan. 
 	Must be called without any p->lock. */
 void wakeup(void *chan);
+
+/* Return the next runnable process */
+struct proc const *get_runnable(void);
 
 /* Select next proc to run */
 void scheduler(void) __attribute__((noreturn))
