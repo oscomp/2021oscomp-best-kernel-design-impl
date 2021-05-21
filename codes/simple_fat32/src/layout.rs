@@ -666,7 +666,7 @@ impl ShortDirEntry{
                 // 读完一个簇
                 //println!("finish writing a cluster");
                 current_cluster = fat_reader.get_next_cluster(current_cluster, Arc::clone(block_device));
-                if current_cluster == END_CLUSTER { break; } //没有下一个簇
+                if current_cluster == END_CLUSTER { panic!("END_CLUSTER"); break; } //没有下一个簇
                 // 计算所在扇区
                 //println!("write at current_cluster = {}", current_cluster);
                 current_sector = manager_reader.first_sector_of_cluster(current_cluster);

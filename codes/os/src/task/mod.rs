@@ -5,12 +5,13 @@ mod manager;
 mod processor;
 mod pid;
 
-use crate::fs::{open, OpenFlags, DiskInodeType};
+use crate::fs::{open, OpenFlags, DiskInodeType, File};
+use crate::mm::UserBuffer;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
 use alloc::sync::Arc;
-use alloc::vec;
+use alloc::vec::Vec;
 use manager::fetch_task;
 use lazy_static::*;
 pub use context::TaskContext;
@@ -76,6 +77,55 @@ lazy_static! {
     });
 }
 
+pub fn add_initproc_into_fs() {
+    extern "C" { fn _num_app(); }
+    extern "C" { fn _app_names(); }
+    let mut num_app_ptr = _num_app as usize as *mut usize;
+    let start = _app_names as usize as *const u8;
+    let mut app_start = unsafe {
+        core::slice::from_raw_parts_mut(num_app_ptr.add(1), 2)
+    };
+
+    //Write apps(initproc & user_shell) to disk from mem
+    if let Some(inode) = open(
+        "/",
+        "initproc",
+        OpenFlags::CREATE,
+        DiskInodeType::File
+    ){
+        let mut data: Vec<&'static mut [u8]> = Vec::new();
+        data.push( unsafe{
+        core::slice::from_raw_parts_mut(
+            app_start[0] as *mut u8,
+            app_start[1] - app_start[0]
+        )}) ;
+        inode.write(UserBuffer::new(data));
+    }
+    else{
+        panic!("initproc create fail!");
+    }
+
+    if let Some(inode) = open(
+        "/",
+        "user_shell",
+        OpenFlags::CREATE,
+        DiskInodeType::File
+    ){
+        let mut data:Vec<&'static mut [u8]> = Vec::new();
+        data.push(unsafe{
+        core::slice::from_raw_parts_mut(
+            app_start[1] as *mut u8,
+            app_start[2] - app_start[1]
+        )});
+        inode.write(UserBuffer::new(data));
+    }
+    else{
+        panic!("user_shell create fail!");
+    }
+    println!("Write apps(initproc & user_shell) to disk from mem");
+}
+
 pub fn add_initproc() {
+    add_initproc_into_fs();
     add_task(INITPROC.clone());
 }

@@ -19,7 +19,7 @@ const SYSCALL_LS: usize = 500;
 mod fs;
 mod process;
 
-use fs::*;
+pub use fs::*;
 use process::*;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {

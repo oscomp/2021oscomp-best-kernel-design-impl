@@ -16,7 +16,10 @@ do
 done
 for programname in $(ls ../user/src/bin)
 do
-    sudo cp ../user/target/riscv64gc-unknown-none-elf/release/${programname%.rs} ../fat32-fuse/fs/${programname%.rs}
+    if [ $programname != "initproc.rs" ] && [ $programname != "user_shell.rs" ]
+    then 
+        sudo cp ../user/target/riscv64gc-unknown-none-elf/release/${programname%.rs} ../fat32-fuse/fs/${programname%.rs}
+    fi
 done
 
 sudo umount ${U_FAT32_DIR}/fs

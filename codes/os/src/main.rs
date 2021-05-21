@@ -30,6 +30,7 @@ mod fs;
 mod drivers;
 
 global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("start_app.S"));
 
 fn clear_bss() {
     extern "C" {
