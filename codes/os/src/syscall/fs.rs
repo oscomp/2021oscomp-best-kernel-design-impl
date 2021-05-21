@@ -1,7 +1,7 @@
 use core::usize;
 
 use crate::{
-    fs::{OSInode, FileClass, File}, 
+    fs::{OSInode, FileClass, File, Dirent}, 
     mm::{
     UserBuffer,
     translated_byte_buffer,
@@ -76,9 +76,9 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
     let mut inner = task.acquire_inner_lock();
-    println!("openat: fd = {}", dirfd);
+    //println!("openat: fd = {}", dirfd);
     if dirfd == AT_FDCWD {
-        println!("cwd = {}", inner.get_work_path().as_str());
+        //println!("cwd = {}", inner.get_work_path().as_str());
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
             path.as_str(),
@@ -287,8 +287,41 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
     new_fd as isize
 }
 
-pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
-    0
+pub fn sys_getdents64(fd:isize, buf: *mut Dirent, len:usize)->isize{
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    let dirent: &mut Dirent = translated_refmut(token, buf);
+    if fd == AT_FDCWD {
+        let work_path = inner.current_path.clone();
+        if let Some(file) = open(
+            "/",
+            work_path.as_str(),
+            OpenFlags::RDONLY,
+            DiskInodeType::Directory
+        ) {
+            return file.getdirent(dirent, 2)
+        } else {
+            return -1
+        }
+    } else {
+        let fd_usz = fd as usize;
+        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
+            return -1
+        }
+        if let Some(file) = &inner.fd_table[fd_usz] {
+            // TODO
+            match file {
+                FileClass::File(f) => {
+                    let ret =  f.getdirent(dirent, 0);
+                    return ret
+                },
+                _ => return -1,
+            }
+        } else {
+            return -1
+        }
+    }
 }
 
 // TODO: mode需要研究
@@ -323,6 +356,7 @@ pub fn sys_mkdir(dirfd:isize, path: *const u8, mode:u32)->isize{
         } else {
             return -1
         }
+
     }
 }
 

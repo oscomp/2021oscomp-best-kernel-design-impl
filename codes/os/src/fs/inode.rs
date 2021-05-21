@@ -1,11 +1,12 @@
 use crate::{drivers::BLOCK_DEVICE, println};
 use crate::color_text;
+use _core::usize;
 use alloc::sync::Arc;
 use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
 use spin::Mutex;
-use super::File;
+use super::{File, Dirent, DT_DIR, DT_REG, DT_UNKNOWN};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
 
@@ -78,6 +79,31 @@ impl OSInode {
                 writable,
                 vfile.unwrap()
             )))
+        }
+    }
+
+    pub fn getdirent(&self, dirent: &mut Dirent, offset:isize)->isize {
+        let inner = self.inner.lock();
+        if let Some((name, offset, first_clu,attri)) 
+        = inner.inode.dirent_info(offset as usize){
+            let mut d_type:u8 = 0;
+            if attri & ATTRIBUTE_DIRECTORY != 0 {
+                d_type = DT_DIR;
+            } else if attri & ATTRIBUTE_ARCHIVE != 0 {
+                d_type = DT_REG;
+            } else {
+                d_type = DT_UNKNOWN;
+            }
+            dirent.fill_info(
+                name.as_str(), 
+                first_clu as usize, 
+                offset as isize, 
+                name.len() as u16, 
+                d_type
+            );
+            (name.len() + 8 + 8 + 2 + 1) as isize
+        } else {
+            -1
         }
     }
     // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
@@ -245,7 +271,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
             }
         }
     } else {
-        println!("pathv = {:?}", pathv);
+        //println!("pathv = {:?}", pathv);
         cur_inode.find_vfile_bypath(pathv)
             .map(|inode| {
                 if flags.contains(OpenFlags::TRUNC) {
@@ -284,12 +310,7 @@ pub fn ch_dir(work_path: &str, path: &str) -> isize{
     }
 }
  
-// TODO: 不急
-/* 
-pub fn read_dir(inode_id: u32) -> Option<Arc<OSDirEntry>> {
-    // 从目录中读取下一个目录项
-}*/
-
+// TODO: 不急 
 // 复制文件/目录
 //pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{
 //    let spathv:Vec<&str> = src_path.split('/').collect();

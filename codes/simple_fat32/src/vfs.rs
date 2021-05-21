@@ -586,6 +586,51 @@ impl VFile{
         }
     }
 
+    /* 获取目录中offset处目录项的信息 TODO:之后考虑和stat复用
+    * 返回<name, offset, firstcluster,attributes>
+    */
+    pub fn dirent_info(&self, off:usize) -> Option<(String, u32, u32, u8)>{
+        if !self.is_dir() {
+            return None
+        } 
+        let mut long_ent = LongDirEntry::empty();
+        let mut offset = off;
+        let mut name = String::new(); 
+        let mut is_long = false;
+        loop {
+            let read_sz = self.read_short_dirent(|curr_ent:&ShortDirEntry|{
+                curr_ent.read_at(
+                    offset, 
+                    long_ent.as_bytes_mut(),
+                    &self.fs,
+                    &self.fs.read().get_fat(),
+                    &self.block_device
+                )
+            });
+            if read_sz != DIRENT_SZ || long_ent.is_empty() { 
+                return None;
+            }
+            if long_ent.is_deleted() { offset += DIRENT_SZ; is_long = false; continue; }
+            // 名称拼接
+            if long_ent.attribute() != ATTRIBUTE_LFN {
+                let (_, se_array, _) = unsafe{
+                    long_ent.as_bytes_mut().align_to_mut::<ShortDirEntry>()
+                };
+                let short_ent = se_array[0];
+                if !is_long {
+                    name = short_ent.get_name_lowercase();
+                } 
+                let attribute = short_ent.attribute();
+                let first_cluster = short_ent.first_cluster();
+                return Some((name, offset as u32, first_cluster,attribute))
+            } else {
+                is_long = true;
+                name.insert_str(0, long_ent.get_name_format().as_str());
+            }
+            offset += DIRENT_SZ; 
+        }
+    }
+
     /* ls精简版，上面那个又臭又长，但这个不保证可靠 */
     // DEBUG
     pub fn ls_lite(&self)-> Option<Vec<(String, u8)>>{   
@@ -607,16 +652,12 @@ impl VFile{
                     &self.block_device
                 )
             });
-            // 检测是否结束或被删除
-            //if offset > 2000 {
-            //    loop{}
-            //}
             if read_sz != DIRENT_SZ || long_ent.is_empty() { 
                 return Some(list)
             }
             if long_ent.is_deleted() { offset += DIRENT_SZ; is_long = false; continue; }
             // 名称拼接
-            if long_ent.attribute() != ATTRIBUTE_LFN {
+            if long_ent.attribute() != ATTRIBUTE_LFN { // 短文件名
                 let (_, se_array, _) = unsafe{
                     long_ent.as_bytes_mut().align_to_mut::<ShortDirEntry>()
                 };
@@ -628,7 +669,7 @@ impl VFile{
                     list.push( (short_ent.get_name_lowercase(), short_ent.attribute()) )
                 }
                 name.clear();
-            } else {
+            } else { // 长文件名，开始拼接
                 is_long = true;
                 name.insert_str(0, long_ent.get_name_format().as_str());
             }
