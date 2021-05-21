@@ -19,7 +19,7 @@ for programname in $(ls ../user/src/bin)
 do
     if [ $programname != "initproc.rs" ] && [ $programname != "user_shell.rs" ]
     then 
-        sudo cp ../user/target/riscv64gc-unknown-none-elf/release/${programname%.rs} ../fat32-fuse/fs/${programname%.rs}
+        sudo cp ../user/target/riscv64imac-unknown-none-elf/release/${programname%.rs} ../fat32-fuse/fs/${programname%.rs}
     fi
 done
 
