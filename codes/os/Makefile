@@ -6,7 +6,8 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
 U_FAT32_DIR := ../fat32-fuse
-U_FAT32 := ${U_FAT32_DIR}/fat32.img
+U_FAT32 := /dev/sdb1
+#U_FAT32 := ${U_FAT32_DIR}/fat32.img
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../k210.bin
@@ -39,7 +40,7 @@ DISASM ?= -x
 build: env $(KERNEL_BIN)
 
 env:
-	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
+	(rustup target list | grep "riscv64imac-unknown-none-elf (installed)") || rustup target add $(TARGET)
 	# cargo install cargo-binutils
 	rustup component add rust-src
 	rustup component add llvm-tools-preview
@@ -70,7 +71,7 @@ clean:
 
 run: run-inner
 
-run-inner: fat32 build 
+run-inner:  build 
 ifeq ($(BOARD),qemu)
 	@qemu-system-riscv64 \
 		-machine virt \
