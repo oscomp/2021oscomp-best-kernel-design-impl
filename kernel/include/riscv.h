@@ -48,6 +48,11 @@ w_mepc(uint64 x)
 #define SSTATUS_UPIE (1L << 4) // User Previous Interrupt Enable
 #define SSTATUS_SIE (1L << 1)  // Supervisor Interrupt Enable
 #define SSTATUS_UIE (1L << 0)  // User Interrupt Enable
+#ifndef QEMU
+#define SSTATUS_PUM (1L << 18)
+#else
+#define SSTATUS_SUM (1L << 18)
+#endif
 
 static inline uint64
 r_sstatus()
@@ -187,7 +192,12 @@ w_mtvec(uint64 x)
 // use riscv's sv39 page table scheme.
 #define SATP_SV39 (8L << 60)
 
+#ifdef QEMU
 #define MAKE_SATP(pagetable) (SATP_SV39 | (((uint64)pagetable) >> 12))
+#else
+#define MAKE_SATP(pagetable) (0x3fffffffff & (((uint64)pagetable) >> 12))
+#endif
+
 
 // supervisor address translation and protection;
 // holds the address of the page table.
@@ -330,7 +340,15 @@ sfence_vma()
 {
   // the zero, zero means flush all TLB entries.
   // asm volatile("sfence.vma zero, zero");
+  #ifdef QEMU
   asm volatile("sfence.vma");
+  #else
+  asm volatile("fence");
+  asm volatile("fence.i");
+  asm volatile(".word 0x10400073");
+  asm volatile("fence");
+  asm volatile("fence.i");
+  #endif
 }
 
 
@@ -345,6 +363,8 @@ sfence_vma()
 #define PTE_W (1L << 2)
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // 1 -> user can access
+#define PTE_RSW1 (1L << 8)  // reserved for supervisor software 1
+#define PTE_RSW2 (1L << 9)  // 2
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

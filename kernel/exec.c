@@ -1,3 +1,6 @@
+#ifndef __DEBUG_exec
+#undef  DEBUG
+#endif
 
 #include "include/types.h"
 #include "include/param.h"
@@ -8,9 +11,11 @@
 #include "include/fs.h"
 #include "include/pm.h"
 #include "include/vm.h"
+#include "include/usrmm.h"
 #include "include/printf.h"
 #include "include/string.h"
 #include "include/syscall.h"
+#include "include/debug.h"
 
 // Load a program segment into pagetable at virtual address va.
 // va must be page-aligned
@@ -56,8 +61,10 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
     if (argp == 0)
       break;
     int arglen = fetchstr(argp, buf, PGSIZE);   // '\0' included in PGSIZE, but not in envlen
-    if (arglen++ < 0)                                 // including '\0'
+    if (arglen++ < 0) {                               // including '\0'
+      // __debug_warn("pushstack", "didn't get null\n");
       goto bad;
+    }
     sp -= arglen;
     sp -= sp % 16;
     if (sp < stackbase || copyout(pt, sp, buf, arglen) < 0)
@@ -80,11 +87,13 @@ int execve(char *path, char **argv, char **envp)
 {
   struct inode *ip = NULL;
   pagetable_t pagetable = NULL;
-  pagetable_t kpagetable = NULL;
+  struct seg *seghead = NULL, *seg;
   struct proc *p = myproc();
 
-  if ((ip = namei(path)) == NULL)
+  if ((ip = namei(path)) == NULL) {
+    __debug_warn("execve", "can't open %s\n", path);
     goto bad;
+  }
   ilock(ip);
 
   // Check ELF header
@@ -92,33 +101,51 @@ int execve(char *path, char **argv, char **envp)
   if (ip->fop->read(ip, 0, (uint64) &elf, 0, sizeof(elf)) != sizeof(elf) || elf.magic != ELF_MAGIC)
     goto bad;
 
-  // Make a copy of p->kpt without old user space, 
+  // Make a copy of p->pagetable without old user space, 
   // but with the same kstack we are using now, which can't be changed.
-  // Load program into memory.
-  uint64 sz = 0;
-  if ((pagetable = proc_pagetable(p)) == NULL ||
-      (kpagetable = (pagetable_t)allocpage()) == NULL)
+  if ((pagetable = (pagetable_t)allocpage()) == NULL)
     goto bad;
-  memmove(kpagetable, p->kpagetable, PGSIZE);
+  memmove(pagetable, p->pagetable, PGSIZE);
+  // Remove old u-map from the new pt, but don't free since later op might fail.
   for (int i = 0; i < PX(2, MAXUVA); i++) {
-    kpagetable[i] = 0;
+    pagetable[i] = 0;
   }
+
+  // Load program into memory.
   struct proghdr ph;
+  int flags;
   for (int i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph)) {
-    if (ip->fop->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
+    if (ip->fop->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph)) {
+      __debug_warn("execve", "fail to read ELF file\n");
       goto bad;
+    }
     if (ph.type != ELF_PROG_LOAD)
       continue;
-    if (ph.memsz < ph.filesz || ph.vaddr + ph.memsz < ph.vaddr)
+    if (ph.vaddr % PGSIZE != 0 || ph.memsz < ph.filesz || ph.vaddr + ph.memsz < ph.vaddr) {
+      __debug_warn("execve", "funny ELF file: va=%p msz=0x%x fsz=0x%x\n", ph.vaddr, ph.memsz, ph.filesz);
       goto bad;
-    uint64 sz1;
-    if ((sz1 = uvmalloc(pagetable, kpagetable, sz, ph.vaddr + ph.memsz)) == 0)
+    }
+    
+    // turn ELF flags to PTE flags
+    flags = 0;
+    flags |= (ph.flags & ELF_PROG_FLAG_EXEC) ? PTE_X : 0;
+    flags |= (ph.flags & ELF_PROG_FLAG_WRITE) ? PTE_W : 0;
+    flags |= (ph.flags & ELF_PROG_FLAG_READ) ? PTE_R : 0;
+
+    __debug_info("execve", "newseg in\n");
+    seg = newseg(pagetable, seghead, LOAD, ph.vaddr, ph.memsz, flags);
+    __debug_info("execve", "newseg out\n");
+    if(seg == NULL) {
+      __debug_warn("execve", "newseg fail: vaddr=%p, memsz=%d\n", ph.vaddr, ph.memsz);
       goto bad;
-    sz = sz1;
-    if (ph.vaddr % PGSIZE != 0)
+    }
+
+    seghead = seg;
+
+    if (loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0) {
+      __debug_warn("execve", "load segment\n");
       goto bad;
-    if (loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
-      goto bad;
+    }
   }
 
   struct stat st;
@@ -129,35 +156,74 @@ int execve(char *path, char **argv, char **envp)
   iput(ip);
   ip = 0;
 
+  /*---------------------------*/
+  /* TODO:
+  Call to usrmm to get a STACK segment struct and allocate pages
+  The problem is how to locate the stack, may we can place it near MAXUVA
+  */
+  // Original Code:
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
-  sz = PGROUNDUP(sz);
-  uint64 sz1;
-  if ((sz1 = uvmalloc(pagetable, kpagetable, sz, sz + 2 * PGSIZE)) == 0)
+  // Clear the PTE_U mark of the first page under the stack as a protection.
+  // if ((sz1 = uvmalloc(pagetable, sz, sz + 2 * PGSIZE, PTE_W|PTE_R|PTE_X)) == 0)
+  // Heap
+  flags = PTE_R | PTE_W;
+  for (seg = seghead; seg->next != NULL; seg = seg->next);
+    __debug_info("execve", "making heap, start=%p\n", PGROUNDUP(seg->addr + seg->sz));
+  seg = newseg(pagetable, seghead, HEAP, PGROUNDUP(seg->addr + seg->sz), 0, flags);
+  if(seg == NULL) {
+    __debug_warn("execve", "new heap fail\n");
     goto bad;
-  sz = sz1;
-  uvmclear(pagetable, sz - 2 * PGSIZE);
-  uint64 sp = sz;
-  uint64 stackbase = sp - PGSIZE;
-  sp -= sizeof(uint64);
-  if (copyout(pagetable, sp, (char *)&ip, sizeof(uint64)) < 0)  // *ep is 0 now, borrow it
-    goto bad;
+  }
+  seghead = seg;
 
+    __debug_info("execve", "making stack\n");
+  // Stack
+  seg = newseg(pagetable, seghead, STACK, VUSTACK - PGSIZE, PGSIZE, flags);
+  if(seg == NULL) {
+    __debug_warn("execve", "new stack fail\n");
+    goto bad;
+  }
+  seghead = seg;
+  // uvmclear(pagetable, sz - 2 * PGSIZE);
+
+  __debug_info("execve", "pushing stack\n");
+  /* If the stack is located, we can assign sp */
+  uint64 sp = VUSTACK;
+  uint64 stackbase = VUSTACK - PGSIZE;
+
+  sp -= sizeof(uint64);
+  sp -= sp % 16;        // on risc-v, sp should be 16-byte aligned
+
+  if (copyout(pagetable, sp, (char *)&ip, sizeof(uint64)) < 0) {  // *ep is 0 now, borrow it
+    __debug_warn("execve", "fail to push bottom NULL into user stack\n");
+    goto bad;
+  }
+
+  __debug_info("execve", "pushing argv/envp\n");
   // arguments to user main(argc, argv, envp)
   // argc is returned via the system call return
   // value, which goes in a0.
   int argc, envc;
   uint64 uargv[MAXARG + 1], uenvp[MAXENV + 1];
   if ((envc = pushstack(pagetable, uenvp, envp, MAXENV, &sp)) < 0 ||
-      (argc = pushstack(pagetable, uargv, argv, MAXARG, &sp)) < 0)
+      (argc = pushstack(pagetable, uargv, argv, MAXARG, &sp)) < 0) {
+    __debug_warn("execve", "fail to push argv or envp into user stack\n");
     goto bad;
+  }
   sp -= (envc + 1) * sizeof(uint64);
+  sp -= sp % 16;
   uint64 a2 = sp;
   sp -= (argc + 1) * sizeof(uint64);
+  sp -= sp % 16;
+  __debug_info("execve", "pushing argv/envp table\n");
   if (sp < stackbase || 
       copyout(pagetable, a2, (char *)uenvp, (envc + 1) * sizeof(uint64)) < 0 ||
       copyout(pagetable, sp, (char *)uargv, (argc + 1) * sizeof(uint64)) < 0)
+  {
+    __debug_warn("execve", "fail to copy argv/envp table into user stack\n");
     goto bad;
+  }
   p->trapframe->a1 = sp;
   p->trapframe->a2 = a2;
 
@@ -166,25 +232,32 @@ int execve(char *path, char **argv, char **envp)
 
   // Commit to the user image.
   pagetable_t oldpagetable = p->pagetable;
-  pagetable_t oldkpagetable = p->kpagetable;
-  uint64 oldsz = p->sz;
+  seg = p->segment;
   p->pagetable = pagetable;
-  p->kpagetable = kpagetable;
-  p->sz = sz;
+  p->segment = seghead;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
-  proc_freepagetable(oldpagetable, oldsz);
-  w_satp(MAKE_SATP(p->kpagetable));
+
+  __debug_info("execve", "sp=%p, stackbase=%p\n", sp, stackbase);
+  w_satp(MAKE_SATP(p->pagetable));
   sfence_vma();
-  kvmfree(oldkpagetable, 0);
+
+  delsegs(oldpagetable, seg);
+  uvmfree(oldpagetable);
+  freepage(oldpagetable);
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
-  if (pagetable)
-    proc_freepagetable(pagetable, sz);
-  if (kpagetable)
-    kvmfree(kpagetable, 0);
+  __debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
+  __debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
+  if (seghead) {
+    delsegs(pagetable, seghead);
+  }
+  if (pagetable) {
+    uvmfree(pagetable);
+    freepage(pagetable);
+  }
   if (ip) {
     iunlock(ip);
     iput(ip);

@@ -30,7 +30,7 @@ And check the `USB serial port` (In my situation it will be `ttyUSB0`):
 ```bash
 ls /dev/ | grep USB
 ```
-Build the kernel and user program:
+Build the kernel and user programs:
 
 ```bash
 cd xv6-k210

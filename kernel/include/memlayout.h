@@ -112,6 +112,7 @@
 // each surrounded by invalid guard pages.
 // #define KSTACK(p)               (TRAMPOLINE - ((p) + 1) * 2 * PGSIZE)
 #define VKSTACK                 0x3EC0000000L
+#define VUSTACK                 (RUSTSBI_BASE - PGSIZE)
 
 // User memory layout.
 // Address zero first:
@@ -122,7 +123,8 @@
 //   ...
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
-#define TRAPFRAME               (TRAMPOLINE - PGSIZE)
+// #define TRAPFRAME               (TRAMPOLINE - PGSIZE)
+#define TRAPFRAME               (VKSTACK + 2 * PGSIZE)
 
 #define MAXUVA                  RUSTSBI_BASE
 

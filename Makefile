@@ -2,7 +2,6 @@
 platform	:= qemu
 mode := debug
 #mode := release
-
 K=kernel
 U=xv6-user
 T=target
@@ -41,7 +40,8 @@ OBJS += \
   $K/disk.o \
   $K/fat32.o \
   $K/plic.o \
-  $K/console.o
+  $K/console.o \
+  $K/usrmm.o
 
 ifeq ($(platform), k210)
 OBJS += \
@@ -156,6 +156,8 @@ else
 	@$(QEMU) $(QEMUOPTS)
 endif
 
+ulinker = ./linker/user.ld
+
 $U/initcode: $U/initcode.S
 	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
@@ -168,7 +170,7 @@ tags: $(OBJS) _init
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
 _%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+	$(LD) $(LDFLAGS) -T $(ulinker) -e main -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
@@ -212,6 +214,8 @@ UPROGS=\
 	$U/_grind\
 	$U/_forktest\
 	$U/_stressfs\
+	$U/_cowtest\
+	$U/_lazytests\
 
 userprogs: $(UPROGS)
 
@@ -224,32 +228,18 @@ fs: $(UPROGS)
 		dd if=/dev/zero of=fs.img bs=512k count=512; \
 		mkfs.vfat -F 32 fs.img; fi
 	@sudo mount fs.img $(dst)
-	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
-	@for file in $$( ls $U/_* ); do \
-		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
-	@sudo cp $U/_init $(dst)/init
-	@sudo cp $U/_sh $(dst)/sh
-	@sudo cp $U/_echo $(dst)/echo
-	@sudo cp $U/shrc $(dst)/shrc
-	@sudo cp README $(dst)/README
+	@make sdcard dst=$(dst)
 	@sudo umount $(dst)
 
-# Write sdcard
-sdcard: fs
-	@if [ "$(sd)" != "" ]; then \
-		echo "flashing into sd card..."; \
-		sudo dd if=fs.img of=$(sd); \
-	else \
-		echo "sd card not detected!"; fi
-
 # Write sdcard mounted at $dst
-mounted-sd: fs
+sdcard: userprogs
 	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
 	@for file in $$( ls $U/_* ); do \
 		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
 	@sudo cp $U/_init $(dst)/init
 	@sudo cp $U/_sh $(dst)/sh
 	@sudo cp $U/shrc $(dst)/shrc
+	@sudo cp $U/_echo $(dst)/echo
 	@sudo cp README $(dst)/README
 
 clean: 

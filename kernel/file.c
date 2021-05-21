@@ -116,9 +116,9 @@ filestat(struct file *f, uint64 addr)
   struct stat st;
   
   if(f->type == FD_INODE){
-    // ilock(f->ip);
+    ilock(f->ip);
     f->ip->op->getattr(f->ip, &st);
-    // iunlock(f->ip);
+    iunlock(f->ip);
     // if(copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
     if(copyout2(addr, (char *)&st, sizeof(st)) < 0)
       return -1;

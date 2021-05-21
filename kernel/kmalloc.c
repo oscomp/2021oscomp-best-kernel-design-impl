@@ -170,15 +170,15 @@ void *kmalloc(uint size) {
 	// if no page available 
 	if (NULL == alloc->list) {
 		struct kmem_node *tmp = (struct kmem_node*)allocpage();
-		if (tmp == NULL) {
+		if (NULL == tmp) {
 			release(&(alloc->lock));
+			__debug_warn("kmalloc", "fail to allocate a node\n");
 			return NULL;
 		}
 		alloc->npages++;
 
 		uint roundup_size = ROUNDUP16(size);
 		uint8 capa = _calc_capa(roundup_size);
-
 		tmp->next = NULL;
 		tmp->config.obj_size = roundup_size;
 		tmp->config.obj_addr = (uint64)tmp + ROUNDUP16(KMEM_NODE_FIX + capa);

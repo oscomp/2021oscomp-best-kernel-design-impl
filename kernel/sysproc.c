@@ -8,6 +8,7 @@
 #include "include/syscall.h"
 #include "include/timer.h"
 #include "include/pm.h"
+#include "include/usrmm.h"
 #include "include/string.h"
 #include "include/printf.h"
 
@@ -62,7 +63,9 @@ sys_getpid(void)
 uint64
 sys_fork(void)
 {
-  return fork();
+  extern int fork_cow();
+  return fork_cow();
+  // return fork();
 }
 
 uint64
@@ -88,14 +91,23 @@ sys_wait(void)
 uint64
 sys_sbrk(void)
 {
-  int addr;
   int n;
-
   if(argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+  
+  struct proc *p = myproc();
+  struct seg *heap = getseg(p->segment, HEAP);
+  uint64 addr = heap->addr + heap->sz;
+  if (n < 0) {
+    if (growproc(n) < 0)  // growproc takes care of p->sz
+      return -1;
+  } else {                // lazy page allocation
+    struct seg *stack = heap->next;
+    if (addr + n > stack->addr - stack->sz) {
+      return -1;
+    }
+    heap->sz += n;
+  }
   return addr;
 }
 
@@ -103,26 +115,31 @@ uint64
 sys_sleep(void)
 {
   int n;
+  int ret = 0;
   uint ticks0;
 
   if(argint(0, &n) < 0)
     return -1;
   struct proc *p = myproc();
-  // acquire(&tickslock);
+  int mask = p->tmask & (1 << (SYS_sleep - 1));
+  if (mask) {
+    printf(") ...\n");
+  }
   acquire(&p->lk);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
     if(p->killed){
-      // release(&tickslock);
-      release(&p->lk);
-      return -1;
+      ret = -1;
+      break;
     }
-    // sleep(&ticks, &tickslock);
     sleep(&ticks, &p->lk);
   }
-  // release(&tickslock);
   release(&p->lk);
-  return 0;
+
+  if (mask) {
+    printf("pid %d: return from sleep(%d", p->pid, n);
+  }
+  return ret;
 }
 
 uint64

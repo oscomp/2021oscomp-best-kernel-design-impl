@@ -6,6 +6,7 @@
 #include "types.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "usrmm.h"
 #include "file.h"
 #include "fs.h"
 #include "trap.h"
@@ -55,20 +56,16 @@ struct proc {
 	// parenting
 	// these fields MUST be protected by lk 
 	struct proc *child;			// point to first child 
-
 	// parent and sibling are protected by parent's lock 
 	struct proc *parent;		// point to its parent, NULL if it's `init`
 	struct proc *sibling;		// point to first sibling 
-
-	// trap handling 
-	struct trapframe *tp;	// trapframe 
 
 	// memory 
 	uint64 kstack;					// virtual address of kernel stack 
 	uint64 sz;						// size of process memory 
 	pagetable_t pagetable;			// user pagetable 
-	pagetable_t kpagetable;			// kernel pagetable 
 	struct trapframe *trapframe;	// data page for trampoline.S 
+	struct seg *segment;			// first seg list node 
 
 	// file system 
 	struct file *ofile[NOFILE];	// open files 
