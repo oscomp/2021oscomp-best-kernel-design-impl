@@ -86,6 +86,7 @@ pub fn rust_main() -> ! {
         // println!("[core 2] Hello, world!");
     let core = id();
     if core != 0 {
+        loop{}
         mm::init_othercore();
         trap::init();
         // trap::enable_timer_interrupt();
