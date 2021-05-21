@@ -19,14 +19,19 @@
 #include "include/file.h"
 #include "include/trap.h"
 #include "include/vm.h"
+#include "include/kmalloc.h"
 #include "include/debug.h"
 
 #include "include/proc.h"
 
+void swtch(struct context*, struct context*);
+
+void forkret(void);
+
 // pid management 
 int pid;
 struct spinlock pid_lock;
-static int allopid(void) {
+static int allocpid(void) {
 	int ret;
 	acquire(&pid_lock);
 	ret = pid;
@@ -37,6 +42,22 @@ static int allopid(void) {
 }
 
 struct cpu cpus[NCPU];
+int cpuid(void) {
+	int id = r_tp();
+	return id;
+}
+struct cpu *mycpu(void) {
+	int id = cpuid();
+	struct cpu *c = &cpus[id];
+	return c;
+}
+struct proc *myproc(void) {
+	push_off();
+	struct cpu *c = mycpu();
+	struct proc *p = c->proc;
+	pop_off();
+	return p;
+}
 
 // lists for scheduling 
 
@@ -81,7 +102,7 @@ static void proc_list_remove(struct proc *p) {
 
 #define __insert_runnable(priority, p) do {\
 	(p)->state = RUNNABLE; \
-	proc_list_insert(&proc_runnable[priority], p); \
+	proc_list_insert(&(proc_runnable[priority]), p); \
 } while (0)
 #define __insert_sleep(p) do {\
 	(p)->state = SLEEPING; \
@@ -93,6 +114,24 @@ static void proc_list_remove(struct proc *p) {
 } while (0)
 #define __remove(p) \
 	proc_list_remove(p) 
+
+static void freeproc(struct proc *p) {
+	// file system fields were freed in exit() 
+
+	// free pagetable 
+	if (p->pagetable) 
+		proc_freepagetable(p->pagetable, p->sz);
+	if (p->kpagetable)
+		kvmfree(p->kpagetable, 1);
+
+	// free trapframe 
+	freepage(p->trapframe);
+
+	// parenting is handled in exit() 
+
+	// free the proc itself 
+	kfree(p);
+}
 
 // alloc a proc ready for running 
 static struct proc *allocproc(void) {
@@ -113,7 +152,7 @@ static struct proc *allocproc(void) {
 	p->child = NULL;
 
 	// allocate a page trapframe 
-	p->trapframe = (struct trapframe*)allopage();
+	p->trapframe = (struct trapframe*)allocpage();
 	if (NULL == p->trapframe) {
 		__debug_warn("allocproc", "fail to alloc trapframe\n");
 		kfree(p);
@@ -138,27 +177,9 @@ static struct proc *allocproc(void) {
 
 	// init ofile 
 	for (int i = 0; i < NOFILE; i ++) 
-		np->ofile = NULL;
+		p->ofile[i] = NULL;
 
 	return p;
-}
-
-static void freeproc(struct proc *p) {
-	// file system fields were freed in exit() 
-
-	// free pagetable 
-	if (p->pagetable) 
-		proc_freepagetable(p->pagetable, p->sz);
-	if (p->kpagetable)
-		kvmfree(p->kpagetable, 1);
-
-	// free trapframe 
-	freepage(p->trapframe);
-
-	// parenting is handled in exit() 
-
-	// free the proc itself 
-	kfree(p);
 }
 
 int fork(void) {
@@ -229,7 +250,9 @@ void exit(int xstate) {
 	iput(p->cwd);
 
 	// write in xstate 
+	acquire(&p->lk);
 	p->xstate = xstate;
+	release(&p->lk);
 
 	__enter_proc_cs 
 
@@ -274,6 +297,7 @@ void exit(int xstate) {
 	// jump into scheduler 
 	sched();
 	__debug_error("exit", "zombie exit\n");
+	panic("panic!\n");
 }
 
 int wait(uint64 addr) {
@@ -290,6 +314,7 @@ int wait(uint64 addr) {
 				if (addr && copyout2(addr, (char*)&np->xstate, sizeof(np->xstate))) {
 					__leave_proc_cs 
 					__debug_error("wait", "fail to copy out xstate\n");
+					panic("panic!\n");
 				}
 				__remove(np);
 				freeproc(np);
@@ -364,7 +389,9 @@ int kill(int pid) {
 		while (NULL != tmp) {
 			if (pid == tmp->pid) {
 				// found 
+				acquire(&tmp->lk);
 				tmp->killed = 1;
+				release(&tmp->lk);
 				__leave_proc_cs 
 				return 0;
 			}
@@ -375,11 +402,13 @@ int kill(int pid) {
 	while (NULL != tmp) {
 		if (pid == tmp->pid) {
 			// found 
+			acquire(&tmp->lk);
 			tmp->killed = 1;
+			release(&tmp->lk);
 			// wakeup the proc 
 			tmp->state = RUNNABLE;
 			__remove(tmp);
-			__insert_runnable(tmp, PRIORITY_NORMAL);
+			__insert_runnable(PRIORITY_NORMAL, tmp);
 
 			__leave_proc_cs 
 			return 0;
@@ -444,7 +473,7 @@ void wakeup(void *chan) {
 // get the next runnable proc 
 // lock must be ACQUIRED before 
 static struct proc *__get_runnable_no_lock(void) {
-	for (int i = 0; i < PRIORITY_TIMEOUT; i < PRIORITY_NUMBER; i ++) {
+	for (int i = 0; i < PRIORITY_NUMBER; i ++) {
 		struct proc *tmp = proc_runnable[i];
 		while (NULL != tmp) {
 			if (RUNNABLE == tmp->state) {
@@ -464,7 +493,7 @@ struct proc const *get_runnable(void) {
 	return ret;
 }
 
-void scheduler(void) __attribute__((noreturn)) {
+void scheduler(void) {
 	struct proc *tmp;
 	struct cpu *c = mycpu();
 
@@ -482,7 +511,7 @@ void scheduler(void) __attribute__((noreturn)) {
 			w_satp(MAKE_SATP(tmp->kpagetable));
 			sfence_vma();
 
-			swtch(&c->context, &p->context);
+			swtch(&c->context, &tmp->context);
 
 			// switch back to kernel pagetable 
 			w_satp(MAKE_SATP(kernel_pagetable));
@@ -493,6 +522,7 @@ void scheduler(void) __attribute__((noreturn)) {
 	} 
 
 	__debug_error("scheduler", "scheduler returns!\n");
+	panic("panic!\n");
 }
 
 // sched() is the only way back to scheduler() 
@@ -523,7 +553,7 @@ void procinit(void) {
 	memset(cpus, 0, sizeof(cpus));
 
 	// init queue 
-	for (int i = 0; i < NUM; i ++) 
+	for (int i = 0; i < PRIORITY_NUMBER; i ++) 
 		proc_runnable[i] = NULL;
 	proc_sleep = NULL;
 	proc_zombie = NULL;
@@ -561,14 +591,15 @@ uchar initcode[] = {
   0x00, 0x00, 0x00, 0x00
 };
 
-int first;
-struct proc *__initproc;
+int first = 1;
+struct proc *__initproc = NULL;
 // init the first proc `initcode`
 // run at kernel init time, and only hart0 should run this 
 void userinit(void) {
 	struct proc *p;
 
 	p = allocproc();
+	first = 1;
 	__initproc = p;
 
 	// allocate one user page and copy init's instruction 
@@ -585,7 +616,7 @@ void userinit(void) {
 	p->tmask = 0;
 
 	__enter_proc_cs 
-	__insert_runnable(p);
+	__insert_runnable(PRIORITY_NORMAL, p);
 	__leave_proc_cs 
 
 	__debug_info("userinit", "init\n");
@@ -608,6 +639,51 @@ int growproc(int n) {
 	p->sz = sz;
 
 	return 0;
+}
+
+extern char trampoline[];	// trampoline.S
+
+// Create a user page table for a given process,
+// with no user memory, but with trampoline pages.
+pagetable_t
+proc_pagetable(struct proc *p)
+{
+  pagetable_t pagetable;
+
+  // An empty page table.
+  pagetable = uvmcreate();
+  if(pagetable == 0)
+    return NULL;
+
+  // map the trampoline code (for system call return)
+  // at the highest user virtual address.
+  // only the supervisor uses it, on the way
+  // to/from user space, so not PTE_U.
+  if(mappages(pagetable, TRAMPOLINE, PGSIZE,
+              (uint64)trampoline, PTE_R | PTE_X) < 0){
+    uvmfree(pagetable, 0);
+    return NULL;
+  }
+
+  // map the trapframe just below TRAMPOLINE, for trampoline.S.
+  if(mappages(pagetable, TRAPFRAME, PGSIZE,
+              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+    vmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return NULL;
+  }
+
+  return pagetable;
+}
+
+// Free a process's page table, and free the
+// physical memory it refers to.
+void
+proc_freepagetable(pagetable_t pagetable, uint64 sz)
+{
+  vmunmap(pagetable, TRAMPOLINE, 1, 0);
+  vmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmfree(pagetable, sz);
 }
 
 // Copy to either a user address, or kernel address,
@@ -666,7 +742,7 @@ static void __print_list(struct proc *list) {
 
 // print current processes to console 
 void procdump(void) {
-	print("\nPID\tSTATE\tNAME\tMEM\n");
+	printf("\nPID\tSTATE\tNAME\tMEM\n");
 	__enter_proc_cs 
 
 	// display runnable 
@@ -713,4 +789,20 @@ int procnum(void) {
 	__leave_proc_cs 
 
 	return num;
+}
+
+void reg_info(void) {
+	printf("register info: {\n");
+	printf("sstatus: %p\n", r_sstatus());
+	printf("sip: %p\n", r_sip());
+	printf("sie: %p\n", r_sie());
+	printf("sepc: %p\n", r_sepc());
+	printf("stvec: %p\n", r_stvec());
+	printf("satp: %p\n", r_satp());
+	printf("scause: %p\n", r_scause());
+	printf("stval: %p\n", r_stval());
+	printf("sp: %p\n", r_sp());
+	printf("tp: %p\n", r_tp());
+	printf("ra: %p\n", r_ra());
+	printf("}\n");
 }

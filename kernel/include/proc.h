@@ -72,7 +72,7 @@ struct proc {
 
 	// file system 
 	struct file *ofile[NOFILE];	// open files 
-	struct dirent *cwd;			// current director 
+	struct inode *cwd;			// current director 
 
 	// scheduling 
 	struct context context;
@@ -121,7 +121,7 @@ void wakeup(void *chan);
 struct proc const *get_runnable(void);
 
 /* Select next proc to run */
-void scheduler(void) __attribute__((noreturn))
+void scheduler(void) __attribute__((noreturn));
 
 /* Return to schduler() */
 void sched(void);
@@ -167,5 +167,7 @@ int either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 
 /* Display content of all registers */
 void reg_info(void);
+void procdump(void);
+int procnum(void);
 
 #endif 

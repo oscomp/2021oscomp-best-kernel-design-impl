@@ -109,19 +109,19 @@ sys_sleep(void)
     return -1;
   struct proc *p = myproc();
   // acquire(&tickslock);
-  acquire(&p->lock);
+  acquire(&p->lk);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
     if(p->killed){
       // release(&tickslock);
-      release(&p->lock);
+      release(&p->lk);
       return -1;
     }
     // sleep(&ticks, &tickslock);
-    sleep(&ticks, &p->lock);
+    sleep(&ticks, &p->lk);
   }
   // release(&tickslock);
-  release(&p->lock);
+  release(&p->lk);
   return 0;
 }
 

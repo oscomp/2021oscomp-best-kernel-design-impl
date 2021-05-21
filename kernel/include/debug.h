@@ -31,7 +31,6 @@
 #define __debug_error(func, ...) do {\
 	__debug_msg(__ERROR(func)": "__VA_ARGS__);\
 	printf("%s: line %d\n", __FILE__, __LINE__);\
-	panic(__ERROR(__module_name__)": panic!");\
 } while (0)
 
 #ifdef DEBUG 

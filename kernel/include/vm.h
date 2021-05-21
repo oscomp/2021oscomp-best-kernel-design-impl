@@ -4,6 +4,8 @@
 #include "types.h"
 #include "riscv.h"
 
+extern pagetable_t kernel_pagetable;
+
 void            kvminit(void);
 void            kvminithart(void);
 uint64          kvmpa(uint64);
