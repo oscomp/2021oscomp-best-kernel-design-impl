@@ -16,6 +16,7 @@ const SYSCALL_WAITPID: usize = 260;
 
 // Not standard POSIX sys_call
 const SYSCALL_LS: usize = 500;
+const SYSCALL_SHUTDOWN: usize = 501;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -91,4 +92,7 @@ pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
 // Not standard POSIX sys_call
 pub fn sys_ls(path:&str) -> isize {
     syscall(SYSCALL_LS, [path.as_ptr() as usize, 0, 0])
+}
+pub fn sys_shutdown() -> isize {
+    syscall(SYSCALL_SHUTDOWN, [0, 0, 0])
 }

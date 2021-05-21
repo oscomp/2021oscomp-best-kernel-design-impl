@@ -15,12 +15,14 @@ const SYSCALL_WAITPID: usize = 260;
 
 // Not standard POSIX sys_call
 const SYSCALL_LS: usize = 500;
+const SYSCALL_SHUTDOWN: usize = 501;
 
 mod fs;
 mod process;
 
 pub use fs::*;
 use process::*;
+use crate::sbi::shutdown;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     match syscall_id {
@@ -39,6 +41,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
         //SYSCALL_LS => sys_ls(args[0] as *const u8),
+        SYSCALL_SHUTDOWN => {shutdown();0}
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

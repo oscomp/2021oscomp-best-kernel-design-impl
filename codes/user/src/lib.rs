@@ -110,3 +110,4 @@ pub fn sleep(period_ms: usize) {
 
 // Not standard POSIX sys_call
 pub fn ls(path: &str) -> isize { sys_ls(path) }
+pub fn shutdown() -> isize { sys_shutdown() }

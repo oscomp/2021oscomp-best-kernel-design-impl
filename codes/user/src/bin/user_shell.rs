@@ -58,7 +58,8 @@ use user_lib::{
     OpenFlags,
     close,
     dup,
-    chdir
+    chdir,
+    shutdown
 };
 use user_lib::console::getchar;
 
@@ -339,7 +340,7 @@ impl ArgMachine{
                     if pid == 0 {
                         // child process
                         if exec(programname, args_addr.as_slice()) == -1 {
-                            println!("Error when executing run_testsuits!");
+                            println!("Error when executing run_testsuites!");
                             return false;
                         }
                         unreachable!();
@@ -353,6 +354,60 @@ impl ArgMachine{
         return true;
     }
 
+    pub fn auto_run_testsuites(){
+        let mut testsuits :Vec<&str>= Vec::new();
+        // testsuits.push("testsuites_brk");
+        // testsuits.push("testsuites_chdir");
+        testsuits.push("testsuites_clone\0");
+        // testsuits.push("testsuites_close");
+        // testsuits.push("testsuites_dup2");
+        // testsuits.push("testsuites_dup");
+        // testsuits.push("testsuites_execve");
+        testsuits.push("testsuites_exit\0");
+        // testsuits.push("testsuites_fork");
+        // testsuits.push("testsuites_fstat");
+        // testsuits.push("testsuites_getcwd");
+        // testsuits.push("testsuites_getdents");
+        testsuits.push("testsuites_getpid\0");
+        // testsuits.push("testsuites_getppid");
+        // testsuits.push("testsuites_gettimeofday");
+        // testsuits.push("testsuites_mkdir_");
+        // testsuits.push("testsuites_mmap");
+        // testsuits.push("testsuites_mount");
+        // testsuits.push("testsuites_munmap");
+        // testsuits.push("testsuites_openat");
+        // testsuits.push("testsuites_open");
+        // testsuits.push("testsuites_pipe");
+        // testsuits.push("testsuites_read");
+        // testsuits.push("testsuites_times");
+        // testsuits.push("testsuites_umount");
+        // testsuits.push("testsuites_uname");
+        // testsuits.push("testsuites_unlink");
+        testsuits.push("testsuites_wait\0");
+        testsuits.push("testsuites_waitpid\0");
+        testsuits.push("testsuites_write\0");
+        // testsuits.push("testsuites_yield_A");
+        // testsuits.push("testsuites_yield_B");
+        // testsuits.push("testsuites_yield_C");
+        for programname in testsuits.iter(){
+            let mut exit_code = 0;
+            let mut args_addr: Vec<*const u8> = Vec::new();
+            args_addr.push(0 as *const u8);
+            let pid = fork();
+            if pid == 0 {
+                // child process
+                println!("{}",programname);
+                if exec(programname, args_addr.as_slice()) == -1 {
+                    println!("Error when executing autorun_testsuites!");
+                    shutdown();
+                }
+                unreachable!();
+            } else {
+                waitpid(pid as usize, &mut exit_code);
+            }
+        }
+        shutdown();
+    }
 
     pub fn print_state(&mut self){
         println!("argc: {}\nstate: {}",
@@ -430,6 +485,7 @@ impl ArgMachine{
 
 #[no_mangle]
 pub fn main() -> i32 {
+    ArgMachine::auto_run_testsuites();
     println!("Rust user shell");
     // println!("听说能输出中文?");
     let mut line: String;

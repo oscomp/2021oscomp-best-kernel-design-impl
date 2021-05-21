@@ -6,8 +6,8 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
 U_FAT32_DIR := ../fat32-fuse
-U_FAT32 := /dev/sdb1
-#U_FAT32 := ${U_FAT32_DIR}/fat32.img
+# U_FAT32 := /dev/sdb1
+U_FAT32 := ${U_FAT32_DIR}/fat32.img
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../k210.bin
@@ -80,7 +80,7 @@ ifeq ($(BOARD),qemu)
 		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
 		-drive file=$(U_FAT32),if=none,format=raw,id=x0 \
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0\
-		-smp threads=2
+		-smp threads=1
 else
 	(which $(K210-BURNER)) || (cd .. && git clone https://github.com/sipeed/kflash.py.git && mv kflash.py tools)
 	@cp $(BOOTLOADER) $(BOOTLOADER).copy
