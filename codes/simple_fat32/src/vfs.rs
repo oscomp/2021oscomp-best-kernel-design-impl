@@ -321,7 +321,7 @@ impl VFile{
         let mut current_vfile = self.clone();
         for i in 0 .. len {
             // DEBUG
-            if path[i] == ""{
+            if path[i] == "" || path[i] == "."{
                 continue;
             }
             if let Some(vfile) = current_vfile.find_vfile_byname(path[i]) {
@@ -477,8 +477,12 @@ impl VFile{
         let vfile = self.find_vfile_byname(name).unwrap();
         //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
         if attribute & ATTRIBUTE_DIRECTORY != 0 {
-            let mut self_dir = ShortDirEntry::new(".".as_bytes(),"".as_bytes(), ATTRIBUTE_DIRECTORY);
-            let mut par_dir = ShortDirEntry::new("..".as_bytes(),"".as_bytes(), ATTRIBUTE_DIRECTORY);
+            let manager_reader = self.fs.read();
+            let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
+            let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
+            let (name_bytes,ext_bytes) = manager_reader.short_name_format("..");
+            let mut par_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
+            drop(manager_reader);
             par_dir.set_first_cluster(self.first_cluster());
             
             vfile.write_at(0, self_dir.as_bytes_mut());

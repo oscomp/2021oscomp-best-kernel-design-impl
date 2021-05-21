@@ -83,7 +83,7 @@ pub fn add_initproc_into_fs() {
     let mut num_app_ptr = _num_app as usize as *mut usize;
     let start = _app_names as usize as *const u8;
     let mut app_start = unsafe {
-        core::slice::from_raw_parts_mut(num_app_ptr.add(1), 2)
+        core::slice::from_raw_parts_mut(num_app_ptr.add(1), 3)
     };
 
     //Write apps(initproc & user_shell) to disk from mem

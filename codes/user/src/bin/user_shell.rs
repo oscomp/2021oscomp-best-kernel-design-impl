@@ -291,8 +291,68 @@ impl ArgMachine{
             }
             return false;
         }
+        print!("changed!");
+        if self.args[0].clone().as_str() == "run_testsuits\0" {
+            let mut testsuits :Vec<&str>= Vec::new();
+            testsuits.push("testsuits_brk");
+            testsuits.push("testsuits_chdir");
+            testsuits.push("testsuits_clone");
+            testsuits.push("testsuits_close");
+            testsuits.push("testsuits_dup2");
+            testsuits.push("testsuits_dup");
+            testsuits.push("testsuits_execve");
+            testsuits.push("testsuits_exit");
+            testsuits.push("testsuits_fork");
+            testsuits.push("testsuits_fstat");
+            testsuits.push("testsuits_getcwd");
+            testsuits.push("testsuits_getdents");
+            testsuits.push("testsuits_getpid");
+            testsuits.push("testsuits_getppid");
+            testsuits.push("testsuits_gettimeofday");
+            testsuits.push("testsuits_mkdir_");
+            testsuits.push("testsuits_mmap");
+            testsuits.push("testsuits_mount");
+            testsuits.push("testsuits_munmap");
+            testsuits.push("testsuits_openat");
+            testsuits.push("testsuits_open");
+            testsuits.push("testsuits_pipe");
+            testsuits.push("testsuits_read");
+            testsuits.push("testsuits_times");
+            testsuits.push("testsuits_umount");
+            testsuits.push("testsuits_uname");
+            testsuits.push("testsuits_unlink");
+            testsuits.push("testsuits_wait");
+            testsuits.push("testsuits_waitpid");
+            testsuits.push("testsuits_write");
+            testsuits.push("testsuits_yield_A");
+            testsuits.push("testsuits_yield_B");
+            testsuits.push("testsuits_yield_C");
+            if self.argc != 1 {
+                println!("cd: Arg expression not right, should be: run_testsuits");
+            }
+            else{
+                for programname in testsuits.iter(){
+                    let pid = fork();
+                    let mut exit_code = 0;
+                    let mut args_addr: Vec<*const u8> = Vec::new();
+                    args_addr.push(0 as *const u8);
+                    if pid == 0 {
+                        // child process
+                        if exec(programname, args_addr.as_slice()) == -1 {
+                            println!("Error when executing run_testsuits!");
+                            return false;
+                        }
+                        unreachable!();
+                    } else {
+                        waitpid(pid as usize, &mut exit_code);
+                    }
+                }
+            }
+            return false;
+        }
         return true;
     }
+
 
     pub fn print_state(&mut self){
         println!("argc: {}\nstate: {}",

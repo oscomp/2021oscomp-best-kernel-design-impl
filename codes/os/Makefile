@@ -70,7 +70,7 @@ clean:
 
 run: run-inner
 
-run-inner: build 
+run-inner: fat32 build 
 ifeq ($(BOARD),qemu)
 	@qemu-system-riscv64 \
 		-machine virt \

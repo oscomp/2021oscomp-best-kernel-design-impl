@@ -433,8 +433,8 @@ impl ShortDirEntry{
 
     /* 设置文件起始簇 */
     pub fn set_first_cluster(&mut self, cluster: u32){
-        self.cluster_high = ((cluster & 0xFF00)>>16) as u16;
-        self.cluster_low = (cluster & 0x00FF) as u16;
+        self.cluster_high = ((cluster & 0xFFFF0000)>>16) as u16;
+        self.cluster_low = (cluster & 0x0000FFFF) as u16;
     }
 
     /* 清空文件，删除时使用 */
@@ -1061,6 +1061,9 @@ impl FAT{
     }
 
     pub fn count_claster_num(&self, start_cluster:u32, block_device: Arc<dyn BlockDevice>)->u32{
+        if start_cluster == 0{
+            return 0;
+        }
         let mut curr_cluster = start_cluster;
         let mut count:u32 = 0; 
         loop{
