@@ -287,12 +287,12 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
     new_fd as isize
 }
 
-pub fn sys_getdents64(){
-
+pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
+    0
 }
 
 // TODO: mode需要研究
-pub fn sys_mkdir(dirfd:isize, path:*const u8, mode:u32)->isize{
+pub fn sys_mkdir(dirfd:isize, path: *const u8, mode:u32)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();

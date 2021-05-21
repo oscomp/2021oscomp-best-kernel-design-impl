@@ -2,6 +2,7 @@ mod pipe;
 mod stdio;
 mod inode;
 mod mount;
+mod finfo;
 
 use crate::mm::UserBuffer;
 use alloc::sync::Arc; 

@@ -15,7 +15,6 @@ pub enum DiskInodeType {
     Directory,
 }
 
-
 #[derive(PartialEq,Copy,Clone)]
 pub enum SeekWhence{
     SeekSet, // 将offset设为新的读写位置 
@@ -28,11 +27,6 @@ pub struct OSInode {
     readable: bool,
     writable: bool,
     inner: Mutex<OSInodeInner>,
-}
-
-pub struct OSDirEntry {
-    inode_id: u32, 
-    offset: usize,//dirent在目录中的偏移量
 }
 
 pub struct OSInodeInner {
