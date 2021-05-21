@@ -87,8 +87,11 @@ allocpage(void)
   }
   release(&kmem.lock);
 
+  #ifdef DEBUG 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  #endif 
+
   return (void*)r;
 }
 
