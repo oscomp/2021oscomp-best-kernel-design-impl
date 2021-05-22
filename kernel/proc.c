@@ -455,10 +455,11 @@ int kill(int pid) {
 		while (NULL != tmp) {
 			if (pid == tmp->pid) {
 				// found 
-				acquire(&tmp->lk);
+				//acquire(&tmp->lk);
 				tmp->killed = 1;
-				release(&tmp->lk);
+				//release(&tmp->lk);
 				__leave_proc_cs 
+				__debug_info("kill", "leave runnable\n");
 				return 0;
 			}
 			else {
@@ -471,15 +472,16 @@ int kill(int pid) {
 	while (NULL != tmp) {
 		if (pid == tmp->pid) {
 			// found 
-			acquire(&tmp->lk);
+			//acquire(&tmp->lk);
 			tmp->killed = 1;
-			release(&tmp->lk);
+			//release(&tmp->lk);
 			// wakeup the proc 
-			tmp->state = RUNNABLE;
 			__remove(tmp);
-			__insert_runnable(PRIORITY_NORMAL, tmp);
+			tmp->timer = TIMER_IRQ;
+			__insert_runnable(PRIORITY_IRQ, tmp);
 
 			__leave_proc_cs 
+			__debug_info("kill", "leave sleep\n");
 			return 0;
 		}
 		else {
@@ -785,9 +787,10 @@ static void __print_list(struct proc *list) {
 				heap = s->sz;
 			}
 		}
-		printf("%d\t%s\t%s\t%d\t%d\n", 
-			list->pid,
+		printf("%d\t%s\t%d\t%s\t%d\t%d\n", 
+			list->pid, 
 			__state_to_str(list->state),
+			list->killed, 
 			list->name, 
 			load, heap
 		);
@@ -797,7 +800,7 @@ static void __print_list(struct proc *list) {
 
 // print current processes to console 
 void procdump(void) {
-	printf("\nPID\tSTATE\tNAME\tMEM_LOAD\tMEM_HEAP\n");
+	printf("\nPID\tSTATE\tKILLED\tNAME\tMEM_LOAD\tMEM_HEAP\n");
 	__enter_proc_cs 
 
 	// display runnable 

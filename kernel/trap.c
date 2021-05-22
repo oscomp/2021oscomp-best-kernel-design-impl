@@ -260,7 +260,6 @@ int handle_intr(uint64 scause) {
 			c = sbi_console_getchar();
 			if (-1 != c) 
 				consoleintr(c);
-			__debug_info("handle_intr", "keyboard\n");
 			break;
 		case DISK_IRQ: 
 			// disk read/write complete 
