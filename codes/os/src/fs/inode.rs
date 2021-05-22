@@ -101,9 +101,50 @@ impl OSInode {
                 name.len() as u16, 
                 d_type
             );
-            (name.len() + 8 + 8 + 2 + 1) as isize
+            (name.len() + 8*4) as isize
         } else {
             -1
+        }
+    }
+
+    pub fn create(&self, path:&str, type_: DiskInodeType)->Option<Arc<OSInode>>{
+        let inner = self.inner.lock();
+        let cur_inode = inner.inode.clone();
+        if !cur_inode.is_dir(){
+            println!("[create]:{} is not a directory!", path);
+            return None;
+        }
+        let mut pathv:Vec<&str> = path.split('/').collect();
+        let (readable, writable) = (true, true);
+        if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
+            // already exists, clear
+            inode.clear();
+            Some(Arc::new(OSInode::new(
+                readable,
+                writable,
+                inode,
+            )))
+        } else {
+            // create file
+            let name = pathv.pop().unwrap();
+            if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
+                let attribute = {
+                    match type_ {
+                        DiskInodeType::Directory=>{ ATTRIBUTE_DIRECTORY }
+                        DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
+                    }
+                };
+                temp_inode.create( name, attribute)
+                .map(|inode| {
+                    Arc::new(OSInode::new(
+                        readable,
+                        writable,
+                        inode,
+                    ))
+                })
+            }else{
+                None
+            }
         }
     }
     // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{

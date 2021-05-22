@@ -250,20 +250,23 @@ pub fn sys_getcwd(buf: *mut u8, len: usize)->isize{
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
     let mut buf_vec = translated_byte_buffer(token, buf, len);
+    let mut userbuf = UserBuffer::new(buf_vec);
     let mut current_offset:usize = 0;
     if buf as usize == 0 {
         return 0
     } else {
-        // TODO:目前假设长度不超过一页
-        for slice_ptr2 in buf_vec.iter_mut() {
-            //let wlen = slice_ptr.len().min(len - current_offset);
-            unsafe{
-                let cwd = inner.current_path.as_bytes();
-                for i in 0..cwd.len(){
-                    (*slice_ptr2)[i] = cwd[i];
-                }
-            }
-        }
+        // DEBUG:跨页
+        let cwd = inner.current_path.as_bytes();
+        userbuf.write( cwd );
+        //for slice_ptr2 in buf_vec.iter_mut() {
+        //    //let wlen = slice_ptr.len().min(len - current_offset);
+        //    unsafe{
+        //        let cwd = inner.current_path.as_bytes();
+        //        for i in 0..cwd.len(){
+        //            (*slice_ptr2)[i] = cwd[i];
+        //        }
+        //    }
+        //}
         return buf as isize
     }
 }
@@ -287,11 +290,14 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
     new_fd as isize
 }
 
-pub fn sys_getdents64(fd:isize, buf: *mut Dirent, len:usize)->isize{
+pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
-    let dirent: &mut Dirent = translated_refmut(token, buf);
+    let mut buf_vec = translated_byte_buffer(token, buf, len);
+    // 使用UserBuffer结构，以便于跨页读写
+    let mut userbuf = UserBuffer::new(buf_vec);
+    let mut dirent = Dirent::empty();
     if fd == AT_FDCWD {
         let work_path = inner.current_path.clone();
         if let Some(file) = open(
@@ -300,7 +306,9 @@ pub fn sys_getdents64(fd:isize, buf: *mut Dirent, len:usize)->isize{
             OpenFlags::RDONLY,
             DiskInodeType::Directory
         ) {
-            return file.getdirent(dirent, 2)
+            let len = file.getdirent(&mut dirent, 0);
+            userbuf.write(dirent.as_bytes());
+            return len;
         } else {
             return -1
         }
@@ -310,11 +318,11 @@ pub fn sys_getdents64(fd:isize, buf: *mut Dirent, len:usize)->isize{
             return -1
         }
         if let Some(file) = &inner.fd_table[fd_usz] {
-            // TODO
             match file {
                 FileClass::File(f) => {
-                    let ret =  f.getdirent(dirent, 0);
-                    return ret
+                    let len = f.getdirent(&mut dirent, 0);
+                    userbuf.write(dirent.as_bytes());
+                    return len;
                 },
                 _ => return -1,
             }
@@ -344,19 +352,25 @@ pub fn sys_mkdir(dirfd:isize, path: *const u8, mode:u32)->isize{
             return -1
         }
     } else {
-        // TODO: 获取dirfd的OSInode
-        //let work_dir = inner.fd_table[dirfd as usize].unwrap() as OSInode;
-        if let Some(inode) = open(
-            "/",
-            path.as_str(),
-            OpenFlags::CREATE,
-            DiskInodeType::Directory
-        ) {
-            return 0
+        // DEBUG: 获取dirfd的OSInode
+        let fd_usz = dirfd as usize;
+        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
+            return -1
+        }
+        if let Some(file) = &inner.fd_table[fd_usz] {
+            match file {
+                FileClass::File(f) => {
+                    if let Some(new_dir) = f.create(path.as_str(), DiskInodeType::Directory){
+                        return 0;
+                    }else{
+                        return -1;
+                    }
+                },
+                _ => return -1,
+            }
         } else {
             return -1
         }
-
     }
 }
 

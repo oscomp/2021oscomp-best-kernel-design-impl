@@ -12,7 +12,7 @@ pub const DT_UNKNOWN:u8 = 0;
 pub const DT_DIR:u8 = 4;
 pub const DT_REG:u8 = 4; //常规文件
 
-pub const NAME_LIMIT:usize = 16; // TODO:太大了会有跨页问题。。
+pub const NAME_LIMIT:usize = 128; // TODO:太大了会有跨页问题。。
 
 #[repr(C)]
 #[derive(Debug)]
@@ -63,6 +63,26 @@ impl Dirent {
         let name_bytes = name.as_bytes();
         for i in 0..len {
             self.d_name[i] = name_bytes[i];
+        }
+    }
+    
+    pub fn as_bytes(&self) -> &[u8] {
+        let size = core::mem::size_of::<Self>();
+        unsafe {
+            core::slice::from_raw_parts(
+                self as *const _ as usize as *const u8,
+                size,
+            )
+        }
+    }
+    
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        let size = core::mem::size_of::<Self>();
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                self as *mut _ as usize as *mut u8,
+                size,
+            )
         }
     }
 }
