@@ -6,7 +6,7 @@ use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
 use spin::Mutex;
-use super::{File, Dirent, DT_DIR, DT_REG, DT_UNKNOWN};
+use super::{File, Dirent, Kstat, DT_DIR, DT_REG, DT_UNKNOWN};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
 
@@ -106,6 +106,25 @@ impl OSInode {
             -1
         }
     }
+
+    pub fn get_fstat(&self, kstat:&mut Kstat){
+        let inner = self.inner.lock();
+        let vfile = inner.inode.clone();
+        let (size, atime, mtime, ctime) = vfile.stat();
+        //println!("info = {:?}", (size, atime, mtime, ctime));
+        kstat.fill_info(
+            0, 
+            233, 
+            0, 
+            1, 
+            size, 
+            atime, 
+            mtime, 
+            ctime
+        );
+
+    }
+
 
     pub fn create(&self, path:&str, type_: DiskInodeType)->Option<Arc<OSInode>>{
         let inner = self.inner.lock();
@@ -264,7 +283,6 @@ impl OpenFlags {
 //    //println!("find par ok");
 //    inode.get_id()
 //}
-
 
 pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType) -> Option<Arc<OSInode>> {
     // DEBUG: 相对路径

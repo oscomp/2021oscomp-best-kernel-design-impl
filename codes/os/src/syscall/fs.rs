@@ -1,7 +1,7 @@
 use core::usize;
 
 use crate::{
-    fs::{/*OSInode*/, FileClass, File, Dirent, MNT_TABLE}, 
+    fs::{/*OSInode,*/Kstat, FileClass, File, Dirent, MNT_TABLE}, 
     mm::{
     UserBuffer,
     translated_byte_buffer,
@@ -332,13 +332,54 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
     }
 }
 
+pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    let mut buf_vec = translated_byte_buffer(token, buf, core::mem::size_of::<Kstat>());
+    // 使用UserBuffer结构，以便于跨页读写
+    let mut userbuf = UserBuffer::new(buf_vec);
+    let mut kstat = Kstat::empty();
+    if fd == AT_FDCWD {
+        let work_path = inner.current_path.clone();
+        if let Some(file) = open(
+            "/",
+            work_path.as_str(),
+            OpenFlags::RDONLY,
+            DiskInodeType::Directory
+        ) {
+            file.get_fstat(&mut kstat);
+            userbuf.write(kstat.as_bytes());
+            return 0
+        } else {
+            return -1
+        }
+    } else {
+        let fd_usz = fd as usize;
+        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
+            return -1
+        }
+        if let Some(file) = &inner.fd_table[fd_usz] {
+            match file {
+                FileClass::File(f) => {
+                    f.get_fstat(&mut kstat);
+                    userbuf.write(kstat.as_bytes());
+                    return 0
+                },
+                _ => return -1,
+            }
+        } else {
+            return -1
+        }
+    }
+}   
+
 // TODO: mode需要研究
 pub fn sys_mkdir(dirfd:isize, path: *const u8, mode:u32)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
-    
     if dirfd == AT_FDCWD {
         let work_path = inner.current_path.clone();
         if let Some(inode) = open(
@@ -380,17 +421,15 @@ pub fn sys_mount( p_special:*const u8, p_dir:*const u8, p_fstype: *const u8, fla
     let special = translated_str(token, p_special);
     let dir = translated_str(token, p_dir);
     let fstype = translated_str(token, p_fstype);
-    MNT_TABLE.lock().mount(special, dir, fstype)
+    MNT_TABLE.lock().mount(special, dir, fstype, flags as u32)
 }
 
 pub fn sys_umount( p_special:*const u8, flags:usize )->isize{
     // TODO
     let token = current_user_token();
     let special = translated_str(token, p_special);
-    MNT_TABLE.lock().umount(special, flags)
+    MNT_TABLE.lock().umount(special, flags as u32)
 }
 
-pub fn sys_fstat(){
 
-}   
 

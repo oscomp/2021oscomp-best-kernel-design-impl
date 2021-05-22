@@ -333,11 +333,6 @@ impl VFile{
         Some(Arc::new(current_vfile))
     }
 
-    /* 获取文件信息 */
-    pub fn stat(){
-
-    }
-
     /* WAITING 既然目录都没有大小，那暂时没必要做这个 */
     #[allow(unused)]
     fn decrease_size(){
@@ -631,6 +626,19 @@ impl VFile{
         }
     }
 
+    /* 获取目录中offset处目录项的信息 TODO:之后考虑和stat复用
+    * 返回<size, atime, mtime, ctime>
+    */
+    pub fn stat(&self)->( i64, i64, i64, i64 ){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            let (_,_,_,_,_,_,ctime) = sde.get_creation_time();
+            let (_,_,_,_,_,_,atime) = sde.get_accessed_time();
+            let (_,_,_,_,_,_,mtime) = sde.get_modification_time();
+            let size = sde.get_size();
+            (size as i64, atime as i64, mtime as i64, ctime as i64)
+        })
+    }
+    
     /* ls精简版，上面那个又臭又长，但这个不保证可靠 */
     // DEBUG
     pub fn ls_lite(&self)-> Option<Vec<(String, u8)>>{   
@@ -746,6 +754,24 @@ impl VFile{
             }
             offset += DIRENT_SZ;
         }
+    }
+
+    pub fn creation_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            sde.get_creation_time()
+        })
+    }
+    
+    pub fn accessed_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            sde.get_accessed_time()
+        })
+    }
+    
+    pub fn modification_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            sde.get_modification_time()
+        })
     }
 
     /* WAITING */

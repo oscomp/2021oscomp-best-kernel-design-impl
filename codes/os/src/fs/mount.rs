@@ -11,7 +11,7 @@ pub struct MountTable {
 
 impl MountTable {
 
-    pub fn mount(&mut self, special:String,dir:String,fstype:String,)->isize{
+    pub fn mount(&mut self, special:String,dir:String,fstype:String, flag:u32)->isize{
         self.mnt_list.push((special, dir, fstype));
         return 0
     }
