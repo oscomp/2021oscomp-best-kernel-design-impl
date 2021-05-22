@@ -28,7 +28,7 @@ mod process;
 use fs::*;
 use process::*;
 
-use crate::fs::Dirent;
+//use crate::fs::Dirent;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     match syscall_id {

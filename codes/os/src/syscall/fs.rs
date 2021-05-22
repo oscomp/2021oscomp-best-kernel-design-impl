@@ -1,14 +1,14 @@
 use core::usize;
 
 use crate::{
-    fs::{OSInode, FileClass, File, Dirent}, 
+    fs::{/*OSInode*/, FileClass, File, Dirent, MNT_TABLE}, 
     mm::{
     UserBuffer,
     translated_byte_buffer,
     translated_refmut,
     translated_str,
 }};
-use crate::task::{current_user_token, current_task, print_core_info};
+use crate::task::{current_user_token, current_task/* , print_core_info*/};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -374,14 +374,20 @@ pub fn sys_mkdir(dirfd:isize, path: *const u8, mode:u32)->isize{
     }
 }
 
-pub fn sys_mount( special:*const u8, dir:*const u8, fstype: *const u8, flags:usize, data: *const u8 )->isize{
+pub fn sys_mount( p_special:*const u8, p_dir:*const u8, p_fstype: *const u8, flags:usize, data: *const u8 )->isize{
     // TODO
-    0
+    let token = current_user_token();
+    let special = translated_str(token, p_special);
+    let dir = translated_str(token, p_dir);
+    let fstype = translated_str(token, p_fstype);
+    MNT_TABLE.lock().mount(special, dir, fstype)
 }
 
-pub fn sys_umount( special:*const u8, flags:usize )->isize{
+pub fn sys_umount( p_special:*const u8, flags:usize )->isize{
     // TODO
-    0
+    let token = current_user_token();
+    let special = translated_str(token, p_special);
+    MNT_TABLE.lock().umount(special, flags)
 }
 
 pub fn sys_fstat(){

@@ -20,6 +20,8 @@ pub trait File : Send + Sync {
     fn write(&self, buf: UserBuffer) -> usize;
 }
 
+
+pub use mount::MNT_TABLE;
 pub use finfo::{Dirent, DT_DIR, DT_REG, DT_UNKNOWN};
 pub use pipe::{Pipe, make_pipe};
 pub use stdio::{Stdin, Stdout};
