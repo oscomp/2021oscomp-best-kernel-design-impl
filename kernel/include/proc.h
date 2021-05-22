@@ -4,6 +4,7 @@
 #define __PROC_H 
 
 #include "types.h"
+#include "param.h"
 #include "riscv.h"
 #include "spinlock.h"
 #include "usrmm.h"
@@ -62,7 +63,7 @@ struct proc {
 
 	// memory 
 	uint64 kstack;					// virtual address of kernel stack 
-	uint64 sz;						// size of process memory 
+	//uint64 sz;						// size of process memory 
 	pagetable_t pagetable;			// user pagetable 
 	struct trapframe *trapframe;	// data page for trampoline.S 
 	struct seg *segment;			// first seg list node 
@@ -80,8 +81,9 @@ struct proc {
 };
 
 /* Create a new process, copying the parent. 
-	Sets up child mem space to return as if from fork() system call */
-int fork(void);
+	Sets up child mem space to return as if from fork() system call 
+	`cow` means that fork implements 'Copy-On-Write' strategy */
+int fork_cow(void);
 
 /* Exit the current process. does not return. 
 	An exited process remains in the zombie state until its 
@@ -136,7 +138,7 @@ pagetable_t proc_pagetable(struct proc *p);
 
 /* Free a process's pagetable, and free the physical 
 	memory it refers to. */
-void proc_freepagetable(pagetable_t pagetable, uint64 sz);
+void proc_freepagetable(pagetable_t pagetable, struct seg *head);
 
 
 /* CPU */

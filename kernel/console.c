@@ -22,6 +22,7 @@
 #include "include/sbi.h"
 #include "include/kmalloc.h"
 #include "include/buf.h"
+#include "include/printf.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x

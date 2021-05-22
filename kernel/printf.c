@@ -127,6 +127,7 @@ panic(char *s)
   printf("\n");
   backtrace();
   panicked = 1; // freeze uart output from other CPUs
+  intr_off();
   for(;;)
     ;
 }

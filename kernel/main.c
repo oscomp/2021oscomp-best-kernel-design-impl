@@ -1,6 +1,8 @@
 // Copyright (c) 2006-2019 Frans Kaashoek, Robert Morris, Russ Cox,
 //                         Massachusetts Institute of Technology
 
+#define __module_name__ 	"main"
+
 #include "include/types.h"
 #include "include/param.h"
 #include "include/memlayout.h"
@@ -38,9 +40,7 @@ main(unsigned long hartid, unsigned long dtb_pa)
     consoleinit();
     printfinit();   // init a lock for printf 
     print_logo();
-    #ifdef DEBUG
-    printf("hart %d enter main()...\n", hartid);
-    #endif
+	__debug_info("main", "hart %d enter main()...\n", hartid);
     kpminit();       // physical page allocator
     kvminit();       // create kernel page table
     kvminithart();   // turn on paging
@@ -74,9 +74,7 @@ main(unsigned long hartid, unsigned long dtb_pa)
     while (started == 0)
       ;
     __sync_synchronize();
-    #ifdef DEBUG
-    printf("hart %d enter main()...\n", hartid);
-    #endif
+	__debug_info("main", "hart %d enter main()...\n", hartid);
     kvminithart();
     trapinithart();
     plicinithart();  // ask PLIC for device interrupts

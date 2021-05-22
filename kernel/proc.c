@@ -19,8 +19,8 @@
 #include "include/file.h"
 #include "include/trap.h"
 #include "include/vm.h"
-#include "include/usrmm.h"
 #include "include/kmalloc.h"
+#include "include/usrmm.h"
 #include "include/debug.h"
 
 #include "include/proc.h"
@@ -96,7 +96,8 @@ static void proc_list_remove(struct proc *p) {
 	__debug_assert("proc_list_remove", NULL != p, "remove NULL from list\n");
 
 	*(p->prev) = p->next;
-	p->next->prev = p->prev;
+	if (NULL != p->next)
+		p->next->prev = p->prev;
 	p->prev = NULL;
 	p->next = NULL;
 }
@@ -121,9 +122,7 @@ static void freeproc(struct proc *p) {
 
 	// free pagetable 
 	if (p->pagetable) 
-		proc_freepagetable(p->pagetable, p->sz);
-	if (p->kpagetable)
-		kvmfree(p->kpagetable, 1);
+		proc_freepagetable(p->pagetable, p->segment);
 
 	// free trapframe 
 	freepage(p->trapframe);
@@ -133,6 +132,45 @@ static void freeproc(struct proc *p) {
 	// free the proc itself 
 	kfree(p);
 }
+
+extern char trampoline[];	// trampoline.S
+
+// Create a user page table for a given process,
+// with no user memory, but with trampoline pages.
+pagetable_t
+proc_pagetable(struct proc *p)
+{
+  pagetable_t pagetable;
+
+  // An empty page table.
+  pagetable = kvmcreate();
+  if(pagetable == 0)
+    return NULL;
+
+  // map the trapframe just below TRAMPOLINE, for trampoline.S.
+  if(mappages(pagetable, TRAPFRAME, PGSIZE,
+            (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+    kvmfree(pagetable, 1);
+    return NULL;
+  }
+
+  return pagetable;
+}
+
+// Free a process's page table, and free the
+// physical memory it refers to.
+void
+proc_freepagetable(pagetable_t pagetable, struct seg *head)
+{
+	__debug_info("proc_freepagetable", "enter\n");
+  unmappages(pagetable, TRAPFRAME, 1, 0);
+  __debug_info("proc_freepagetable", "leave\n");
+  delsegs(pagetable, head);
+  __debug_info("proc_freepagetable", "leave 2\n");
+  uvmfree(pagetable);
+  kvmfree(pagetable, 1);
+}
+
 
 // alloc a proc ready for running 
 static struct proc *allocproc(void) {
@@ -146,24 +184,11 @@ static struct proc *allocproc(void) {
 	// init lock here
 	initlock(&(p->lk), "proc");
 
+	p->chan = NULL;
 	p->killed = 0;
 	p->pid = allocpid();
 
-	p->timer = 0;
-	p->chan = NULL;
-
-	// init parenting 
 	p->child = NULL;
-
-	// init memory 
-	p->kstack = VKSTACK;
-	p->sz = 0;
-	// An empty user pagetable 
-	// and an identical kernel pagetable for this proc 
-	if ((p->pagetable = proc_pagetable(p)) == NULL) {
-		freeproc(p);
-		return NULL;
-	}
 
 	// allocate a page trapframe 
 	p->trapframe = (struct trapframe*)allocpage();
@@ -172,41 +197,32 @@ static struct proc *allocproc(void) {
 		kfree(p);
 		return NULL;
 	}
+
+	// pagetable 
 	p->segment = NULL;
+	if (NULL == (p->pagetable = proc_pagetable(p))) {
+		__debug_warn("allocproc", "fail to set pagetable\n");
+		freeproc(p);
+		return NULL;
+	}
+
+	// user kernel stack 
+	p->kstack = VKSTACK;
+
+	p->context.ra = (uint64)forkret;
+	p->context.sp = p->kstack + PGSIZE;
 
 	// init ofile 
 	for (int i = 0; i < NOFILE; i ++) 
 		p->ofile[i] = NULL;
-	p->cwd = NULL;
 
 	return p;
 }
 
-// free a proc structure and the data hanging from it,
-// including user pages.
-// p->lock must be held.
-static void freeproc(struct proc *p) {
-	if(p->trapframe)
-		freepage((void*)p->trapframe);
-	p->trapframe = 0;
-	if(p->pagetable)
-		proc_freepagetable(p->pagetable, p->segment);
-	p->pagetable = 0;
-	p->segment = 0;
-	p->pid = 0;
-	p->parent = 0;
-	p->name[0] = 0;
-	p->chan = 0;
-	p->killed = 0;
-	p->xstate = 0;
-	p->state = UNUSED;
-}
-
-int fork(void) {
+int fork_cow(void) {
 	struct proc *p = myproc();
 	struct proc *np;
 
-<<<<<<< HEAD
 	// allocate proc 
 	np = allocproc();
 	if (NULL == np) {
@@ -214,13 +230,34 @@ int fork(void) {
 		return -1;
 	}
 
-	// copy parent's memory 
-	if (uvmcopy(p->pagetable, np->pagetable, np->kpagetable, p->sz) < 0) {
-		freeproc(np);
-		__debug_warn("fork", "fail to copy parent's memory\n");
-		return -1;
+	// copy parent's memory layout 
+	struct seg *seg;
+	struct seg **s2 = &(np->segment);
+	for (seg = p->segment; seg != NULL; seg = seg->next) {
+		struct seg *s = kmalloc(sizeof(struct seg));
+		if (s == NULL) {
+			__debug_warn("fork_cow", "seg kmalloc fail\n");
+			freeproc(np);
+			return -1;
+		}
+		// Copy user memory from parent to child.
+		if (uvmcopy_cow(p->pagetable, np->pagetable, 
+				seg->addr, seg->addr + seg->sz, seg->type) < 0) 
+		{
+			__debug_warn("fork_cow", "uvmcopy_cow fails\n");
+			__debug_warn("fork_cow", "p %s\n", p->name);
+			__debug_warn("fork_cow", "%p, %p, %d\n", 
+					seg->addr, seg->addr + seg->sz, seg->type);
+			kfree(s);
+			__debug_warn("fork_cow", "exit kfree\n");
+			freeproc(np);
+			return -1;
+		}
+		memmove(s, seg, sizeof(struct seg));
+		s->next = NULL;
+		*s2 = s;
+		s2 = &s->next;
 	}
-	np->sz = p->sz;
 	
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);
@@ -245,33 +282,9 @@ int fork(void) {
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
 	np->tmask = p->tmask;
-=======
-  // An empty page table.
-  pagetable = kvmcreate();
-  if(pagetable == 0)
-    return NULL;
-
-  // map the trampoline code (for system call return)
-  // at the highest user virtual address.
-  // only the supervisor uses it, on the way
-  // to/from user space, so not PTE_U.
-  // if(mappages(pagetable, TRAMPOLINE, PGSIZE,
-  //             (uint64)trampoline, PTE_R | PTE_X, 0) < 0){
-  //   uvmfree(pagetable, 0);
-  //   return NULL;
-  // }
-
-  // map the trapframe just below TRAMPOLINE, for trampoline.S.
-  if(mappages(pagetable, TRAPFRAME, PGSIZE,
-            (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
-    kvmfree(pagetable, 1);
-    return NULL;
-  }
->>>>>>> usrmm
 
 	int pid = np->pid;
 
-<<<<<<< HEAD
 	__enter_proc_cs 
 	// init timer 
 	np->timer = TIMER_NORMAL;
@@ -279,54 +292,19 @@ int fork(void) {
 	__insert_runnable(PRIORITY_NORMAL, np);
 	__leave_proc_cs 
 
+	__debug_info("fork_cow", "leave from fork\n");
+
 	return pid;
 }
-=======
-// Free a process's page table, and free the
-// physical memory it refers to.
-void
-proc_freepagetable(pagetable_t pagetable, struct seg *head)
-{
-  // unmappages(pagetable, TRAMPOLINE, 1, 0, 0);
-  unmappages(pagetable, TRAPFRAME, 1, 0);
-  delsegs(pagetable, head);
-  uvmfree(pagetable);
-  kvmfree(pagetable, 1);
-}
-
-// pagetable_t proc_kpagetable(struct proc *p)
-// {
-//   pagetable_t pagetable;
-
-//   if((pagetable = kvmcreate()) == NULL)
-//     return NULL;
-
-//   if(mappages(pagetable, TRAPFRAME, PGSIZE,
-//             (uint64)(p->trapframe), PTE_R | PTE_W, 0) < 0){
-//     kvmfree(pagetable, 1);
-//     return NULL;
-//   }
-
-//   return pagetable;
-// }
-
-// a user program that calls exec("/init")
-// od -t xC initcode
-uchar initcode[] = {
-  0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x45, 0x02,
-  0x97, 0x05, 0x00, 0x00, 0x93, 0x85, 0x35, 0x02,
-  0x93, 0x08, 0x70, 0x00, 0x73, 0x00, 0x00, 0x00,
-  0x93, 0x08, 0x20, 0x00, 0x73, 0x00, 0x00, 0x00,
-  0xef, 0xf0, 0x9f, 0xff, 0x2f, 0x69, 0x6e, 0x69,
-  0x74, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00
-};
->>>>>>> usrmm
 
 void exit(int xstate) {
 	struct proc *p = myproc();
 
-<<<<<<< HEAD
+	extern struct proc *__initproc;
+	__debug_assert("exit", __initproc != p, "init exiting\n");
+
+	__debug_info("exit", "p %s\n", p->name);
+
 	// free filesystem fields 
 	for (int fd = 0; fd < NOFILE; fd ++) {
 		if (NULL != p->ofile[fd]) {
@@ -341,16 +319,10 @@ void exit(int xstate) {
 	p->xstate = xstate;
 	release(&p->lk);
 
-	__enter_proc_cs 
-
-	__remove(p);		// remove p from its list 
-	__insert_zombie(p);	// re-insert p into `proc_zombie`
-
-	__leave_proc_cs 
-
 	// remove itself from parent's child list 
 	// concurrency safety of sibling list is protected by p->parent->lk 
-	if (NULL != p->parent) {
+	extern struct proc *__initproc;
+	if (__initproc != p->parent) {
 		acquire(&(p->parent->lk));	// enter cs p->parent 
 		if (p->parent->child == p) {
 			p->parent->child = p->sibling;
@@ -360,28 +332,14 @@ void exit(int xstate) {
 			while (tmp && tmp->sibling != p) {
 				tmp = tmp->sibling;
 			}
-			__debug_assert("exit", NULL == tmp, "p is not in child list\n");
+			__debug_assert("exit", NULL != tmp, "p is not in child list\n");
 
 			tmp->sibling = p->sibling;
 		}
 		release(&(p->parent->lk));	// leave cs p->parent 
 	}
-=======
-  p = allocproc();
-  initproc = p;
-  
-  // allocate one user page and copy init's instructions
-  // and data into it.
-  uvminit(p->pagetable, initcode, sizeof(initcode));
-  struct seg *s = kmalloc(sizeof(struct seg));
-  s->addr = 0;
-  s->sz = PGSIZE;
-  s->next = NULL;
-  s->type = LOAD;
-  p->segment = s;
->>>>>>> usrmm
 
-	// re-parent all it's child to `init`
+	// re-parent all it's child to `__initproc`
 	acquire(&p->lk);	// enter cs p 
 	struct proc *tmp = p->child;
 	while (NULL != tmp) {
@@ -396,6 +354,11 @@ void exit(int xstate) {
 	wakeup(p->parent);
 
 	// jump into scheduler 
+	__enter_proc_cs 
+
+	__remove(p);		// remove p from its list 
+	__insert_zombie(p);	// re-insert p into `proc_zombie`
+
 	sched();
 	__debug_error("exit", "zombie exit\n");
 	panic("panic!\n");
@@ -437,6 +400,7 @@ int wait(uint64 addr) {
 					has_child = 1;
 					goto end_search;
 				}
+				np = np->next;
 			}
 		}
 		// search sleeping list 
@@ -446,6 +410,7 @@ int wait(uint64 addr) {
 				has_child = 1;
 				goto end_search;
 			}
+			np = np->next;
 		}
 		end_search: if (has_child) {
 			// wait for child to exit 
@@ -464,22 +429,21 @@ void proc_tick(void) {
 	for (int i = PRIORITY_IRQ; i < PRIORITY_NUMBER; i ++) {
 		struct proc *p = proc_runnable[i];
 		while (NULL != p) {
+			struct proc *next = p->next;
 			if (RUNNING != p->state) {
-				struct proc *next = p->next;
 				p->timer = p->timer - 1;
 				if (0 == p->timer) {	// timeout 
 					__remove(p);
 					__insert_runnable(PRIORITY_TIMEOUT, p);
 				}
-				p = next;
 			}
+			p = next;
 		}
 	} 
 
 	__leave_proc_cs 
 }
 
-<<<<<<< HEAD
 int kill(int pid) {
 	struct proc *tmp;
 
@@ -496,6 +460,9 @@ int kill(int pid) {
 				release(&tmp->lk);
 				__leave_proc_cs 
 				return 0;
+			}
+			else {
+				tmp = tmp->next;
 			}
 		}
 	}
@@ -515,6 +482,9 @@ int kill(int pid) {
 			__leave_proc_cs 
 			return 0;
 		}
+		else {
+			tmp = tmp->next;
+		}
 	}
 
 	__leave_proc_cs 
@@ -525,119 +495,13 @@ int kill(int pid) {
 // and switch to scheduler 
 void yield(void) {
 	struct proc *p = myproc();
-=======
-// Grow or shrink user memory by n bytes.
-// Return 0 on success, -1 on failure.
-int
-growproc(int n)
-{
-  struct proc *p = myproc();
 
-  struct seg *heap = getseg(p->segment, HEAP);
-  struct seg *stack = heap->next;
-
-  uint64 oldva = heap->addr + heap->sz;
-  uint64 newva = oldva + n;
-
-  if(n > 0){
-    if (newva > stack->addr - stack->sz ||
-        uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
-      return -1;
-    }
-  } else if(n < 0){
-    if (newva < heap->addr || newva > oldva) {
-      newva = heap->addr;
-    }
-
-    uvmdealloc(p->pagetable, newva, oldva, HEAP);
-  }
-  heap->sz += n;
-  return 0;
-}
-
-// Create a new process, copying the parent.
-// Sets up child kernel stack to return as if from fork() system call.
-// int
-// fork(void)
-// {
-//   int i, pid;
-//   struct proc *np;
-//   struct proc *p = myproc();
-
-//   // Allocate process.
-//   if((np = allocproc()) == NULL){
-//     return -1;
-//   }
-
-//   // Copy user memory from parent to child.
-//   if(uvmcopy(p->pagetable, np->pagetable, np->kpagetable, p->sz) < 0){
-//     freeproc(np);
-//     release(&np->lock);
-//     return -1;
-//   }
-//   np->sz = p->sz;
-
-//   np->parent = p;
-
-//   // copy tracing mask from parent.
-//   np->tmask = p->tmask;
-
-//   // copy saved user registers.
-//   *(np->trapframe) = *(p->trapframe);
-
-//   // Cause fork to return 0 in the child.
-//   np->trapframe->a0 = 0;
-
-//   // increment reference counts on open file descriptors.
-//   for(i = 0; i < NOFILE; i++)
-//     if(p->ofile[i])
-//       np->ofile[i] = filedup(p->ofile[i]);
-//   np->cwd = edup(p->cwd);
-
-//   safestrcpy(np->name, p->name, sizeof(p->name));
-
-//   pid = np->pid;
-
-//   np->state = RUNNABLE;
-
-//   release(&np->lock);
-
-//   return pid;
-// }
-
-int fork_cow(void)
-{
-  int i, pid;
-  struct proc *np;
-  struct proc *p = myproc();
->>>>>>> usrmm
-
+	__debug_assert("yield", p != NULL, "p == NULL\n");
 	__enter_proc_cs 
 
-<<<<<<< HEAD
-	p->timer = TIMER_NORMAL;
 	__remove(p);
+	p->timer = TIMER_NORMAL;
 	__insert_runnable(PRIORITY_NORMAL, p);
-=======
-  struct seg *seg;
-  struct seg **s2 = &np->segment;
-  for (seg = p->segment; seg != NULL; seg = seg->next) {
-    struct seg *s = kmalloc(sizeof(struct seg));
-    if (s == NULL) {
-      goto fail;
-    }
-    // Copy user memory from parent to child.
-    // __debug_info("fork_cow", "type=%d start=%p end=%p\n", seg->type, start, end);
-    if (uvmcopy_cow(p->pagetable, np->pagetable, seg->addr, seg->addr + seg->sz, seg->type) < 0) {
-      kfree(s);
-      goto fail;
-    }
-    memmove(s, seg, sizeof(struct seg));
-    s->next = NULL;
-    *s2 = s;
-    s2 = &s->next;
-  }
->>>>>>> usrmm
 
 	// swtch to scheduler 
 	sched();
@@ -647,6 +511,8 @@ int fork_cow(void)
 
 void sleep(void *chan, struct spinlock *lk) {
 	struct proc *p = myproc();
+
+	__debug_assert("sleep", NULL != p, "p == NULL\n");
 
 	release(lk);
 	__enter_proc_cs 
@@ -679,7 +545,6 @@ void wakeup(void *chan) {
 	__leave_proc_cs 
 }
 
-<<<<<<< HEAD
 // get the next runnable proc 
 // lock must be ACQUIRED before 
 static struct proc *__get_runnable_no_lock(void) {
@@ -688,19 +553,12 @@ static struct proc *__get_runnable_no_lock(void) {
 		while (NULL != tmp) {
 			if (RUNNABLE == tmp->state) {
 				return tmp;
+			} else {
+				tmp = tmp->next;
 			}
-			tmp = tmp->next;
 		}
 	}
 	return NULL;
-=======
-  return pid;
-
-fail:
-  freeproc(np);
-  release(&np->lock);
-  return -1;
->>>>>>> usrmm
 }
 
 struct proc const *get_runnable(void) {
@@ -726,14 +584,14 @@ void scheduler(void) {
 
 			// switch to user kernel pagetable 
 			// will switch to user's pagetable at usertrapret 
-			w_satp(MAKE_SATP(tmp->kpagetable));
+			w_satp(MAKE_SATP(tmp->pagetable));
 			sfence_vma();
-
+			// swtch context 
 			swtch(&c->context, &tmp->context);
-
 			// switch back to kernel pagetable 
 			w_satp(MAKE_SATP(kernel_pagetable));
 			sfence_vma();
+			__debug_info("scheduler()", "swtch from %s\n", tmp->name);
 		}
 		c->proc = NULL;
 		__leave_proc_cs
@@ -748,6 +606,8 @@ void sched(void) {
 	int intena;
 	struct proc *p = myproc();
 
+	__debug_assert("sched", NULL != p, "NULL == p\n");
+	__debug_info("sched", "p %s\n", p->name);
 	if (!holding(&proc_lock)) 
 		panic("sched proc_lock\n");
 	if (1 != mycpu()->noff) 
@@ -764,13 +624,13 @@ void sched(void) {
 
 void procinit(void) {
 	// init pid 
-	pid = 2;	// 1 is reserved for in-kernel process `init`
+	pid = 1;
 	initlock(&pid_lock, "pid_lock");
 
 	// init cpus 
 	memset(cpus, 0, sizeof(cpus));
 
-	// init queue 
+	// init list 
 	for (int i = 0; i < PRIORITY_NUMBER; i ++) 
 		proc_runnable[i] = NULL;
 	proc_sleep = NULL;
@@ -789,6 +649,7 @@ void forkret(void) {
 		// File system initialization must be run in the context of a 
 		// regular process (e.g., because it calls sleep), and thus 
 		// cannot be run from main() 
+		__debug_info("forkret", "hart%d enter here\n", cpuid());
 		first = 0;
 		rootfs_init();
 		myproc()->cwd = namei("/");
@@ -822,63 +683,17 @@ void userinit(void) {
 
 	// allocate one user page and copy init's instruction 
 	// and data into it 
-	uvminit(p->pagetable, p->kpagetable, initcode, sizeof(initcode));
-	p->sz = PGSIZE;
+	uvminit(p->pagetable, initcode, sizeof(initcode));
+	struct seg *s = kmalloc(sizeof(struct seg));
+	s->addr = 0;
+	s->sz = PGSIZE;
+	s->next = NULL;
+	s->type = LOAD;
+	p->segment = s;
 
-<<<<<<< HEAD
 	// prepare for the very first "return" from kernel to user 
 	p->trapframe->epc = 0x0;
 	p->trapframe->sp = PGSIZE;
-=======
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run.
-//  - swtch to start running that process.
-//  - eventually that process transfers control
-//    via swtch back to the scheduler.
-void
-scheduler(void)
-{
-  struct proc *p;
-  struct cpu *c = mycpu();
-  extern pagetable_t kernel_pagetable;
-
-  c->proc = 0;
-  for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
-    
-    int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        // printf("[scheduler]found runnable proc with pid: %d\n", p->pid);
-        p->state = RUNNING;
-        c->proc = p;
-        w_satp(MAKE_SATP(p->pagetable));
-        sfence_vma();
-        swtch(&c->context, &p->context);
-        w_satp(MAKE_SATP(kernel_pagetable));
-        sfence_vma();
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-
-        found = 1;
-      }
-      release(&p->lock);
-    }
-    if(found == 0) {
-      intr_on();
-      asm volatile("wfi");
-    }
-  }
-}
->>>>>>> usrmm
 
 	safestrcpy(p->name, "initcode", sizeof(p->name));
 
@@ -894,65 +709,28 @@ scheduler(void)
 // Grow or shrink user memory by n bytes. 
 // Return 0 on success, -1 on failure 
 int growproc(int n) {
-	int sz;
-	struct proc *p = myproc();
+  struct proc *p = myproc();
 
-	sz = p->sz;
-	if (n > 0) {
-		if (0 == (sz = uvmalloc(p->pagetable, p->kpagetable, sz, sz+n))) 
-			return -1;
-	}
-	else if (n < 0) {
-		sz = uvmdealloc(p->pagetable, p->kpagetable, sz, sz + n);
-	}
-	p->sz = sz;
+  struct seg *heap = getseg(p->segment, HEAP);
+  struct seg *stack = heap->next;
 
-	return 0;
-}
+  uint64 oldva = heap->addr + heap->sz;
+  uint64 newva = oldva + n;
 
-extern char trampoline[];	// trampoline.S
+  if(n > 0){
+    if (newva > stack->addr - stack->sz ||
+        uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
+      return -1;
+    }
+  } else if(n < 0){
+    if (newva < heap->addr || newva > oldva) {
+      newva = heap->addr;
+    }
 
-// Create a user page table for a given process,
-// with no user memory, but with trampoline pages.
-pagetable_t
-proc_pagetable(struct proc *p)
-{
-  pagetable_t pagetable;
-
-  // An empty page table.
-  pagetable = uvmcreate();
-  if(pagetable == 0)
-    return NULL;
-
-  // map the trampoline code (for system call return)
-  // at the highest user virtual address.
-  // only the supervisor uses it, on the way
-  // to/from user space, so not PTE_U.
-  if(mappages(pagetable, TRAMPOLINE, PGSIZE,
-              (uint64)trampoline, PTE_R | PTE_X) < 0){
-    uvmfree(pagetable, 0);
-    return NULL;
+    uvmdealloc(p->pagetable, newva, oldva, HEAP);
   }
-
-  // map the trapframe just below TRAMPOLINE, for trampoline.S.
-  if(mappages(pagetable, TRAPFRAME, PGSIZE,
-              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
-    vmunmap(pagetable, TRAMPOLINE, 1, 0);
-    uvmfree(pagetable, 0);
-    return NULL;
-  }
-
-  return pagetable;
-}
-
-// Free a process's page table, and free the
-// physical memory it refers to.
-void
-proc_freepagetable(pagetable_t pagetable, uint64 sz)
-{
-  vmunmap(pagetable, TRAMPOLINE, 1, 0);
-  vmunmap(pagetable, TRAPFRAME, 1, 0);
-  uvmfree(pagetable, sz);
+  heap->sz += n;
+  return 0;
 }
 
 // Copy to either a user address, or kernel address,
@@ -987,7 +765,6 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
   }
 }
 
-<<<<<<< HEAD
 static inline char const *__state_to_str(enum procstate state) {
 	switch (state) {
 	case RUNNABLE: 		return "runnable"; 
@@ -996,54 +773,23 @@ static inline char const *__state_to_str(enum procstate state) {
 	case ZOMBIE: 		return "zombie  ";
 	default: 			return "\e[31;1m????????\e[0m";
 	}
-=======
-// Print a process listing to console.  For debugging.
-// Runs when user types ^P on console.
-// No lock to avoid wedging a stuck machine further.
-void
-procdump(void)
-{
-  static char *states[] = {
-  [UNUSED]    "unused",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-  };
-  struct proc *p;
-  char *state;
-
-  printf("\nPID\tLOAD\tHEAP\tSTATE\tNAME\n");
-  for(p = proc; p < &proc[NPROC]; p++){
-    if(p->state == UNUSED)
-      continue;
-    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
-      state = states[p->state];
-    else
-      state = "???";
-
-    uint64 load = 0, heap = 0;
-    for (struct seg *s = p->segment; s != NULL; s = s->next) {
-      if (s->type == LOAD) {
-        load += s->sz;
-      } else if (s->type == HEAP) {
-        heap = s->sz;
-      }
-    }
-
-    printf("%d\t%d\t%d\t%s\t%s", p->pid, load, heap, state, p->name);
-    printf("\n");
-  }
->>>>>>> usrmm
 }
 
 static void __print_list(struct proc *list) {
 	while (list) {
-		printf("%d\t%s\t%s\t%d\n", 
+		uint64 load = 0, heap = 0;
+		for (struct seg *s = list->segment; s != NULL; s = s->next) {
+			if (s->type == LOAD) {
+				load += s->sz;
+			} else if (s->type == HEAP) {
+				heap = s->sz;
+			}
+		}
+		printf("%d\t%s\t%s\t%d\t%d\n", 
 			list->pid,
 			__state_to_str(list->state),
-			list->name,
-			list->sz
+			list->name, 
+			load, heap
 		);
 		list = list->next;
 	}
@@ -1051,7 +797,7 @@ static void __print_list(struct proc *list) {
 
 // print current processes to console 
 void procdump(void) {
-	printf("\nPID\tSTATE\tNAME\tMEM\n");
+	printf("\nPID\tSTATE\tNAME\tMEM_LOAD\tMEM_HEAP\n");
 	__enter_proc_cs 
 
 	// display runnable 

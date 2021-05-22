@@ -2,6 +2,11 @@
 // Support functions for system calls that involve file descriptors.
 //
 
+#ifndef __DEBUG_file 
+#undef DEBUG 
+#endif 
+
+#define __module_name__ 	"file"
 
 #include "include/types.h"
 #include "include/riscv.h"
@@ -17,6 +22,7 @@
 #include "include/string.h"
 #include "include/vm.h"
 #include "include/kmalloc.h"
+#include "include/debug.h"
 
 struct devsw devsw[NDEV];
 // struct {

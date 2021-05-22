@@ -2,6 +2,8 @@
 #undef  DEBUG
 #endif
 
+#define __module_name__ 	"usrmm"
+
 #include "include/usrmm.h"
 #include "include/kmalloc.h"
 #include "include/proc.h"
@@ -158,6 +160,8 @@ struct seg*
 delseg(pagetable_t pagetable, struct seg *s)
 {
   struct seg *next = s->next;
+  __debug_info("delseg", "s = %p\n", s);
+  __debug_info("delseg", "s->type: %d\n", s->type);
   uvmdealloc(pagetable, s->addr, s->addr + s->sz, s->type);
   kfree(s);
   return next;

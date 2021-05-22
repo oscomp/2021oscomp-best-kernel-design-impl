@@ -1,3 +1,8 @@
+#ifndef __DEBUG_syscall 
+#undef DEBUG 
+#endif 
+
+#define __module_name__ 	"syscall"
 
 #include "include/types.h"
 #include "include/param.h"
@@ -12,6 +17,7 @@
 #include "include/usrmm.h"
 #include "include/string.h"
 #include "include/printf.h"
+#include "include/debug.h"
 
 // Fetch the uint64 at addr from the current process.
 int
@@ -206,7 +212,10 @@ syscall(void)
   int num;
   struct proc *p = myproc();
 
+	__debug_info("syscall", "enter syscall\n");
+	__debug_assert("syscall", p != NULL, "p == NULL\n");
   num = p->trapframe->a7;
+  __debug_info("syscall", "num = %d\n", num);
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // trace
     int trace = p->tmask & (1 << (num - 1));

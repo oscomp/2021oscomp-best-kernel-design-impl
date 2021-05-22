@@ -2,6 +2,8 @@
 #undef  DEBUG
 #endif
 
+#define __module_name__ 	"exec"
+
 #include "include/types.h"
 #include "include/param.h"
 #include "include/memlayout.h"
@@ -85,6 +87,8 @@ bad:
 // All argvs are pointers came from user space, and should be checked by sys_caller
 int execve(char *path, char **argv, char **envp)
 {
+	__debug_info("exeve", "path = %s\n", path);
+
   struct inode *ip = NULL;
   pagetable_t pagetable = NULL;
   struct seg *seghead = NULL, *seg;
@@ -249,8 +253,8 @@ int execve(char *path, char **argv, char **envp)
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
-  __debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
-  __debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
+  //__debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
+  //__debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
   if (seghead) {
     delsegs(pagetable, seghead);
   }

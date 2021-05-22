@@ -2,6 +2,8 @@
 #undef DEBUG
 #endif
 
+#define __module_name__ "vm"
+
 #include "include/param.h"
 #include "include/types.h"
 #include "include/memlayout.h"
