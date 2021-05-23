@@ -43,7 +43,7 @@
 typedef struct list_node
 {
     struct list_node *next, *prev;
-    ptr_t pt_pcb;
+    ptr_t ptr;
 } list_node_t;
 
 typedef list_node_t list_head;
@@ -56,7 +56,7 @@ typedef list_node_t list_head;
     })
 
 // LIST_HEAD is used to define the head of a list.
-#define LIST_HEAD(name) struct list_node name = {.next = &(name), .prev = &(name), .pt_pcb = &pid0_pcb}
+#define LIST_HEAD(name) struct list_node name = {.next = &(name), .prev = &(name), .ptr = (ptr_t)&pid0_pcb}
 
 static inline void init_list_head(list_head *list)
 {

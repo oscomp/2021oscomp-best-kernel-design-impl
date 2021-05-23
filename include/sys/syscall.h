@@ -44,5 +44,7 @@ void sys_reflush();
 
 long sys_get_timebase();
 long sys_get_tick();
+void sys_move_cursor(int x, int y);
+void sys_exit();
 
 #endif

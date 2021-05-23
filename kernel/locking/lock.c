@@ -34,21 +34,19 @@ void do_mutex_lock_init(mutex_lock_t *lock)
 
 void do_mutex_lock_acquire(mutex_lock_t *lock)
 {
-    if (LOCKED == atomic_cmpxchg(UNLOCKED, LOCKED, &lock->lock.status) )
+    while (LOCKED == atomic_cmpxchg(UNLOCKED, LOCKED, &lock->lock.status) )
     {
     	// printk("id [%d] will be blocked.\n\r",current_running->pid);
     	do_block(&current_running->list, &lock->block_queue);
+        do_scheduler();
     }
-    else
-    	// printk("id [%d] got the lock.\n\r",current_running->pid)
-    	;
 }
 
 void do_mutex_lock_release(mutex_lock_t *lock)
 {
     if (UNLOCKED == atomic_cmpxchg(LOCKED, UNLOCKED, &lock->lock.status))
     {
-    	//exit
+    	//error
     	;
     }
     if (lock->block_queue.next != &lock->block_queue)

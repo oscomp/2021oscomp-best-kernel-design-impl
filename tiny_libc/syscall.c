@@ -40,3 +40,8 @@ long sys_get_tick()
 {
     return invoke_syscall(SYSCALL_GET_TICK, IGNORE, IGNORE, IGNORE);
 }
+
+void sys_exit()
+{
+    invoke_syscall(SYSCALL_EXIT, IGNORE, IGNORE, IGNORE);
+}

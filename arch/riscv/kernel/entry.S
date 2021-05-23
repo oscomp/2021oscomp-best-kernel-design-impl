@@ -9,12 +9,12 @@
    * the kernel thread pointer.  If we came from the kernel, sscratch
    * will contain 0, and we should continue on the current TP.
    */
-  csrrw tp, CSR_SSCRATCH, tp
-  bnez tp, _save_context
+#   csrrw tp, CSR_SSCRATCH, tp
+#   bnez tp, _save_context
 
-_restore_kernel_tpsp:
-  csrr tp, CSR_SSCRATCH
-  sd sp, PCB_KERNEL_SP(tp)
+# _restore_kernel_tpsp:
+#   csrr tp, CSR_SSCRATCH
+#   sd sp, PCB_KERNEL_SP(tp)
 _save_context:
   sd sp, PCB_USER_SP(tp)
   ld sp, PCB_KERNEL_SP(tp)
@@ -24,7 +24,6 @@ _save_context:
   sd zero, OFFSET_REG_ZERO(sp)
   sd ra, OFFSET_REG_RA(sp)
 
-  // sp
   sd sp, PCB_KERNEL_SP(tp)
 
   sd gp, OFFSET_REG_GP(sp)
@@ -80,12 +79,12 @@ _save_context:
   sd s0, OFFSET_REG_SBADADDR(sp)
   csrr s0, CSR_SCAUSE
   sd s0, OFFSET_REG_SCAUSE(sp)
+  csrr s0, CSR_SATP
+  sd s0, OFFSET_REG_SATP(sp)
 .endm
 
 .macro RESTORE_CONTEXT
   /* TODO: Restore all registers and sepc,sstatus */
-  ld sp, PCB_KERNEL_SP(tp)
-
   ld zero, OFFSET_REG_ZERO(sp)
   ld ra, OFFSET_REG_RA(sp)
     
@@ -96,7 +95,6 @@ _save_context:
   ld t1, OFFSET_REG_T1(sp)
   ld t2, OFFSET_REG_T2(sp)
 
-  ld s0, OFFSET_REG_S0(sp)
   ld s1, OFFSET_REG_S1(sp)
 
   ld a0, OFFSET_REG_A0(sp)
@@ -126,9 +124,23 @@ _save_context:
 
   
   ld s0, OFFSET_REG_SSTATUS(sp)
-  csrw s0, CSR_SSTATUS
+  csrw CSR_SSTATUS, s0
   ld s0, OFFSET_REG_SEPC(sp)
-  csrr s0, CSR_SEPC
+  csrw CSR_SEPC, s0
+  ld s0, OFFSET_REG_SATP(sp)
+  fence
+  fence.i
+  sfence.vma
+  fence
+  fence.i
+  csrw CSR_SATP, s0
+  fence
+  fence.i
+  sfence.vma
+  fence
+  fence.i
+
+  ld s0, OFFSET_REG_S0(sp)
 
   addi sp, sp, OFFSET_SIZE
   sd sp, PCB_KERNEL_SP(tp)
@@ -166,7 +178,7 @@ ENDPROC(enable_interrupt)
 
 ENTRY(disable_interrupt)
   li t0, SR_SIE
-  csrs CSR_SSTATUS, t0
+  csrc CSR_SSTATUS, t0
   jr ra
 ENDPROC(disable_interrupt)
 
@@ -174,9 +186,6 @@ ENDPROC(disable_interrupt)
 // the address of next pcb in a1
 ENTRY(switch_to)
   addi tp, a0, 0
-  sd sp, PCB_USER_SP(tp)
-  ld sp, PCB_KERNEL_SP(tp)  
-
   // save all callee save registers on kernel stack
   addi sp, sp, -(SWITCH_TO_SIZE)
   sd ra, SWITCH_TO_RA(sp)
@@ -199,9 +208,7 @@ ENTRY(switch_to)
   
   // restore next
   addi tp, a1, 0
-  ld sp, PCB_KERNEL_SP(tp)
-  
-  ld ra, SWITCH_TO_RA(sp)
+  ld sp, PCB_KERNEL_SP(tp)  
 
   ld s0, SWITCH_TO_S0(sp)
   ld s1, SWITCH_TO_S1(sp)
@@ -217,20 +224,20 @@ ENTRY(switch_to)
   ld s10, SWITCH_TO_S10(sp)
   ld s11, SWITCH_TO_S11(sp)  
 
+  ld ra, SWITCH_TO_RA(sp)
   addi sp, sp, SWITCH_TO_SIZE
-  sd sp, PCB_KERNEL_SP(tp)
-  ld sp, PCB_USER_SP(tp)
   jr ra
 ENDPROC(switch_to)
 
 ENTRY(ret_from_exception)
-  /* TODO: */
+  RESTORE_CONTEXT
+  sret
 ENDPROC(ret_from_exception)
 
 ENTRY(exception_handler_entry)
+  .align 4
+  
   SAVE_CONTEXT
-
-  csrw CSR_SSCRATCH, x0
 
   /* Load the global pointer */
   .option push
@@ -238,12 +245,29 @@ ENTRY(exception_handler_entry)
   la gp, __global_pointer$
   .option pop
 
+  csrw CSR_SSCRATCH, x0
+
   /* TODO: load ret_from_exception into $ra
    * so that we can return to ret_from_exception
    * when interrupt_help complete.
    */
+  
+  la ra, ret_from_exception
 
   /* TODO: call interrupt_helper
-   * note: don't forget to pass parameters for it.
+   * note: dont forget to pass parameters for it.
    */
+  ld a0, PCB_KERNEL_SP(tp)
+  csrr a1, CSR_STVAL
+  csrr a2, CSR_SCAUSE
+  mv a3, tp
+
+  la t0, interrupt_helper
+  jr t0
+
 ENDPROC(exception_handler_entry)
+
+ENTRY(do_sret)
+  csrw CSR_SEPC, ra
+  sret
+ENDPROC(do_sret)

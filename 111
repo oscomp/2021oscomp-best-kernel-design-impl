@@ -1,0 +1,88 @@
+HOST_CC = gcc
+CROSS_PREFIX = riscv64-unknown-elf-
+CC = ${CROSS_PREFIX}gcc
+OBJDUMP = ${CROSS_PREFIX}objdump
+OBJCOPY = ${CROSS_PREFIX}objcopy
+CFLAGS = -O0  -fno-builtin -nostdlib -T riscv.lds -Wall -mcmodel=medany -Iinclude -Idrivers -Itest -Itiny_libc/include -nostdinc -g -w
+
+BOOTLOADER_ENTRYPOINT = 0x80000000
+START_ENTRYPOINT = 0x80020000
+KERNEL_ENTRYPOINT = 0xffffffff80400000
+START_QEMU_ENTRY = 0x80200000
+
+ARCH = riscv
+ARCH_DIR = ./arch/$(ARCH)
+CFLAGS += -Iarch/$(ARCH)/include
+
+SRC_BOOT 	= $(ARCH_DIR)/boot/bootblock.S
+SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
+SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S $(ARCH_DIR)/sbi/common.c
+SRC_DRIVER	= ./drivers/screen.c
+SRC_INIT 	= ./init/main.c
+SRC_INT		= ./kernel/irq/irq.c
+SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
+SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c
+SRC_MM		= ./kernel/mm/mm.c
+SRC_SYSCALL	= ./kernel/syscall/syscall.c
+SRC_LIBS	= ./libs/string.c ./libs/printk.c
+
+SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/syscall.S ./tiny_libc/time.c
+
+SRC_TEST	= ./test/test.c
+
+SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
+				${SRC_TEST} ${SRC_LIBC}
+
+SRC_IMAGE	= ./tools/createimage.c
+
+SRC_ELF2CHAR = ./tools/elf2char.c
+
+SRC_BURNER	= ./tools/kflash.py
+
+SRC_LINKER = ./linker-k210.ld
+
+K210_SERIALPORT	= /dev/ttyUSB0
+
+.PHONY:all main bootblock clean
+
+all: k210 qemu asm# floppy
+
+k210: payload createimage image
+
+qemu: payload createimage qemu_head
+
+head: ${SRC_HEAD} ${SRC_LINKER}
+	${CC} ${CFLAGS} -o head $(SRC_HEAD) -Ttext=${START_ENTRYPOINT}
+
+payload: elf2char main
+	./elf2char main > payload.c
+
+elf2char: ${SRC_ELF2CHAR}
+	${HOST_CC} ${SRC_ELF2CHAR} -o elf2char -ggdb -Wall
+
+main: $(SRC_MAIN) ${SRC_LINKER}
+	${CC} ${CFLAGS} -o main $(SRC_MAIN) -Ttext=${KERNEL_ENTRYPOINT}
+
+createimage: ${SRC_IMAGE}
+	${HOST_CC} ${SRC_IMAGE} -o createimage -ggdb -Wall
+
+image: createimage head main 
+	./createimage --extended head head.bin
+	cp rustsbi-k210.bin k210.bin
+	dd if=head.bin of=k210.bin bs=128K seek=1
+
+run:
+	sudo python3 kflash.py -p ${K210_SERIALPORT} -b 1500000 k210.bin
+	sudo python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct ${K210_SERIALPORT} 115200
+
+clean:
+	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu
+
+asm:
+	${OBJDUMP} -d main > kernel.txt
+	${OBJDUMP} -d head > head.txt
+	${OBJDUMP} -d head_qemu > head_qemu.txt
+
+qemu_head: createimage ${SRC_HEAD}
+	${CC} ${CFLAGS} -o head_qemu $(SRC_HEAD) -Ttext=${START_QEMU_ENTRY}	
+	./createimage --extended head_qemu head_qemu.bin

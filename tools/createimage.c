@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define IMAGE_FILE "./image"
+#define IMAGE_FILE "./k210.bin"
 #define ARGS "[--extended] [--vm] <bootblock> <executable-file> ..."
 
 
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
         error("%s: option --vm not implemented\n", progname);
     }
     if (argc < 3) {
-        /* at least 3 args (createimage bootblock kernel) */
+         // at least 3 args
         error("usage: %s %s\n", progname, ARGS);
     }
     create_image(argc - 1, argv + 1, options.extended);
@@ -66,34 +66,32 @@ static void create_image(int nfiles, char *files[], int extended)
     Elf64_Phdr phdr;
 
     /* open the image file */
-    img = fopen(IMAGE_FILE,"wb");
+    img = fopen(files[1],"wb");
     
-    /* for each input file */
-    while (nfiles-- > 0) {
+    /* open input file */
+	fp = fopen(*files,"rb");   
+    /* read ELF header */
+    read_ehdr(&ehdr, fp);
 
-        /* open input file */
-    	fp = fopen(*files,"rb");                                             //error
-        /* read ELF header */
-        read_ehdr(&ehdr, fp);
-        printf("0x%04lx: %s\n", ehdr.e_entry, *files);
+    printf("0x%04lx: %s\n", ehdr.e_entry, *files);
 
-        /* for each program header */
-        for (ph = 0; ph < ehdr.e_phnum; ph++) {
+    /* for each program header */
+    for (ph = 0; ph < ehdr.e_phnum; ph++) {
 
-            /* read program header */
-            read_phdr(&phdr, fp, ph, ehdr);
-            if (extended)
-            {
-            	printf("\tsegment %x\n", ph);
-            	printf("\t\toffset 0x%.4lx\t\tvaddr 0x%.4lx\n"
-            			"\t\tfilesz 0x%.4lx\t\tmemsz 0x%.4lx\n", phdr.p_offset,phdr.p_vaddr, phdr.p_filesz,phdr.p_memsz);
-            }
-            /* write segment to the image */
-            write_segment(ehdr, phdr, fp, img, &nbytes, &first, extended);
+        /* read program header */
+        read_phdr(&phdr, fp, ph, ehdr);
+        if (extended)
+        {
+        	printf("\tsegment %x\n", ph);
+        	printf("\t\toffset 0x%.4lx\t\tvaddr 0x%.4lx\n"
+        			"\t\tfilesz 0x%.4lx\t\tmemsz 0x%.4lx\n", phdr.p_offset,phdr.p_vaddr, phdr.p_filesz,phdr.p_memsz);
         }
-        fclose(fp);
-        files++;
+        /* write segment to the image */
+        write_segment(ehdr, phdr, fp, img, &nbytes, &first, extended);
     }
+    fclose(fp);
+    files++;
+
     write_os_size(nbytes, img, extended);
     fclose(img);
 }
@@ -144,8 +142,8 @@ static void write_segment(Elf64_Ehdr ehdr, Elf64_Phdr phdr, FILE * fp,
 static void write_os_size(int nbytes, FILE * img, int extended)
 {
 	short sector_num = nbytes / 512 - 1;
-    fseek(img,0x1fc,0);
-    fwrite(&sector_num,2,1,img);
+ //    fseek(img,0x1fc,0);
+ //    fwrite(&sector_num,2,1,img);
     if (extended)
     	printf("os_size: %d sectors\n", sector_num);
 }

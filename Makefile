@@ -1,61 +1,132 @@
+SHELL := /bin/bash
 HOST_CC = gcc
-CROSS_PREFIX = riscv64-unknown-linux-gnu-
+CROSS_PREFIX = riscv64-unknown-elf-
 CC = ${CROSS_PREFIX}gcc
+AR = ${CROSS_PREFIX}ar
 OBJDUMP = ${CROSS_PREFIX}objdump
-CFLAGS = -O0  -fno-builtin -nostdlib -T riscv.lds -Wall -mcmodel=medany -Iinclude -Idrivers -Itest -Itest/test_project2 -Itiny_libc/include -nostdinc -g
-DISK = /dev/sdb
+OBJCOPY = ${CROSS_PREFIX}objcopy
+CFLAGS = -O0 -w -nostdlib -T riscv.lds -Wall -mcmodel=medany -Iinclude -Idrivers \
+	-Itest -Itiny_libc/include -nostdinc -g -fvar-tracking -ffreestanding \
+	-Idrivers/sdcard/include
+USER_CFLAGS = -O0 -w -nostdlib -T user_riscv.lds -Wall -mcmodel=medany -Itest -Itiny_libc/include -Iinclude -Idrivers -nostdinc -g -fvar-tracking
+USER_LDFLAGS = -L./ -ltiny_libc
 
-BOOTLOADER_ENTRYPOINT = 0x50200000
-KERNEL_ENTRYPOINT = 0x50200000
+BOOTLOADER_ENTRYPOINT = 0x80000000
+START_ENTRYPOINT = 0x80020000
+KERNEL_ENTRYPOINT = 0xffffffff80400000
+START_QEMU_ENTRY = 0x80200000
 
 ARCH = riscv
 ARCH_DIR = ./arch/$(ARCH)
+ARCH_SD	= ./drivers/sdcard
 CFLAGS += -Iarch/$(ARCH)/include
+USER_CFLAGS += -Iarch/$(ARCH)/include
+USER_LDFLAGS += $(ARCH_DIR)/crt0.o
 
 SRC_BOOT 	= $(ARCH_DIR)/boot/bootblock.S
-SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/sbi/common.c
+SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
+SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S $(ARCH_DIR)/sbi/common.c
+SRC_SCREEN	= ./drivers/screen.c
+SRC_SDCARD	= ${ARCH_SD}/sdcard.c ${ARCH_SD}/fpioa.c ${ARCH_SD}/gpiohs.c ${ARCH_SD}/spi.c ${ARCH_SD}/utils.c
 SRC_DRIVER	= ./drivers/screen.c
 SRC_INIT 	= ./init/main.c
 SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
 SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c
-SRC_MM	= ./kernel/mm/mm.c
+SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c
+SRC_FS		= ./kernel/fs/fs.c
+SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
-SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/syscall.S ./tiny_libc/time.c
+SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S ./tiny_libc/time.c
+SRC_LIBC_ASM	= $(filter %.S %.s,$(SRC_LIBC))
+SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
-SRC_TEST	= ./test/test.c
-SRC_TEST2	= ./test/test_project2/test_scheduler1.c ./test/test_project2/test_lock1.c
-SRC_TEST3	= ./test/test_project2/test_scheduler2.c ./test/test_project2/test_sleep.c ./test/test_project2/test_timer.c ./test/test_project2/test_lock2.c ./test/test_project2/test_deadlock.c
+SRC_USER	= ./test/shell.elf
 
-SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} ${SRC_LIBC} ${SRC_TEST} ${SRC_TEST2} ${SRC_TEST3}
-
+SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
+				${SRC_SDCARD} ${SRC_FS}
 SRC_IMAGE	= ./tools/createimage.c
+SRC_GENMAP	= ./tools/generateMapping.c
+SRC_ELF2CHAR = ./tools/elf2char.c
+
+SRC_BURNER	= ./tools/kflash.py
+
+SRC_LINKER = ./linker-k210.ld
+
+K210_SERIALPORT	= /dev/ttyUSB0
 
 .PHONY:all main bootblock clean
 
-all: createimage image asm # floppy
+all: test/shell.elf k210 qemu asm# floppy
 
-bootblock: $(SRC_BOOT) riscv.lds
-	${CC} ${CFLAGS} -o bootblock $(SRC_BOOT) -e main -Ttext=${BOOTLOADER_ENTRYPOINT}
+k210: payload createimage image
 
-main: $(SRC_MAIN) riscv.lds
-	${CC} ${CFLAGS} -o main $(SRC_MAIN) -Ttext=${KERNEL_ENTRYPOINT}
+qemu: payload createimage qemu_head
 
-createimage: $(SRC_IMAGE)
+head: ${SRC_HEAD} ${SRC_LINKER}
+	${CC} ${CFLAGS} -o head $(SRC_HEAD) -Ttext=${START_ENTRYPOINT}
+
+payload: elf2char main
+	./elf2char main > payload.c
+
+elf2char: ${SRC_ELF2CHAR}
+	${HOST_CC} ${SRC_ELF2CHAR} -o elf2char -ggdb -Wall
+
+generateMapping: $(SRC_GENMAP)
+	${HOST_CC} ${SRC_GENMAP} -o generateMapping -ggdb -Wall
+
+main: $(SRC_MAIN) ${SRC_LINKER} user mkfs
+	${CC} ${CFLAGS} -o main $(SRC_MAIN) ./kernel/user_programs.c -Ttext=${KERNEL_ENTRYPOINT}
+
+createimage: ${SRC_IMAGE}
 	${HOST_CC} ${SRC_IMAGE} -o createimage -ggdb -Wall
 
-image: bootblock main createimage
-	./createimage --extended bootblock main
+mkfs:
+	dd if=/dev/zero of=disk.img bs=3M count=2
+	mkfs.vfat -F 32 disk.img
+
+image: createimage head main 
+	./createimage --extended head head.bin
+	cp rustsbi-k210.bin k210.bin
+	dd if=head.bin of=k210.bin bs=128K seek=1
+
+run:
+	sudo python3 kflash.py -p ${K210_SERIALPORT} -b 1500000 k210.bin
+	sudo minicom
+# 	sudo python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct ${K210_SERIALPORT} 115200
 
 clean:
-	rm -rf bootblock image createimage main
-	find . -name "*.o" -exec rm {} \;
-
-floppy:
-	sudo fdisk -l ${DISK}
-	sudo dd if=image of=${DISK}2 conv=notrunc
+	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu
 
 asm:
 	${OBJDUMP} -d main > kernel.txt
+	${OBJDUMP} -d head > head.txt
+	${OBJDUMP} -d head_qemu > head_qemu.txt
+	${OBJDUMP} -d ./test/shell.elf > shell.txt
+
+qemu_head: createimage ${SRC_HEAD}
+	${CC} ${CFLAGS} -o head_qemu $(SRC_HEAD) -Ttext=${START_QEMU_ENTRY}	
+	./createimage --extended head_qemu head_qemu.bin
+
+user: elf2char generateMapping
+	echo "" > user_programs.c
+	echo "" > user_programs.h
+	for prog in $(SRC_USER); do ./elf2char --header-only $$prog >> user_programs.h; done
+	for prog in $(SRC_USER); do ./elf2char $$prog >> user_programs.c; done
+	./generateMapping user_programs
+	mv user_programs.h include/
+	mv user_programs.c kernel/
+
+libtiny_libc.a: $(SRC_LIBC_C) $(SRC_LIBC_ASM) user_riscv.lds
+	for libobj in $(SRC_LIBC_C); do ${CC} ${USER_CFLAGS} -c $$libobj -o $${libobj/.c/.o}; done
+	for libobj in $(SRC_LIBC_ASM); do ${CC} ${USER_CFLAGS} -c $$libobj -o $${libobj/.S/.o}; done
+	${AR} rcs libtiny_libc.a $(patsubst %.c, %.o, $(patsubst %.S, %.o,$(SRC_LIBC)))
+
+$(ARCH_DIR)/crt0.o: $(ARCH_DIR)/crt0.S
+	${CC} ${USER_CFLAGS} -c $(ARCH_DIR)/crt0.S -o $(ARCH_DIR)/crt0.o
+
+%.elf : %.c user_riscv.lds libtiny_libc.a $(ARCH_DIR)/crt0.o
+	${CC} ${USER_CFLAGS} $< ${USER_LDFLAGS} -o $@
+

@@ -5,12 +5,10 @@
 #include <os/lock.h>
 #include <os/sched.h>
 #include <os/irq.h>
+#include <sbi.h>
 
 #define SCREEN_WIDTH    80
 #define SCREEN_HEIGHT   50
-
-int screen_cursor_x;
-int screen_cursor_y;
 
 /* screen buffer */
 char new_screen[SCREEN_HEIGHT * SCREEN_WIDTH] = {0};
@@ -46,16 +44,19 @@ static void screen_write_ch(char ch)
 {
     if (ch == '\n')
     {
-        screen_cursor_x = 1;
-        screen_cursor_y++;
+        current_running->cursor_x = 1;
+        current_running->cursor_y++;
+    }
+    else if (ch == '\b')
+    {
+        current_running->cursor_x--;
+        new_screen[(current_running->cursor_y - 1) * SCREEN_WIDTH + (current_running->cursor_x - 1)] = ' ';
     }
     else
     {
-        new_screen[(screen_cursor_y - 1) * SCREEN_WIDTH + (screen_cursor_x - 1)] = ch;
-        screen_cursor_x++;
+        new_screen[(current_running->cursor_y - 1) * SCREEN_WIDTH + (current_running->cursor_x - 1)] = ch;
+        current_running->cursor_x++;
     }
-    current_running->cursor_x = screen_cursor_x;
-    current_running->cursor_y = screen_cursor_y;
 }
 
 void init_screen(void)
@@ -74,23 +75,23 @@ void screen_clear(void)
             new_screen[i * SCREEN_WIDTH + j] = ' ';
         }
     }
-    screen_cursor_x = 1;
-    screen_cursor_y = 1;
+    current_running->cursor_x = 1;
+    current_running->cursor_y = 1;
     screen_reflush();
 }
 
 void screen_move_cursor(int x, int y)
 {
-    screen_cursor_x = x;
-    screen_cursor_y = y;
-    current_running->cursor_x = screen_cursor_x;
-    current_running->cursor_y = screen_cursor_y;
+    current_running->cursor_x = x;
+    current_running->cursor_y = y;
 }
 
 void screen_write(char *buff)
 {
+    // static int32_t cnt = 0;
+    // sbi_console_putchar('A'+ cnt % 10); cnt++;
     int i = 0;
-    int l = kstrlen(buff);
+    int l = strlen(buff);
 
     for (i = 0; i < l; i++)
     {
@@ -107,6 +108,7 @@ void screen_write(char *buff)
 void screen_reflush(void)
 {
     int i, j;
+    int prev_cursor_x = current_running->cursor_x, prev_cursor_y = current_running->cursor_y;
 
     /* here to reflush screen buffer to serial port */
     for (i = 0; i < SCREEN_HEIGHT; i++)
@@ -116,13 +118,17 @@ void screen_reflush(void)
             /* We only print the data of the modified location. */
             if (new_screen[i * SCREEN_WIDTH + j] != old_screen[i * SCREEN_WIDTH + j])
             {
+                // sbi_console_putchar('6');
                 vt100_move_cursor(j + 1, i + 1);
                 port_write_ch(new_screen[i * SCREEN_WIDTH + j]);
                 old_screen[i * SCREEN_WIDTH + j] = new_screen[i * SCREEN_WIDTH + j];
             }
+            // else
+            //     sbi_console_putchar('7');
         }
     }
 
     /* recover cursor position */
-    vt100_move_cursor(screen_cursor_x, screen_cursor_y);
+    vt100_move_cursor(prev_cursor_x, prev_cursor_y);
+    current_running->cursor_x = prev_cursor_x; current_running->cursor_y = prev_cursor_y;
 }

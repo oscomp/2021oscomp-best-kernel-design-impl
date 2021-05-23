@@ -1,6 +1,7 @@
-#include <os/string.h>
+#include <string.h>
+#include <pgtable.h>
 
-int kstrlen(const char *src)
+int strlen(const char *src)
 {
     int i;
     for (i = 0; src[i] != '\0'; i++) {
@@ -8,14 +9,26 @@ int kstrlen(const char *src)
     return i;
 }
 
-void kmemcpy(uint8_t *dest, const uint8_t *src, uint32_t len)
+void memcpy(uint8_t *dest, const uint8_t *src, uint32_t len)
 {
     for (; len != 0; len--) {
         *dest++ = *src++;
     }
 }
 
-void kmemset(void *dest, uint8_t val, uint32_t len)
+void memmove(uint8_t *dest, const uint8_t *src, uint32_t len)
+{
+    uint8_t temp[len];
+    int32_t i;
+    for (i = 0; len != 0; len--) {
+        temp[i] = *src++;
+    }
+    for (; len != 0; len--) {
+        *dest++ = temp[i];
+    }
+}
+
+void memset(void *dest, uint8_t val, uint32_t len)
 {
     uint8_t *dst = (uint8_t *)dest;
 
@@ -24,9 +37,9 @@ void kmemset(void *dest, uint8_t val, uint32_t len)
     }
 }
 
-void kbzero(void *dest, uint32_t len) { kmemset(dest, 0, len); }
+void bzero(void *dest, uint32_t len) { memset(dest, 0, len); }
 
-int kstrcmp(const char *str1, const char *str2)
+int strcmp(const char *str1, const char *str2)
 {
     while (*str1 && *str2) {
         if (*str1 != *str2) {
@@ -38,7 +51,7 @@ int kstrcmp(const char *str1, const char *str2)
     return (*str1) - (*str2);
 }
 
-char *kstrcpy(char *dest, const char *src)
+char *strcpy(char *dest, const char *src)
 {
     char *tmp = dest;
 
@@ -51,7 +64,7 @@ char *kstrcpy(char *dest, const char *src)
     return tmp;
 }
 
-char *kstrcat(char *dest, const char *src)
+char *strcat(char *dest, const char *src)
 {
     char *tmp = dest;
 

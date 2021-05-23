@@ -44,6 +44,7 @@
 #include <screen.h>
 #include <stdarg.h>
 #include <os/sched.h>
+#include <os/smp.h>
 #include <os/irq.h>
 
 static unsigned int mini_strlen(const char *s)
@@ -71,12 +72,21 @@ static unsigned int mini_itoa(
 
     /* This builds the string back to front ... */
     do {
-        int digit = value % radix;
+        int digit = 0;
+        if (unsig) {
+            digit = (unsigned long)value % (unsigned)radix;
+        } else {
+            digit = value % radix;
+        }
         *(pbuffer++) =
             (digit < 10 ? '0' + digit :
-                          (uppercase ? 'A' : 'a') + digit - 10);
-        value /= radix;
-    } while (value > 0);
+             (uppercase ? 'A' : 'a') + digit - 10);
+        if (unsig) {
+            value = (unsigned long) value / (unsigned) radix;
+        } else {
+            value /= radix;
+        }
+    } while (value != 0);
 
     for (i = (pbuffer - buffer); i < zero_pad; i++)
         *(pbuffer++) = '0';
@@ -217,7 +227,8 @@ end:
     return b.pbuffer - b.buffer;
 }
 
-int vprintk(const char *fmt, va_list _va)
+static int _vprintk(const char* fmt, va_list _va,
+                   void (*output)(char*))
 {
     va_list va;
     va_copy(va, _va);
@@ -230,7 +241,7 @@ int vprintk(const char *fmt, va_list _va)
     buff[ret] = '\0';
 
     disable_preempt();
-    port_write(buff);
+    output(buff);
     for (int i = 0; i < ret; ++i) {
         if (buff[i] == '\n') {
             current_running->cursor_y++;
@@ -240,9 +251,37 @@ int vprintk(const char *fmt, va_list _va)
             current_running->cursor_x++;
         }
     }
+
     enable_preempt();
 
     return ret;
+}
+
+static int _vprints(const char* fmt, va_list _va,
+                   void (*output)(char*))
+{
+    va_list va;
+    va_copy(va, _va);
+
+    int ret;
+    char buff[256];
+
+    ret = mini_vsnprintf(buff, 256, fmt, va);
+
+    buff[ret] = '\0';
+
+    disable_preempt();
+    output(buff);
+
+    enable_preempt();
+
+    return ret;
+}
+
+
+int vprintk(const char *fmt, va_list _va)
+{
+    return _vprintk(fmt, _va, port_write);
 }
 
 int printk(const char *fmt, ...)
@@ -252,6 +291,23 @@ int printk(const char *fmt, ...)
 
     va_start(va, fmt);
     ret = vprintk(fmt, va);
+    va_end(va);
+
+    return ret;
+}
+
+int vprints(const char *fmt, va_list _va)
+{
+    return _vprints(fmt, _va, screen_write);
+}
+
+int prints(const char *fmt, ...)
+{
+    int ret = 0;
+    va_list va;
+
+    va_start(va, fmt);
+    ret = vprints(fmt, va);
     va_end(va);
 
     return ret;

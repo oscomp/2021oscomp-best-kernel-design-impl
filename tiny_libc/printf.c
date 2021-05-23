@@ -237,3 +237,13 @@ int printf(const char *fmt, ...)
 
     return ret;
 }
+
+int puts(const char *str)
+{
+    return printf("%s\n", str);
+}
+
+int putchar(int ch)
+{
+    return printf("%c", ch);
+}

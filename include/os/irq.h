@@ -66,7 +66,7 @@ typedef void (*handler_t)(regs_context_t*, uint64_t, uint64_t);
 extern handler_t irq_table[IRQC_COUNT];
 extern handler_t exc_table[EXCC_COUNT];
 
-extern void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause);
+extern void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause, uint64_t tp);
 
 /* exception handler entery */
 extern void exception_handler_entry(void);
@@ -74,15 +74,22 @@ extern void init_exception();
 extern void setup_exception();
 
 extern void reset_irq_timer();
+extern void handle_software();
 extern void handle_int(regs_context_t *regs, uint64_t interrupt, uint64_t cause);
 extern void handle_other(regs_context_t *regs, uint64_t interrupt, uint64_t cause);
 extern void handle_syscall(regs_context_t *regs, uint64_t interrupt, uint64_t cause);
+extern void handle_pgfault(regs_context_t *regs, uint64_t interrupt, uint64_t cause);
 
 extern void enable_interrupt(void);
 extern void disable_interrupt(void);
+extern void clear_interrupt(void);
 extern void enable_preempt(void);
 extern void disable_preempt(void);
 
+extern uint64_t read_satp();
+
 extern uintptr_t riscv_dtb;
+
+extern int PREEMPT_FREQUENCY;
 
 #endif

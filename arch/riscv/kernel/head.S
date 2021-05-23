@@ -8,6 +8,15 @@
 
 .section ".entry_function","ax"
 ENTRY(_start)
+  /* Load the global pointer */
+  .option push
+  .option norelax
+  la gp, __global_pointer$
+  .option pop
+
+  fence
+  fence.i
+
   /* Mask all interrupts */
   csrw CSR_SIE, zero
   csrw CSR_SIP, zero
@@ -19,34 +28,30 @@ ENTRY(_start)
   li t0, SR_FS
   csrc sstatus, t0
 
-  /* Load the global pointer */
-  .option push
-  .option norelax
-  la gp, __global_pointer$
-  .option pop
+  bnez a0, secondary
 
   /* Clear BSS for flat non-ELF images */
   la a3, __bss_start
   la a4, __BSS_END__
   ble a4, a3, clear_bss_done
 clear_bss:
-  sd zero, (a3)
-  add a3, a3, RISCV_SZPTR
+  sw zero, (a3)
+  add a3, a3, 4
   blt a3, a4, clear_bss
 clear_bss_done:
-
-  /* setup C environment */
-  la tp, pid0_pcb
-  lw sp, pid0_stack
-  csrw CSR_SSCRATCH, x0
-
-  la a0, riscv_dtb
-  sd a1, (a0)
-
-  call main
+  li sp, 0x80280000
+  j boot_kernel
+secondary:
+  li sp, 0x80288000
+  j boot_kernel
 
 loop:
   wfi
   j loop
 
 END(_start)
+
+ENTRY(get_s0)
+  mv a0, s0
+  ret
+END(get_s0)

@@ -1,5 +1,5 @@
-#ifndef INCLUDE_STDIO_H_
-#define INCLUDE_STDIO_H_
+#ifndef INCLUDE_STDIO_H_U
+#define INCLUDE_STDIO_H_U
 
 #include<stdarg.h>
 

@@ -40,7 +40,10 @@
 
 static inline void sbi_console_putstr(char *str)
 {
-    SBI_CALL_1(SBI_CONSOLE_PUTSTR, str);
+    while (*str){
+        SBI_CALL_1(SBI_CONSOLE_PUTCHAR, *str);
+        str++;
+    }
 }
 
 static inline uintptr_t sbi_sd_write(

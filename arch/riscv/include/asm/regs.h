@@ -86,9 +86,10 @@
 #define OFFSET_REG_SEPC         264
 #define OFFSET_REG_SBADADDR     272
 #define OFFSET_REG_SCAUSE       280
+#define OFFSET_REG_SATP         288
 
 /* Size of stack frame, word/double word alignment */
-#define OFFSET_SIZE             288
+#define OFFSET_SIZE             296
 
 #define PCB_KERNEL_SP          0
 #define PCB_USER_SP            8

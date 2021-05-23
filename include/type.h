@@ -44,9 +44,18 @@ typedef unsigned __attribute__((__mode__(SI))) uint32_t;
 typedef int      __attribute__((__mode__(DI))) int64_t;
 typedef unsigned __attribute__((__mode__(DI))) uint64_t;
 
+typedef unsigned __attribute__((__mode__(QI))) int8;
+typedef unsigned __attribute__((__mode__(QI))) uint8;
+typedef int      __attribute__((__mode__(HI))) int16;
+typedef unsigned __attribute__((__mode__(HI))) uint16;
+typedef int      __attribute__((__mode__(SI))) int32;
+typedef unsigned __attribute__((__mode__(SI))) uint32;
+typedef int      __attribute__((__mode__(DI))) int64;
+typedef unsigned __attribute__((__mode__(DI))) uint64;
+
 typedef int32_t pid_t;
 typedef uint64_t reg_t;
-typedef uint64_t ptr_t;
+typedef uint64_t __attribute__((aligned (16))) ptr_t;
 typedef uint64_t uintptr_t;
 typedef int64_t intptr_t;
 typedef uint64_t size_t;
