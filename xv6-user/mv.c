@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     strcpy(dst, argv[2]);
     struct kstat st;
     if (stat(dst, &st) == 0) {
-        if (st.mode == T_DIR) {
+        if (st.mode & ST_MODE_DIR) {
             char *ps, *pd;
             for (ps = src + strlen(src) - 1; ps >= src; ps--) { // trim '/' in tail
                 if (*ps != '/') {

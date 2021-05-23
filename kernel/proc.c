@@ -147,7 +147,7 @@ found:
     return NULL;
   }
 
-  memset(p->ofile, 0, sizeof(p->ofile));
+  memset(&p->fds, 0, sizeof(p->fds));
 
   p->kstack = VKSTACK;
 
@@ -350,59 +350,9 @@ growproc(int n)
   return 0;
 }
 
-// Create a new process, copying the parent.
-// Sets up child kernel stack to return as if from fork() system call.
-// int
-// fork(void)
-// {
-//   int i, pid;
-//   struct proc *np;
-//   struct proc *p = myproc();
-
-//   // Allocate process.
-//   if((np = allocproc()) == NULL){
-//     return -1;
-//   }
-
-//   // Copy user memory from parent to child.
-//   if(uvmcopy(p->pagetable, np->pagetable, np->kpagetable, p->sz) < 0){
-//     freeproc(np);
-//     release(&np->lock);
-//     return -1;
-//   }
-//   np->sz = p->sz;
-
-//   np->parent = p;
-
-//   // copy tracing mask from parent.
-//   np->tmask = p->tmask;
-
-//   // copy saved user registers.
-//   *(np->trapframe) = *(p->trapframe);
-
-//   // Cause fork to return 0 in the child.
-//   np->trapframe->a0 = 0;
-
-//   // increment reference counts on open file descriptors.
-//   for(i = 0; i < NOFILE; i++)
-//     if(p->ofile[i])
-//       np->ofile[i] = filedup(p->ofile[i]);
-//   np->cwd = edup(p->cwd);
-
-//   safestrcpy(np->name, p->name, sizeof(p->name));
-
-//   pid = np->pid;
-
-//   np->state = RUNNABLE;
-
-//   release(&np->lock);
-
-//   return pid;
-// }
-
 int fork_cow(void)
 {
-  int i, pid;
+  int pid;
   struct proc *np;
   struct proc *p = myproc();
 
@@ -430,6 +380,10 @@ int fork_cow(void)
     s2 = &s->next;
   }
 
+  // increment reference counts on open file descriptors.
+  if (copyfdtable(&p->fds, &np->fds) < 0)
+    goto fail;
+
   np->parent = p;
 
   // copy tracing mask from parent.
@@ -441,10 +395,7 @@ int fork_cow(void)
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
 
-  // increment reference counts on open file descriptors.
-  for(i = 0; i < NOFILE; i++)
-    if(p->ofile[i])
-      np->ofile[i] = filedup(p->ofile[i]);
+
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
@@ -501,13 +452,7 @@ exit(int status)
     panic("init exiting");
 
   // Close all open files.
-  for(int fd = 0; fd < NOFILE; fd++){
-    if(p->ofile[fd]){
-      struct file *f = p->ofile[fd];
-      fileclose(f);
-      p->ofile[fd] = 0;
-    }
-  }
+  dropfdtable(&p->fds);
 
   iput(p->cwd);
   p->cwd = 0;

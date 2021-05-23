@@ -150,8 +150,7 @@ int execve(char *path, char **argv, char **envp)
 
   char pname[16];
   safestrcpy(pname, ip->entry->filename, sizeof(pname));
-  iunlock(ip);
-  iput(ip);
+  iunlockput(ip);
   ip = 0;
 
   // Heap
@@ -237,7 +236,7 @@ int execve(char *path, char **argv, char **envp)
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
-  __debug_warn("execve", "reach bad: seg=%p, pt=%p, ep=%p\n", seghead, pagetable, ep);
+  __debug_warn("execve", "reach bad: seg=%p, pt=%p, ip=%p\n", seghead, pagetable, ip);
   if (seghead) {
     delsegs(pagetable, seghead);
   }
@@ -246,8 +245,7 @@ int execve(char *path, char **argv, char **envp)
     freepage(pagetable);
   }
   if (ip) {
-    iunlock(ip);
-    iput(ip);
+    iunlockput(ip);
   }
   return -1;
 }

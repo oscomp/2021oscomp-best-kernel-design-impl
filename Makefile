@@ -206,6 +206,7 @@ UPROGS=\
 	$U/_sleep\
 	$U/_find\
 	$U/_rm\
+	$U/_rmdir\
 	$U/_wc\
 	$U/_info\
 	$U/_usertests\
@@ -219,6 +220,7 @@ UPROGS=\
 	$U/_lazytests\
 	$U/_mount\
 	$U/_umount\
+	$U/_dup3\
 
 userprogs: $(UPROGS)
 

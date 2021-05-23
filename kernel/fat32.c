@@ -138,7 +138,7 @@ struct inode *fat32_root_init(struct superblock *sb)
     iroot->real_i = root;
     iroot->ref = 0;
 	iroot->inum = 0;
-	iroot->mode = T_DIR;
+	iroot->mode = I_MODE_DIR | 0x1ff;
 	iroot->state |= I_STATE_VALID;
 	iroot->op = &fat32_inode_op;
 	iroot->fop = &fat32_file_op;
@@ -635,6 +635,7 @@ static struct fat32_entry *fat_lookup_dir_ent(struct inode *dir, char *filename,
  */
 struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 {
+    __debug_info("fat_alloc_entry", "allocating %s\n", name);
     if (dir->state & I_STATE_FREE || !(name = formatname(name))) {        // detect illegal character
         return NULL;
     }
@@ -650,6 +651,7 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
         return ip;
     }
     if ((ip = fat_alloc_inode(sb)) == NULL) {
+        __debug_warn("fat_alloc_entry", "2\n");
         return NULL;
     }
     ip->op = dir->op;
@@ -659,9 +661,10 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
     struct fat32_entry *ep;
     if ((ep = kmalloc(sizeof(struct fat32_entry))) == NULL) {
         kfree(ip);
+        __debug_warn("fat_alloc_entry", "3\n");
         return NULL;
     }
-    ep->attribute = mode == T_DIR ? ATTR_DIRECTORY : 0;
+    ep->attribute = (mode & I_MODE_DIR) ? ATTR_DIRECTORY : 0;
     ep->file_size = 0;
     ep->first_clus = 0;
     ep->clus_cnt = 0;
@@ -672,7 +675,7 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
     reloc_clus(dir, off, 0);
     ip->inum = ((uint64)dp->cur_clus << 32) | (off % sb2fat(sb)->byts_per_clus);
 
-    if (mode == T_DIR) {    // generate "." and ".." for ep
+    if (mode & I_MODE_DIR) {    // generate "." and ".." for ep
         if ((ep->cur_clus = ep->first_clus = alloc_clus(sb)) < 0
             || fat_make_entry(ip, ep, ".          ", 0, 0) < 0
             || fat_make_entry(ip, dp, "..         ", 32, 0) < 0)
@@ -692,6 +695,7 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
     return ip;
 
 fail:
+    __debug_warn("fat_alloc_entry", "fail\n");
     __alert_fs_err("fat_alloc_entry");
     kfree(ip);
     kfree(ep);
@@ -953,11 +957,16 @@ int fat_read_dir(struct inode *ip, struct dirent *dent, uint off)
     if (ret < 0) {
         return 0;
     }
-    ret = off2 + (count << 5) - off;
+    off2 += (count << 5);
+    ret = off2 - off;
+
+    // Size of this dent, varies from length of filename.
+    int size = sizeof(struct dirent) - sizeof(dent->name) + strlen(dent->name) + 1;
+    size += (sizeof(uint64) - (size % sizeof(uint64))) % sizeof(uint64); // Align to 8.
 
     dent->ino = entry.first_clus;
     dent->off = off2;
-    dent->reclen = strlen(dent->name);
+    dent->reclen = size;
     dent->type = (entry.attribute & ATTR_DIRECTORY) ? T_DIR : T_FILE;
 
     return ret;
@@ -1042,7 +1051,8 @@ struct inode *fat_lookup_dir(struct inode *dir, char *filename, uint *poff)
 	ip->fop = dir->fop;
     ip->real_i = ep;
     ip->size = ep->file_size;
-    ip->mode = (ep->attribute & ATTR_DIRECTORY) ? T_DIR : T_FILE;
+    ip->mode = (ep->attribute & ATTR_DIRECTORY) ? I_MODE_DIR : 0;
+    ip->mode |= 0x1ff;
 
     struct fat32_entry *dp = i2fat(dir);
     uint32 coff = reloc_clus(dir, off, 0);

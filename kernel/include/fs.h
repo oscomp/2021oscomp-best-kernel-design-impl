@@ -79,6 +79,9 @@ struct superblock {
 #define I_STATE_FREE		(1 << 3)
 #define I_STATE_LOCKED		(1 << 4)
 
+// For inode.mode
+#define I_MODE_DIR			(1 << 9)
+
 struct inode {
 	uint64				inum;
 	int					ref;
@@ -120,7 +123,7 @@ struct dentry {
 void rootfs_init();
 void rootfs_print();
 
-struct inode *create(char *path, int type);
+struct inode *create(struct inode *dp, char *path, int mode);
 int unlink(struct inode *ip);
 
 struct inode *idup(struct inode *ip);
@@ -130,6 +133,8 @@ void iunlock(struct inode *ip);
 
 struct inode *namei(char *path);
 struct inode *nameiparent(char *path, char *name);
+struct inode *nameifrom(struct inode *ip, char *path);
+struct inode *nameiparentfrom(struct inode *ip, char *path, char *name);
 int namepath(struct inode *ip, char *path, int max);
 
 int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, void *data);

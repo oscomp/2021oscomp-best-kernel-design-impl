@@ -5,6 +5,8 @@
 #define T_FILE    2   // File
 #define T_DEVICE  3   // Device
 
+#define ST_MODE_DIR (1 << 9)
+
 #define DIRENT_MAX_NAME 255
 
 struct kstat {
