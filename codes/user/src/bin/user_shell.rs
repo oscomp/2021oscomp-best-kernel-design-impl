@@ -418,8 +418,8 @@ impl ArgMachine{
             let pid = fork();
             if pid == 0 {
                 // child process
-                println!("{}",programname);
-                if programname == "mkdir_\0" {
+                //println!("{}",programname);
+                if *programname == "mkdir_\0" {
                     ls("\0");
                 }
                 if exec(programname, args_addr.as_slice()) == -1 {

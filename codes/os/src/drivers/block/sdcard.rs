@@ -750,7 +750,8 @@ impl SDCardWrapper {
 impl BlockDevice for SDCardWrapper {
     fn read_block(&self, block_id: usize, buf: &mut [u8]) {
         if block_id >= 31115264 {
-            println!("blk_id = 0x{:X}", block_id);
+            //println!("blk_id = 0x{:X}", block_id);
+            return;
         } 
         self.0.lock().read_sector(buf,block_id as u32).unwrap();
     }
