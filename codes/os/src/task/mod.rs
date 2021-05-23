@@ -108,13 +108,16 @@ pub fn add_initproc_into_fs() {
         OpenFlags::CREATE,
         DiskInodeType::File
     ){
+        println!("Create init_proc ");
         let mut data: Vec<&'static mut [u8]> = Vec::new();
         data.push( unsafe{
         core::slice::from_raw_parts_mut(
             app_start[0] as *mut u8,
             app_start[1] - app_start[0]
         )}) ;
+        println!("Start write init_proc ");
         inode.write(UserBuffer::new(data));
+        println!("Init_proc OK");
     }
     else{
         panic!("initproc create fail!");
