@@ -402,7 +402,7 @@ impl ArgMachine{
         // testsuits.push("pipe\0");
         testsuits.push("read\0");
         // testsuits.push("testsuites_times");
-        testsuits.push("umount");
+        testsuits.push("umount\0");
         // testsuits.push("testsuites_uname");
         // testsuits.push("testsuites_unlink");
         testsuits.push("wait\0");

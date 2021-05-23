@@ -295,7 +295,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
         }
     };
     let mut pathv:Vec<&str> = path.split('/').collect();
-    println!("pathv = {:?}", pathv);
+    // println!("pathv = {:?}", pathv);
     // shell应当保证此处输入的path不为空
     let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
@@ -309,7 +309,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
             )))
         } else {
             // create file
-            println!("start create");
+            // println!("start create");
             let name = pathv.pop().unwrap();
             println!("name = {}", name);
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
@@ -319,7 +319,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                         DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
                     }
                 };
-                println!("start create");
+                // println!("start create");
                 temp_inode.create( name, attribute)
                 .map(|inode| {
                     Arc::new(OSInode::new(
@@ -329,7 +329,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                     ))
                 })
             }else{
-                println!("cannot find pah");
+                // println!("cannot find pah");
                 None
             }
         }
