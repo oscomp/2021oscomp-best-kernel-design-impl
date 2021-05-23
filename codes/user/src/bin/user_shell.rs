@@ -379,7 +379,7 @@ impl ArgMachine{
         // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("brk\0");
-        testsuits.push("chdir\0");
+        //testsuits.push("chdir\0");
         testsuits.push("clone\0");
         testsuits.push("close\0");
         testsuits.push("dup2\0");
@@ -419,9 +419,9 @@ impl ArgMachine{
             if pid == 0 {
                 // child process
                 //println!("{}",programname);
-                if *programname == "mkdir_\0" {
-                    ls("\0");
-                }
+                //if *programname == "mkdir_\0" {
+                //    ls("\0");
+                //}
                 if exec(programname, args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     shutdown();
