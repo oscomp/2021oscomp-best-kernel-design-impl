@@ -88,8 +88,8 @@ mkfs:
 
 image: createimage head main 
 	./createimage --extended head head.bin
-	cp rustsbi-k210.bin k210.bin
-	dd if=head.bin of=k210.bin bs=128K seek=1
+	cp rustsbi-k210.bin K210.bin
+	dd if=head.bin of=K210.bin bs=128K seek=1
 
 run:
 	sudo python3 kflash.py -p ${K210_SERIALPORT} -b 1500000 k210.bin
