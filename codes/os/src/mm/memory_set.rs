@@ -14,6 +14,7 @@ use crate::config::{
     TRAMPOLINE,
     TRAP_CONTEXT,
     USER_STACK_SIZE,
+    USER_HEAP_SIZE,
     MMIO,
 };
 
@@ -80,7 +81,6 @@ impl MemorySet {
     }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
-        //println!("*** trampoline = {:X}",TRAMPOLINE);
         self.page_table.map(
             VirtAddr::from(TRAMPOLINE).into(),
             PhysAddr::from(strampoline as usize).into(),
@@ -145,7 +145,7 @@ impl MemorySet {
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp and entry point.
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
@@ -179,18 +179,20 @@ impl MemorySet {
                 );
             }
         }
-        // map user stack with U flags
+
+        //map user heap
         let max_end_va: VirtAddr = max_end_vpn.into();
-        let mut user_stack_bottom: usize = max_end_va.into();
-        // guard page
-        user_stack_bottom += PAGE_SIZE;
-        let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
+        let mut user_heap_bottom: usize = max_end_va.into();
+        //guard page
+        user_heap_bottom += PAGE_SIZE;
+        let user_heap_top: usize = user_heap_bottom + USER_HEAP_SIZE;
         memory_set.push(MapArea::new(
-            user_stack_bottom.into(),
-            user_stack_top.into(),
+            user_heap_bottom.into(),
+            user_heap_top.into(),
             MapType::Framed,
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
+
         // map TrapContext
         memory_set.push(MapArea::new(
             TRAP_CONTEXT.into(),
@@ -198,8 +200,22 @@ impl MemorySet {
             MapType::Framed,
             MapPermission::R | MapPermission::W,
         ), None);
-        (memory_set, user_stack_top, elf.header.pt2.entry_point() as usize)
+
+        // map user stack with U flags
+        let max_top_va: VirtAddr = TRAP_CONTEXT.into();
+        let mut user_stack_top: usize = TRAP_CONTEXT;
+        user_stack_top -= PAGE_SIZE;
+        let user_stack_bottom: usize = user_stack_top - USER_STACK_SIZE;
+        memory_set.push(MapArea::new(
+            user_stack_bottom.into(),
+            user_stack_top.into(),
+            MapType::Framed,
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        ), None);
+
+        (memory_set, user_stack_top, user_heap_bottom, elf.header.pt2.entry_point() as usize)
     }
+ 
     pub fn from_existed_user(user_space: &MemorySet) -> MemorySet {
         let mut memory_set = Self::new_bare();
         // map trampoline

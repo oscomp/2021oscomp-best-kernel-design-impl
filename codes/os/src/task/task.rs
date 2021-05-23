@@ -6,7 +6,7 @@ use crate::{console::print, mm::{
     translated_refmut,
 }};
 use crate::trap::{TrapContext, trap_handler};
-use crate::config::{TRAP_CONTEXT};
+use crate::config::{TRAP_CONTEXT, USER_HEAP_SIZE};
 use super::TaskContext;
 use super::{PidHandle, pid_alloc, KernelStack};
 use alloc::sync::{Weak, Arc};
@@ -27,6 +27,8 @@ pub struct TaskControlBlock {
 pub struct TaskControlBlockInner {
     pub trap_cx_ppn: PhysPageNum,
     pub base_size: usize,
+    pub heap_start: usize,
+    pub heap_pt: usize,
     pub task_cx_ptr: usize,
     pub task_status: TaskStatus,
     pub memory_set: MemorySet,
@@ -80,7 +82,7 @@ impl TaskControlBlock {
     }
     pub fn new(elf_data: &[u8]) -> Self {
         // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, user_sp, user_heap, entry_point) = MemorySet::from_elf(elf_data);
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
@@ -97,6 +99,8 @@ impl TaskControlBlock {
             inner: Mutex::new(TaskControlBlockInner {
                 trap_cx_ppn,
                 base_size: user_sp,
+                heap_start: user_heap,
+                heap_pt: user_heap,
                 task_cx_ptr: task_cx_ptr as usize,
                 task_status: TaskStatus::Ready,
                 memory_set,
@@ -125,9 +129,13 @@ impl TaskControlBlock {
         );
         task_control_block
     }
+    pub fn get_parent(&self) -> Option<Arc<TaskControlBlock>> {
+        let inner = self.inner.lock();
+        inner.parent.as_ref().unwrap().upgrade()
+    }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
         // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, mut user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, mut user_sp, user_heap, entry_point) = MemorySet::from_elf(elf_data);
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
@@ -171,6 +179,9 @@ impl TaskControlBlock {
         // QUES
         //inner.current_inode = par_inode_id;
         inner.memory_set = memory_set;
+        inner.heap_start = user_heap;
+        inner.heap_pt = user_heap;
+        // println!("The heap start is {}", user_heap);
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize trap_cx
@@ -219,9 +230,12 @@ impl TaskControlBlock {
             inner: Mutex::new(TaskControlBlockInner {
                 trap_cx_ppn,
                 base_size: parent_inner.base_size,
+                heap_start: parent_inner.heap_start,
+                heap_pt: parent_inner.heap_pt,
                 task_cx_ptr: task_cx_ptr as usize,
                 task_status: TaskStatus::Ready,
                 memory_set,
+                //mmap_area: MmapArea,
                 parent: Some(Arc::downgrade(self)),
                 children: Vec::new(),
                 exit_code: 0,
@@ -244,6 +258,24 @@ impl TaskControlBlock {
         self.pid.0
     }
 
+    pub fn grow_proc(&self, grow_size: isize) -> usize {
+        if grow_size > 0 {
+            let growed_addr: usize = self.inner.lock().heap_pt + grow_size as usize;
+            let limit = self.inner.lock().heap_start + USER_HEAP_SIZE;
+            if growed_addr > limit {
+                panic!("process doesn't have enough memsize to grow! {} {} {} {}", limit, self.inner.lock().heap_pt, growed_addr, self.pid.0);
+            }
+            self.inner.lock().heap_pt = growed_addr;
+        }
+        else {
+            let shrinked_addr: usize = self.inner.lock().heap_pt + grow_size as usize;
+            if shrinked_addr < self.inner.lock().heap_start {
+                panic!("Memory shrinked to the lowest boundary!")
+            }
+            self.inner.lock().heap_pt = shrinked_addr;
+        }
+        return self.inner.lock().heap_pt;
+    }
 }
 
 #[derive(Copy, Clone, PartialEq)]
