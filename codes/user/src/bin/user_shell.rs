@@ -393,7 +393,6 @@ impl ArgMachine{
         testsuits.push("getpid\0");
         testsuits.push("getppid\0");
         // testsuits.push("gettimeofday");
-        ls("\0");
         testsuits.push("mkdir_\0");
         // testsuits.push("mmap");
         testsuits.push("mount\0");
@@ -420,6 +419,9 @@ impl ArgMachine{
             if pid == 0 {
                 // child process
                 println!("{}",programname);
+                if programname == "mkdir_\0" {
+                    ls("\0");
+                }
                 if exec(programname, args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     shutdown();
