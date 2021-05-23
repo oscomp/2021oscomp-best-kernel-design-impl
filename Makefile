@@ -76,7 +76,7 @@ elf2char: ${SRC_ELF2CHAR}
 generateMapping: $(SRC_GENMAP)
 	${HOST_CC} ${SRC_GENMAP} -o generateMapping -ggdb -Wall
 
-main: $(SRC_MAIN) ${SRC_LINKER} user mkfs
+main: $(SRC_MAIN) ${SRC_LINKER} user
 	${CC} ${CFLAGS} -o main $(SRC_MAIN) ./kernel/user_programs.c -Ttext=${KERNEL_ENTRYPOINT}
 
 createimage: ${SRC_IMAGE}
