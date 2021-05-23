@@ -319,9 +319,10 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                         DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
                     }
                 };
-                // println!("start create");
+                println!("start create");
                 temp_inode.create( name, attribute)
                 .map(|inode| {
+                    println!("end create");
                     Arc::new(OSInode::new(
                         readable,
                         writable,

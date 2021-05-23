@@ -470,27 +470,31 @@ impl VFile{
         
         // 如果是目录类型，需要创建.和..
         //println!("name = {}", name);
-        let vfile = self.find_vfile_byname(name).unwrap();
-        //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
-        if attribute & ATTRIBUTE_DIRECTORY != 0 {
-            //println!("");
-            let manager_reader = self.fs.read();
-            let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
-            let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
-            let (name_bytes,ext_bytes) = manager_reader.short_name_format("..");
-            let mut par_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
-            drop(manager_reader);
-            par_dir.set_first_cluster(self.first_cluster());
-            
-            vfile.write_at(0, self_dir.as_bytes_mut());
-            vfile.write_at(DIRENT_SZ, par_dir.as_bytes_mut());
-            let first_cluster = vfile.read_short_dirent(|se: &ShortDirEntry|{
-                se.first_cluster()
-            }); 
-            self_dir.set_first_cluster(first_cluster);
-            vfile.write_at(0, self_dir.as_bytes_mut());
-        }
-        Some(Arc::new(vfile))
+
+        if let Some(vfile) = self.find_vfile_byname(name){
+            //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
+            if attribute & ATTRIBUTE_DIRECTORY != 0 {
+                //println!("");
+                let manager_reader = self.fs.read();
+                let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
+                let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
+                let (name_bytes,ext_bytes) = manager_reader.short_name_format("..");
+                let mut par_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
+                drop(manager_reader);
+                par_dir.set_first_cluster(self.first_cluster());
+
+                vfile.write_at(0, self_dir.as_bytes_mut());
+                vfile.write_at(DIRENT_SZ, par_dir.as_bytes_mut());
+                let first_cluster = vfile.read_short_dirent(|se: &ShortDirEntry|{
+                    se.first_cluster()
+                }); 
+                self_dir.set_first_cluster(first_cluster);
+                vfile.write_at(0, self_dir.as_bytes_mut());
+            }
+            return Some(Arc::new(vfile))
+        } else {
+            None
+        }   
     }
 
 
