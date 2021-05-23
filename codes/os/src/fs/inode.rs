@@ -295,7 +295,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
         }
     };
     let mut pathv:Vec<&str> = path.split('/').collect();
-    // println!("pathv = {:?}", pathv);
+    println!("pathv = {:?}", pathv);
     // shell应当保证此处输入的path不为空
     let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {

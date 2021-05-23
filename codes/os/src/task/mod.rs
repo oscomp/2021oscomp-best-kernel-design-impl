@@ -86,6 +86,14 @@ pub fn add_initproc_into_fs() {
     let mut app_start = unsafe {
         core::slice::from_raw_parts_mut(num_app_ptr.add(1), 3)
     };
+
+    open(
+        "/",
+        "mnt",
+        OpenFlags::CREATE,
+        DiskInodeType::Directory
+    );
+
     // find if there already exits 
     println!("Find if there already exits ");
     if let Some(inode) = open(
