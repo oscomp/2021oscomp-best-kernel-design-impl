@@ -393,6 +393,7 @@ impl ArgMachine{
         testsuits.push("getpid\0");
         testsuits.push("getppid\0");
         // testsuits.push("gettimeofday");
+        ls("\0");
         testsuits.push("mkdir_\0");
         // testsuits.push("mmap");
         testsuits.push("mount\0");
