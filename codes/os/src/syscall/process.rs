@@ -109,6 +109,48 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     }
 }
 
+pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
+    if option != 0 {
+        panic!{"Extended option not support yet..."};
+    }
+
+    loop {
+        let task = current_task().unwrap();
+        let mut inner = task.acquire_inner_lock();
+        if inner.children
+            .iter()
+            .find(|p| {pid == -1 || pid as usize == p.getpid()})
+            .is_none() {
+            return -1;
+            // ---- release current PCB lock
+            }
+        // println!{"acquiring lock......"};
+        let waited = inner.children
+            .iter()
+            .find(|p| {
+                // ++++ temporarily hold child PCB lock
+                p.acquire_inner_lock().is_zombie() && (pid == -1 || pid as usize == p.getpid())
+            });
+        // println!{"drop lock......"};
+        if let Some(waited_child) = waited {
+            let found_pid = waited_child.getpid();
+            // ++++ temporarily hold child lock
+            // println!{"acquiring lock......"};
+            let exit_code = waited_child.acquire_inner_lock().exit_code;
+            // println!{"drop lock......"};
+            let ret_status = exit_code << 8;
+            *translated_refmut(inner.memory_set.token(), wstatus) = ret_status;
+            // println!("=============The pid being waited is {}===================", pid);
+            // println!("=============The exit code of waiting_pid is {}===========", exit_code);
+            return found_pid as isize;
+        } else {
+            drop(inner);
+            suspend_current_and_run_next();
+            continue;
+        }
+    }
+}
+
 /// If there is not a child process whose pid is same as given, return -1.
 /// Else if there is a child process but it is still running, return -2.
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {

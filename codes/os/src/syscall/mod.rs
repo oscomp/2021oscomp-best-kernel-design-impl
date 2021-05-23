@@ -1,3 +1,4 @@
+const SYSCALL_WAITPID: usize = 7;
 const SYSCALL_DUP: usize = 24;
 const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPEN: usize = 56;
@@ -14,7 +15,7 @@ const SYSCALL_SBRK: usize = 213;
 const SYSCALL_BRK: usize = 214;
 const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
-const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_WAIT4: usize = 260;
 
 // Not standard POSIX sys_call
 const SYSCALL_LS: usize = 500;
@@ -45,6 +46,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_GETPPID => sys_getppid(),
         SYSCALL_FORK => sys_fork(),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
+        SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
         //SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => {shutdown();0}

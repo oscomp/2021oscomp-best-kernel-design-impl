@@ -1,4 +1,4 @@
-
+const SYSCALL_WAITPID: usize = 7;
 const SYSCALL_DUP: usize = 24;
 const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPEN: usize = 56;
@@ -12,7 +12,7 @@ const SYSCALL_GET_TIME: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
-const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_WAIT4: usize = 260;
 
 // Not standard POSIX sys_call
 const SYSCALL_LS: usize = 500;
@@ -88,6 +88,9 @@ pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
     syscall(SYSCALL_WAITPID, [pid as usize, exit_code as usize, 0])
 }
 
+pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: usize) -> isize {
+    syscall(SYSCALL_WAIT4, [pid as usize, wstatus as usize, option])
+}
 
 // Not standard POSIX sys_call
 pub fn sys_ls(path:&str) -> isize {
