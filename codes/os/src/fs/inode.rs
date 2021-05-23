@@ -296,6 +296,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
     };
     let mut pathv:Vec<&str> = path.split('/').collect();
     //println!("pathv = {:?}", pathv);
+    print!("");
     // shell应当保证此处输入的path不为空
     let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
@@ -312,6 +313,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
             // println!("start create");
             let name = pathv.pop().unwrap();
             //println!("name = {}", name);
+            print!("");
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
                 let attribute = {
                     match type_ {
@@ -319,9 +321,10 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                         DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
                     }
                 };
-                //println!("start create");
+                print!("");
                 temp_inode.create( name, attribute)
                 .map(|inode| {
+                    print!("");
                     //println!("end create");
                     Arc::new(OSInode::new(
                         readable,
