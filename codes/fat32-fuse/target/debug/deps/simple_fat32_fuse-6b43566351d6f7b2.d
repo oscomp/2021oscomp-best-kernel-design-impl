@@ -1,5 +1,0 @@
-/home/ghc/桌面/os_comp/ultraOS/ultra-os/codes/fat32-fuse/target/debug/deps/simple_fat32_fuse-6b43566351d6f7b2.rmeta: src/main.rs
-
-/home/ghc/桌面/os_comp/ultraOS/ultra-os/codes/fat32-fuse/target/debug/deps/simple_fat32_fuse-6b43566351d6f7b2.d: src/main.rs
-
-src/main.rs:
