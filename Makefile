@@ -128,5 +128,5 @@ $(ARCH_DIR)/crt0.o: $(ARCH_DIR)/crt0.S
 	${CC} ${USER_CFLAGS} -c $(ARCH_DIR)/crt0.S -o $(ARCH_DIR)/crt0.o
 
 %.elf : %.c user_riscv.lds libtiny_libc.a $(ARCH_DIR)/crt0.o
-	${CC} ${USER_CFLAGS} $< ${SRC_LIBC} ${USER_LDFLAGS} -o $@
+	${CC} ${USER_CFLAGS} $< ${SRC_LIBC} $(ARCH_DIR)/crt0.S -o $@
 
