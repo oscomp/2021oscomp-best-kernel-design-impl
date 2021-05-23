@@ -101,7 +101,17 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             // TODO
             match file {
                 FileClass::File(f) => {
-                    if let Some(tar_f) = f.find(path.as_str(), OpenFlags::from_bits(flags).unwrap()){
+                    let oflags = OpenFlags::from_bits(flags).unwrap();
+                    if oflags.contains(OpenFlags::CREATE){
+                        if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
+                            let fd = inner.alloc_fd();
+                            inner.fd_table[fd] = Some(FileClass::File(tar_f));
+                            return fd as isize
+                        }else{
+                            return -1;
+                        }
+                    }
+                    if let Some(tar_f) = f.find(path.as_str(), oflags){
                         let fd = inner.alloc_fd();
                         inner.fd_table[fd] = Some(FileClass::File(tar_f));
                         fd as isize
