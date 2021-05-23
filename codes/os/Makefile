@@ -44,7 +44,10 @@ env:
 	# cargo install cargo-binutils
 	rustup component add rust-src
 	rustup component add llvm-tools-preview
-	# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
+#(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
+#cargo install cargo-binutils
+	
+# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 # dev/zero永远输出0
 sdcard: 
@@ -59,6 +62,9 @@ $(APPS):
 
 fat32: 
 	./buildfs.sh
+
+fsimg-format:
+	sudo mkfs.vfat -F 32 ${U_FAT32}
 
 kernel:
 	@echo Platform: $(BOARD)

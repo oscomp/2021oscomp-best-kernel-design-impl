@@ -174,6 +174,8 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     v
 }
 
+
+
 /// Load a string from other address spaces into kernel space without an end `\0`.
 pub fn translated_str(token: usize, ptr: *const u8) -> String {
     let page_table = PageTable::from_token(token);
@@ -209,12 +211,47 @@ impl UserBuffer {
     pub fn new(buffers: Vec<&'static mut [u8]>) -> Self {
         Self { buffers }
     }
+
     pub fn len(&self) -> usize {
         let mut total: usize = 0;
         for b in self.buffers.iter() {
             total += b.len();
         }
         total
+    }
+
+    // 将一个Buffer的数据写入UserBuffer，返回写入长度
+    pub fn write(&mut self, buff: &[u8])->usize{
+        let len = self.len().min(buff.len());
+        let mut current = 0;
+        for sub_buff in self.buffers.iter_mut() {
+            let sblen = (*sub_buff).len();
+            for j in 0..sblen {
+                (*sub_buff)[j] = buff[current];
+                current += 1;
+                if current == len {
+                    return len;
+                }
+            }
+        }
+        return len;
+    }
+
+    // 将UserBuffer的数据读入一个Buffer，返回读取长度
+    pub fn read(&self, buff:&mut [u8])->usize{
+        let len = self.len().min(buff.len());
+        let mut current = 0;
+        for sub_buff in self.buffers.iter() {
+            let sblen = (*sub_buff).len();
+            for j in 0..sblen {
+                buff[current] = (*sub_buff)[j];
+                current += 1;
+                if current == len {
+                    return len;
+                }
+            }
+        }
+        return len;
     }
 }
 

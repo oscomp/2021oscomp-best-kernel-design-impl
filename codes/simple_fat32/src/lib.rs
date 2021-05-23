@@ -14,7 +14,7 @@ pub use layout::ShortDirEntry;
 //pub use layout::NAME_LENGTH_LIMIT;
 pub use fat32_manager::FAT32Manager;
 pub use layout::*;
-use block_cache::{get_block_cache,get_info_cache,write_to_dev, CacheMode};
+use block_cache::{get_block_cache,get_info_cache,write_to_dev,set_start_sec, CacheMode};
 
 /*
 pub trait w_field {

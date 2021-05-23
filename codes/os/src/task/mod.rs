@@ -23,7 +23,8 @@ pub use processor::{
     current_trap_cx,
     take_current_task,
     schedule,
-    get_core_id
+    get_core_id,
+    print_core_info
 };
 pub use manager::add_task;
 pub use pid::{PidHandle, pid_alloc, KernelStack};
@@ -85,6 +86,17 @@ pub fn add_initproc_into_fs() {
     let mut app_start = unsafe {
         core::slice::from_raw_parts_mut(num_app_ptr.add(1), 3)
     };
+    // find if there already exits 
+    if let Some(inode) = open(
+        "/",
+        "initproc",
+        OpenFlags::RDONLY,
+        DiskInodeType::File
+    ){
+        println!("Already have init proc in FS");
+        return;
+    }
+
 
     //Write apps(initproc & user_shell) to disk from mem
     if let Some(inode) = open(

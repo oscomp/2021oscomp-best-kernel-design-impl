@@ -96,10 +96,14 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         args_vec.push(translated_str(token, arg_str_ptr as *const u8));
         unsafe { args = args.add(1); }
     }
-    if let Some(app_inode) = open("/",path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    //println!("try get app {}{}", inner.current_path.as_str(), path);
+    if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
+        drop(inner);
         //let par_inode_id:u32 = find_par_inode_id(path.as_str());
         let all_data = app_inode.read_all();
-        let task = current_task().unwrap();
+        //let task = current_task().unwrap();
         let argc = args_vec.len();
         task.exec(all_data.as_slice(), args_vec);
         // return argc because cx.x[10] will be covered with it later

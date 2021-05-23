@@ -45,7 +45,9 @@ impl Processor {
         loop{
             // True: Not first time to fetch a task 
             if let Some(current_task) = take_current_task(){
+                //println!("try lock");
                 let mut current_task_inner = current_task.acquire_inner_lock();
+                //println!("get lock");
                 let task_cx_ptr2 = current_task_inner.get_task_cx_ptr2();
                 let idle_task_cx_ptr2 = self.get_idle_task_cx_ptr2();
                 // True: switch
@@ -61,6 +63,7 @@ impl Processor {
                     // Change status to Ready
                     current_task_inner.task_status = TaskStatus::Ready;
                     drop(current_task_inner);
+                    //println!("drop lock1");
                     // push back to ready queue.
                     add_task(current_task);
                     ////////// current task  /////////
@@ -73,6 +76,7 @@ impl Processor {
                 }
                 else{
                     drop(current_task_inner);
+                    //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
                     
                     unsafe {
@@ -144,8 +148,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
     current_task().unwrap().acquire_inner_lock().get_trap_cx()
 }
 
+pub fn print_core_info(){
+    println!( "[core{}] pid = {}", 0, PROCESSOR_LIST[0].current().unwrap().getpid() );
+    println!( "[core{}] pid = {}", 1, PROCESSOR_LIST[1].current().unwrap().getpid() );
+}
+
 pub fn schedule(switched_task_cx_ptr2: *const usize) {
     let core_id: usize = get_core_id();
+    //println!("core {} still alive", core_id);    
     let idle_task_cx_ptr2 = PROCESSOR_LIST[core_id].get_idle_task_cx_ptr2();
     unsafe {
         __switch(

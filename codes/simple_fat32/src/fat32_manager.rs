@@ -2,7 +2,9 @@ use alloc::sync::Arc;
 use super::{
     BlockDevice,
     get_info_cache,
+    get_block_cache,
     write_to_dev,
+    set_start_sec,
     CacheMode,
     FSInfo, 
     FatBS, 
@@ -64,6 +66,25 @@ impl FAT32Manager {
 
     /* 打开现有的FAT32  */
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>>{
+        // 读入分区偏移
+        let start_sector:u32 = get_info_cache(
+            0, 
+            Arc::clone(&block_device),
+            CacheMode::READ )
+        .read()
+        .read(0x1c6, |ssec_bytes:&[u8;4]|{
+            // DEBUG
+            let mut start_sec:u32 = 0;
+            for i in 0..4 {
+                let tmp = ssec_bytes[i] as u32;
+                start_sec = start_sec + (tmp << (8*i));
+                //println!("start sec = {}, buf = {}", start_sec , ssec_bytes[i])
+            }
+            start_sec
+        });
+        
+        set_start_sec(start_sector as usize);
+        
         // 读入 Boot Sector
         let boot_sec:FatBS = get_info_cache(
             0, 
@@ -75,7 +96,7 @@ impl FAT32Manager {
             *bs
         });
 
-        //println!("{:?}", boot_sec);
+        // println!("{:?}", boot_sec);
         // 读入 Extended Boot Sector
         let ext_boot_sec:FatExtBS = get_info_cache(
             0, 
@@ -89,7 +110,8 @@ impl FAT32Manager {
         let fsinfo = FSInfo::new(ext_boot_sec.fat_info_sec());
         // 校验签名
         assert!(fsinfo.check_signature(Arc::clone(&block_device)),"Error loading fat32! Illegal signature");
-
+        //println!( "first free clu = {}", fsinfo.first_free_cluster(block_device.clone()) );
+        
         let sectors_per_cluster = boot_sec.sectors_per_cluster as u32;
         let bytes_per_sector = boot_sec.bytes_per_sector as u32;
         let bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
@@ -120,6 +142,7 @@ impl FAT32Manager {
             total_sectors: boot_sec.total_sectors(), 
             vroot_dirent: Arc::new(RwLock::new(root_dirent)),
         };
+        
         Arc::new(RwLock::new(fat32_manager))
     }
 
@@ -142,6 +165,7 @@ impl FAT32Manager {
     }
 
     /* 分配簇，会填写FAT，成功返回第一个簇号，失败返回None */
+    // TODO:分配的时候清零
     pub fn alloc_cluster(&self, num: u32)->Option<u32> {
         let free_clusters = self.free_clusters();
         if num > free_clusters {
@@ -160,12 +184,14 @@ impl FAT32Manager {
         // 搜索可用簇，同时写表项
         #[allow(unused)]
         for i in 1..num {
+            self.clear_cluster(current_cluster);
             let next_cluster = fat_writer.next_free_cluster(current_cluster, self.block_device.clone());
             fat_writer.set_next_cluster(current_cluster, next_cluster, self.block_device.clone());
             //cluster_vec.push(next_cluster);
             //println!("alloc: next = {}", fat_writer.get_next_cluster(current_cluster, self.block_device.clone()));
             current_cluster = next_cluster;
         }
+        self.clear_cluster(current_cluster);
         // 填写最后一个表项
         fat_writer.set_end(current_cluster, self.block_device.clone());
         // 修改FSINFO
@@ -198,6 +224,23 @@ impl FAT32Manager {
             }
         }
     }    
+
+    pub fn clear_cluster(&self,  cluster_id: u32 ){
+        let start_sec = self.first_sector_of_cluster(cluster_id);
+        for i in 0..self.sectors_per_cluster {
+            get_block_cache(
+                start_sec + i as usize,
+                self.block_device.clone(),
+                CacheMode::WRITE
+            )
+            .write()
+            .modify(0, |blk: &mut [u8; 512]|{
+                for j in 0..512 {
+                    blk[j] = 0;
+                }        
+            });
+        }
+    }
 
     pub fn get_fat(&self)->Arc<RwLock<FAT>>{
         Arc::clone(&self.fat)
@@ -280,7 +323,11 @@ impl FAT32Manager {
 
     /* 将短文件名格式化为目录项存储的内容 */
     pub fn short_name_format(&self, name: &str)->([u8;8],[u8;3]){
-        let (name_,ext_) = self.split_name_ext(name);
+        let (mut name_,mut ext_) = self.split_name_ext(name);
+        if name == "." || name == ".." {
+            name_ = name;
+            ext_ = ""
+        }
         let name_bytes = name_.as_bytes();
         let ext_bytes = ext_.as_bytes();
         let mut f_name = [0u8;8];

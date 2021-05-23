@@ -59,7 +59,8 @@ use user_lib::{
     close,
     dup,
     chdir,
-    shutdown
+    shutdown,
+    ls
 };
 use user_lib::console::getchar;
 
@@ -128,12 +129,19 @@ impl InputMachine{
                         }
                     }
                     _ =>{
-                        self.cmd.insert(self.p, c);
-                        cursor_move_left!(self.p);
-                        
-                        // cursor_move_right!(1);
-                        print!("{}",self.cmd.as_str());
-                        cursor_move_left!(self.cmd.len() - self.p - 1);//assert len>p
+                        if(self.cmd.len() == self.p){
+                            self.cmd.insert(self.p, c);
+                            print!("{}",c);
+
+                        }
+                        else{
+                            self.cmd.insert(self.p, c);
+                            cursor_move_left!(self.p);
+                            
+                            // cursor_move_right!(1);
+                            print!("{}",self.cmd.as_str());
+                            cursor_move_left!(self.cmd.len() - self.p - 1);//assert len>p
+                        }
                         self.p += 1;
                     }
                 }
@@ -278,7 +286,7 @@ impl ArgMachine{
         if self.state == STATE_ARGS{
             self.args[self.argc-1].push(0 as char);
         }
-        self.print_state();
+        // self.print_state();
         // \0 indicates the end of str while rust doesn't do so
         if self.args.is_empty(){
             return false;
@@ -292,42 +300,42 @@ impl ArgMachine{
             }
             return false;
         }
-        print!("changed!");
+        // print!("changed!");
         if self.args[0].clone().as_str() == "run_testsuites\0" {
             let mut testsuits :Vec<&str>= Vec::new();
-            testsuits.push("testsuites_brk");
-            testsuits.push("testsuites_chdir");
-            testsuits.push("testsuites_clone");
-            testsuits.push("testsuites_close");
-            testsuits.push("testsuites_dup2");
-            testsuits.push("testsuites_dup");
-            testsuits.push("testsuites_execve");
-            testsuits.push("testsuites_exit");
-            testsuits.push("testsuites_fork");
-            testsuits.push("testsuites_fstat");
-            testsuits.push("testsuites_getcwd");
-            testsuits.push("testsuites_getdents");
-            testsuits.push("testsuites_getpid");
-            testsuits.push("testsuites_getppid");
-            testsuits.push("testsuites_gettimeofday");
-            testsuits.push("testsuites_mkdir_");
-            testsuits.push("testsuites_mmap");
-            testsuits.push("testsuites_mount");
-            testsuits.push("testsuites_munmap");
-            testsuits.push("testsuites_openat");
-            testsuits.push("testsuites_open");
-            testsuits.push("testsuites_pipe");
-            testsuits.push("testsuites_read");
-            testsuits.push("testsuites_times");
-            testsuits.push("testsuites_umount");
-            testsuits.push("testsuites_uname");
-            testsuits.push("testsuites_unlink");
-            testsuits.push("testsuites_wait");
-            testsuits.push("testsuites_waitpid");
-            testsuits.push("testsuites_write");
-            testsuits.push("testsuites_yield_A");
-            testsuits.push("testsuites_yield_B");
-            testsuits.push("testsuites_yield_C");
+            testsuits.push("testsuites_brk\0");
+            testsuits.push("testsuites_chdir\0");
+            testsuits.push("testsuites_clone\0");
+            testsuits.push("testsuites_close\0");
+            testsuits.push("testsuites_dup2\0");
+            testsuits.push("testsuites_dup\0");
+            testsuits.push("testsuites_execve\0");
+            // testsuits.push("testsuites_exit\0");
+            testsuits.push("testsuites_fork\0");
+            testsuits.push("testsuites_fstat\0");
+            testsuits.push("testsuites_getcwd\0");
+            testsuits.push("testsuites_getdents\0");
+            testsuits.push("testsuites_getpid\0");
+            testsuits.push("testsuites_getppid\0");
+            // testsuits.push("testsuites_gettimeofday\0");
+            testsuits.push("testsuites_mkdir_\0");
+            // testsuits.push("testsuites_mmap\0");
+            testsuits.push("testsuites_mount\0");
+            // testsuits.push("testsuites_munmap\0");
+            testsuits.push("testsuites_openat\0");
+            testsuits.push("testsuites_open\0");
+            testsuits.push("testsuites_pipe\0");
+            testsuits.push("testsuites_read\0");
+            testsuits.push("testsuites_times\0");
+            testsuits.push("testsuites_umount\0");
+            // testsuits.push("testsuites_uname\0");
+            // testsuits.push("testsuites_unlink\0");
+            testsuits.push("testsuites_wait\0");
+            testsuits.push("testsuites_waitpid\0");
+            testsuits.push("testsuites_write\0");
+            // testsuits.push("testsuites_yield_A");
+            // testsuits.push("testsuites_yield_B");
+            // testsuits.push("testsuites_yield_C");
             if self.argc != 1 {
                 println!("cd: Arg expression not right, should be: run_testsuits");
             }
@@ -351,36 +359,50 @@ impl ArgMachine{
             }
             return false;
         }
+        if self.args[0].clone().as_str() == "ls\0" {
+            if !(self.argc == 2 || self.argc == 1) {
+                println!("ls: Arg expression not right");
+                return false
+            }
+            
+            if self.argc == 1 {
+                ls("\0");
+            } else{
+                ls(self.args[1].clone().as_str());
+            }
+            return false
+        }
         return true;
     }
 
     pub fn auto_run_testsuites(){
+        ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
-        // testsuits.push("testsuites_brk");
-        // testsuits.push("testsuites_chdir");
+        testsuits.push("brk\0");
+        testsuits.push("chdir\0");
         testsuits.push("clone\0");
-        // testsuits.push("testsuites_close");
-        // testsuits.push("testsuites_dup2");
-        // testsuits.push("testsuites_dup");
-        // testsuits.push("testsuites_execve");
-        testsuits.push("exit\0");
-        // testsuits.push("testsuites_fork");
-        // testsuits.push("testsuites_fstat");
-        // testsuits.push("testsuites_getcwd");
-        // testsuits.push("testsuites_getdents");
+        testsuits.push("close\0");
+        testsuits.push("dup2\0");
+        testsuits.push("dup\0");
+        testsuits.push("execve\0");
+        // testsuits.push("exit\0");
+        testsuits.push("fork\0");
+        testsuits.push("fstat\0");
+        testsuits.push("getcwd\0");
+        testsuits.push("getdents\0");
         testsuits.push("getpid\0");
-        // testsuits.push("testsuites_getppid");
-        // testsuits.push("testsuites_gettimeofday");
-        // testsuits.push("testsuites_mkdir_");
-        // testsuits.push("testsuites_mmap");
-        // testsuits.push("testsuites_mount");
-        // testsuits.push("testsuites_munmap");
-        // testsuits.push("testsuites_openat");
-        // testsuits.push("testsuites_open");
-        // testsuits.push("testsuites_pipe");
-        // testsuits.push("testsuites_read");
+        testsuits.push("getppid\0");
+        // testsuits.push("gettimeofday");
+        testsuits.push("mkdir_\0");
+        // testsuits.push("mmap");
+        testsuits.push("mount\0");
+        // testsuits.push("munmap");
+        testsuits.push("openat\0");
+        testsuits.push("open\0");
+        // testsuits.push("pipe\0");
+        testsuits.push("read\0");
         // testsuits.push("testsuites_times");
-        // testsuits.push("testsuites_umount");
+        testsuits.push("umount");
         // testsuits.push("testsuites_uname");
         // testsuits.push("testsuites_unlink");
         testsuits.push("wait\0");
@@ -485,17 +507,17 @@ impl ArgMachine{
 
 #[no_mangle]
 pub fn main() -> i32 {
-    // ArgMachine::auto_run_testsuites();
-    println!("Rust user shell");
+    ArgMachine::auto_run_testsuites();
+    // println!("Rust user shell");
     // println!("听说能输出中文?");
     let mut line: String;
     let left = 3;
-    cursor_move_right!(left);
+    // cursor_move_right!(left);
     // cursor_move_right!(3);
-    println!("{}","TTTTTTTTTTTTTTTTTTEST  test start");
-    print!("{}{}{}","hello", " ", "delete");
+    // println!("{}","TTTTTTTTTTTTTTTTTTEST  test start");
+    // print!("{}{}{}","hello", " ", "delete");
     // cursor_move_left!(3);
-    cursor_move_left!(left);
+    // cursor_move_left!(left);
     // print!("{}{}K",CSI as char, 2u8 as char);
     // print!("\r");
     // println!("{}{}{}","hello", KEY_LEFT, "left");
@@ -504,7 +526,7 @@ pub fn main() -> i32 {
     // println!("{}{}{}","hello", KEY_UP, "up");
     // println!("sth_in:{}",sth_in);
     // let mut sth = 3;
-    println!("{}","TTTTTTTTTTTTTTTTTTEST  test end");
+    // println!("{}","TTTTTTTTTTTTTTTTTTEST  test end");
     // print!("Password:");
     // loop{
     //     let c = getchar();
@@ -531,7 +553,7 @@ pub fn main() -> i32 {
                 arg_machine.clear();
                 continue;
             }
-            println!("Input:{}",line);
+            // println!("Input:{}",line);
             let (args_copy,input,output) = arg_machine.get_args();
             
             let mut args_addr: Vec<*const u8> = args_copy

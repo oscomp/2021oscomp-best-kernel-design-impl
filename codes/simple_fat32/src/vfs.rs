@@ -333,11 +333,6 @@ impl VFile{
         Some(Arc::new(current_vfile))
     }
 
-    /* 获取文件信息 */
-    pub fn stat(){
-
-    }
-
     /* WAITING 既然目录都没有大小，那暂时没必要做这个 */
     #[allow(unused)]
     fn decrease_size(){
@@ -349,7 +344,7 @@ impl VFile{
         new_size: u32,
     ) {  // TODO: return sth when cannot increase
         //println!("===================== in increase =======================");
-        //println!("file: {}", self.get_name());
+        //println!("file: {}, newsz = {}", self.get_name(), new_size);
         //println!("try lock");
         let first_cluster = self.first_cluster();
         let old_sz = self.get_size();
@@ -357,6 +352,7 @@ impl VFile{
         //println!("get lock");
         let old_size = self.size;
         if new_size <= old_size {
+            //println!("oldsz > newsz");
             return;
         }
         let needed = manager_writer.cluster_num_needed(old_sz, new_size, self.is_dir(), first_cluster);
@@ -477,6 +473,7 @@ impl VFile{
         let vfile = self.find_vfile_byname(name).unwrap();
         //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
         if attribute & ATTRIBUTE_DIRECTORY != 0 {
+            //println!("");
             let manager_reader = self.fs.read();
             let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
             let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
@@ -493,7 +490,6 @@ impl VFile{
             self_dir.set_first_cluster(first_cluster);
             vfile.write_at(0, self_dir.as_bytes_mut());
         }
-
         Some(Arc::new(vfile))
     }
 
@@ -585,6 +581,64 @@ impl VFile{
         }
     }
 
+    /* 获取目录中offset处目录项的信息 TODO:之后考虑和stat复用
+    * 返回<name, offset, firstcluster,attributes>
+    */
+    pub fn dirent_info(&self, off:usize) -> Option<(String, u32, u32, u8)>{
+        if !self.is_dir() {
+            return None
+        } 
+        let mut long_ent = LongDirEntry::empty();
+        let mut offset = off;
+        let mut name = String::new(); 
+        let mut is_long = false;
+        loop {
+            let read_sz = self.read_short_dirent(|curr_ent:&ShortDirEntry|{
+                curr_ent.read_at(
+                    offset, 
+                    long_ent.as_bytes_mut(),
+                    &self.fs,
+                    &self.fs.read().get_fat(),
+                    &self.block_device
+                )
+            });
+            if read_sz != DIRENT_SZ || long_ent.is_empty() { 
+                return None;
+            }
+            if long_ent.is_deleted() { offset += DIRENT_SZ; is_long = false; continue; }
+            // 名称拼接
+            if long_ent.attribute() != ATTRIBUTE_LFN {
+                let (_, se_array, _) = unsafe{
+                    long_ent.as_bytes_mut().align_to_mut::<ShortDirEntry>()
+                };
+                let short_ent = se_array[0];
+                if !is_long {
+                    name = short_ent.get_name_lowercase();
+                } 
+                let attribute = short_ent.attribute();
+                let first_cluster = short_ent.first_cluster();
+                return Some((name, offset as u32, first_cluster,attribute))
+            } else {
+                is_long = true;
+                name.insert_str(0, long_ent.get_name_format().as_str());
+            }
+            offset += DIRENT_SZ; 
+        }
+    }
+
+    /* 获取目录中offset处目录项的信息 TODO:之后考虑和stat复用
+    * 返回<size, atime, mtime, ctime>
+    */
+    pub fn stat(&self)->( i64, i64, i64, i64 ){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            let (_,_,_,_,_,_,ctime) = sde.get_creation_time();
+            let (_,_,_,_,_,_,atime) = sde.get_accessed_time();
+            let (_,_,_,_,_,_,mtime) = sde.get_modification_time();
+            let size = sde.get_size();
+            (size as i64, atime as i64, mtime as i64, ctime as i64)
+        })
+    }
+    
     /* ls精简版，上面那个又臭又长，但这个不保证可靠 */
     // DEBUG
     pub fn ls_lite(&self)-> Option<Vec<(String, u8)>>{   
@@ -611,7 +665,7 @@ impl VFile{
             }
             if long_ent.is_deleted() { offset += DIRENT_SZ; is_long = false; continue; }
             // 名称拼接
-            if long_ent.attribute() != ATTRIBUTE_LFN {
+            if long_ent.attribute() != ATTRIBUTE_LFN { // 短文件名
                 let (_, se_array, _) = unsafe{
                     long_ent.as_bytes_mut().align_to_mut::<ShortDirEntry>()
                 };
@@ -623,7 +677,7 @@ impl VFile{
                     list.push( (short_ent.get_name_lowercase(), short_ent.attribute()) )
                 }
                 name.clear();
-            } else {
+            } else { // 长文件名，开始拼接
                 is_long = true;
                 name.insert_str(0, long_ent.get_name_format().as_str());
             }
@@ -700,6 +754,24 @@ impl VFile{
             }
             offset += DIRENT_SZ;
         }
+    }
+
+    pub fn creation_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            sde.get_creation_time()
+        })
+    }
+    
+    pub fn accessed_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            sde.get_accessed_time()
+        })
+    }
+    
+    pub fn modification_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
+        self.read_short_dirent(|sde:&ShortDirEntry|{
+            sde.get_modification_time()
+        })
     }
 
     /* WAITING */
