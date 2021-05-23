@@ -516,7 +516,9 @@ void sleep(void *chan, struct spinlock *lk) {
 
 	__debug_assert("sleep", NULL != p, "p == NULL\n");
 
-	release(lk);
+	if (NULL != lk) {
+		release(lk);
+	}
 	__enter_proc_cs 
 
 	p->chan = chan;
@@ -527,7 +529,9 @@ void sleep(void *chan, struct spinlock *lk) {
 	p->chan = NULL;
 
 	__leave_proc_cs 
-	acquire(lk);
+	if (NULL != lk) {
+		acquire(lk);
+	}
 }
 
 void wakeup(void *chan) {

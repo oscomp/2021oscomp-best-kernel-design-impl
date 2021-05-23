@@ -341,9 +341,10 @@ static void *dmac_chan = (void *) DMAC_V;
 void dmac_wait_idle(dmac_channel_number_t channel_num)
 {
     while(!dmac_is_idle(channel_num)) {
-        acquire(&myproc()->lock);
-        sleep(dmac_chan, &myproc()->lock);
-        release(&myproc()->lock);
+		// lock here seems meaningless 
+        /*acquire(&myproc()->lock);*/
+        sleep(dmac_chan, NULL);
+        /*release(&myproc()->lock);*/
     }
 }
 
