@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 HOST_CC = gcc
 CROSS_PREFIX = riscv64-unknown-elf-
 CC = ${CROSS_PREFIX}gcc
