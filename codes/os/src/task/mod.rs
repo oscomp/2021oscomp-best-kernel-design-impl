@@ -87,6 +87,7 @@ pub fn add_initproc_into_fs() {
         core::slice::from_raw_parts_mut(num_app_ptr.add(1), 3)
     };
     // find if there already exits 
+    println!("Find if there already exits ");
     if let Some(inode) = open(
         "/",
         "initproc",
@@ -97,6 +98,8 @@ pub fn add_initproc_into_fs() {
         return;
     }
 
+
+    println!("Write apps(initproc & user_shell) to disk from mem ");
 
     //Write apps(initproc & user_shell) to disk from mem
     if let Some(inode) = open(
