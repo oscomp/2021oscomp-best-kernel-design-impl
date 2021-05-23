@@ -376,10 +376,10 @@ impl ArgMachine{
     }
 
     pub fn auto_run_testsuites(){
-        ls("\0");
+        // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("brk\0");
-        testsuits.push("chdir\0");
+        // testsuits.push("chdir\0");
         testsuits.push("clone\0");
         testsuits.push("close\0");
         testsuits.push("dup2\0");
