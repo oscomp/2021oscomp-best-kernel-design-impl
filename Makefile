@@ -9,7 +9,7 @@ CFLAGS = -O0 -w -nostdlib -T riscv.lds -Wall -mcmodel=medany -Iinclude -Idrivers
 	-Itest -Itiny_libc/include -nostdinc -g -fvar-tracking -ffreestanding \
 	-Idrivers/sdcard/include
 USER_CFLAGS = -O0 -w -nostdlib -T user_riscv.lds -Wall -mcmodel=medany -Itest -Itiny_libc/include -Iinclude -Idrivers -nostdinc -g -fvar-tracking
-USER_LDFLAGS = -L./ -ltiny_libc
+# USER_LDFLAGS = -L./ -ltiny_libc
 
 BOOTLOADER_ENTRYPOINT = 0x80000000
 START_ENTRYPOINT = 0x80020000
@@ -21,7 +21,7 @@ ARCH_DIR = ./arch/$(ARCH)
 ARCH_SD	= ./drivers/sdcard
 CFLAGS += -Iarch/$(ARCH)/include
 USER_CFLAGS += -Iarch/$(ARCH)/include
-USER_LDFLAGS += $(ARCH_DIR)/crt0.o
+USER_LDFLAGS = $(ARCH_DIR)/crt0.o
 
 SRC_BOOT 	= $(ARCH_DIR)/boot/bootblock.S
 SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
@@ -128,5 +128,5 @@ $(ARCH_DIR)/crt0.o: $(ARCH_DIR)/crt0.S
 	${CC} ${USER_CFLAGS} -c $(ARCH_DIR)/crt0.S -o $(ARCH_DIR)/crt0.o
 
 %.elf : %.c user_riscv.lds libtiny_libc.a $(ARCH_DIR)/crt0.o
-	${CC} ${USER_CFLAGS} $< ${USER_LDFLAGS} -o $@
+	${CC} ${USER_CFLAGS} $< ${SRC_LIBC} ${USER_LDFLAGS} -o $@
 
