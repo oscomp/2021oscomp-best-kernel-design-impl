@@ -9,7 +9,7 @@ use crate::fs::{open, OpenFlags, DiskInodeType, File};
 use crate::mm::UserBuffer;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
-use task::{TaskControlBlock, TaskStatus};
+pub use task::{TaskControlBlock, TaskStatus};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use manager::fetch_task;

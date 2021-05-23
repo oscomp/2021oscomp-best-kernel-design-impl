@@ -4,6 +4,7 @@ use crate::task::{
     current_task,
     current_user_token,
     add_task,
+    TaskControlBlock,
 };
 use crate::timer::get_time_ms;
 use crate::mm::{
@@ -39,6 +40,34 @@ pub fn sys_get_time() -> isize {
 
 pub fn sys_getpid() -> isize {
     current_task().unwrap().pid.0 as isize
+}
+
+pub fn sys_getppid() -> isize {
+    // let mut search_task_pid: usize = current_task().unwrap().pid.0;
+    let mut search_task: Arc<TaskControlBlock> = current_task().unwrap();
+    search_task = search_task.get_parent().unwrap();
+    search_task.pid.0 as isize
+    // while search_task_pid != 0 {
+    //     search_task = search_task.get_parent().unwrap();
+    //     search_task_pid = search_task.pid.0;
+    // }
+    
+    // getppid(child_pid, &search_task) as isize
+}
+
+
+pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> usize {
+    current_task().unwrap().grow_proc(grow_size)
+}
+
+pub fn sys_brk(brk_addr: usize) -> isize{
+    if brk_addr == 0 {
+        return sys_sbrk(0, 0) as isize
+    }
+    let former_addr = current_task().unwrap().grow_proc(0);
+    let grow_size: isize = (brk_addr - former_addr) as isize;
+    current_task().unwrap().grow_proc(grow_size);
+    0
 }
 
 pub fn sys_fork() -> isize {
