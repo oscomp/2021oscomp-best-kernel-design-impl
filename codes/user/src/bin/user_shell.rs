@@ -304,7 +304,7 @@ impl ArgMachine{
         if self.args[0].clone().as_str() == "run_testsuites\0" {
             let mut testsuits :Vec<&str>= Vec::new();
             testsuits.push("testsuites_brk\0");
-            testsuits.push("testsuites_chdir\0");
+            // testsuits.push("testsuites_chdir\0");
             testsuits.push("testsuites_clone\0");
             testsuits.push("testsuites_close\0");
             testsuits.push("testsuites_dup2\0");
