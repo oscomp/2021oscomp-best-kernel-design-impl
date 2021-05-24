@@ -4,6 +4,9 @@
 // user code, and calls into file.c and fs.c.
 //
 
+#ifndef __DEBUG_sysfile
+#undef DEBUG
+#endif
 
 #include "include/types.h"
 #include "include/riscv.h"
@@ -20,7 +23,7 @@
 #include "include/string.h"
 #include "include/printf.h"
 #include "include/vm.h"
-
+#include "include/debug.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -32,10 +35,12 @@ argfd(int n, int *pfd, struct file **pf)
 
   if(argint(n, &fd) < 0)
     return -1;
-  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == NULL)
-    return -1;
   if(pfd)
     *pfd = fd;
+  if(fd < 0)
+    return -1;
+  if ((f = fd2file(fd, 0)) == NULL)
+    return -1;
   if(pf)
     *pf = f;
   return 0;
@@ -43,20 +48,20 @@ argfd(int n, int *pfd, struct file **pf)
 
 // Allocate a file descriptor for the given file.
 // Takes over file reference from caller on success.
-static int
-fdalloc(struct file *f)
-{
-  int fd;
-  struct proc *p = myproc();
+// static int
+// fdalloc(struct file *f)
+// {
+//   int fd;
+//   struct proc *p = myproc();
 
-  for(fd = 0; fd < NOFILE; fd++){
-    if(p->ofile[fd] == 0){
-      p->ofile[fd] = f;
-      return fd;
-    }
-  }
-  return -1;
-}
+//   for(fd = 0; fd < NOFILE; fd++){
+//     if(p->ofile[fd] == 0){
+//       p->ofile[fd] = f;
+//       return fd;
+//     }
+//   }
+//   return -1;
+// }
 
 uint64
 sys_dup(void)
@@ -70,6 +75,24 @@ sys_dup(void)
     return -1;
   filedup(f);
   return fd;
+}
+
+uint64
+sys_dup3(void)
+{
+  struct file *f;
+  int old, new, flag;
+
+  if (argfd(0, &old, &f) < 0 || argint(1, &new) < 0 || argint(2, &flag) < 0)
+    return -1;
+  if (old == new || new < 0)
+    return -1;
+
+  if (fdalloc3(f, new, flag) < 0)
+    return -1;
+  
+  filedup(f);
+  return new;
 }
 
 uint64
@@ -105,7 +128,7 @@ sys_close(void)
 
   if(argfd(0, &fd, &f) < 0)
     return -1;
-  myproc()->ofile[fd] = 0;
+  f = fd2file(fd, 1);
   fileclose(f);
   return 0;
 }
@@ -122,27 +145,35 @@ sys_fstat(void)
 }
 
 uint64
-sys_open(void)
+sys_openat(void)
 {
   char path[MAXPATH];
-  int fd, omode;
-  struct file *f;
-  struct inode *ip;
+  int dirfd, fd, omode, fmode;
+  struct file *f = NULL;
+  struct inode *dp = NULL, *ip;
 
-  if(argstr(0, path, MAXPATH) < 0 || argint(1, &omode) < 0)
+  if (argfd(0, &dirfd, &f) < 0) {
+    if (dirfd != AT_FDCWD) {
+      return -1;
+    }
+    dp = myproc()->cwd;
+  } else {
+    dp = f->ip;
+  }
+  if (argstr(1, path, MAXPATH) < 0 || argint(2, &omode) < 0 || argint(3, &fmode) < 0)
     return -1;
 
   if(omode & O_CREATE){
-    ip = create(path, T_FILE);
+    ip = create(dp, path, fmode & (~I_MODE_DIR));
     if(ip == NULL){
       return -1;
     }
   } else {
-    if((ip = namei(path)) == NULL){
+    if((ip = nameifrom(dp, path)) == NULL){
       return -1;
     }
     ilock(ip);
-    if (ip->mode == T_DIR && omode != O_RDONLY) {
+    if ((ip->mode & I_MODE_DIR) && omode != O_RDONLY) {
       iunlockput(ip);
       return -1;
     }
@@ -156,7 +187,7 @@ sys_open(void)
     return -1;
   }
 
-  if (ip->mode != T_DIR && (omode & O_TRUNC)) {
+  if (!(ip->mode & I_MODE_DIR) && (omode & O_TRUNC)) {
     ip->op->truncate(ip);
   }
 
@@ -172,12 +203,27 @@ sys_open(void)
 }
 
 uint64
-sys_mkdir(void)
+sys_mkdirat(void)
 {
   char path[MAXPATH];
-  struct inode *ip;
+  int dirfd, mode;
+  struct file *f = NULL;
+  struct inode *dp = NULL, *ip;
 
-  if(argstr(0, path, MAXPATH) < 0 || (ip = create(path, T_DIR)) == 0){
+  if (argfd(0, &dirfd, &f) < 0) {
+    if (dirfd != AT_FDCWD) {
+      return -1;
+    }
+    dp = myproc()->cwd;
+  } else {
+    dp = f->ip;
+  }
+  if (argstr(1, path, MAXPATH) < 0 || argint(2, &mode) < 0) {
+    return -1;
+  }
+  __debug_info("mkdirat", "create dir %s\n", path);
+  if ((ip = create(dp, path, mode | I_MODE_DIR)) == NULL) {
+    __debug_warn("mkdirat", "create fail\n");
     return -1;
   }
   iunlockput(ip);
@@ -194,7 +240,7 @@ sys_chdir(void)
   if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == NULL){
     return -1;
   }
-  if (ip->mode != T_DIR) {
+  if (!(ip->mode & I_MODE_DIR)) {
     iput(ip);
     return -1;
   }
@@ -209,7 +255,7 @@ sys_pipe(void)
   uint64 fdarray; // user pointer to array of two integers
   struct file *rf, *wf;
   int fd0, fd1;
-  struct proc *p = myproc();
+  // struct proc *p = myproc();
 
   if(argaddr(0, &fdarray) < 0)
     return -1;
@@ -218,7 +264,7 @@ sys_pipe(void)
   fd0 = -1;
   if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
     if(fd0 >= 0)
-      p->ofile[fd0] = 0;
+      fd2file(fd0, 1);
     fileclose(rf);
     fileclose(wf);
     return -1;
@@ -227,8 +273,8 @@ sys_pipe(void)
   //    copyout(p->pagetable, fdarray+sizeof(fd0), (char *)&fd1, sizeof(fd1)) < 0){
   if(copyout2(fdarray, (char*)&fd0, sizeof(fd0)) < 0 ||
      copyout2(fdarray+sizeof(fd0), (char *)&fd1, sizeof(fd1)) < 0){
-    p->ofile[fd0] = 0;
-    p->ofile[fd1] = 0;
+    fd2file(fd0, 1);
+    fd2file(fd1, 1);
     fileclose(rf);
     fileclose(wf);
     return -1;
@@ -273,14 +319,14 @@ sys_dev(void)
 
 // To support ls command
 uint64
-sys_readdir(void)
+sys_getdents(void)
 {
   struct file *f;
-  uint64 p;
+  uint64 p, len;
 
-  if(argfd(0, 0, &f) < 0 || argaddr(1, &p) < 0)
+  if(argfd(0, 0, &f) < 0 || argaddr(1, &p) < 0 || argint(2, (int*)&len) < 0)
     return -1;
-  return filereaddir(f, p);
+  return filereaddir(f, p, len);
 }
 
 // get absolute cwd string
@@ -293,34 +339,34 @@ sys_getcwd(void)
     return -1;
 
   if (size < 2)
-    return -1;
+    return NULL;
 
   char buf[MAXPATH];
 
   int max = MAXPATH < size ? MAXPATH : size;
   if (namepath(myproc()->cwd, buf, max) < 0)
-    return -1;
+    return NULL;
 
   if (copyout2(addr, buf, max) < 0)
-    return -1;
+    return NULL;
 
-  return 0;
+  return addr;
 }
 
 // Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)
 {
-  struct stat st;
+  struct dirent dent;
   int off = 0, ret;
   while (1) {
-    ret = dp->fop->readdir(dp, &st, off);
+    ret = dp->fop->readdir(dp, &dent, off);
     if (ret < 0)
       return -1;
     else if (ret == 0)
       return 1;
-    else if ((st.name[0] == '.' && st.name[1] == '\0') ||     // skip the "." and ".."
-             (st.name[0] == '.' && st.name[1] == '.' && st.name[2] == '\0'))
+    else if ((dent.name[0] == '.' && dent.name[1] == '\0') ||     // skip the "." and ".."
+             (dent.name[0] == '.' && dent.name[1] == '.' && dent.name[2] == '\0'))
     {
       off += ret;
     }
@@ -330,12 +376,24 @@ isdirempty(struct inode *dp)
 }
 
 uint64
-sys_unlink(void)
+sys_unlinkat(void)
 {
   char path[MAXPATH];
-  struct inode *ip;
+  int dirfd, mode;
+  struct file *f = NULL;
+  struct inode *dp = NULL, *ip;
+
+  if (argfd(0, &dirfd, &f) < 0) {
+    if (dirfd != AT_FDCWD) {
+      return -1;
+    }
+    dp = myproc()->cwd;
+  } else {
+    dp = f->ip;
+  }
+
   int len;
-  if((len = argstr(0, path, MAXPATH)) <= 0)
+  if((len = argstr(1, path, MAXPATH)) <= 0 || argint(2, &mode) < 0)
     return -1;
 
   char *s = path + len - 1;
@@ -346,11 +404,15 @@ sys_unlink(void)
     return -1;
   }
   
-  if((ip = namei(path)) == NULL){
+  if((ip = nameifrom(dp, path)) == NULL){
+    return -1;
+  }
+  if ((ip->mode ^ mode) & I_MODE_DIR) {
+    iput(ip);
     return -1;
   }
   ilock(ip);
-  if (ip->mode == T_DIR && isdirempty(ip) != 1) {
+  if ((ip->mode & I_MODE_DIR) && isdirempty(ip) != 1) {
       iunlockput(ip);
       return -1;
   }
@@ -476,7 +538,7 @@ sys_mount(void)
     iunlock(dev);
     goto fail;
   }
-  iunlock(imnt);  // Don't put, umount will take care of that.
+  iunlockput(imnt);
   iunlockput(dev);
 
   return 0;
@@ -495,5 +557,28 @@ fail:
 uint64
 sys_umount(void)
 {
-  return -1;
+  char buf[MAXPATH];
+  struct inode *mnt = NULL;
+  uint64 flag;
+
+  if (argstr(0, buf, MAXPATH) < 0 || (mnt = namei(buf)) == NULL) {
+    return -1;
+  }
+  if (argint(1, (int*)&flag) < 0 ||
+      mnt->ref > 1) // Is there anyone else holding this inode?
+  {                 // If a syscall try to umount the same mntpoint, he won't pass this.
+    iput(mnt);
+    return -1;
+  }
+
+  ilock(mnt);
+  if (do_umount(mnt, flag) < 0) {
+    iunlockput(mnt);
+    return -1;
+  }
+
+  // If umount successfully, mnt is no longer available,
+  // we shouldn't unlock it, or put it.
+
+  return 0;
 }

@@ -3,7 +3,7 @@
 #include "kernel/include/fcntl.h"
 #include "kernel/include/sysinfo.h"
 
-struct stat;
+// struct stat;
 struct rtcdate;
 struct sysinfo;
 
@@ -18,27 +18,47 @@ int close(int fd);
 int kill(int pid);
 int exec(char*, char**);
 int execve(char *name, char *argv[], char *envp[]);
-int open(const char *filename, int mode);
-int fstat(int fd, struct stat*);
-int mkdir(const char *dirname);
+int openat(int fd, const char *filename, int flag, int mode);
+static inline int open(const char *filename, int flag) {
+    return openat(AT_FDCWD, filename, flag, 0600);
+}
+int fstat(int fd, struct kstat*);
+int mkdirat(int fd, const char *dirname, int mode);
+static inline int mkdir(const char *dirname) {
+    return mkdirat(AT_FDCWD, dirname, 0400);
+}
 int chdir(const char *dirname);
 int dup(int fd);
+int dup3(int oldfd, int newfd, int flag);
+static inline int dup2(int oldfd, int newfd) {
+    return oldfd == newfd ? newfd : dup3(oldfd, newfd, 0);
+}
 int getpid(void);
 char* sbrk(int size);
 int sleep(int ticks);
 int uptime(void);
 int test_proc(int);
 int dev(int, short, short);
-int readdir(int fd, struct stat*);
-int getcwd(char *buf, uint size);
-int remove(char *filename);
+char *getcwd(char *buf, uint size);
+int unlinkat(int fd, char *filename, int flag);
+static inline int unlink(char *filename) {
+    return unlinkat(AT_FDCWD, filename, 0);
+}
+static inline int remove(char *filename) {
+    return unlinkat(AT_FDCWD, filename, 0);
+}
+static inline int rmdir(char *dirname) {
+    return unlinkat(AT_FDCWD, dirname, 01000);
+}
 int trace(int mask);
 int sysinfo(struct sysinfo *);
 int rename(char *old, char *new);
-int mount(char *special, char *dir, char *fstype, uint64 flags, void *data);
+int mount(char *dev, char *dir, char *fstype, uint64 flag, void *data);
+int getdents(int fd, struct dirent *buf, unsigned long len);
+int umount(char *dir, uint64 flag);
 
 // ulib.c
-int stat(const char*, struct stat*);
+int stat(const char*, struct kstat*);
 char* strcpy(char*, const char*);
 char* strcat(char*, const char*);
 void *memmove(void*, const void*, int);

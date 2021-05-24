@@ -78,6 +78,7 @@ void rootfs_init()
 	rootfs.root->inode = iroot;
 	rootfs.root->op = &rootfs_dentry_op;
 	rootfs.root->filename[0] = '/';
+	rootfs.root->filename[1] = '\0';
 	__debug_info("rootfs_init", "done\n");
 }
 
@@ -135,17 +136,25 @@ static int rootfs_clear(struct superblock *sb, uint64 sectorno, uint64 sectorcnt
  * 
  */
 
-struct inode *create(char *path, int type)
+struct inode *create(struct inode *dp, char *path, int mode)
 {
-	struct inode *ip, *dp;
+	struct inode *ip;
 	char name[MAXNAME + 1];
 	struct dentry *de;
 
-	if((dp = nameiparent(path, name)) == NULL) {
+	if (dp != NULL && !(dp->mode & I_MODE_DIR)) {
+		__debug_warn("create", "create on file\n");
 		return NULL;
 	}
+	
+	if ((dp = nameiparentfrom(dp, path, name)) == NULL) {
+		__debug_warn("create", "%s doesn't exist\n", path);
+		return NULL;
+	}
+
 	ilock(dp);
 	if (dp->state & I_STATE_FREE) {
+		__debug_warn("create", "%s doesn't exist\n", path);
 		iunlockput(dp);
 		return NULL;
 	}
@@ -157,8 +166,9 @@ struct inode *create(char *path, int type)
 	if (de != NULL) {
 		iunlockput(dp);
 		ip = idup(de->inode);
-		if (type != ip->mode) {
+		if ((mode ^ ip->mode) & I_MODE_DIR) { // dir and file
 			iput(ip);
+			__debug_warn("create", "%s exists in cache but type is wrong\n", path);
 			ip = NULL;
 		} else {
 			ilock(ip);
@@ -171,7 +181,8 @@ struct inode *create(char *path, int type)
 		return NULL;
 	}
 
-	if ((ip = dp->op->create(dp, name, type)) == NULL) {
+	if ((ip = dp->op->create(dp, name, mode)) == NULL) {
+		__debug_warn("create", "%s create fail\n", path);
 		iunlockput(dp);
 		kfree(de);
 		return NULL;
@@ -193,10 +204,10 @@ struct inode *create(char *path, int type)
 	dp->entry->child = de;
 	release(&sb->cache_lock);
 
-	if (type != ip->mode) {
+	if ((mode ^ ip->mode) & I_MODE_DIR) {
 		iunlockput(dp);
 		iput(ip);
-		kfree(de);
+		__debug_warn("create", "%s exists but type is wrong\n", path);
 		return NULL;
 	}
 
@@ -406,7 +417,6 @@ void de_print(struct superblock *sb, int level)
 	if (sb->dev) {
 		printf(__INFO("%d/%d")" %s mounted at %s\n",
 			sb->ref, root->inode->ref, sb->dev->entry->filename, root->parent->filename);
-
 	} else {
 		printf(__INFO("%d/%d")" %s\n", sb->ref, root->inode->ref, root->filename);
 	}
@@ -439,7 +449,7 @@ void rootfs_print()
  */
 struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 {
-	if (dir->mode != T_DIR)
+	if (!(dir->mode & I_MODE_DIR))
 		panic("dirlookup");
 
 	struct superblock *sb = dir->sb;
@@ -470,6 +480,7 @@ struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 		return idup(de->inode);
 	}
 
+	__debug_info("dirlookup", "look up on disk: %s\n", filename);
 	struct inode *ip = dir->op->lookup(dir, filename, poff);
 	if (ip == NULL || (de = kmalloc(sizeof(struct dentry))) == NULL) {
 		if (ip) {
@@ -478,6 +489,7 @@ struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 		__debug_warn("dirlookup", "file not found: %s\n", filename);
 		return NULL;
 	}
+	__debug_info("dirlookup", "found: %s\n", filename);
 
 	idup(ip);
 	ip->entry = de;
@@ -524,21 +536,25 @@ static char *skipelem(char *path, char *name, int max)
 
 
 // FAT32 version of namex in xv6's original file system.
-static struct inode *lookup_path(char *path, int parent, char *name)
+static struct inode *lookup_path(struct inode *ip, char *path, int parent, char *name)
 {
-	struct inode *ip, *next;
+	struct inode *next;
 	if (*path == '/') {
 		ip = idup(rootfs.root->inode);
 	} else if (*path != '\0') {
-		ip = idup(myproc()->cwd);
+		if (ip != NULL)
+			ip = idup(ip);
+		else
+			ip = idup(myproc()->cwd);
 	} else {
 		__debug_warn("lookup_path", "path invalid\n");
 		return NULL;
 	}
 
 	while ((path = skipelem(path, name, MAXNAME)) != 0) {
+		__debug_info("lookup_path", "lookup: %s\n", name);
 		ilock(ip);
-		if (ip->mode != T_DIR) {
+		if (!(ip->mode & I_MODE_DIR)) {
 			iunlockput(ip);
 			return NULL;
 		}
@@ -566,14 +582,24 @@ static struct inode *lookup_path(char *path, int parent, char *name)
 struct inode *namei(char *path)
 {
 	char name[MAXNAME + 1];
-	return lookup_path(path, 0, name);
+	return lookup_path(NULL, path, 0, name);
 }
 
 struct inode *nameiparent(char *path, char *name)
 {
-	return lookup_path(path, 1, name);
+	return lookup_path(NULL, path, 1, name);
 }
 
+struct inode *nameifrom(struct inode *ip, char *path)
+{
+	char name[MAXNAME + 1];
+	return lookup_path(ip, path, 0, name);
+}
+
+struct inode *nameiparentfrom(struct inode *ip, char *path, char *name)
+{
+	return lookup_path(ip, path, 1, name);
+}
 
 // path is kernel space, and max must be bigger than 2.
 int namepath(struct inode *ip, char *path, int max)
@@ -631,7 +657,7 @@ int namepath(struct inode *ip, char *path, int max)
  */
 
 extern struct superblock *image_fs_init(struct inode *img);
-
+extern void image_fs_uninstall(struct superblock *sb);
 
 // Ignore flag and data in our implement.
 // Caller must hold all inodes' locks.
@@ -643,53 +669,105 @@ int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, vo
 		__debug_warn("do_mount", "Unsupported fs type: %s\n", type);
 		return -1;
 	}
-	if (dev->state & I_STATE_LOCKED) {
-		__debug_warn("do_mount", "%s is already mounted at %s\n", dev);
+	if (mntpoint->entry == rootfs.root) {
+		__debug_warn("do_mount", "can not mount at \"/\"\n");
 		return -1;
 	}
 
 	__debug_info("do_mount", "dev:%s mntpnt:%s\n", dev->entry->filename, mntpoint->entry->filename);
 
-	if (dev->mode == T_DIR || mntpoint->mode != T_DIR) {
-		__debug_warn("do_mount", "Error file type: dev:%d mntpoint:%d\n",
+	if ((dev->mode & I_MODE_DIR) || !(mntpoint->mode & I_MODE_DIR)) {
+		__debug_warn("do_mount", "Error file type: dev:%x mntpoint:%x\n",
 			dev->mode, mntpoint->mode);
 		return -1;
 	}
 
 	struct dentry *dmnt = mntpoint->entry;
-	// We only support one mount at a time.
-	// In fact, if mntpoint is mounted, namei will get its mounting dev,
+	// We planed only to support one mount at a time.
+	// But in fact, if mntpoint is mounted, namei will get its mounting dev,
 	// so this could be a root of a fs, at which can be mounted.
 	if (dmnt->mount != NULL) {
 		__debug_error("do_mount", "%s is already be mounted\n", dmnt->filename);
 		panic("do_mount");
 	}
 
-	if (dev->mode == T_DEVICE) {
-		// On FAT32 volume, there is no file with device type.
-		__debug_warn("do_mount", "How do you put a device on FAT32???\n");
+	// if (dev->mode == T_DEVICE) {
+	// 	// On FAT32 volume, there is no file with device type.
+	// 	__debug_warn("do_mount", "How do you put a device on FAT32???\n");
+	// 	return -1;
+	// }
+	// else if (dev->mode == T_FILE) {
+	struct superblock *imgsb = image_fs_init(dev);
+	if (imgsb == NULL)
 		return -1;
-	}
-	else if (dev->mode == T_FILE) {
-		struct superblock *imgsb = image_fs_init(dev);
-		if (imgsb == NULL)
-			return -1;
 
-		acquire(&rootfs.cache_lock); // borrow this lock
+	acquire(&rootfs.cache_lock); // borrow this lock
 
-		struct superblock *psb = &rootfs;
-		while (psb->next != NULL)
-			psb = psb->next;
-		psb->next = imgsb;
-		imgsb->root->parent = dmnt;
-		dmnt->mount = imgsb;
+	struct superblock *psb = &rootfs;
+	while (psb->next != NULL)
+		psb = psb->next;
+	psb->next = imgsb;
+	imgsb->root->parent = dmnt;
+	safestrcpy(imgsb->root->filename, dmnt->filename, sizeof(dmnt->filename));
+	dmnt->mount = imgsb;
 
-		release(&rootfs.cache_lock);
+	release(&rootfs.cache_lock);
 
-	}
+	idup(mntpoint);
+
+	// }
 
 	return 0;
 }
 
+// Caller must hold mntpoint->lock.
+// flag is of no use in out implement.
+int do_umount(struct inode *mntpoint, int flag)
+{
+	if (!(mntpoint->mode & I_MODE_DIR)) {
+		__debug_warn("do_umount", "try to umount file: %s\n", mntpoint->entry->filename);
+		return -1;
+	}
 
+	struct superblock *sb = mntpoint->sb;
+	if (mntpoint->entry != sb->root || sb == &rootfs) {
+		__debug_warn("do_umount", "%s is not a mount point\n", mntpoint->entry->filename);
+		return -1;
+	}
 
+	struct dentry *de = mntpoint->entry;
+	struct superblock *sb_prnt = NULL;
+	do { // Look up parent of the mount point.
+		de = de->parent;
+		if (de == NULL) { // Meet root of rootfs.
+			break;
+		}
+		sb_prnt = de->inode->sb;
+	} while (de == sb_prnt->root);
+
+	// Lock parent to block cache check.
+	acquire(&sb_prnt->cache_lock);
+	// Check whether only we hold this ref.
+	if (sb->ref > 1) {
+		__debug_warn("do_umount", "mount point is busy\n");
+		release(&sb_prnt->cache_lock);
+		return -1;
+	}
+	// Unmount from dentry tree.
+	de = mntpoint->entry;
+	de->parent->mount = NULL;
+	release(&sb_prnt->cache_lock);
+
+	// Put the inode it mounts at.
+	iput(de->parent->inode);
+
+	// Remove from superblock list.
+	sb_prnt = &rootfs;
+	while (sb_prnt->next != sb)
+		sb_prnt = sb_prnt->next;
+	sb_prnt->next = sb->next;
+
+	image_fs_uninstall(sb);
+
+	return 0;
+}

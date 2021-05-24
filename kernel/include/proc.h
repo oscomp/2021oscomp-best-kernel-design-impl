@@ -69,9 +69,8 @@ struct proc {
 	struct seg *segment;			// first seg list node 
 
 	// file system 
-	struct file *ofile[NOFILE];	// open files 
-	struct inode *cwd;			// current director 
-
+	struct fdtable fds;				// Open files
+	struct inode *cwd;				// Current directory
 	// scheduling 
 	struct context context;
 

@@ -230,6 +230,13 @@ int fork_cow(void) {
 		return -1;
 	}
 
+	// filesystem 
+	if (copyfdtable(&p->fds, &np->fds) < 0) {
+		freeproc(np);
+		return -1;
+	}
+	np->cwd = idup(p->cwd);
+
 	// copy parent's memory layout 
 	struct seg *seg;
 	struct seg **s2 = &(np->segment);
@@ -271,14 +278,6 @@ int fork_cow(void) {
 	p->child = np;
 	release(&p->lk);	// leave cs p 
 
-	// filesystem 
-	for (int i = 0; i < NOFILE; i ++) {
-		if (NULL != p->ofile[i]) {
-			np->ofile[i] = filedup(p->ofile[i]);
-		}
-	}
-	np->cwd = idup(p->cwd);
-
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
 	np->tmask = p->tmask;
@@ -305,13 +304,8 @@ void exit(int xstate) {
 
 	__debug_info("exit", "p %s\n", p->name);
 
-	// free filesystem fields 
-	for (int fd = 0; fd < NOFILE; fd ++) {
-		if (NULL != p->ofile[fd]) {
-			struct file *f = p->ofile[fd];
-			fileclose(f);
-		}
-	}
+	// close all open files 
+	dropfdtable(&p->fds);
 	iput(p->cwd);
 
 	// write in xstate 

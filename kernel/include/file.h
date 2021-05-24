@@ -1,6 +1,8 @@
 #ifndef __FILE_H
 #define __FILE_H
 
+#include "param.h"
+
 struct file {
   enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
   int ref; // reference count
@@ -24,6 +26,15 @@ struct devsw {
 
 extern struct devsw devsw[];
 
+struct fdtable {
+  uint16 basefd;
+  uint16 nextfd;
+  uint16 used;
+  uint16 exec_close;
+  struct file *arr[NOFILE];
+  struct fdtable *next;
+};
+
 #define CONSOLE 1
 
 struct file*    filealloc(void);
@@ -33,6 +44,12 @@ struct file*    filedup(struct file*);
 int             fileread(struct file*, uint64, int n);
 int             filestat(struct file*, uint64 addr);
 int             filewrite(struct file*, uint64, int n);
-int             filereaddir(struct file *f, uint64 addr);
+int             filereaddir(struct file *f, uint64 addr, uint64 n);
+
+int             copyfdtable(struct fdtable *fdt1, struct fdtable *fdt2);
+void            dropfdtable(struct fdtable *fdt);
+struct file*    fd2file(int fd, int free);
+int             fdalloc(struct file *f);
+int             fdalloc3(struct file *f, int fd, int flag);
 
 #endif

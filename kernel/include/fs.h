@@ -40,7 +40,7 @@ struct inode_op {
 	int (*truncate)(struct inode *ip);
 	int (*unlink)(struct inode *ip);
 	int (*update)(struct inode *ip);
-	int (*getattr)(struct inode *ip, struct stat *st);
+	int (*getattr)(struct inode *ip, struct kstat *st);
 
 };
 
@@ -52,7 +52,7 @@ struct dentry_op {
 struct file_op {
 	int (*read)(struct inode *ip, int usr, uint64 dst, uint off, uint n);
 	int (*write)(struct inode *ip, int usr, uint64 src, uint off, uint n);
-	int (*readdir)(struct inode *ip, struct stat *st, uint off);
+	int (*readdir)(struct inode *ip, struct dirent *dent, uint off);
 };
 
 
@@ -63,7 +63,7 @@ struct superblock {
 
 	void				*real_sb;
 	struct superblock	*next;
-	int					ref;
+	int					ref;		// sum of refs of all its inodes
 	
 	struct sleeplock	sb_lock;
 	struct fs_op		op;
@@ -78,6 +78,9 @@ struct superblock {
 #define I_STATE_DIRTY		(1 << 2)
 #define I_STATE_FREE		(1 << 3)
 #define I_STATE_LOCKED		(1 << 4)
+
+// For inode.mode
+#define I_MODE_DIR			(1 << 9)
 
 struct inode {
 	uint64				inum;
@@ -120,7 +123,7 @@ struct dentry {
 void rootfs_init();
 void rootfs_print();
 
-struct inode *create(char *path, int type);
+struct inode *create(struct inode *dp, char *path, int mode);
 int unlink(struct inode *ip);
 
 struct inode *idup(struct inode *ip);
@@ -130,9 +133,12 @@ void iunlock(struct inode *ip);
 
 struct inode *namei(char *path);
 struct inode *nameiparent(char *path, char *name);
+struct inode *nameifrom(struct inode *ip, char *path);
+struct inode *nameiparentfrom(struct inode *ip, char *path, char *name);
 int namepath(struct inode *ip, char *path, int max);
 
 int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, void *data);
+int do_umount(struct inode *mntpoint, int flag);
 
 static inline void iunlockput(struct inode *ip)
 {

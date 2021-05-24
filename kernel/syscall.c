@@ -75,7 +75,7 @@ argint(int n, int *ip)
 {
   *ip = argraw(n);
   struct proc *p = myproc();
-  if (p->tmask & (1 << (p->trapframe->a7 - 1))) {
+  if (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/) {
     if (n != 0) {
       printf(", ");
     }
@@ -92,7 +92,7 @@ argaddr(int n, uint64 *ip)
 {
   *ip = argraw(n);
   struct proc *p = myproc();
-  if (p->tmask & (1 << (p->trapframe->a7 - 1))) {
+  if (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/) {
       if (n != 0) {
       printf(", ");
     }
@@ -112,7 +112,7 @@ argstr(int n, char *buf, int max)
     return -1;
   int ret = fetchstr(addr, buf, max);
   struct proc *p = myproc();
-  if (ret >= 0 && (p->tmask & (1 << (p->trapframe->a7 - 1)))) {
+  if (ret >= 0 && (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/)) {
     printf("=\"%s\"", buf);
   }
   return ret;
@@ -121,16 +121,18 @@ argstr(int n, char *buf, int max)
 extern uint64 sys_chdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_dup(void);
+extern uint64 sys_dup3(void);
 extern uint64 sys_exec(void);
 extern uint64 sys_exit(void);
 extern uint64 sys_fork(void);
 extern uint64 sys_fstat(void);
 extern uint64 sys_getpid(void);
 extern uint64 sys_kill(void);
-extern uint64 sys_mkdir(void);
-extern uint64 sys_open(void);
+extern uint64 sys_mkdirat(void);
+extern uint64 sys_openat(void);
 extern uint64 sys_pipe(void);
 extern uint64 sys_read(void);
+extern uint64 sys_brk(void);
 extern uint64 sys_sbrk(void);
 extern uint64 sys_sleep(void);
 extern uint64 sys_wait(void);
@@ -138,9 +140,9 @@ extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_test_proc(void);
 extern uint64 sys_dev(void);
-extern uint64 sys_readdir(void);
+extern uint64 sys_getdents(void);
 extern uint64 sys_getcwd(void);
-extern uint64 sys_unlink(void);
+extern uint64 sys_unlinkat(void);
 extern uint64 sys_trace(void);
 extern uint64 sys_sysinfo(void);
 extern uint64 sys_rename(void);
@@ -159,24 +161,26 @@ static uint64 (*syscalls[])(void) = {
   [SYS_fstat]       sys_fstat,
   [SYS_chdir]       sys_chdir,
   [SYS_dup]         sys_dup,
+  [SYS_dup3]        sys_dup3,
   [SYS_getpid]      sys_getpid,
+  [SYS_brk]         sys_brk,
   [SYS_sbrk]        sys_sbrk,
   [SYS_sleep]       sys_sleep,
   [SYS_uptime]      sys_uptime,
-  [SYS_open]        sys_open,
+  [SYS_openat]      sys_openat,
   [SYS_write]       sys_write,
-  [SYS_mkdir]       sys_mkdir,
+  [SYS_mkdirat]     sys_mkdirat,
   [SYS_close]       sys_close,
   [SYS_test_proc]   sys_test_proc,
   [SYS_dev]         sys_dev,
-  [SYS_readdir]     sys_readdir,
+  [SYS_getdents]    sys_getdents,
   [SYS_getcwd]      sys_getcwd,
-  [SYS_unlink]      sys_unlink,
+  [SYS_unlinkat]    sys_unlinkat,
   [SYS_trace]       sys_trace,
   [SYS_sysinfo]     sys_sysinfo,
   [SYS_rename]      sys_rename,
   [SYS_execve]      sys_execve,
-  [SYS_mount]      sys_mount,
+  [SYS_mount]       sys_mount,
   [SYS_umount]      sys_umount,
 };
 
@@ -191,19 +195,21 @@ static char *sysnames[] = {
   [SYS_fstat]       "fstat",
   [SYS_chdir]       "chdir",
   [SYS_dup]         "dup",
+  [SYS_dup3]        "dup3",
   [SYS_getpid]      "getpid",
+  [SYS_brk]         "brk",
   [SYS_sbrk]        "sbrk",
   [SYS_sleep]       "sleep",
   [SYS_uptime]      "uptime",
-  [SYS_open]        "open",
+  [SYS_openat]      "openat",
   [SYS_write]       "write",
-  [SYS_mkdir]       "mkdir",
+  [SYS_mkdirat]     "mkdirat",
   [SYS_close]       "close",
   [SYS_test_proc]   "test_proc",
   [SYS_dev]         "dev",
-  [SYS_readdir]     "readdir",
+  [SYS_getdents]    "getdents",
   [SYS_getcwd]      "getcwd",
-  [SYS_unlink]      "unlink",
+  [SYS_unlinkat]    "unlinkat",
   [SYS_trace]       "trace",
   [SYS_sysinfo]     "sysinfo",
   [SYS_rename]      "rename",
@@ -224,7 +230,7 @@ syscall(void)
   __debug_info("syscall", "num = %d\n", num);
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // trace
-    int trace = p->tmask & (1 << (num - 1));
+    int trace = p->tmask;// & (1 << (num - 1));
     if (trace) {
       printf("pid %d: %s(", p->pid, sysnames[num]);
     }

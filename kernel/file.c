@@ -119,7 +119,7 @@ int
 filestat(struct file *f, uint64 addr)
 {
   // struct proc *p = myproc();
-  struct stat st;
+  struct kstat st;
   
   if(f->type == FD_INODE){
     ilock(f->ip);
@@ -203,30 +203,221 @@ filewrite(struct file *f, uint64 addr, int n)
 // Read from dir f.
 // addr is a user virtual address.
 int
-filereaddir(struct file *f, uint64 addr)
+filereaddir(struct file *f, uint64 addr, uint64 n)
 {
   // struct proc *p = myproc();
   if (f->type != FD_INODE || f->readable == 0)
     return -1;
 
-  struct stat st;
+  struct dirent dent;
   struct inode *ip = f->ip;
 
-  ip->op->getattr(ip, &st);
-  if(st.type != T_DIR)
+  if(!(ip->mode & I_MODE_DIR))
     return -1;
 
   int ret;
+  uint64 old = addr;
   ilock(ip);
-  ret = ip->fop->readdir(ip, &st, f->off);
+  for (;;) {
+    ret = ip->fop->readdir(ip, &dent, f->off);
+    if (ret <= 0 || dent.reclen > n) // 0 is end, -1 is err
+      break;
+
+    if(copyout2(addr, (char *)&dent, dent.reclen) < 0) {
+      iunlock(ip);
+      return -1;
+    }
+
+    f->off += ret;
+    addr += dent.reclen;
+    n -= dent.reclen;
+
+  }
   iunlock(ip);
-  if (ret <= 0) // 0 is end, -1 is err
-    return ret;
 
-  f->off += ret;
-  // if(copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
-  if(copyout2(addr, (char *)&st, sizeof(st)) < 0)
-    return -1;
+  return addr - old;
+}
 
-  return 1;
+
+
+/**
+ * File descriptors operations.
+ * 
+ */
+
+// Fork calls this.
+int copyfdtable(struct fdtable *fdt1, struct fdtable *fdt2)
+{
+  struct fdtable *fd = fdt2;
+
+  for (;;) {
+    fd->basefd = fdt1->basefd;
+    fd->nextfd = fdt1->nextfd;
+    fd->used = fdt1->used;
+    fd->exec_close = fdt1->exec_close;
+    for (int i = 0; i < NOFILE; i++) {
+      if (fdt1->arr[i]) {
+        fdt2->arr[i] = filedup(fdt1->arr[i]);
+      } else {
+        fdt2->arr[i] = NULL;
+      }
+    }
+    fdt1 = fdt1->next;
+    if (fdt1) {
+      if ((fd->next = kmalloc(sizeof(struct fdtable))) == NULL) {
+        goto bad;
+      }
+      __debug_info("copyfdtable", "alloc\n");
+      fd = fd->next;
+    } else {
+      fd->next = NULL;
+      break;
+    }
+  }
+  return 0;
+bad:
+  dropfdtable(fdt2);
+  return -1;
+}
+
+void dropfdtable(struct fdtable *fdt)
+{
+  for (int i = 0; i < NOFILE; i++) {
+    if (fdt->arr[i]) {
+      fileclose(fdt->arr[i]);
+    }
+  }
+  if (fdt->next) {
+    dropfdtable(fdt->next);
+    kfree(fdt->next);
+      __debug_info("dropfdtable", "free\n");
+  }
+}
+
+struct file *fd2file(int fd, int free)
+{
+  if (fd < 0)
+    panic("fd2file");
+
+  struct proc *p = myproc();
+  struct fdtable *head = &p->fds, *prev = NULL;
+  struct file *f = NULL;
+
+  while (head && fd >= head->basefd + NOFILE) {
+    prev = head;
+    head = head->next;
+  }
+  if (!head || fd < head->basefd)
+    return NULL;
+
+  fd %= NOFILE;
+  f = head->arr[fd];
+  if (free) {
+    head->arr[fd] = NULL;
+    if (fd < head->nextfd) {
+      head->nextfd = fd;
+    }
+    if (--head->used == 0 && prev) {
+      prev->next = head->next;
+      kfree(head);
+      __debug_info("fd2file", "free %p\n", head);
+    }
+  }
+  return f;
+}
+
+// Allocate a file descriptor for the given file.
+// Takes over file reference from caller on success.
+int fdalloc(struct file *f)
+{
+  int fd = 0;
+  struct proc *p = myproc();
+  struct fdtable *fdt = &p->fds;
+  
+  while (fdt->nextfd < 0) {
+    if (!fdt->next || fdt->basefd + NOFILE != fdt->next->basefd) {
+      struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
+      if (fdnew == NULL) {
+        return -1;
+      }
+      __debug_info("fdalloc", "alloc %p\n", fdnew);
+      fdnew->basefd = fdt->basefd + NOFILE;
+      fdnew->exec_close = 0;
+      fdnew->nextfd = 0;
+      fdnew->used = 0;
+      memset(fdnew->arr, 0, sizeof(fdnew->arr));
+      fdnew->next = fdt->next;
+      fdt->next = fdnew;
+    }
+    fdt = fdt->next;
+  }
+
+  fd = fdt->nextfd;
+  fdt->arr[fd] = f;
+  fdt->used++;
+  fdt->nextfd = -1;
+  for (int i = 0; i < NOFILE; i++) {
+    if (fdt->arr[i] == NULL) {
+      fdt->nextfd = i;
+      break;
+    }
+  }
+
+  return fd + fdt->basefd;
+}
+
+int fdalloc3(struct file *f, int fd, int flag)
+{
+  if (fd < 0)
+    panic("fdalloc3");
+
+  __debug_info("fdalloc3", "in fd=%d flag=%d\n", fd, flag);
+  struct proc *p = myproc();
+  struct fdtable *fdt = &p->fds, *prev = NULL;
+
+  while (fdt && fdt->basefd + NOFILE <= fd) {
+    prev = fdt;
+    fdt = fdt->next;
+  }
+  if (!fdt || fdt->basefd > fd) {
+    struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
+    if (fdnew == NULL) {
+      return -1;
+    }
+    fdnew->basefd = fd - fd % NOFILE;
+    fdnew->used = 0;
+    fdnew->nextfd = 0;
+    fdnew->exec_close = 0;
+    memset(fdnew->arr, 0, sizeof(fdnew->arr));
+    fdnew->next = fdt;
+    prev->next = fdnew;
+    fdt = fdnew;
+    __debug_info("fdalloc3", "alloc %p base=%d\n",
+                  fdnew, fdnew->basefd);
+  }
+
+  int fd2 = fd % NOFILE;
+  if (fdt->arr[fd2] != NULL) {
+    fileclose(fdt->arr[fd2]);
+    fdt->arr[fd2] = f;
+  } else {
+    fdt->arr[fd2] = f;
+    fdt->used++;
+    if (fd2 == fdt->nextfd) {
+      fdt->nextfd = -1;
+      for (int i = 0; i < NOFILE; i++) {
+        if (fdt->arr[i] == NULL) {
+          fdt->nextfd = i;
+          break;
+        }
+      }
+    }
+  }
+  __debug_info("fdalloc3", "table %p base=%d, nextfd=%d, fd2=%d, fd=%d\n",
+                fdt, fdt->basefd, fdt->nextfd, fd2, fd);
+
+  if (flag)
+    fdt->exec_close |= (1 << fd2);
+
+  return fd;
 }
