@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="GB2312" standalone="no"?>
+<SylixOSSetting>
+<BaseSetting Profile="standard" ProjectType="SylixOSBspProject" RealEvoVer="3.11.0 Experience" TlsVersion="default"/>
+<OutputSetting>
+<OutputPath Name="Output" Path="Release:Debug" TreeNode="Output"/>
+<OutputPath Name="Debug" Path="Debug" TreeNode="Debug"/>
+<OutputPath Name="Release" Path="Release" TreeNode="Release"/>
+</OutputSetting>
+<BuildSetting CoustomCfgMakefile="false" NeedReBuild="false" NotScanSourceFile="false"/>
+<DeviceSetting DevName="192.168.7.30" WorkDir="/lib"/>
+<BspSetting TemplatePath="/bsp/arm/arm-mini2440"/>
+</SylixOSSetting>

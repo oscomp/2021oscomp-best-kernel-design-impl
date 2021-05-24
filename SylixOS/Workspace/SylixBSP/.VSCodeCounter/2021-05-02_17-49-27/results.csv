@@ -1,0 +1,11 @@
+"filename", "language", "C++", "C", "comment", "blank", "total"
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\Am29LV160DB.h", "C++", 277, 0, 34, 17, 328
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\fake_nor.c", "C", 0, 93, 52, 6, 151
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\fake_nor.h", "C++", 17, 0, 23, 8, 48
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\nor.c", "C", 0, 415, 186, 44, 645
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\nor.h", "C++", 70, 0, 36, 14, 120
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\nor_cmd.c", "C", 0, 200, 40, 19, 259
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\nor_cmd.h", "C++", 24, 0, 29, 6, 59
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\nor_util.c", "C", 0, 274, 171, 13, 458
+"g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\driver\mtd\nor\nor_util.h", "C++", 28, 0, 32, 6, 66
+"Total", "-", 416, 982, 603, 133, 2134

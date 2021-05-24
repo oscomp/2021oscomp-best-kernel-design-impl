@@ -1,0 +1,6 @@
+MEMORY
+{
+  TEXT (rx) : ORIGIN = (0x30000000), LENGTH = (6 * 1024 * 1024)
+  DATA (rw) : ORIGIN = (0x30000000) + ((6 * 1024 * 1024)), LENGTH = (18 * 1024 * 1024)
+}
+BOOT_STACK_SIZE = (128 * 1024);

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+	<storageModule moduleId="org.eclipse.cdt.core.settings">
+		<cconfiguration id="org.eclipse.cdt.core.default.config.398931790">
+			<storageModule buildSystemId="org.eclipse.cdt.core.defaultConfigDataProvider" id="org.eclipse.cdt.core.default.config.398931790" moduleId="org.eclipse.cdt.core.settings" name="Configuration">
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+		</cconfiguration>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="org.eclipse.cdt.core.pathentry">
+		<pathentry kind="mac" name="__GNUC__" path="" value="4"/>
+		<pathentry kind="mac" name="SYLIXOS" path="" value=""/>
+		<pathentry kind="mac" name="__arm__" path="" value=""/>
+		<pathentry kind="mac" name="__BOOT_INRAM" path="" value="1"/>
+		<pathentry base-ref="SylixBSP" include="D:/HUZHISHENG/HoitOS/github_project/HoitOS/SylixOS/Workspace/SylixOS/libsylixos/SylixOS" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="D:/HUZHISHENG/HoitOS/github_project/HoitOS/SylixOS/Workspace/SylixOS/libsylixos/SylixOS/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="D:/HUZHISHENG/HoitOS/github_project/HoitOS/SylixOS/Workspace/SylixOS/libcextern/libcextern/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="D:/HUZHISHENG/HoitOS/RealEvo/compiler/arm-sylixos-toolchain/lib/gcc/arm-sylixos-eabi/4.9.3/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="D:/HUZHISHENG/HoitOS/RealEvo/compiler/arm-sylixos-toolchain/arm-sylixos-eabi/include" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="D:/HUZHISHENG/HoitOS/github_project/HoitOS/SylixOS/Workspace/SylixOS/libsylixos/SylixOS/include/network" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="SylixOS" kind="inc" path="" system="true"/>
+		<pathentry base-ref="SylixBSP" include="SylixOS/bsp" kind="inc" path="" system="true"/>
+		<pathentry excluding="obj|dep" kind="out" path="Debug"/>
+		<pathentry excluding="obj|dep" kind="out" path="Release"/>
+	</storageModule>
+</cproject>

@@ -1,0 +1,44 @@
+Date : 2021-05-02 17:48:55
+Directory : g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs
+Total : 19 files,  3884 codes, 1839 comments, 770 blanks, all 6493 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| C        |          9 |      3,401 |      1,524 |        626 |      5,551 |
+| C++      |         10 |        483 |        315 |        144 |        942 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                   |         19 |      3,884 |      1,839 |        770 |      6,493 |
++-----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                            | language | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFs.c         | C        |        987 |        335 |        225 |      1,547 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFs.h         | C++      |         12 |         30 |          4 |         46 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsCache.c    | C        |        268 |        176 |         41 |        485 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsCache.h    | C++      |         25 |         27 |         12 |         64 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsFDLib.c    | C        |        141 |         71 |         27 |        239 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsFDLib.h    | C++      |         13 |         23 |          5 |         41 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsGC.c       | C        |        188 |         71 |         41 |        300 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsGC.h       | C++      |          8 |         21 |          6 |         35 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsLib.c      | C        |      1,041 |        417 |        144 |      1,602 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsLib.h      | C++      |         57 |         26 |         13 |         96 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsLog.c      | C        |          0 |         20 |          2 |         22 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsLog.h      | C++      |          4 |         20 |          5 |         29 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsMid.c      | C        |          3 |         20 |          6 |         29 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsMid.h      | C++      |          3 |         20 |          5 |         28 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsTree.c     | C        |        444 |        232 |         85 |        761 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsTree.h     | C++      |        108 |         56 |         27 |        191 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsTreeUtil.c | C        |        329 |        182 |         55 |        566 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitFsTreeUtil.h | C++      |         21 |         20 |         10 |         51 |
+| g:\MyProject\Project.HoitOS\HoitOS\SylixOS\Workspace\SylixBSP\SylixOS\extfs\hoitFs\hoitType.h       | C++      |        232 |         72 |         57 |        361 |
+| Total                                                                                               |          |      3,884 |      1,839 |        770 |      6,493 |
++-----------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+

@@ -1,0 +1,9 @@
+/README - 副本.md
+
+/SylixOS/*
+!/SylixOS/Workspace/
+
+/SylixOS/Workspace/*
+!/SylixOS/Workspace/SylixBSP
+
+/SylixOS/Workspace/SylixBSP/Debug
