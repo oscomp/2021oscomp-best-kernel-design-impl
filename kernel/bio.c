@@ -13,7 +13,11 @@
 // * Only one process at a time can use a buffer,
 //     so do not keep them longer than necessary.
 
+#ifndef __DEBUG_bio
+#undef DEBUG
+#endif
 
+#define __module_name__ "bio"
 
 #include "include/types.h"
 #include "include/param.h"
@@ -24,6 +28,7 @@
 #include "include/sdcard.h"
 #include "include/printf.h"
 #include "include/disk.h"
+#include "include/debug.h"
 
 struct {
   struct spinlock lock;
@@ -102,8 +107,11 @@ bread(uint dev, uint sectorno) {
   struct buf *b;
 
   b = bget(dev, sectorno);
+  __debug_info("bread", "get buffer\n");
   if (!b->valid) {
+    __debug_info("bread", "start reading sno %d\n", sectorno);
     disk_read(b);
+    __debug_info("bread", "done sno %d\n", sectorno);
     b->valid = 1;
   }
 

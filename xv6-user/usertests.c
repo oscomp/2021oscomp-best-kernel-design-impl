@@ -1913,7 +1913,7 @@ iref(char *s)
   // clean up
   for(i = 0; i < NINODE + 1; i++){
     chdir("..");
-    remove("irefd");
+    rmdir("irefd");
   }
 
   chdir("/");

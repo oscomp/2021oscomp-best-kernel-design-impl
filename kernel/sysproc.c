@@ -120,7 +120,9 @@ sys_brk(void)
   
   struct proc *p = myproc();
   struct seg *heap = getseg(p->segment, HEAP);
-  if (addr < heap->addr) {
+  if (addr == 0) {
+    return heap->addr + heap->sz;
+  } else if (addr < heap->addr) {
     return -1;
   }
   int n = addr - (heap->addr + heap->sz);
@@ -134,7 +136,7 @@ sys_brk(void)
     }
     heap->sz += n;
   }
-  return addr;
+  return 0;
 }
 
 uint64

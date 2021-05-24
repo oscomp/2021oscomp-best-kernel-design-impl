@@ -4,6 +4,8 @@
 #undef DEBUG
 #endif
 
+#define __module_name__	"fs"
+
 #include "include/param.h"
 #include "include/fs.h"
 #include "include/fat32.h"
@@ -54,6 +56,7 @@ void rootfs_init()
 
 	// Read superblock from sector 0.
 	struct buf *b = bread(ROOTDEV, 0);
+	__debug_info("rootfs_init", "read superblock\n");
 	struct fat32_sb *fat = fat32_init((char*)b->data);
 	brelse(b);
 	
@@ -243,12 +246,12 @@ int unlink(struct inode *ip)
 	}
 
 	acquire(&sb->cache_lock);
-	if (ip->nlink == 0) {
+	// if (ip->nlink == 0) {
 		// No other files link to ip
 		ip->state |= I_STATE_FREE;
 		// Remove the dentry from cache, but do not free it.
 		de_delete(de);
-	}
+	// }
 	release(&sb->cache_lock);
 
 	return 0;
@@ -281,7 +284,8 @@ void iput(struct inode *ip)
 		// deleted from the dentry tree.
 		// This inode is invisible, just free it.
 		if (ip->state & I_STATE_FREE) {
-			ip->op->truncate(ip);
+			if (ip->nlink == 0)
+				ip->op->truncate(ip);
 			kfree(ip->entry);
 			sb->op.destroy_inode(ip);
 			return;

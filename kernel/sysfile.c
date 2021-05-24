@@ -173,7 +173,11 @@ sys_openat(void)
       return -1;
     }
     ilock(ip);
-    if ((ip->mode & I_MODE_DIR) && omode != O_RDONLY) {
+    if ((ip->mode & I_MODE_DIR) && omode != O_RDONLY && omode != O_DIRECTORY) {
+      iunlockput(ip);
+      return -1;
+    }
+    if ((omode & O_DIRECTORY) && !(ip->mode & I_MODE_DIR)) {
       iunlockput(ip);
       return -1;
     }

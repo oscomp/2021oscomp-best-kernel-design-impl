@@ -263,6 +263,7 @@ int handle_intr(uint64 scause) {
 			break;
 		case DISK_IRQ: 
 			// disk read/write complete 
+			__debug_info("handle_intr", "disk\n");
 			disk_intr();
 			break;
 		default: 
