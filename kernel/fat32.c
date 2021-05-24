@@ -2,6 +2,8 @@
 #undef DEBUG 
 #endif 
 
+#define __module_name__     "fat32"
+
 #include "include/param.h"
 #include "include/types.h"
 #include "include/riscv.h"

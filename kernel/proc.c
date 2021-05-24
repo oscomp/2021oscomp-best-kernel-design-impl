@@ -504,15 +504,19 @@ void yield(void) {
 	__leave_proc_cs 
 }
 
+// sleep must be atomic, so lk must be held when going into sleep()
 void sleep(void *chan, struct spinlock *lk) {
 	struct proc *p = myproc();
 
 	__debug_assert("sleep", NULL != p, "p == NULL\n");
 
-	if (NULL != lk) {
-		release(lk);
-	}
-	__enter_proc_cs 
+    // either proc_lock or lk must be held at any time, 
+    // so that proc would sleep atomically 
+    if (&proc_lock != lk) {
+        __enter_proc_cs 
+        if (NULL != lk) 
+            release(lk);
+    }
 
 	p->chan = chan;
 	__remove(p);	// remove p from runnable 
@@ -521,7 +525,9 @@ void sleep(void *chan, struct spinlock *lk) {
 	sched();
 	p->chan = NULL;
 
-	__leave_proc_cs 
+    // release proc_lock first to avoid deadlock 
+    // with another call to sleep() with the same lk
+    __leave_proc_cs 
 	if (NULL != lk) {
 		acquire(lk);
 	}
@@ -531,9 +537,12 @@ void wakeup(void *chan) {
 	__enter_proc_cs 
 
 	struct proc *p = proc_sleep;
+    __debug_info("wakeup", "chan = %p\n", chan);
 	while (NULL != p) {
 		struct proc *next = p->next;
-		if (chan == p->chan) {
+        //__debug_info("wakeup", "%p\n", p->chan);
+		if ((uint64)chan == (uint64)p->chan) {
+            //__debug_info("wakeup", "find\n");
 			__remove(p);
 			p->timer = TIMER_IRQ;
 			__insert_runnable(PRIORITY_IRQ, p);

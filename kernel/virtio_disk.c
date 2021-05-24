@@ -6,6 +6,11 @@
 // qemu ... -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 //
 
+#ifndef __DEBUG_virtio_disk 
+#undef DEBUG
+#endif 
+
+#define __module_name__     "virtio_disk"
 
 #include "include/types.h"
 #include "include/riscv.h"
@@ -19,7 +24,7 @@
 #include "include/vm.h"
 #include "include/string.h"
 #include "include/printf.h"
-
+#include "include/debug.h"
 
 // the address of virtio mmio register r.
 #define R(r) ((volatile uint32 *)(VIRTIO0_V + (r)))
@@ -27,8 +32,7 @@
 static struct disk {
  // memory for virtio descriptors &c for queue 0.
  // this is a global instead of allocated because it must
- // be multiple contiguous pages, which kalloc()
- // doesn't support, and page aligned.
+ // be multiple contiguous pages, which kalloc() // doesn't support, and page aligned.
   char pages[2*PGSIZE];
   struct VRingDesc *desc;
   uint16 *avail;
@@ -267,7 +271,9 @@ virtio_disk_intr()
       panic("virtio_disk_intr status");
     
     disk.info[id].b->disk = 0;   // disk is done with buf
+    __debug_info("virtio_disk_intr", "enter wakeup, %p\n", disk.info[id].b);
     wakeup(disk.info[id].b);
+    __debug_info("virtio_disk_intr", "leave wakeup\n");
 
     disk.used_idx = (disk.used_idx + 1) % NUM;
   }
