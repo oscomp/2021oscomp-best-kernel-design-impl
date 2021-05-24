@@ -53,9 +53,14 @@ typedef unsigned __attribute__((__mode__(SI))) uint32;
 typedef int      __attribute__((__mode__(DI))) int64;
 typedef unsigned __attribute__((__mode__(DI))) uint64;
 
+typedef unsigned int   uint;
+typedef unsigned short ushort;
+typedef unsigned char  uchar;
+typedef unsigned short wchar;
+
 typedef int32_t pid_t;
 typedef uint64_t reg_t;
-typedef uint64_t __attribute__((aligned (16))) ptr_t;
+typedef uint64_t ptr_t;
 typedef uint64_t uintptr_t;
 typedef int64_t intptr_t;
 typedef uint64_t size_t;

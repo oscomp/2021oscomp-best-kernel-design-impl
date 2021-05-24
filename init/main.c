@@ -41,11 +41,15 @@
 #include <fpioa.h>
 #include <memlayout.h>
 #include <user_programs.h>
+#include <buf.h>
+#include <os/fat32.h>
 
 #include <csr.h>
 #include <asm.h>
 
 extern void ret_from_exception();
+
+uint64_t shell_pgdir;
 
 static void init_pcb()
 {
@@ -63,6 +67,7 @@ static void init_pcb()
     pcb_underinit->status = TASK_READY;
     pcb_underinit->priority = 1;
     pcb_underinit->temp_priority = pcb_underinit->priority;
+    pcb_underinit->spawn_num = 0;
     pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
     pcb_underinit->mask = 0xf;
     
@@ -73,7 +78,7 @@ static void init_pcb()
     clear_pgdir(pgdir);
     alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
     uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper);
-    share_pgtable(pgdir,pa2kva(PGDIR_PA));
+    shell_pgdir = pgdir;
 
     init_pcb_stack(pgdir, kernel_stack, user_stack, test_shell, 0, NULL, pcb_underinit);
     list_add_tail(&pcb_underinit->list,&ready_queue);
@@ -95,6 +100,10 @@ static void init_pcb()
     pid0_pcb2.wait_list.next = &pid0_pcb2.wait_list; pid0_pcb2.wait_list.prev = &pid0_pcb2.wait_list;
 }
 
+/* just for temp use */
+extern void do_testdisk();
+/* end */
+
 static void init_syscall(void)
 {
     // initialize system call table.
@@ -111,6 +120,11 @@ static void init_syscall(void)
     syscall[SYSCALL_GET_TIMEBASE] = &sbi_read_fdt;
     syscall[SYSCALL_GET_TICK] = &get_ticks;
     syscall[SYSCALL_EXIT] = &do_exit;
+
+    syscall[SYSCALL_TESTDISK] = &do_testdisk;
+    syscall[SYSCALL_EXEC] = &do_exec;
+
+    syscall[SYSCALL_TEST] = &fat32_read;
 }
 
 // stop mapping boot_kernel
@@ -144,51 +158,57 @@ int main()
     init_syscall();
     printk("> [INIT] System call initialized successfully.\n\r");
 
+#ifdef K210
     // init sdcard
     fpioa_pin_init();
     printk("> [INIT] FPIOA initialized successfully.\n\r");
     // printk("fpioa is at %lx\n\r", get_kva_of(FPIOA_BASE_ADDR, pa2kva(PGDIR_PA)));
-
-#ifdef K210
-    ioremap(UARTHS, UARTHS, NORMAL_PAGE_SIZE);
-#elif
-    ioremap(UART0, UART0, NORMAL_PAGE_SIZE);
+    ioremap(UARTHS, NORMAL_PAGE_SIZE);
+#else
+    ioremap(UART0, NORMAL_PAGE_SIZE);
 #endif
 
 #ifndef K210
     // virtio mmio disk interface
-    ioremap(VIRTIO0, VIRTIO0, NORMAL_PAGE_SIZE);
+    ioremap(VIRTIO0, NORMAL_PAGE_SIZE);
 #endif
 
-    ioremap(CLINT, CLINT, 0x10000);
+    ioremap(CLINT, 0x10000);
 
-    ioremap(PLIC, PLIC, 0x400000);
+    ioremap(PLIC, 0x400000);
 
 #ifdef K210
-    ioremap(GPIOHS, GPIOHS, 0x1000);
-    ioremap(GPIO, GPIO, 0x1000);
-    ioremap(SPI_SLAVE, SPI_SLAVE, 0x1000);
-    ioremap(GPIOHS, GPIOHS, 0x1000);
-    ioremap(SPI0, SPI0, 0x1000);
-    ioremap(SPI1, SPI1, 0x1000);
-    ioremap(SPI2, SPI2, 0x1000);
+    ioremap(GPIOHS, 0x1000);
+    ioremap(GPIO, 0x1000);
+    ioremap(SPI_SLAVE, 0x1000);
+    ioremap(GPIOHS, 0x1000);
+    ioremap(SPI0, 0x1000);
+    ioremap(SPI1, 0x1000);
+    ioremap(SPI2, 0x1000);
 #endif
 
     printk("> [INIT] IOREMAP initialized successfully.\n\r");
 
+    share_pgtable(shell_pgdir,pa2kva(PGDIR_PA));
+    printk("> [INIT] SHARE PGTABLE initialized successfully.\n\r");
+
 #ifdef K210
     sdcard_init();
     printk("> [INIT] SD card initialized successfully.\n\r");
-    test_sdcard();
-    print_cardInfo();
+    fat32_init();
+    printk("> [INIT] FAT32 initialized successfully.\n\r");
+#else
+    plicinit();      // set up interrupt controller
+    plicinithart();  // ask PLIC for device interrupts
+    printk("> [INIT] PLIC initialized successfully.\n\r");
+    disk_init();
+    printk("> [INIT] Virtio Disk initialized successfully.\n\r");
 #endif
     // init screen (QAQ)
     init_screen();
     printk("> [INIT] SCREEN initialization succeeded.\n\r");
     // Setup timer interrupt and enable all interrupt
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
-    // printk("ticks: %d\n", get_ticks());
-    // printk("timebase: %d\n", time_base);
     /* setup exception */
     clear_interrupt();
     setup_exception();
@@ -202,49 +222,4 @@ int main()
         ;
     };
     return 0;
-}
-
-void test_sdcard() {
-    uint8 *buffer = kalloc();
-    uint8 *pre_buffer = kalloc();
-    memset(buffer, 0, sizeof(buffer));
-    if(sd_read_sector(pre_buffer, 0, sizeof(pre_buffer))) {
-        printk("[test_sdcard]SD card read sector err\nr");
-    } else {
-        printk("[test_sdcard]SD card read sector succeed\nr");
-    }
-    printk("[test_sdcard]Buffer: %s\n", buffer);
-    memmove(buffer, "Hello,sdcard", sizeof("Hello,sdcard"));
-    printk("[test_sdcard]Buffer: %s\n", buffer);
-    if(sd_write_sector(buffer, 0, sizeof(buffer))) {
-        printk("[test_sdcard]SD card write sector err\n\r");
-    } else {
-        printk("[test_sdcard]SD card write sector succeed\n\r");
-    }
-    memset(buffer, 0, sizeof(buffer));
-    if(sd_read_sector(buffer, 0, sizeof(buffer))) {
-        printk("[test_sdcard]SD card read sector err\n\r");
-    } else {
-        printk("[test_sdcard]SD card read sector succeed\n\r");
-    }
-    printk("[test_sdcard]Buffer: %s\n", buffer);
-    if(sd_write_sector(pre_buffer, 0, sizeof(pre_buffer))) {
-        printk("[test_sdcard]SD card recover err\n\r");
-    } else {
-        printk("[test_sdcard]SD card recover succeed\n");
-    }
-    kfree(buffer);
-    kfree(pre_buffer);
-}
-
-void print_cardInfo()
-{
-    printk("BlockSize: %d\n\r", cardinfo.CardBlockSize);
-    printk("Capacity: %d\n\r", cardinfo.CardCapacity);
-    printk("MinRd: %d\n\r", cardinfo.SD_csd.MaxRdCurrentVDDMin);   /*!< Max. read current @ VDD min */
-    printk("MaxRd: %d\n\r", cardinfo.SD_csd.MaxRdCurrentVDDMax);   /*!< Max. read current @ VDD max */
-    printk("MinWr: %d\n\r", cardinfo.SD_csd.MaxWrCurrentVDDMin);   /*!< Max. write current @ VDD min */
-    printk("MaxWr: %d\n\r", cardinfo.SD_csd.MaxWrCurrentVDDMax);   /*!< Max. write current @ VDD max */
-    printk("MaxWr: %d\n\r", cardinfo.SD_csd.MaxWrBlockLen);
-    printk("Fileformat: %d\n\r", cardinfo.SD_csd.FileFormat);
 }

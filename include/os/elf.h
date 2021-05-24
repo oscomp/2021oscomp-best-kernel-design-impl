@@ -4,6 +4,7 @@
 #include <os/string.h>
 #include <pgtable.h>
 #include <type.h>
+#include <sbi.h>
 
 /* 64-bit ELF base types. */
 typedef uint64_t Elf64_Addr;

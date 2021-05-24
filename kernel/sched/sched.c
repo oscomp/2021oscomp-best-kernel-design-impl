@@ -11,6 +11,7 @@
 #include <pgtable.h>
 #include <csr.h>
 #include <qemu.h>
+#include <os/elf.h>
 
 #define TOO_LARGE_PRIORITY 10000000
 #define true 1
@@ -46,6 +47,7 @@ pcb_t pid0_pcb2 = {
 LIST_HEAD(ready_queue);
 LIST_HEAD(general_block_queue);
 LIST_HEAD(available_queue);
+LIST_HEAD(fileop_queue);
 
 /* current running task PCB */
 pcb_t * volatile current_running;
@@ -198,40 +200,25 @@ void do_unblock(void *pcb_node)
 
 void do_exit()
 {
+    // check if some other thread is waiting
+    // if there is, unblock them
     list_node_t *temp = current_running->wait_list.next;
 
     while (temp != &current_running->wait_list)
     {
         list_node_t *tempnext = temp->next;
-        pcb_t *abcd = temp->ptr;
-        pid_t waitting_pid = abcd->pid;
+        pcb_t *waitting = temp->ptr;
+        pid_t waitting_pid = waitting->pid;
         list_del(temp);
 
-        int still_wait = 0;
-        for (int i = 2; still_wait == 0 && i < NUM_MAX_TASK; ++i)
-        {
-            list_node_t *temp2 = pcb[i].wait_list.next;
-            while (temp2 != &pcb[i].wait_list)
-            {
-                pcb_t *pt_pcb = temp2->ptr;
-                if (pt_pcb->pid == waitting_pid)
-                {
-                    still_wait = 1;
-                    break;
-                }
-                temp2 = temp2->next;
-            }
-        }
+        pcb_t *pt_pcb = temp->ptr;
+        pt_pcb->status = TASK_READY;
+        list_add_tail(temp,&ready_queue);
 
-        if (!still_wait)
-        {
-            pcb_t *pt_pcb = temp->ptr;
-            pt_pcb->status = TASK_READY;
-            list_add_tail(temp,&ready_queue);
-        }
         temp = tempnext;
     }
 
+    // decide terminal state by mode
     if (current_running->mode == ENTER_ZOMBIE_ON_EXIT)
         current_running->status = TASK_ZOMBIE;
     else if (current_running->mode == AUTO_CLEANUP_ON_EXIT)
@@ -241,6 +228,64 @@ void do_exit()
         free_all_pages(current_running->pgdir, current_running->kernel_stack_base);
     }
     do_scheduler();
+}
+
+pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode)
+{
+    for (int i = 1; i < NUM_MAX_TASK; ++i)
+        if (pcb[i].status == TASK_EXITED)
+        {
+            // init pcb
+            pcb_t *pcb_underinit = &pcb[i];
+            ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
+            ptr_t user_stack = USER_STACK_ADDR;
+
+            pcb_underinit->preempt_count = 0;
+            pcb_underinit->list.ptr = pcb_underinit;
+            pcb_underinit->pid = process_id++;
+            pcb_underinit->type = USER_PROCESS;
+            pcb_underinit->status = TASK_READY;
+            pcb_underinit->priority = 1;
+            pcb_underinit->temp_priority = pcb_underinit->priority;
+            pcb_underinit->mode = mode;
+            pcb_underinit->spawn_num = 0;
+            pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1;
+            pcb_underinit->mask = current_running->mask;
+
+            // get file
+            unsigned char *_elf_binary = NULL;
+            int length;
+
+            get_elf_file(file_name,&_elf_binary,&length);
+            uintptr_t pgdir = allocPage();
+            clear_pgdir(pgdir);
+            uint64_t user_stack_page_kva = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+            uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper);
+            share_pgtable(pgdir,pa2kva(PGDIR_PA));
+
+            // copy argc & argv
+            if (argc){
+                unsigned char **pointers = user_stack_page_kva;
+                unsigned char *strings = user_stack_page_kva + argc*sizeof(unsigned char *);
+                uint64_t write_to_stack = user_stack - NORMAL_PAGE_SIZE + argc*sizeof(unsigned char*);
+                for (int i = 0; i < argc; ++i)
+                {
+                    // memcpy(pointers,&argv[i],sizeof(char *));pointers += sizeof(char*);
+                    memcpy(strings,argv[i],strlen(argv[i])+1);
+                    pointers[i] = write_to_stack;
+                    strings += (strlen(argv[i])+1);write_to_stack += (strlen(argv[i])+1);
+                }
+            }
+
+            // prepare stack
+            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argc, user_stack - NORMAL_PAGE_SIZE, pcb_underinit);
+            // add to ready_queue
+            list_del(&pcb_underinit->list);
+            list_add_tail(&pcb_underinit->list,&ready_queue);
+            // prints("mem:%lx",memalloc);
+            return pcb[i].pid;
+        }
+    return -1;
 }
 
 

@@ -7,6 +7,8 @@
 #include <sbi.h>
 #include <screen.h>
 #include <pgtable.h>
+#include <qemu.h>
+#include <memlayout.h>
 
 #define SXLEN 64
 
@@ -58,7 +60,7 @@ void init_exception()
     irq_table[IRQC_S_TIMER] = &handle_int;
     irq_table[IRQC_M_TIMER] = &handle_other; 
     irq_table[IRQC_U_EXT] = &handle_other;   
-    irq_table[IRQC_S_EXT] = &handle_other;   
+    irq_table[IRQC_S_EXT] = &handle_sext;   
     irq_table[IRQC_M_EXT] = &handle_other;
 
     exc_table[EXCC_SYSCALL] = &handle_syscall;
@@ -71,6 +73,35 @@ void init_exception()
     exc_table[EXCC_LOAD_PAGE_FAULT] = &handle_pgfault;   
     exc_table[EXCC_STORE_PAGE_FAULT] = &handle_pgfault;
 }
+
+extern int plic_claim(void);
+extern void disk_intr(void);
+extern void plic_complete(int irq);
+
+void handle_sext(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
+{
+    // this is a supervisor external interrupt, via PLIC.
+
+    // irq indicates which device interrupted.
+    #ifndef K210
+    int irq = plic_claim();
+    if(irq == UART0_IRQ){
+      // uartintr();
+    } else if(irq == VIRTIO0_IRQ){
+      disk_intr();
+    } else if(irq){
+      prints("unexpected interrupt irq=%d\n", irq);
+    }
+    // the PLIC allows each device to raise at most one
+    // interrupt at a time; tell the PLIC the device is
+    // now allowed to interrupt again.
+    if(irq)
+      plic_complete(irq);
+    #endif
+
+    return ;
+}
+
 
 void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
 {

@@ -39,6 +39,7 @@
 #define FREEMEM (INIT_KERNEL_STACK+4*PAGE_SIZE)
 #define USER_STACK_ADDR 0xf00010000lu
 #define FREEMEM_TOP KERNEL_END
+#define MEM_FOR_PROC 0xffffffff80180000lu
 
 /* Rounding; only works for n = power of two */
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
@@ -75,5 +76,8 @@ void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base);
 
 void *kalloc(void);
 void kfree(void *p);
+
+void *allocproc();
+void allocfree();
 
 #endif /* MM_H */

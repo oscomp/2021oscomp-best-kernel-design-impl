@@ -110,6 +110,7 @@ typedef struct pcb
 
     /* spawn mode */
     spawn_mode_t mode;
+    uint32_t spawn_num;
 
     /* priority */
     int32_t priority;
@@ -137,6 +138,7 @@ typedef struct task_info
 extern list_head ready_queue;
 extern list_head general_block_queue;
 extern list_head available_queue;
+extern list_head fileop_queue;
 
 /* current running task PCB */
 extern pcb_t * volatile current_running;
@@ -170,6 +172,7 @@ pid_t do_getpid();
 int do_taskset(uint32_t pid,uint32_t mask);
 
 void do_exit();
+pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;

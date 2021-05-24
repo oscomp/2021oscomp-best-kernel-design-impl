@@ -87,4 +87,7 @@
 #define SYSCALL_SHMPGET 56
 #define SYSCALL_SHMPDT 57
 
+#define SYSCALL_TESTDISK 58
+#define SYSCALL_TEST 59
+
 #endif

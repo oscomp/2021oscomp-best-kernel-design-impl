@@ -35,6 +35,7 @@ void            disk_init(void);
 void            disk_read(struct buf *b);
 void            disk_write(struct buf *b);
 void            disk_intr(void);
+void            do_testdisk(void);
 
 // exec.c
 int             exec(char*, char**);
@@ -104,10 +105,10 @@ int             piperead(struct pipe*, uint64, int);
 int             pipewrite(struct pipe*, uint64, int);
 
 // printf.c
-void            printstring(const char* s);
-void            printf(char*, ...);
-void            panic(char*) __attribute__((noreturn));
-void            printfinit(void);
+// void            printstring(const char* s);
+// void            printf(char*, ...);
+// void            panic(char*) __attribute__((noreturn));
+// void            printfinit(void);
 
 // proc.c
 void            reg_info(void);

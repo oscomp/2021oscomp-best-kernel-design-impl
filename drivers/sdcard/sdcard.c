@@ -45,10 +45,11 @@ void sdcard_init() {
     if(cardinfo) {
       // panic("sd card init error\n");
     	// printk("sdcard init fail");
-    	while(1) ;
+    	assert(0) ;
     } else
     {
-      printk("sdcard init: %d\n", cardinfo);
+      // printk("sdcard init: %d\n", cardinfo);
+    	;
     }
 }
 void SD_CS_HIGH(void)
@@ -387,7 +388,7 @@ uint8 sd_init(void)
         printk("SD_CMD0 is %x\n", result);
         return 0xFF;
     }
-
+    
 	sd_send_cmd(SD_CMD8, 0x01AA, 0x87);
 	/*!< 0x01 or 0x05 */
 	result = sd_get_response();

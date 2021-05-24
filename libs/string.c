@@ -16,6 +16,16 @@ void memcpy(uint8_t *dest, const uint8_t *src, uint32_t len)
     }
 }
 
+int memcmp(const void *ptr1, const void *ptr2, size_t num)
+{
+    for (int i = 0; i < num; ++i) {
+        if (((char*)ptr1)[i] != ((char*)ptr2)[i]) {
+            return ((char*)ptr1)[i] - ((char*)ptr2)[i];
+        }
+    }
+    return 0;
+}
+
 void memmove(uint8_t *dest, const uint8_t *src, uint32_t len)
 {
     uint8_t temp[len];

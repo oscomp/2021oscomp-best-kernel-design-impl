@@ -46,7 +46,7 @@ void *ioremap(unsigned long phys_addr, unsigned long size)
     // return prev_io_base + (phys_addr & (LARGE_PAGE_SIZE-1));
     uint64_t pagenum = (size + LARGE_PAGE_SIZE-1) / LARGE_PAGE_SIZE;
     for (uint64_t i = 0; i < pagenum; ++i){
-        map_page(phys_addr+i*LARGE_PAGE_SIZE,phys_addr+i*LARGE_PAGE_SIZE,pa2kva(PGDIR_PA));
+        map_page(phys_addr+i*LARGE_PAGE_SIZE,(phys_addr+i*LARGE_PAGE_SIZE)&(0xffffffff),pa2kva(PGDIR_PA));
     }
     local_flush_tlb_all();
     return ;

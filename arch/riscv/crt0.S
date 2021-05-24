@@ -8,8 +8,8 @@ ENTRY(_start)
   la gp, __global_pointer$
   .option pop
 
-  /* for convinience */
-  j clear_bss_done
+  # /* for convinience */
+  # j clear_bss_done
 
     /* clear bss */
   la t3, __bss_start

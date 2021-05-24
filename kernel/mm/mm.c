@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <sbi.h>
 #include <string.h>
+#include <screen.h>
 
 ptr_t memCurr = FREEMEM;
 // ptr_t memTop = KERNEL_END;
@@ -35,10 +36,12 @@ ptr_t allocPage()
     }
     // else
     //     return swap_page();
-    else{
-        memCurr += NORMAL_PAGE_SIZE;
-        ret = memCurr - NORMAL_PAGE_SIZE;
-    }
+    else
+        assert(0);
+    // else{
+    //     memCurr += NORMAL_PAGE_SIZE;
+    //     ret = memCurr - NORMAL_PAGE_SIZE;
+    // }
     return ret;
 }
 
@@ -172,7 +175,7 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
 
 void freePage(ptr_t baseAddr)
 {   
-    int clear = 1;
+    uint8_t clear = 1;
     for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
     {
         shm_page_node_t *temp = i->ptr;
@@ -190,7 +193,8 @@ void freePage(ptr_t baseAddr)
         tmp->next=tmp;tmp->prev=tmp;tmp->ptr=baseAddr;
         list_add_tail(tmp,&freePageList);
     }
-    // prints("Free:%x",baseAddr);
+    // vt100_move_cursor(1,10);
+    // printk("Free:%x",baseAddr);
 }
 
 void *kmalloc(size_t size)
@@ -308,17 +312,17 @@ void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base)
     // make sure no page fault
     set_satp(SATP_MODE_SV39,0,PGDIR_PA >> NORMAL_PAGE_SHIFT);
     // free page
-    for (int i = 0; i < NUM_PTE_ENTRY; ++i)
+    for (uint32_t i = 0; i < NUM_PTE_ENTRY; ++i)
     {
         // int clear1 = 1;
         PTE *ptr1 = pgdir + i*sizeof(PTE);
         if (get_attribute(*ptr1,_PAGE_PRESENT)&&get_attribute(*ptr1,_PAGE_USER)){
             // level1 valid, goto level2
-            for (int j = 0; j < NUM_PTE_ENTRY; ++j){
+            for (uint32_t j = 0; j < NUM_PTE_ENTRY; ++j){
                 PTE* ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT) + j*sizeof(PTE);
                 if (get_attribute(*ptr2,_PAGE_PRESENT)&&get_attribute(*ptr2,_PAGE_USER)){
                     // level2 valid, goto level3
-                    for (int k = 0; k < NUM_PTE_ENTRY; ++k){
+                    for (uint32_t k = 0; k < NUM_PTE_ENTRY; ++k){
                         PTE* ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
                         if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)){
                             //level3 valid, goto free
@@ -336,14 +340,19 @@ void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base)
     //         kernel_stack-(kernel_stack % NORMAL_PAGE_SIZE) : kernel_stack - NORMAL_PAGE_SIZE;
     freePage(kernel_stack_base);
 }
-/* this is used for mapping kernel virtual address into user page table */
+
+/**
+ this is used for mapping kernel virtual address into user page table 
+ if page is valid, then no share
+ guarantee ioremap
+ */
 void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir)
 {
     PTE* dest = dest_pgdir, *src = src_pgdir;
     for (int i = 0; i < NUM_PTE_ENTRY; ++i)
     {
         PTE *tmp1 = src + i, *tmp2 = dest + i;
-        if (get_attribute(*tmp1,_PAGE_PRESENT))
+        if (get_attribute(*tmp1,_PAGE_PRESENT) && !get_attribute(*tmp2,_PAGE_PRESENT))
             *tmp2 = *tmp1;
     }
 }
@@ -414,4 +423,14 @@ void *kalloc(void)
 void kfree(void *p)
 {
     freePage(p);
+}
+
+void *allocproc()
+{
+    return MEM_FOR_PROC;
+}
+
+void allocfree()
+{
+    return ;
 }

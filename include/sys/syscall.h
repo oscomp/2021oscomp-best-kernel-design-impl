@@ -30,8 +30,10 @@
 
 #include <os/syscall_number.h>
 #include <stdint.h>
+#include <os/sched.h>
+#include <type.h>
 
-extern long invoke_syscall(long, long, long, long);
+extern uint64_t invoke_syscall(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
 void sys_sleep(uint32_t);
 
@@ -46,5 +48,10 @@ long sys_get_timebase();
 long sys_get_tick();
 void sys_move_cursor(int x, int y);
 void sys_exit();
+
+void sys_testdisk();
+pid_t sys_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
+
+int8_t sys_test(const char* filename);
 
 #endif

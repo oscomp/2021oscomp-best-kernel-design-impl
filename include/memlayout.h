@@ -34,30 +34,29 @@
 // unused RAM after 80000000.
 
 
-#ifdef QEMU
 // qemu puts UART registers here in physical memory.
-#define UART0 0x10000000L
+#define UART0 0xffffffff10000000L
 #define UART0_IRQ 10
-#else
-#define UARTHS 0x38000000L
-#define UARTHS_IRQ 33
-#endif
 
-#ifdef QEMU
+#define UARTHS 0xffffffff38000000L
+#define UARTHS_IRQ 33
+
+
+
 // virtio mmio interface
-#define VIRTIO0 0x10001000
+#define VIRTIO0 0xffffffff10001000
 #define VIRTIO0_IRQ 1
-#endif
+
 
 // local interrupt controller, which contains the timer.
-#define CLINT 0x02000000L
+#define CLINT 0xffffffff02000000L
 #define CLINT_MTIMECMP(hartid) (CLINT + 0x4000 + 8*(hartid))
 #define CLINT_MTIME (CLINT + 0xBFF8) // cycles since boot.
 
 #ifndef QEMU
-#define PLIC 0x0c200000L
+#define PLIC 0xffffffff0c200000L
 #else
-#define PLIC 0x0c000000L
+#define PLIC 0xffffffff0c000000L
 #endif
 #define PLIC_PRIORITY (PLIC + 0x0)
 #define PLIC_PENDING (PLIC + 0x1000)
@@ -69,30 +68,30 @@
 #define PLIC_SCLAIM(hart) (PLIC + 0x201004 + (hart)*0x2000)
 
 #ifndef QEMU
-#define GPIOHS 0x38001000
+#define GPIOHS 0xffffffff38001000
 
-#define GPIO 0x50200000
+#define GPIO 0xffffffff50200000
 
-#define SPI_SLAVE 0x50240000
+#define SPI_SLAVE 0xffffffff50240000
 
-#define FPIOA 0x502B0000
+#define FPIOA 0xffffffff502B0000
 
-#define SPI0 0x52000000
+#define SPI0 0xffffffff52000000
 
-#define SPI1 0x53000000
+#define SPI1 0xffffffff53000000
 
-#define SPI2 0x54000000
+#define SPI2 0xffffffff54000000
 #endif
 
 // the physical address of rustsbi
-#define RUSTSBI_BASE 0x80000000
+#define RUSTSBI_BASE 0xffffffff80000000
 
 // the kernel expects there to be RAM
 // for use by the kernel and user pages
 // from physical address 0x80200000 to PHYSTOP.
-#define KERNBASE 0x80020000
+#define KERNBASE 0xffffffff80020000
 // #define PHYSTOP (KERNBASE + 128*1024*1024)
-#define PHYSTOP 0x80600000
+#define PHYSTOP 0xffffffff80600000
 
 // map the trampoline page to the highest address,
 // in both user and kernel space.
