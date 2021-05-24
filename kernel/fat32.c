@@ -656,7 +656,7 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
     }
     ip->op = dir->op;
     ip->fop = dir->fop;
-    ip->mode = mode;
+    ip->mode = mode | 0x1ff;
 
     struct fat32_entry *ep;
     if ((ep = kmalloc(sizeof(struct fat32_entry))) == NULL) {
@@ -923,6 +923,7 @@ int fat_dir_next(struct inode *dir, struct fat32_entry *ep, char *namebuf, uint 
                 read_entry_name(namebuf, &de);
             }
             read_entry_info(ep, &de);
+            __debug_info("fat_dir_next", "from off=%d get %s\n", off, namebuf);
             return 1;
         }
     }
@@ -930,6 +931,7 @@ int fat_dir_next(struct inode *dir, struct fat32_entry *ep, char *namebuf, uint 
 
 excep:
     *count = 0;     // Caller will re-read
+    __debug_warn("fat_dir_next", "??? from %d\n", off);
     return 0;
 }
 
@@ -992,6 +994,7 @@ static struct fat32_entry *fat_lookup_dir_ent(struct inode *dir, char *filename,
     if (dir->state & I_STATE_FREE)
         return NULL;
 
+    __debug_info("fat_lookup_dir_ent", "in\n");
     struct fat32_entry *ep = kmalloc(sizeof(struct fat32_entry));
     if (ep == NULL) { return NULL; }
 

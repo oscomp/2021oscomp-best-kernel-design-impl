@@ -47,7 +47,7 @@ sys_exit(void)
   if(argint(0, &n) < 0)
     return -1;
   // since exit never return, we print the trace-info here
-  if (myproc()->tmask & (1 << (SYS_exit - 1))) {
+  if (myproc()->tmask/* & (1 << (SYS_exit - 1))*/) {
     printf(")\n");
   }
   exit(n);
@@ -77,7 +77,7 @@ sys_wait(void)
   // since wait suspends the proc, we print the left trace-info here
   // and when coming back, we re-print the leading trace-info for a clear view
   struct proc *pr = myproc();
-  int mask = pr->tmask & (1 << (SYS_wait - 1));
+  int mask = pr->tmask;// & (1 << (SYS_wait - 1));
   if (mask) {
     printf(") ...\n");
   }
@@ -103,7 +103,33 @@ sys_sbrk(void)
       return -1;
   } else {                // lazy page allocation
     struct seg *stack = heap->next;
-    if (addr + n > stack->addr - stack->sz) {
+    if (addr + n > stack->addr - PGSIZE) {
+      return -1;
+    }
+    heap->sz += n;
+  }
+  return addr;
+}
+
+uint64
+sys_brk(void)
+{
+  uint64 addr;
+  if(argaddr(0, &addr) < 0)
+    return -1;
+  
+  struct proc *p = myproc();
+  struct seg *heap = getseg(p->segment, HEAP);
+  if (addr < heap->addr) {
+    return -1;
+  }
+  int n = addr - (heap->addr + heap->sz);
+  if (n < 0) {
+    if (growproc(n) < 0)  // growproc takes care of p->sz
+      return -1;
+  } else {                // lazy page allocation
+    struct seg *stack = heap->next;
+    if (addr > stack->addr - PGSIZE) {
       return -1;
     }
     heap->sz += n;
@@ -120,7 +146,7 @@ sys_sleep(void)
   if(argint(0, &n) < 0)
     return -1;
   struct proc *p = myproc();
-  int mask = p->tmask & (1 << (SYS_sleep - 1));
+  int mask = p->tmask;// & (1 << (SYS_sleep - 1));
   if (mask) {
     printf(") ...\n");
   }

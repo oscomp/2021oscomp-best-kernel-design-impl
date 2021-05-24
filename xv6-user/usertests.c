@@ -381,7 +381,7 @@ iputtest(char *s)
     printf("%s: chdir iputdir failed\n", s);
     exit(1);
   }
-  if(remove("../iputdir") < 0){
+  if(rmdir("../iputdir") < 0){
     printf("%s: remove ../iputdir failed\n", s);
     exit(1);
   }
@@ -411,7 +411,7 @@ exitiputtest(char *s)
       printf("%s: child chdir failed\n", s);
       exit(1);
     }
-    if(remove("../iputdir") < 0){
+    if(rmdir("../iputdir") < 0){
       printf("%s: remove ../iputdir failed\n", s);
       exit(1);
     }
@@ -455,7 +455,7 @@ openiputtest(char *s)
     exit(0);
   }
   sleep(1);
-  if(remove("oidir") != 0){
+  if(rmdir("oidir") != 0){
     printf("%s: remove failed\n", s);
     exit(1);
   }
@@ -1505,7 +1505,7 @@ subdir(char *s)
   write(fd, "ff", 2);
   close(fd);
 
-  if(remove("dd") >= 0){
+  if(rmdir("dd") >= 0){
     printf("%s: remove dd (non-empty dir) succeeded!\n", s);
     exit(1);
   }
@@ -1651,15 +1651,15 @@ subdir(char *s)
     printf("%s: remove dd/ff failed\n", s);
     exit(1);
   }
-  if(remove("dd") == 0){
+  if(rmdir("dd") == 0){
     printf("%s: remove non-empty dd succeeded!\n", s);
     exit(1);
   }
-  if(remove("dd/dd") < 0){
+  if(rmdir("dd/dd") < 0){
     printf("%s: remove dd/dd failed\n", s);
     exit(1);
   }
-  if(remove("dd") < 0){
+  if(rmdir("dd") < 0){
     printf("%s: remove dd failed\n", s);
     exit(1);
   }
@@ -1801,11 +1801,11 @@ rmdot(char *s)
     printf("%s: chdir dots failed\n", s);
     exit(1);
   }
-  if(remove(".") == 0){
+  if(rmdir(".") == 0){
     printf("%s: rm . worked!\n", s);
     exit(1);
   }
-  if(remove("..") == 0){
+  if(rmdir("..") == 0){
     printf("%s: rm .. worked!\n", s);
     exit(1);
   }
@@ -1813,15 +1813,15 @@ rmdot(char *s)
     printf("%s: chdir / failed\n", s);
     exit(1);
   }
-  if(remove("dots/.") == 0){
+  if(rmdir("dots/.") == 0){
     printf("%s: remove dots/. worked!\n", s);
     exit(1);
   }
-  if(remove("dots/..") == 0){
+  if(rmdir("dots/..") == 0){
     printf("%s: remove dots/.. worked!\n", s);
     exit(1);
   }
-  if(remove("dots") != 0){
+  if(rmdir("dots") != 0){
     printf("%s: remove dots failed!\n", s);
     exit(1);
   }

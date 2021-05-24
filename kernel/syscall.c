@@ -69,7 +69,7 @@ argint(int n, int *ip)
 {
   *ip = argraw(n);
   struct proc *p = myproc();
-  if (p->tmask & (1 << (p->trapframe->a7 - 1))) {
+  if (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/) {
     if (n != 0) {
       printf(", ");
     }
@@ -86,7 +86,7 @@ argaddr(int n, uint64 *ip)
 {
   *ip = argraw(n);
   struct proc *p = myproc();
-  if (p->tmask & (1 << (p->trapframe->a7 - 1))) {
+  if (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/) {
       if (n != 0) {
       printf(", ");
     }
@@ -106,7 +106,7 @@ argstr(int n, char *buf, int max)
     return -1;
   int ret = fetchstr(addr, buf, max);
   struct proc *p = myproc();
-  if (ret >= 0 && (p->tmask & (1 << (p->trapframe->a7 - 1)))) {
+  if (ret >= 0 && (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/)) {
     printf("=\"%s\"", buf);
   }
   return ret;
@@ -126,6 +126,7 @@ extern uint64 sys_mkdirat(void);
 extern uint64 sys_openat(void);
 extern uint64 sys_pipe(void);
 extern uint64 sys_read(void);
+extern uint64 sys_brk(void);
 extern uint64 sys_sbrk(void);
 extern uint64 sys_sleep(void);
 extern uint64 sys_wait(void);
@@ -156,6 +157,7 @@ static uint64 (*syscalls[])(void) = {
   [SYS_dup]         sys_dup,
   [SYS_dup3]        sys_dup3,
   [SYS_getpid]      sys_getpid,
+  [SYS_brk]         sys_brk,
   [SYS_sbrk]        sys_sbrk,
   [SYS_sleep]       sys_sleep,
   [SYS_uptime]      sys_uptime,
@@ -189,6 +191,7 @@ static char *sysnames[] = {
   [SYS_dup]         "dup",
   [SYS_dup3]        "dup3",
   [SYS_getpid]      "getpid",
+  [SYS_brk]         "brk",
   [SYS_sbrk]        "sbrk",
   [SYS_sleep]       "sleep",
   [SYS_uptime]      "uptime",
@@ -218,7 +221,7 @@ syscall(void)
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // trace
-    int trace = p->tmask & (1 << (num - 1));
+    int trace = p->tmask;// & (1 << (num - 1));
     if (trace) {
       printf("pid %d: %s(", p->pid, sysnames[num]);
     }

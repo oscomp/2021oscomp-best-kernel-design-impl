@@ -90,10 +90,12 @@ int execve(char *path, char **argv, char **envp)
   struct seg *seghead = NULL, *seg;
   struct proc *p = myproc();
 
+  __debug_info("execve", "in\n");
   if ((ip = namei(path)) == NULL) {
     __debug_warn("execve", "can't open %s\n", path);
     goto bad;
   }
+  __debug_info("execve", "get elf\n");
   ilock(ip);
 
   // Check ELF header
@@ -111,6 +113,7 @@ int execve(char *path, char **argv, char **envp)
     pagetable[i] = 0;
   }
 
+  __debug_info("execve", "load from elf\n");
   // Load program into memory.
   struct proghdr ph;
   int flags;
@@ -132,9 +135,7 @@ int execve(char *path, char **argv, char **envp)
     flags |= (ph.flags & ELF_PROG_FLAG_WRITE) ? PTE_W : 0;
     flags |= (ph.flags & ELF_PROG_FLAG_READ) ? PTE_R : 0;
 
-    __debug_info("execve", "newseg in\n");
     seg = newseg(pagetable, seghead, LOAD, ph.vaddr, ph.memsz, flags);
-    __debug_info("execve", "newseg out\n");
     if(seg == NULL) {
       __debug_warn("execve", "newseg fail: vaddr=%p, memsz=%d\n", ph.vaddr, ph.memsz);
       goto bad;

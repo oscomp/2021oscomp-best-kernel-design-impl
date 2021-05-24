@@ -480,6 +480,7 @@ struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 		return idup(de->inode);
 	}
 
+	__debug_info("dirlookup", "look up on disk: %s\n", filename);
 	struct inode *ip = dir->op->lookup(dir, filename, poff);
 	if (ip == NULL || (de = kmalloc(sizeof(struct dentry))) == NULL) {
 		if (ip) {
@@ -488,6 +489,7 @@ struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 		__debug_warn("dirlookup", "file not found: %s\n", filename);
 		return NULL;
 	}
+	__debug_info("dirlookup", "found: %s\n", filename);
 
 	idup(ip);
 	ip->entry = de;
@@ -550,6 +552,7 @@ static struct inode *lookup_path(struct inode *ip, char *path, int parent, char 
 	}
 
 	while ((path = skipelem(path, name, MAXNAME)) != 0) {
+		__debug_info("lookup_path", "lookup: %s\n", name);
 		ilock(ip);
 		if (!(ip->mode & I_MODE_DIR)) {
 			iunlockput(ip);

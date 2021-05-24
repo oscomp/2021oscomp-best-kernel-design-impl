@@ -335,7 +335,7 @@ growproc(int n)
   uint64 newva = oldva + n;
 
   if(n > 0){
-    if (newva > stack->addr - stack->sz ||
+    if (newva > stack->addr - PGSIZE ||
         uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
       return -1;
     }
