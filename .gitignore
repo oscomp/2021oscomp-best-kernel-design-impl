@@ -1,4 +1,5 @@
 tags
+fs/
 .vscode/*
 *.img
 xv6-user/_*
