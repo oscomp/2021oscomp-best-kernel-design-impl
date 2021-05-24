@@ -238,7 +238,7 @@ static int check_block_size(void) {
 	uint8 result = 0xff;
 	uint8 ocr[4];
 
-	int timeout = 0xff;
+	int timeout = 0xffff;
 	while (timeout --) {
 		sd_send_cmd(SD_CMD58, 0, 0);
 		result = sd_get_response_R1();

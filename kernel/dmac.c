@@ -254,12 +254,15 @@ int dmac_set_channel_param(dmac_channel_number_t channel_num,
     return 0;
 }
 
+struct spinlock dmac_useless_lock;
 void dmac_init(void)
 {
     uint64 tmp;
     dmac_commonreg_intclear_u_t intclear;
     dmac_cfg_u_t dmac_cfg;
     dmac_reset_u_t dmac_reset;
+
+	initlock(&dmac_useless_lock, "useless_lock");
 
     sysctl_clock_enable(SYSCTL_CLOCK_DMA);
     // printf("[dmac_init] dma clk=%d\n", sysctl_clock_get_freq(SYSCTL_CLOCK_DMA));
@@ -342,9 +345,9 @@ void dmac_wait_idle(dmac_channel_number_t channel_num)
 {
     while(!dmac_is_idle(channel_num)) {
 		// lock here seems meaningless 
-        /*acquire(&myproc()->lock);*/
-        sleep(dmac_chan, NULL);
-        /*release(&myproc()->lock);*/
+		acquire(&dmac_useless_lock);
+        sleep(dmac_chan, &dmac_useless_lock);
+		release(&dmac_useless_lock);
     }
 }
 

@@ -145,13 +145,13 @@ proc_pagetable(struct proc *p)
   // An empty page table.
   pagetable = kvmcreate();
   if(pagetable == 0)
-    return NULL;
+	return NULL;
 
   // map the trapframe just below TRAMPOLINE, for trampoline.S.
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
-            (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
-    kvmfree(pagetable, 1);
-    return NULL;
+			(uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+	kvmfree(pagetable, 1);
+	return NULL;
   }
 
   return pagetable;
@@ -509,14 +509,14 @@ void sleep(void *chan, struct spinlock *lk) {
 	struct proc *p = myproc();
 
 	__debug_assert("sleep", NULL != p, "p == NULL\n");
+	__debug_assert("sleep", NULL != lk, "lk == NULL\n");
 
-    // either proc_lock or lk must be held at any time, 
-    // so that proc would sleep atomically 
-    if (&proc_lock != lk) {
-        __enter_proc_cs 
-        if (NULL != lk) 
-            release(lk);
-    }
+	// either proc_lock or lk must be held at any time, 
+	// so that proc would sleep atomically 
+	if (&proc_lock != lk) {
+		__enter_proc_cs 
+		release(lk);
+	}
 
 	p->chan = chan;
 	__remove(p);	// remove p from runnable 
@@ -525,24 +525,22 @@ void sleep(void *chan, struct spinlock *lk) {
 	sched();
 	p->chan = NULL;
 
-    // release proc_lock first to avoid deadlock 
-    // with another call to sleep() with the same lk
-    __leave_proc_cs 
-	if (NULL != lk) {
-		acquire(lk);
-	}
+	// release proc_lock first to avoid deadlock 
+	// with another call to sleep() with the same lk
+	__leave_proc_cs 
+	acquire(lk);
 }
 
 void wakeup(void *chan) {
 	__enter_proc_cs 
 
 	struct proc *p = proc_sleep;
-    __debug_info("wakeup", "chan = %p\n", chan);
+	__debug_info("wakeup", "chan = %p\n", chan);
 	while (NULL != p) {
 		struct proc *next = p->next;
-        //__debug_info("wakeup", "%p\n", p->chan);
+		//__debug_info("wakeup", "%p\n", p->chan);
 		if ((uint64)chan == (uint64)p->chan) {
-            //__debug_info("wakeup", "find\n");
+			//__debug_info("wakeup", "find\n");
 			__remove(p);
 			p->timer = TIMER_IRQ;
 			__insert_runnable(PRIORITY_IRQ, p);
@@ -726,16 +724,16 @@ int growproc(int n) {
   uint64 newva = oldva + n;
 
   if(n > 0){
-    if (newva > stack->addr - PGSIZE ||
-        uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
-      return -1;
-    }
+	if (newva > stack->addr - PGSIZE ||
+		uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
+	  return -1;
+	}
   } else if(n < 0){
-    if (newva < heap->addr || newva > oldva) {
-      newva = heap->addr;
-    }
+	if (newva < heap->addr || newva > oldva) {
+	  newva = heap->addr;
+	}
 
-    uvmdealloc(p->pagetable, newva, oldva, HEAP);
+	uvmdealloc(p->pagetable, newva, oldva, HEAP);
   }
   heap->sz += n;
   return 0;
@@ -749,11 +747,11 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 {
   // struct proc *p = myproc();
   if(user_dst){
-    // return copyout(p->pagetable, dst, src, len);
-    return copyout2(dst, src, len);
+	// return copyout(p->pagetable, dst, src, len);
+	return copyout2(dst, src, len);
   } else {
-    memmove((char*)dst, src, len);
-    return 0;
+	memmove((char*)dst, src, len);
+	return 0;
   }
 }
 
@@ -765,11 +763,11 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {
   // struct proc *p = myproc();
   if(user_src){
-    // return copyin(p->pagetable, dst, src, len);
-    return copyin2(dst, src, len);
+	// return copyin(p->pagetable, dst, src, len);
+	return copyin2(dst, src, len);
   } else {
-    memmove(dst, (char*)src, len);
-    return 0;
+	memmove(dst, (char*)src, len);
+	return 0;
   }
 }
 
