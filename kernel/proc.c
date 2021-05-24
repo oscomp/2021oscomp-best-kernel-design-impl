@@ -206,15 +206,14 @@ static struct proc *allocproc(void) {
 		return NULL;
 	}
 
+	// init fds 
+	memset(&p->fds, 0, sizeof(p->fds));
+
 	// user kernel stack 
 	p->kstack = VKSTACK;
 
 	p->context.ra = (uint64)forkret;
 	p->context.sp = p->kstack + PGSIZE;
-
-	// init ofile 
-	for (int i = 0; i < NOFILE; i ++) 
-		p->ofile[i] = NULL;
 
 	return p;
 }
