@@ -7,6 +7,7 @@
 #include "include/riscv.h"
 #include "include/gpiohs.h"
 #include <pgtable.h>
+#include "qemu.h"
 // #include "include/defs.h"
 /*
  * @brief  Start Data tokens:
@@ -76,15 +77,22 @@ static void sd_lowlevel_init(uint8 spi_index)
 static void sd_write_data(uint8 *data_buff, uint32 length)
 {
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
+    #ifndef SUBMIT
     spi_send_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
+    #else
+    spi_send_data_standard(SPI_DEVICE_0, 0, NULL, 0, data_buff, length);
+    #endif
 }
 
 static void sd_read_data(uint8 *data_buff, uint32 length)
 {
 
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
+    #ifndef SUBMIT
     spi_receive_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
-
+    #else
+    spi_receive_data_standard(SPI_DEVICE_0, 0, NULL, 0, data_buff, length);
+    #endif
 }
 
 
