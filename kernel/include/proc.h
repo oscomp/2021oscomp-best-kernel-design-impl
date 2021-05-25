@@ -39,6 +39,7 @@ enum procstate {
 
 // Process Control Block 
 struct proc {
+	// a useless lock 
 	struct spinlock lk;
 
 	// basic information 
@@ -55,11 +56,11 @@ struct proc {
 	void *chan;				// the reason this proc is sleeping for 
 
 	// parenting
-	// these fields MUST be protected by lk 
-	struct proc *child;			// point to first child 
-	// parent and sibling are protected by parent's lock 
-	struct proc *parent;		// point to its parent, NULL if it's `init`
-	struct proc *sibling;		// point to first sibling 
+	// these fields can only be operated by proc itself 
+	struct proc *child;				// point to first child 
+	struct proc *parent;			// point to its parent, NULL if it's `init`
+	struct proc *sibling_next;		// point to first sibling 
+	struct proc **sibling_prev;		// point to previous sibling->sibling_next 
 
 	// memory 
 	uint64 kstack;					// virtual address of kernel stack 

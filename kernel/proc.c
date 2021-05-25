@@ -80,7 +80,7 @@ struct spinlock proc_lock;
 	release(&proc_lock);
 
 // before modifying proc_list, lock should be acquired 
-static void proc_list_insert(struct proc **head, struct proc *p) {
+static void __proc_list_insert_no_lock(struct proc **head, struct proc *p) {
 	__debug_assert("proc_list_insert", NULL != p, "insert NULL into list\n");
 
 	struct proc *tmp = *head;
@@ -92,7 +92,7 @@ static void proc_list_insert(struct proc **head, struct proc *p) {
 	p->prev = head;
 	p->next = NULL;
 }
-static void proc_list_remove(struct proc *p) {
+static void __proc_list_remove_no_lock(struct proc *p) {
 	__debug_assert("proc_list_remove", NULL != p, "remove NULL from list\n");
 
 	*(p->prev) = p->next;
@@ -104,18 +104,18 @@ static void proc_list_remove(struct proc *p) {
 
 #define __insert_runnable(priority, p) do {\
 	(p)->state = RUNNABLE; \
-	proc_list_insert(&(proc_runnable[priority]), p); \
+	__proc_list_insert_no_lock(&(proc_runnable[priority]), p); \
 } while (0)
 #define __insert_sleep(p) do {\
 	(p)->state = SLEEPING; \
-	proc_list_insert(&proc_sleep, p); \
+	__proc_list_insert_no_lock(&proc_sleep, p); \
 } while (0)
 #define __insert_zombie(p) do {\
 	(p)->state = ZOMBIE; \
-	proc_list_insert(&proc_zombie, p); \
+	__proc_list_insert_no_lock(&proc_zombie, p); \
 } while (0)
 #define __remove(p) \
-	proc_list_remove(p) 
+	__proc_list_remove_no_lock(p) 
 
 static void freeproc(struct proc *p) {
 	// file system fields were freed in exit() 
@@ -181,8 +181,8 @@ static struct proc *allocproc(void) {
 		return NULL;
 	}
 
-	// init lock here
-	initlock(&(p->lk), "proc");
+	// initlock 
+	initlock(&p->lk, "p->lk");
 
 	p->chan = NULL;
 	p->killed = 0;
@@ -229,13 +229,6 @@ int fork_cow(void) {
 		return -1;
 	}
 
-	// filesystem 
-	if (copyfdtable(&p->fds, &np->fds) < 0) {
-		freeproc(np);
-		return -1;
-	}
-	np->cwd = idup(p->cwd);
-
 	// copy parent's memory layout 
 	struct seg *seg;
 	struct seg **s2 = &(np->segment);
@@ -264,17 +257,26 @@ int fork_cow(void) {
 		*s2 = s;
 		s2 = &s->next;
 	}
-	
+
+	// filesystem 
+	if (copyfdtable(&p->fds, &np->fds) < 0) {
+		freeproc(np);
+		return -1;
+	}
+	np->cwd = idup(p->cwd);
+
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);
 	np->trapframe->a0 = 0;
 
 	// parenting 
-	acquire(&p->lk);	// enter cs p 
 	np->parent = p;
-	np->sibling = p->child;
+	np->sibling_prev = &(p->child);
+	np->sibling_next = p->child;
+	if (NULL != p->child) {
+		p->child->sibling_prev = &(np->sibling_next);
+	}
 	p->child = np;
-	release(&p->lk);	// leave cs p 
 
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
@@ -311,14 +313,6 @@ int clone(uint64 flag, uint64 stack) {
 		return -1;
 	}
 
-	// these parts may be improved later 
-	// filesystem 
-	if (copyfdtable(&p->fds, &np->fds) < 0) {
-		freeproc(np);
-		return -1;
-	}
-	np->cwd = idup(p->cwd);
-
 	// copy parent's memory layout 
 	struct seg *seg;
 	struct seg **s2 = &(np->segment);
@@ -348,17 +342,27 @@ int clone(uint64 flag, uint64 stack) {
 		s2 = &s->next;
 	}
 	
+	// these parts may be improved later 
+	// filesystem 
+	if (copyfdtable(&p->fds, &np->fds) < 0) {
+		freeproc(np);
+		return -1;
+	}
+
+	np->cwd = idup(p->cwd);
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);
 	np->trapframe->a0 = 0;
 	np->trapframe->sp = stack;
 
 	// parenting 
-	acquire(&p->lk);	// enter cs p 
 	np->parent = p;
-	np->sibling = p->child;
+	np->sibling_prev = &(np->child);
+	np->sibling_next = p->child;
+	if (NULL != p->child) {
+		p->child->sibling_prev = &(np->sibling_next);
+	}
 	p->child = np;
-	release(&p->lk);	// leave cs p 
 
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
@@ -378,6 +382,25 @@ int clone(uint64 flag, uint64 stack) {
 	return pid;
 }
 
+static void __wakeup_no_lock(void *chan) {
+	struct proc *p = proc_sleep;
+	while (NULL != p) {
+		struct proc *next = p->next;
+		if ((uint64)chan == (uint64)p->chan) {
+			__remove(p);
+			p->timer = TIMER_IRQ;
+			__insert_runnable(PRIORITY_IRQ, p);
+		}
+		p = next;
+	}
+}
+
+void wakeup(void *chan) {
+	__enter_proc_cs 
+	__wakeup_no_lock(chan);
+	__leave_proc_cs 
+}
+
 void exit(int xstate) {
 	struct proc *p = myproc();
 
@@ -390,50 +413,31 @@ void exit(int xstate) {
 	dropfdtable(&p->fds);
 	iput(p->cwd);
 
+	// DO NOT REMOVE ITSELF FROM PARENT'S CHILD LIST!
+	// IN CASE THAT PARENT WAS KILLED BEFORE ABLE TO WAIT 
+
 	// write in xstate 
-	acquire(&p->lk);
 	p->xstate = xstate;
-	release(&p->lk);
-
-	// remove itself from parent's child list 
-	// concurrency safety of sibling list is protected by p->parent->lk 
-	extern struct proc *__initproc;
-	if (__initproc != p->parent) {
-		acquire(&(p->parent->lk));	// enter cs p->parent 
-		if (p->parent->child == p) {
-			p->parent->child = p->sibling;
-		}
-		else {
-			struct proc *tmp = p->parent->child;
-			while (tmp && tmp->sibling != p) {
-				tmp = tmp->sibling;
-			}
-			__debug_assert("exit", NULL != tmp, "p is not in child list\n");
-
-			tmp->sibling = p->sibling;
-		}
-		release(&(p->parent->lk));	// leave cs p->parent 
-	}
 
 	// re-parent all it's child to `__initproc`
-	acquire(&p->lk);	// enter cs p 
 	struct proc *tmp = p->child;
 	while (NULL != tmp) {
-		extern struct proc *__initproc;
+		__debug_assert("exit", tmp != tmp->sibling_next, "dead loop\n");
 		tmp->parent = __initproc;	// re-parent to init 
-		tmp = tmp->sibling;
+		tmp = tmp->sibling_next;
 	}
-	release(&p->lk);	// leave cs p 
-
-	// p is freed from parent's child list, no long 
-	// needs lock for protection 
-	wakeup(p->parent);
+	__debug_info("exit", "leave\n");
 
 	// jump into scheduler 
 	__enter_proc_cs 
 
 	__remove(p);		// remove p from its list 
 	__insert_zombie(p);	// re-insert p into `proc_zombie`
+
+	// wakeup parent after the proc is inserted into zombie list 
+	__wakeup_no_lock(p->parent);
+	// wakeup __initproc means no bad 
+	__wakeup_no_lock(__initproc);
 
 	sched();
 	__debug_error("exit", "zombie exit\n");
@@ -443,7 +447,7 @@ void exit(int xstate) {
 #define WAIT_OPTIONS_WNOHANG 		1
 #define WAIT_OPTIONS_WUNTRACED 		2
 #define WAIT_OPTIONS_WCONTINUED 	8
-static inline int __find_child_no_lock(int pid, struct proc *p, struct proc *np) {
+static inline int __is_child_no_lock(int pid, struct proc *p, struct proc *np) {
 	if (-1 == pid) {
 		return p == np->parent;
 	}
@@ -460,9 +464,14 @@ int wait4(int pid, uint64 status, uint64 options) {
 	while(1) {
 		np = proc_zombie;
 		while (NULL != np) {
-			if (__find_child_no_lock(pid, p, np)) {
+			if (__is_child_no_lock(pid, p, np)) {
 				// find one 
 				int child_pid = np->pid;
+				// remove child from parent's child list 
+				*(np->sibling_prev) = np->sibling_next;
+				if (NULL != np->sibling_next) 
+					np->sibling_next->sibling_prev = np->sibling_prev;
+				// copyout child's xstate 
 				if (status && copyout2(status, (char*)&np->xstate, sizeof(np->xstate))) {
 					__leave_proc_cs 
 					__debug_error("wait", "fail to copy out xstate\n");
@@ -484,7 +493,7 @@ int wait4(int pid, uint64 status, uint64 options) {
 		for (int i = 0; i < PRIORITY_NUMBER; i ++) {
 			np = proc_runnable[i];
 			while (NULL != np) {
-				if (__find_child_no_lock(pid, p, np)) {
+				if (__is_child_no_lock(pid, p, np)) {
 					has_child = 1;
 					goto end_search;
 				}
@@ -494,7 +503,7 @@ int wait4(int pid, uint64 status, uint64 options) {
 		// search sleeping list 
 		np = proc_sleep;
 		while (NULL != np) {
-			if (__find_child_no_lock(pid, p, np)) {
+			if (__is_child_no_lock(pid, p, np)) {
 				has_child = 1;
 				goto end_search;
 			}
@@ -516,6 +525,7 @@ int wait4(int pid, uint64 status, uint64 options) {
 		}
 	}
 }
+
 
 void proc_tick(void) {
 	__enter_proc_cs 
@@ -549,9 +559,7 @@ int kill(int pid) {
 		while (NULL != tmp) {
 			if (pid == tmp->pid) {
 				// found 
-				//acquire(&tmp->lk);
 				tmp->killed = 1;
-				//release(&tmp->lk);
 				__leave_proc_cs 
 				__debug_info("kill", "leave runnable\n");
 				return 0;
@@ -566,9 +574,7 @@ int kill(int pid) {
 	while (NULL != tmp) {
 		if (pid == tmp->pid) {
 			// found 
-			//acquire(&tmp->lk);
 			tmp->killed = 1;
-			//release(&tmp->lk);
 			// wakeup the proc 
 			__remove(tmp);
 			tmp->timer = TIMER_IRQ;
@@ -612,6 +618,7 @@ void sleep(void *chan, struct spinlock *lk) {
 	__debug_assert("sleep", NULL != p, "p == NULL\n");
 	__debug_assert("sleep", NULL != lk, "lk == NULL\n");
 
+	__debug_info("sleep", "enter\n");
 	// either proc_lock or lk must be held at any time, 
 	// so that proc would sleep atomically 
 	if (&proc_lock != lk) {
@@ -630,23 +637,6 @@ void sleep(void *chan, struct spinlock *lk) {
 	// with another call to sleep() with the same lk
 	__leave_proc_cs 
 	acquire(lk);
-}
-
-void wakeup(void *chan) {
-	__enter_proc_cs 
-
-	struct proc *p = proc_sleep;
-	while (NULL != p) {
-		struct proc *next = p->next;
-		if ((uint64)chan == (uint64)p->chan) {
-			__remove(p);
-			p->timer = TIMER_IRQ;
-			__insert_runnable(PRIORITY_IRQ, p);
-		}
-		p = next;
-	}
-
-	__leave_proc_cs 
 }
 
 // get the next runnable proc 
@@ -785,6 +775,10 @@ void userinit(void) {
 	first = 1;
 	__initproc = p;
 
+	p->parent = NULL;
+	p->sibling_prev = NULL;
+	p->sibling_next = NULL;
+
 	// allocate one user page and copy init's instruction 
 	// and data into it 
 	uvminit(p->pagetable, initcode, sizeof(initcode));
@@ -879,7 +873,7 @@ static inline char const *__state_to_str(enum procstate state) {
 	}
 }
 
-static void __print_list(struct proc *list) {
+static void __print_list_no_lock(struct proc *list) {
 	while (list) {
 		uint64 load = 0, heap = 0;
 		for (struct seg *s = list->segment; s != NULL; s = s->next) {
@@ -902,19 +896,20 @@ static void __print_list(struct proc *list) {
 
 // print current processes to console 
 void procdump(void) {
+	printf("epc = %p\n", r_sepc());
 	printf("\nPID\tSTATE\tKILLED\tNAME\tMEM_LOAD\tMEM_HEAP\n");
 	__enter_proc_cs 
 
 	// display runnable 
 	for (int i = 0; i < PRIORITY_NUMBER; i ++) {
-		__print_list(proc_runnable[i]);
+		__print_list_no_lock(proc_runnable[i]);
 	}
 
 	// display sleeping 
-	__print_list(proc_sleep);
+	__print_list_no_lock(proc_sleep);
 
 	// display zombie 
-	__print_list(proc_zombie);
+	__print_list_no_lock(proc_zombie);
 
 	__leave_proc_cs 
 }
