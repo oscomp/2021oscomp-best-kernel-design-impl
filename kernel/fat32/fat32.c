@@ -137,7 +137,7 @@ int8 fat32_read_test(const char *filename)
         p++; return 1;
     }
 
-    printk_port("filename: ;%s;\n\r", p->filename);
+    printk_port("filename: ;%s;\n", p->filename);
     // printk_port("strings: %s %s\n", accept_table[0], accept_table[1]);
     // printk_port("len: %d %d\n", strlen(accept_table[0]), strlen(accept_table[1]));
     // printk_port("I'm here, now %d\n", memcmp(p->filename, accept_table[1], strlen(accept_table[1])));
@@ -154,16 +154,16 @@ int8 fat32_read_test(const char *filename)
         }
     }
     if (0 == found){
-        // printk_port("Not match\n");
-        // printk_port("filename :%s\n\r", p->filename);
+        printk_port("Not match\n");
+        printk_port("filename :%s\n", p->filename);
         // printk_port("table :%s, %s", accept_table[0],accept_table[1]);
         p++;
         return 1;
     }
     // printk_port("filename: ;%s;\n\r", p->filename);
 
-    // printk("HI: %x\n", p->HI_clusnum);
-    // printk("LO: %x\n", p->LO_clusnum);
+    printk("HI: %x\n", p->HI_clusnum);
+    printk("LO: %x\n", p->LO_clusnum);
     // printk("Clusnum: %d %x\n", get_cluster_from_dentry(p), get_cluster_from_dentry(p));
 
     /* Now we must read file */
