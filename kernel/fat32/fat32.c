@@ -84,13 +84,16 @@ int8 fat32_read_test(const char *filename)
     // }
     static uint32 cnt = 0;
     printk_port("read %d\n", cnt++);
-
-    // busy
-    for (int i = 1; i < NUM_MAX_TASK; ++i)
-    {
-        if (pcb[i].status != TASK_EXITED)
-            return -1;
+    if (cnt > 32){
+        printk_port("???\n");
+        return 1;
     }
+    // busy
+    // for (int i = 1; i < NUM_MAX_TASK; ++i)
+    // {
+    //     if (pcb[i].status != TASK_EXITED)
+    //         return -1;
+    // }
 
     uchar *_elf_binary;
     uint32_t length;
@@ -98,6 +101,12 @@ int8 fat32_read_test(const char *filename)
 #ifdef K210
 
     static dentry_t *p = (dentry_t *)buf;
+    printk_port("filename: aa;%s;\n", p->filename);
+    printk_port("extname: ;%s;\n", p->extname);
+    printk_port("attribute: ;%x;\n", p->attribute);
+    printk_port("length: ;%d;\n", p->length);
+    p++;
+    return 1;
     // 0x0f: long dentry
     while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
         printk_port("<cause 3>\n");
