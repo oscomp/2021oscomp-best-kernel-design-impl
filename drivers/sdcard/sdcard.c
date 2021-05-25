@@ -372,14 +372,17 @@ uint8 sd_init(void)
 	uint8 frame[10], index, result;
 	/*!< Initialize SD_SPI */
 	sd_lowlevel_init(0);
+	while(1) printk("111\n");
 	/*!< SD chip select high */
 	SD_CS_HIGH();
+	while(1) printk("222\n");
 	/*!< Send dummy byte 0xFF, 10 times with CS high */
 	/*!< Rise CS and MOSI for 80 clocks cycles */
 	/*!< Send dummy byte 0xFF */
 	for (index = 0; index < 10; index++)
 		frame[index] = 0xFF;
 	sd_write_data(frame, 10);
+	while(1) printk("333\n");
 	/*------------Put SD in SPI mode--------------*/
 	/*!< SD initialized and set to SPI mode properly */
     index = 0xFF;
