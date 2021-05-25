@@ -53,6 +53,8 @@ uint8_t fat32_init()
     printk("> [FAT32 init] fat_hid: %d\n", fat.bpb.hidd_sec);
 
     /* read root dir and store it for now*/
+    cwd = fat.bpb.root_clus;
+    strcpy(cwd_path, "/");
     uint32_t root_sec = first_sec_of_clus(fat.bpb.root_clus);
     sd_read_sector(buf, root_sec, READ_PAGE_CNT);
     // printk("root_sec: %d\n\r", root_sec);
@@ -98,7 +100,7 @@ int8 fat32_read_test(const char *filename)
     static dentry_t *p = (dentry_t *)buf;
     // 0x0f: long dentry
     while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
-        // prints("<cause 3>\n");
+        printk_port("<cause 3>\n");
         p++;
     }
     /* now we are at a real dentry */
@@ -113,7 +115,7 @@ int8 fat32_read_test(const char *filename)
             break;
     }
     if (index == 32){
-        // prints("<return>");
+        printk_port("<return>");
         p++;
         return 0;
     }
@@ -258,6 +260,8 @@ size_t fat32_write(uint32 fd, uchar *buff, uint64_t count)
     }
 
 }
+
+/* go to child directory */
 
 uint32_t get_next_cluster(uint32_t cluster)
 {
