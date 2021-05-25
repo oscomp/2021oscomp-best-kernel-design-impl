@@ -57,7 +57,7 @@ uint8_t fat32_init()
     strcpy(cwd_path, "/");
     uint32_t root_sec = first_sec_of_clus(fat.bpb.root_clus);
     sd_read_sector(buf, root_sec, 1);
-    sd_read_sector(buf + 512, root_sec, 2);
+    sd_read_sector(buf + 512, root_sec + 1, 1);
     // printk("root_sec: %d\n\r", root_sec);
     // fat32_read(NULL);
     // printk("success");
