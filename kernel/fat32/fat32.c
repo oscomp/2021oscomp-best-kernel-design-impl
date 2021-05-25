@@ -80,8 +80,8 @@ int8 fat32_read_test(const char *filename)
     // {
     //     ;
     // }
-    // static uint32 cnt = 0;
-    // printk_port("read %d\n", cnt++);
+    static uint32 cnt = 0;
+    printk_port("read %d\n", cnt++);
 
     // busy
     for (int i = 1; i < NUM_MAX_TASK; ++i)
@@ -118,27 +118,27 @@ int8 fat32_read_test(const char *filename)
         return 0;
     }
 
-    // printk_port("filename: ;%s;\n\r", p->filename);
-    // printk_port("extname: ;%s;\n", p->extname);
-    // printk_port("attribute: ;%x;\n", p->attribute);
-    // printk_port("length: ;%d;\n\r", p->length);
+    printk_port("filename: ;%s;\n\r", p->filename);
+    printk_port("extname: ;%s;\n", p->extname);
+    printk_port("attribute: ;%x;\n", p->attribute);
+    printk_port("length: ;%d;\n\r", p->length);
 
     // no length or deleted
     if (p->length == 0) {
-        // printk_port("<cause 1>\n");
+        printk_port("<cause 1>\n");
         p++; 
         return 1;
     }
     // not rw-able
     if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
-        // printk_port("<cause 2>\n");
+        printk_port("<cause 2>\n");
         p++; return 1;
     }
 
-    // printk_port("filename: ;%s;\n\r", p->filename);
-    // printk_port("strings: %s %s\n", accept_table[0], accept_table[1]);
-    // printk_port("len: %d %d\n", strlen(accept_table[0]), strlen(accept_table[1]));
-    // printk_port("I'm here, now %d\n", memcmp(p->filename, accept_table[1], strlen(accept_table[1])));
+    printk_port("filename: ;%s;\n\r", p->filename);
+    printk_port("strings: %s %s\n", accept_table[0], accept_table[1]);
+    printk_port("len: %d %d\n", strlen(accept_table[0]), strlen(accept_table[1]));
+    printk_port("I'm here, now %d\n", memcmp(p->filename, accept_table[1], strlen(accept_table[1])));
 
     /* debug return */
     uint8 i;
