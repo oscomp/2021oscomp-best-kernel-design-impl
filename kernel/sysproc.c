@@ -71,11 +71,9 @@ sys_getppid(void) {
 	struct proc *p = myproc();
 	int pid;
 
-	acquire(&p->parent->lk);
 	__debug_assert("sys_getppid", NULL != p->parent, 
 			"NULL == p->parent\n");
 	pid = p->parent->pid;
-	release(&p->parent->lk);
 
 	return pid;
 }

@@ -38,7 +38,7 @@
 #define EXCP_LOAD_PAGE    0xd // 13
 #define EXCP_STORE_PAGE   0xf // 15
 
-#ifdef QEMU 
+#ifndef QEMU 
 	#define is_page_fault(scause) \
 		(EXCP_LOAD_ACCESS == (scause) || EXCP_STORE_ACCESS == (scause)) 
 #else 

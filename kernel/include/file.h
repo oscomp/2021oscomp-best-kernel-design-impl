@@ -1,11 +1,13 @@
 #ifndef __FILE_H
 #define __FILE_H
 
+#include "spinlock.h"
 #include "param.h"
 
 // struct file中已经添加成员mmap_ph_addr，但是还未考虑初始化其为NULL
 // TODO: 新建文件描述符时初始化mmap_ph_addr为NULL
 struct file {
+  struct spinlock lock;
   enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
   int ref; // reference count
   uint64 mmap_ph_addr;
