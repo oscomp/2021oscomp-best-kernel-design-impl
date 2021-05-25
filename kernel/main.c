@@ -71,8 +71,6 @@ main(unsigned long hartid, unsigned long dtb_pa)
   else
   {
     // hart 1
-	intr_off();
-	while (1);
     while (started == 0)
       ;
     __sync_synchronize();

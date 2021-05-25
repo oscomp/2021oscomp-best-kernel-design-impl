@@ -52,6 +52,7 @@ filealloc(void)
   if (f == NULL) {
     return NULL;
   }
+  initlock(&f->lock, "f->lock");
 
   f->ref = 1;
   return f;
@@ -77,11 +78,11 @@ filealloc(void)
 struct file*
 filedup(struct file *f)
 {
-  // acquire(&ftable.lock);
+  acquire(&f->lock);
   if(f->ref < 1)
     panic("filedup");
   f->ref++;
-  // release(&ftable.lock);
+  release(&f->lock);
   return f;
 }
 
@@ -91,11 +92,11 @@ fileclose(struct file *f)
 {
   // struct file ff;
 
-  // acquire(&ftable.lock);
+   acquire(&f->lock);
   if(f->ref < 1)
     panic("fileclose");
   if(--f->ref > 0){
-    // release(&ftable.lock);
+	 release(&f->lock);
     return;
   }
   // ff = *f;
@@ -103,6 +104,8 @@ fileclose(struct file *f)
   // f->type = FD_NONE;
   // release(&ftable.lock);
 
+  // NOT SURE HERE!
+  release(&f->lock);
   if(f->type == FD_PIPE){
     pipeclose(f->pipe, f->writable);
   } else if (f->type == FD_INODE) {
