@@ -78,7 +78,6 @@ extern fat_t fat;
 int8 fat32_read_test(const char *filename);
 size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
 
-uint32_t get_next_cluster(uint32_t cluster);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -101,4 +100,13 @@ static inline uint32 get_cluster_from_dentry(dentry_t *p)
 static inline uint32 fat_offset_of_clus(uint32 cluster)
 {
     return ((cluster) * 4) % fat.bpb.byts_per_sec;
+}
+
+static inline uint32_t get_next_cluster(uint32_t cluster)
+{
+    uchar buf2[fat.bpb.byts_per_sec];
+    // printk("cluster is %d, fatsec is %d\n",cluster, fat_sec_of_clus(cluster));
+    sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
+    // printk("offset: %x\n", fat_offset_of_clus(cluster));
+    return (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
 }

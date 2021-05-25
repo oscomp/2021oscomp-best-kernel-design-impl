@@ -8,10 +8,18 @@
 #include <user_programs.h>
 #include <os/sched.h>
 
+#define max(x,y) (((x) > (y)) ? (x) : (y))
+#define min(x,y) (((x) > (y)) ? (y) : (x))
+
+#define BUFSIZE (min(NORMAL_PAGE_SIZE, CLUSTER_SIZE))
+#define READ_BUF_CNT (BUFSIZE/SECTOR_SIZE)
+
 fat_t fat;
 uchar buf[NORMAL_PAGE_SIZE];
 uchar filebuf[NORMAL_PAGE_SIZE];
-ientry_t cwd;
+ientry_t cwd_first_clus;
+ientry_t cwd_clus;
+ientry_t cwd_sec;
 uchar cwd_path[MAX_PATHLEN];
 fd_t fd[NUM_FD];
 
@@ -20,6 +28,35 @@ uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 #define ACCEPT_NUM  2
 uchar accept_table[2][10] = {{"GETPID"}, {"UNAME"}};
+
+void sd_read(char *buf, uint32_t sec)
+{
+    sd_read_sector(buf, sec, READ_BUF_CNT);
+}
+
+void sd_write(char *buf, uint32_t sec)
+{
+    sd_write_sector(buf, sec, READ_BUF_CNT);
+}
+
+dentry_t *get_next_dentry(dentry_t *p)
+{
+    p++;
+    if ((uintptr_t)p - (uintptr_t)buf == BUFSIZE){
+        // read another
+        if ((uintptr_t)p - (uintptr_t)buf == CLUSTER_SIZE){
+            cwd_clus = get_next_cluster(cwd_clus); //another cluster
+            cwd_sec = first_sec_of_clus(cwd_clus);
+            sd_read(buf, cwd_sec);
+        }
+        else{
+            cwd_sec += BUFSIZE / SECTOR_SIZE; // same cluster
+            sd_read(buf, cwd_sec);
+        }
+        p = buf;
+    }
+    return p;
+}
 
 uint8_t fat32_init()
 {
@@ -53,11 +90,11 @@ uint8_t fat32_init()
     printk("> [FAT32 init] fat_hid: %d\n", fat.bpb.hidd_sec);
 
     /* read root dir and store it for now*/
-    cwd = fat.bpb.root_clus;
+    cwd_clus = fat.bpb.root_clus;
     strcpy(cwd_path, "/");
-    uint32_t root_sec = first_sec_of_clus(fat.bpb.root_clus);
-    // sd_read_sector(buf, root_sec, 1);
-    sd_read_sector(buf, root_sec + 1, 1);
+    cwd_sec = first_sec_of_clus(fat.bpb.root_clus);
+    /* from root sector read buffsize */
+    sd_read_sector(buf, cwd_sec, READ_BUF_CNT);
     // printk("root_sec: %d\n\r", root_sec);
     // fat32_read(NULL);
     // printk("success");
@@ -89,12 +126,13 @@ int8 fat32_read_test(const char *filename)
         printk_port("???\n");
         assert(0);
     }
-    // busy
-    // for (int i = 1; i < NUM_MAX_TASK; ++i)
-    // {
-    //     if (pcb[i].status != TASK_EXITED)
-    //         return -1;
-    // }
+
+    /* busy */
+    for (int i = 1; i < NUM_MAX_TASK; ++i)
+    {
+        if (pcb[i].status != TASK_EXITED)
+            return -1;
+    }
 
     uchar *_elf_binary;
     uint32_t length;
@@ -106,12 +144,12 @@ int8 fat32_read_test(const char *filename)
     printk_port("extname: ;%s;\n", p->extname);
     printk_port("attribute: ;%x;\n", p->attribute);
     printk_port("length: ;%d;\n", p->length);
-    p++;
+    p = get_next_dentry(p);
     return 1;
     // 0x0f: long dentry
     while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
-        printk_port("<cause 3>\n");
-        p++;
+        // printk_port("<cause 3>\n");
+        p = get_next_dentry(p);
     }
     /* now we are at a real dentry */
 
@@ -125,55 +163,52 @@ int8 fat32_read_test(const char *filename)
             break;
     }
     if (index == 32){
-        printk_port("<return>");
-        p++;
+        // printk_port("<return>");
         return 0;
     }
 
-    printk_port("filename: aa;%s;\n", p->filename);
-    printk_port("extname: ;%s;\n", p->extname);
-    printk_port("attribute: ;%x;\n", p->attribute);
-    printk_port("length: ;%d;\n", p->length);
+    // printk_port("filename: aa;%s;\n", p->filename);
+    // printk_port("extname: ;%s;\n", p->extname);
+    // printk_port("attribute: ;%x;\n", p->attribute);
+    // printk_port("length: ;%d;\n", p->length);
 
     // no length or deleted
     if (p->length == 0) {
-        printk_port("<cause 1>\n");
-        p++; 
+        // printk_port("<cause 1>\n");
+        p = get_next_dentry(p); 
         return 1;
     }
     // not rw-able
     if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
-        printk_port("<cause 2>\n");
-        p++; return 1;
+        // printk_port("<cause 2>\n");
+        p = get_next_dentry(p); return 1;
     }
 
-    printk_port("filename: bb;%s;\n", p->filename);
+    // printk_port("filename: bb;%s;\n", p->filename);
     // printk_port("strings: %s %s\n", accept_table[0], accept_table[1]);
     // printk_port("len: %d %d\n", strlen(accept_table[0]), strlen(accept_table[1]));
     // printk_port("I'm here, now %d\n", memcmp(p->filename, accept_table[1], strlen(accept_table[1])));
 
     /* debug return */
     uint8 i;
-    uint8 found = 0;
     for (i = 0; i < ACCEPT_NUM; ++i)
     {
         uint8 num = (strlen(accept_table[i]) > 6)? 6 : strlen(accept_table[i]);
         if (!memcmp(p->filename, accept_table[i], num)){
-            found = 1;
             break;
         }
     }
-    if (0 == found){
-        printk_port("Not match\n");
-        printk_port("filename :%s\n", p->filename);
+    if (i == ACCEPT_NUM){
+        // printk_port("Not match\n");
+        // printk_port("filename :%s\n", p->filename);
         // printk_port("table :%s, %s", accept_table[0],accept_table[1]);
-        p++;
+        p = get_next_dentry(p);
         return 1;
     }
     // printk_port("filename: ;%s;\n\r", p->filename);
 
-    printk("HI: %x\n", p->HI_clusnum);
-    printk("LO: %x\n", p->LO_clusnum);
+    // printk("HI: %x\n", p->HI_clusnum);
+    // printk("LO: %x\n", p->LO_clusnum);
     // printk("Clusnum: %d %x\n", get_cluster_from_dentry(p), get_cluster_from_dentry(p));
 
     /* Now we must read file */
@@ -183,19 +218,22 @@ int8 fat32_read_test(const char *filename)
     uint32_t sec = first_sec_of_clus(cluster); // make sure you know the start addr
     uchar *file = allocproc(); // make sure space is enough
     uchar *temp = file; // for future use
-    for (uint32_t i = 0; i < p->length; i += CLUSTER_SIZE)
+    for (uint32_t i = 0; i < p->length; )
     {
         // 1. read 1 cluster
-        for (uint8 j = 0; j < READ_CLUS_CNT; ++j)
-        {
-            sd_read_sector(temp, sec + j, 1);
-            temp += fat.bpb.byts_per_sec; // make sure continous
+        sd_read(temp, sec);
+        i += BUFSIZE;
+        temp += BUFSIZE;
+        // 2. compute sec number of next buf-size datablock
+        if (i % CLUSTER_SIZE == 0){
+            cluster = get_next_cluster(cluster);
+            sec = first_sec_of_clus(cluster);
         }
-        // 2. compute sec number of next cluster
-        cluster = get_next_cluster(cluster);
-        sec = first_sec_of_clus(cluster);
+        else
+            sec += READ_BUF_CNT;
     }
 
+    /* set elf_binary and length */
     _elf_binary = file;
     length = p->length;
 
@@ -244,7 +282,7 @@ int8 fat32_read_test(const char *filename)
             #ifdef K210
             // free resource
             allocfree();
-            p++;
+            p = get_next_dentry(p);
             #endif
 
             return -1;
@@ -273,11 +311,3 @@ size_t fat32_write(uint32 fd, uchar *buff, uint64_t count)
 
 /* go to child directory */
 
-uint32_t get_next_cluster(uint32_t cluster)
-{
-    uchar buf2[fat.bpb.byts_per_sec];
-    // printk("cluster is %d, fatsec is %d\n",cluster, fat_sec_of_clus(cluster));
-    sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
-    // printk("offset: %x\n", fat_offset_of_clus(cluster));
-    return (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
-}
