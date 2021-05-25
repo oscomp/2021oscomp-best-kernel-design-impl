@@ -8,5 +8,6 @@ int printk(const char *fmt, ...);
 int vprintk(const char *fmt, va_list va);
 int prints(const char *fmt, ...);
 int vprints(const char *fmt, va_list va);
+uint32_t printk_port(const char *fmt, ...);
 
 #endif

@@ -20,6 +20,10 @@ typedef struct fat{
 
 }fat_t;
 
+/* first cluster numer of cwd */
+typedef uint32_t ientry_t;
+
+/* directory entry */
 typedef struct dentry{
 
     uchar filename[8];  //7:0
@@ -38,6 +42,19 @@ typedef struct dentry{
 
 }dentry_t;
 
+/* file discriptor */
+#define O_RDONLY 1 /* read only open */
+#define O_WRONLY 2 /* write only open */
+#define O_RDWR 3 /* read/write open */
+typedef struct fd{
+    uint32 first_clus_num;
+    uint8 privilege;
+    uint64 pos;
+    uint8 used;
+}fd_t;
+#define NUM_FD 16
+extern fd_t fd[NUM_FD];
+
 #define SECTOR_SIZE (fat.bpb.byts_per_sec)
 #define CLUSTER_SIZE (fat.byts_per_clus)
 #define READ_PAGE_CNT (NORMAL_PAGE_SIZE/fat.bpb.byts_per_sec)
@@ -51,9 +68,16 @@ typedef struct dentry{
 #define FILE_ATTRIBUTE_CHDIR 0x10
 #define FILE_ATTRIBUTE_GDIR 0x20
 
+#define stdout 1
+
+#define MAX_PATHLEN 60
+
+
 extern fat_t fat;
 
-int8 fat32_read(const char *filename);
+int8 fat32_read_test(const char *filename);
+size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
+
 uint32_t get_next_cluster(uint32_t cluster);
 
 /* get the first sector num of this cluster */

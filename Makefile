@@ -40,16 +40,19 @@ SRC_FS		= ./kernel/fs/fs.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_FAT32	= ./kernel/fat32/fat32.c
+SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
 SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S ./tiny_libc/time.c
 SRC_LIBC_ASM	= $(filter %.S %.s,$(SRC_LIBC))
 SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
-SRC_USER	= ./test/shell.c ./test/loop.c
+SRC_USER	= ./test/shell.c
+
+TEST_ELF	= shell.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_SDCARD} ${SRC_FS} ${SRC_FAT32}
+				${SRC_SDCARD} ${SRC_FS} ${SRC_FAT32} ${SRC_UNAME}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c
@@ -58,7 +61,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker-k210.ld
 
-K210_SERIALPORT	= /dev/ttyUSB0
+K210_SERIALPORT	= /dev/ttyUSB1
 
 .PHONY:all
 
@@ -105,7 +108,7 @@ asm:
 	${OBJDUMP} -d main > txt/kernel.txt
 	${OBJDUMP} -d head > txt/head.txt
 	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
-	${OBJDUMP} -d ./test/shell.elf > txt/shell.txt
+	for testelf in $(TEST_ELF); do ${OBJDUMP} -d ./test/$$testelf > txt/$${testelf/.elf/.txt}; done
 
 qemu_head: createimage ${SRC_HEAD}
 	${CC} ${CFLAGS} -o head_qemu $(SRC_HEAD) -Ttext=${START_QEMU_ENTRY}	
@@ -114,8 +117,8 @@ qemu_head: createimage ${SRC_HEAD}
 user: elf2char generateMapping
 	echo "" > user_programs.c
 	echo "" > user_programs.h
-	for prog in $(SRC_USER); do ./elf2char --header-only $${prog/.c/.elf} >> user_programs.h; done
-	for prog in $(SRC_USER); do ./elf2char $${prog/.c/.elf} >> user_programs.c; done
+	for prog in $(TEST_ELF); do ./elf2char --header-only ./test/$$prog >> user_programs.h; done
+	for prog in $(TEST_ELF); do ./elf2char ./test/$$prog >> user_programs.c; done
 	./generateMapping user_programs
 	mv user_programs.h include/
 	mv user_programs.c kernel/

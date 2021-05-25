@@ -22,7 +22,9 @@ void reset_irq_timer()
 {
     // TODO clock interrupt handler.
     // TODO: call following functions when task4
+    #ifndef K210
     screen_reflush();
+    #endif
     timer_check();
 
     // note: use sbi_set_timer
@@ -66,9 +68,14 @@ void init_exception()
     exc_table[EXCC_SYSCALL] = &handle_syscall;
     exc_table[EXCC_INST_MISALIGNED] = &handle_other; 
     exc_table[EXCC_INST_ACCESS] = &handle_other;
-    exc_table[EXCC_BREAKPOINT] = &handle_other;  
+    exc_table[EXCC_BREAKPOINT] = &handle_other;
+    #ifdef K210  
+    exc_table[EXCC_LOAD_ACCESS] = &handle_pgfault;
+    exc_table[EXCC_STORE_ACCESS] = &handle_pgfault; 
+    #else
     exc_table[EXCC_LOAD_ACCESS] = &handle_other;
     exc_table[EXCC_STORE_ACCESS] = &handle_other; 
+    #endif
     exc_table[EXCC_INST_PAGE_FAULT] = &handle_pgfault; 
     exc_table[EXCC_LOAD_PAGE_FAULT] = &handle_pgfault;   
     exc_table[EXCC_STORE_PAGE_FAULT] = &handle_pgfault;
@@ -105,7 +112,14 @@ void handle_sext(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
 
 void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
 {
-    if (stval >= 0xffffffff00000000lu)
+    // for (uint32 i = 0; i < 30000000; ++i)
+    // {
+    //     printk_port("stval: %lx\n", regs->sbadaddr);
+    //     printk_port("scause: %lx\n", regs->scause);
+    //     printk_port("sepc: %lx\n", regs->sepc);
+    //     printk_port("ra: %lx", regs->regs[1]);
+    // }
+    if (stval >= 0xffffffff00000000lu || stval < 0x1000)
         handle_other(regs,stval,cause);
     uint64_t satp = read_satp();
     uint64_t va = stval;
@@ -165,12 +179,16 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
             }
         }
         set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
+        #ifndef K210
         switch(cause){
             case 12: set_attribute(ptr,_PAGE_EXEC);break;
             case 13: set_attribute(ptr,_PAGE_READ|_PAGE_WRITE);break;
             case 15: set_attribute(ptr,_PAGE_READ|_PAGE_WRITE);break;
             default: printk("page fault handler error!\n");break;
         }
+        #else
+            set_attribute(ptr,_PAGE_READ|_PAGE_WRITE|_PAGE_ACCESSED|_PAGE_DIRTY);
+        #endif
     }
     else if (cause == 15 && !get_attribute(*ptr,_PAGE_WRITE))
     {

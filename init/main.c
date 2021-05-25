@@ -43,6 +43,7 @@
 #include <user_programs.h>
 #include <buf.h>
 #include <os/fat32.h>
+#include <os/uname.h>
 
 #include <csr.h>
 #include <asm.h>
@@ -112,6 +113,7 @@ static void init_syscall(void)
     syscall[SYSCALL_FUTEX_WAIT] = &futex_wait;
     syscall[SYSCALL_FUTEX_WAKEUP] = &futex_wakeup;
 
+    /* for shell to use */
     syscall[SYSCALL_WRITE] = &screen_write;
     // syscall[SYSCALL_READ] = ???;
     syscall[SYSCALL_CURSOR] = &screen_move_cursor;
@@ -124,8 +126,10 @@ static void init_syscall(void)
     syscall[SYSCALL_TESTDISK] = &do_testdisk;
     syscall[SYSCALL_EXEC] = &do_exec;
 
-    syscall[SYSCALL_TEST] = &fat32_read;
+    syscall[SYS_write] = &fat32_write;
+    syscall[SYSCALL_TEST] = &fat32_read_test;
     syscall[SYS_getpid] = &do_getpid;
+    syscall[SYS_uname] = &do_uname;
 }
 
 // stop mapping boot_kernel

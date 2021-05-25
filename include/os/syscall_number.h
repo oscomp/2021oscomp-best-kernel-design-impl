@@ -89,8 +89,10 @@
 #define SYSCALL_TESTDISK 58
 #define SYSCALL_TEST 59
 
-#define SYS_exit 93
+#define SYS_write 64
 
+#define SYS_exit 93
+#define SYS_uname 160
 #define SYS_getpid 172
 
 #endif

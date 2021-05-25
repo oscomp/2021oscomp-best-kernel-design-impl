@@ -122,9 +122,10 @@ void do_scheduler(void)
     if (!current_running)
         current_running = &pid0_pcb;
     /* end schedule */
-
+    #ifndef K210
     vt100_move_cursor(current_running->cursor_x,
                       current_running->cursor_y);
+    #endif
     switch_to(previous_running,current_running);
 }
 

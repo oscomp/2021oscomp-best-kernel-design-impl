@@ -6,6 +6,7 @@
 #include <os/sched.h>
 #include <os/irq.h>
 #include <sbi.h>
+#include <pgtable.h>
 
 #define SCREEN_WIDTH    80
 #define SCREEN_HEIGHT   50
@@ -61,8 +62,10 @@ static void screen_write_ch(char ch)
 
 void init_screen(void)
 {
+    #ifndef K210
     vt100_hidden_cursor();
     vt100_clear();
+    #endif
 }
 
 void screen_clear(void)
@@ -77,7 +80,9 @@ void screen_clear(void)
     }
     current_running->cursor_x = 1;
     current_running->cursor_y = 1;
+    #ifndef K210
     screen_reflush();
+    #endif
 }
 
 void screen_move_cursor(int x, int y)
@@ -90,8 +95,8 @@ void screen_write(char *buff)
 {
     // static int32_t cnt = 0;
     // sbi_console_putchar('A'+ cnt % 10); cnt++;
-    int i = 0;
-    int l = strlen(buff);
+    uint32_t i = 0;
+    uint32_t l = strlen(buff);
 
     for (i = 0; i < l; i++)
     {
@@ -107,8 +112,8 @@ void screen_write(char *buff)
  */
 void screen_reflush(void)
 {
-    int i, j;
-    int prev_cursor_x = current_running->cursor_x, prev_cursor_y = current_running->cursor_y;
+    uint32_t i, j;
+    uint32_t prev_cursor_x = current_running->cursor_x, prev_cursor_y = current_running->cursor_y;
 
     /* here to reflush screen buffer to serial port */
     for (i = 0; i < SCREEN_HEIGHT; i++)

@@ -30,3 +30,8 @@ ENTRY(read_gp)
   mv a0, gp
   ret
 ENDPROC(read_gp)
+
+ENTRY(get_a2)
+  mv a0, a2
+  ret
+ENDPROC(get_a2)

@@ -312,3 +312,44 @@ int prints(const char *fmt, ...)
 
     return ret;
 }
+
+/* for port output, direct output */
+
+static int _vprintk_port(const char* fmt, va_list _va,
+                   void (*output)(char*))
+{
+    va_list va;
+    va_copy(va, _va);
+
+    int ret;
+    char buff[256];
+
+    ret = mini_vsnprintf(buff, 256, fmt, va);
+
+    buff[ret] = '\0';
+
+    disable_preempt();
+    port_write(buff);
+
+    enable_preempt();
+
+    return ret;
+}
+
+
+int vprintk_port(const char *fmt, va_list _va)
+{
+    return _vprintk_port(fmt, _va, port_write);
+}
+
+uint32_t printk_port(const char *fmt, ...)
+{
+    uint32_t ret = 0;
+    va_list va;
+
+    va_start(va, fmt);
+    ret = vprintk_port(fmt, va);
+    va_end(va);
+
+    return ret;
+}
