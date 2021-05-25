@@ -62,7 +62,7 @@ K210_SERIALPORT	= /dev/ttyUSB1
 
 .PHONY:all main bootblock clean
 
-all: elf k210 qemu asm# floppy
+all: elf# floppy
 
 k210: payload createimage image
 
