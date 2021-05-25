@@ -349,13 +349,18 @@ static uint8 sd_get_cidregister(SD_CID *SD_cid)
  */
 static uint8 sd_get_cardinfo(SD_CardInfo *cardinfo)
 {
-	if (sd_get_csdregister(&(cardinfo->SD_csd)))
+	if (sd_get_csdregister(&(cardinfo->SD_csd))){
+	    printk("12345\n"); while(1);
 		return 0xFF;
-	if (sd_get_cidregister(&(cardinfo->SD_cid)))
+	}
+	if (sd_get_cidregister(&(cardinfo->SD_cid))){
+	    printk("12346\n"); while(1);
 		return 0xFF;
+	}
 	cardinfo->CardCapacity = (cardinfo->SD_csd.DeviceSize + 1) * 1024;
 	cardinfo->CardBlockSize = 1 << (cardinfo->SD_csd.RdBlockLen);
 	cardinfo->CardCapacity *= cardinfo->CardBlockSize;
+	    printk("12347\n"); while(1);
 	/*!< Returns the reponse */
 	return 0;
 }
@@ -444,7 +449,6 @@ uint8 sd_init(void)
 	if ((frame[0] & 0x40) == 0)
 		return 0xFF;
 	SD_HIGH_SPEED_ENABLE();
-    printk("1234\n"); while(1);
 	return sd_get_cardinfo(&cardinfo);
 }
 
