@@ -115,6 +115,8 @@ int8 fat32_read(const char *filename)
 
     printk("filename: %s\n\r", p->filename);
     printk("length: %d\n\r", p->length);
+    p++;
+    
     return 1;
 
 #else

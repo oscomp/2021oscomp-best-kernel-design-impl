@@ -208,7 +208,6 @@ int main()
     // init screen (QAQ)
     init_screen();
     printk("> [INIT] SCREEN initialization succeeded.\n\r");
-    while(1);
     // Setup timer interrupt and enable all interrupt
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
     /* setup exception */
