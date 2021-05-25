@@ -142,6 +142,12 @@ uint64 sys_wait4(void) {
 	return ret;
 }
 
+// yield has no arg
+uint64 sys_sched_yield(void) {
+	yield();
+	return 0;
+}
+
 uint64
 sys_sbrk(void)
 {
@@ -222,6 +228,11 @@ sys_sleep(void)
     printf("pid %d: return from sleep(%d", p->pid, n);
   }
   return ret;
+}
+
+uint64 sys_nanosleep(void) {
+	printf("not implemented yet!\n");
+	return -1;
 }
 
 uint64
