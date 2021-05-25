@@ -118,10 +118,10 @@ int8 fat32_read_test(const char *filename)
         return 0;
     }
 
-    printk_port("filename: ;%s;\n\r", p->filename);
+    printk_port("filename: ;%s;\n", p->filename);
     printk_port("extname: ;%s;\n", p->extname);
     printk_port("attribute: ;%x;\n", p->attribute);
-    printk_port("length: ;%d;\n\r", p->length);
+    printk_port("length: ;%d;\n", p->length);
 
     // no length or deleted
     if (p->length == 0) {
@@ -136,9 +136,9 @@ int8 fat32_read_test(const char *filename)
     }
 
     printk_port("filename: ;%s;\n\r", p->filename);
-    printk_port("strings: %s %s\n", accept_table[0], accept_table[1]);
-    printk_port("len: %d %d\n", strlen(accept_table[0]), strlen(accept_table[1]));
-    printk_port("I'm here, now %d\n", memcmp(p->filename, accept_table[1], strlen(accept_table[1])));
+    // printk_port("strings: %s %s\n", accept_table[0], accept_table[1]);
+    // printk_port("len: %d %d\n", strlen(accept_table[0]), strlen(accept_table[1]));
+    // printk_port("I'm here, now %d\n", memcmp(p->filename, accept_table[1], strlen(accept_table[1])));
 
     /* debug return */
     uint8 i;
