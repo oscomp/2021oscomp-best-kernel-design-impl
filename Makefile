@@ -60,9 +60,9 @@ SRC_LINKER = ./linker-k210.ld
 
 K210_SERIALPORT	= /dev/ttyUSB1
 
-.PHONY:all main bootblock clean
+.PHONY:all
 
-all: elf k210 qemu asm# floppy
+all: asm# floppy
 
 k210: payload createimage image
 
@@ -97,7 +97,8 @@ run:
 	sudo python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct ${K210_SERIALPORT} 115200
 
 clean:
-	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu
+	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu head_qemu.bin
+	rm -rf generateMapping disk.img bootblock test/*.elf
 
 asm:
 	cd ./txt
