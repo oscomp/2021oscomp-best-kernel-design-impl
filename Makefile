@@ -49,7 +49,10 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
 SRC_USER	= ./test/shell.c
 
-TEST_ELF	= shell.elf
+TEST_ELF	= shell.elf clone.elf brk.elf chdir.elf close.elf dup.elf dup2.elf \
+			execve.elf exit.elf fork.elf fstat.elf getcwd.elf getdents.elf getppid.elf gettimeofday.elf mkdir_.elf mmap.elf mount.elf \
+			munmap.elf open.elf openat.elf pipe.elf read.elf sleep.elf test_echo.elf times.elf umount.elf unlink.elf wait.elf waitpid.elf \
+			write.elf yield.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
 				${SRC_SDCARD} ${SRC_FS} ${SRC_FAT32} ${SRC_UNAME}
@@ -92,6 +95,7 @@ createimage: ${SRC_IMAGE}
 image: createimage head main 
 	./createimage --extended head head.bin
 	cp rustsbi-k210.bin k210.bin
+# 	cp sbi-k210 k210.bin
 	dd if=head.bin of=k210.bin bs=128K seek=1
 
 run:
