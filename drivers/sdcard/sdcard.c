@@ -441,10 +441,10 @@ uint8 sd_init(void)
 	    printk("SD_CMD58 is %x\n", result);  while(1) ;
 		return 0xFF;
 	}
-    printk("123\n"); while(1);
 	if ((frame[0] & 0x40) == 0)
 		return 0xFF;
 	SD_HIGH_SPEED_ENABLE();
+    printk("1234\n"); while(1);
 	return sd_get_cardinfo(&cardinfo);
 }
 
