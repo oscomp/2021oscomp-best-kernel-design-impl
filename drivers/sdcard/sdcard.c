@@ -374,7 +374,6 @@ uint8 sd_init(void)
 	sd_lowlevel_init(0);
 	/*!< SD chip select high */
 	SD_CS_HIGH();
-	printk("222\n"); while(1) ;
 	/*!< Send dummy byte 0xFF, 10 times with CS high */
 	/*!< Rise CS and MOSI for 80 clocks cycles */
 	/*!< Send dummy byte 0xFF */
@@ -395,7 +394,8 @@ uint8 sd_init(void)
     }
     if (index == 0)
     {
-        while(1) printk("SD_CMD0 is %x\n", result);
+        printk("SD_CMD0 is %x\n", result);
+        while(1);
         return 0xFF;
     }
     
@@ -406,7 +406,7 @@ uint8 sd_init(void)
 	sd_end_cmd();
 	if (result != 0x01)
 	{
-        while(1) printk("SD_CMD8 is %x\n", result);
+        printk("SD_CMD8 is %x\n", result); while(1) ;
 		return 0xFF;
     }
 	index = 0xFF;
@@ -424,7 +424,7 @@ uint8 sd_init(void)
 	}
 	if (index == 0)
 	{
-        while(1) printk("SD_CMD55 is %x\n", result);
+        printk("SD_CMD55 is %x\n", result);  while(1) ;
 		return 0xFF;
     }
 	index = 255;
@@ -439,7 +439,7 @@ uint8 sd_init(void)
 	}
 	if(index == 0)
 	{
-	    while(1) printk("SD_CMD58 is %x\n", result);
+	    printk("SD_CMD58 is %x\n", result);  while(1) ;
 		return 0xFF;
 	}
 	if ((frame[0] & 0x40) == 0)
