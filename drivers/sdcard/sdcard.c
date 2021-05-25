@@ -46,7 +46,7 @@ void sdcard_init() {
     if(cardinfo) {
       // panic("sd card init error\n");
     	// printk("sdcard init fail");
-    	assert(0) ;
+    	while(1) ;
     } else
     {
       // printk("sdcard init: %d\n", cardinfo);
