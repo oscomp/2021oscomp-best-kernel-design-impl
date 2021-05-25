@@ -196,7 +196,7 @@ int execve(char *path, char **argv, char **envp)
   // arguments to user main(argc, argv, envp)
   // argc is returned via the system call return
   // value, which goes in a0.
-  int argc, envc;
+  uint64 argc, envc;
   uint64 uargv[MAXARG + 1], uenvp[MAXENV + 1];
   if ((envc = pushstack(pagetable, uenvp, envp, MAXENV, &sp)) < 0 ||
       (argc = pushstack(pagetable, uargv, argv, MAXARG, &sp)) < 0) {
@@ -208,15 +208,20 @@ int execve(char *path, char **argv, char **envp)
   uint64 a2 = sp;
   sp -= (argc + 1) * sizeof(uint64);
   sp -= sp % 16;
+  // uint64 a1 = sp; // original
+  uint64 a1 = sp - sizeof(uint64); // for os test
+  sp -= sizeof(uint64) << 1; // push argc into stack top and align to 16
+  // sp -= sp % 16;
   __debug_info("execve", "pushing argv/envp table\n");
   if (sp < stackbase || 
       copyout(pagetable, a2, (char *)uenvp, (envc + 1) * sizeof(uint64)) < 0 ||
-      copyout(pagetable, sp, (char *)uargv, (argc + 1) * sizeof(uint64)) < 0)
+      copyout(pagetable, a1, (char *)uargv, (argc + 1) * sizeof(uint64)) < 0 ||
+      copyout(pagetable, sp, (char *)&argc, sizeof(uint64)) < 0)
   {
     __debug_warn("execve", "fail to copy argv/envp table into user stack\n");
     goto bad;
   }
-  p->trapframe->a1 = sp;
+  p->trapframe->a1 = a1;
   p->trapframe->a2 = a2;
 
   // Save program name for debugging.

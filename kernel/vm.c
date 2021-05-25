@@ -557,7 +557,7 @@ int uvmcopy_cow(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum
   return 0;
 
  err:
-  unmappages(new, start, i / PGSIZE, VM_FREE|VM_USER|heapflag);
+  unmappages(new, start, (i - start) / PGSIZE, VM_FREE|VM_USER|heapflag);
   return -1;
 }
 

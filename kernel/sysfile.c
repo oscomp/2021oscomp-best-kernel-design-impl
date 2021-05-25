@@ -338,7 +338,7 @@ uint64
 sys_getcwd(void)
 {
   uint64 addr;
-  uint64 size;
+  int size;
   if (argaddr(0, &addr) < 0 || argint(1, (int*)&size) < 0)
     return -1;
 

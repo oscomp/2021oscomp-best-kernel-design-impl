@@ -16,11 +16,11 @@ struct utsname {
 	char domainname[UTSNAME_STR_LEN];
 };
 
-extern char const *const UNAME_SYSNAME;
-extern char const *const UNAME_NODENAME;
-extern char const *const UNAME_RELEASE;
-extern char const *const UNAME_VERSION;
-extern char const *const UNAME_MACHINE;
-extern char const *const UNAME_DOMAINNAME;
+extern char const UNAME_SYSNAME[];
+extern char const UNAME_NODENAME[];
+extern char const UNAME_RELEASE[];
+extern char const UNAME_VERSION[];
+extern char const UNAME_MACHINE[];
+extern char const UNAME_DOMAINNAME[];
 
 #endif 

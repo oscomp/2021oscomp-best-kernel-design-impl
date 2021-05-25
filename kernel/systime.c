@@ -9,6 +9,14 @@
 #include "include/types.h"
 #include "include/printf.h"
 
+struct tms {
+	uint64 tms_utime;  /* user time */
+	uint64 tms_stime;  /* system time */
+	uint64 tms_cutime; /* user time of children */
+	uint64 tms_cstime; /* system time of children */
+};
+
+
 uint64 sys_times(void) {
 	printf("not implemented yet!\n");
 	return -1;

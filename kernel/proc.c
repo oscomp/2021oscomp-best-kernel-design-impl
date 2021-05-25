@@ -229,13 +229,6 @@ int fork_cow(void) {
 		return -1;
 	}
 
-	// filesystem 
-	if (copyfdtable(&p->fds, &np->fds) < 0) {
-		freeproc(np);
-		return -1;
-	}
-	np->cwd = idup(p->cwd);
-
 	// copy parent's memory layout 
 	struct seg *seg;
 	struct seg **s2 = &(np->segment);
@@ -264,6 +257,13 @@ int fork_cow(void) {
 		*s2 = s;
 		s2 = &s->next;
 	}
+
+	// filesystem 
+	if (copyfdtable(&p->fds, &np->fds) < 0) {
+		freeproc(np);
+		return -1;
+	}
+	np->cwd = idup(p->cwd);
 	
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);
@@ -311,14 +311,6 @@ int clone(uint64 flag, uint64 stack) {
 		return -1;
 	}
 
-	// these parts may be improved later 
-	// filesystem 
-	if (copyfdtable(&p->fds, &np->fds) < 0) {
-		freeproc(np);
-		return -1;
-	}
-	np->cwd = idup(p->cwd);
-
 	// copy parent's memory layout 
 	struct seg *seg;
 	struct seg **s2 = &(np->segment);
@@ -347,6 +339,14 @@ int clone(uint64 flag, uint64 stack) {
 		*s2 = s;
 		s2 = &s->next;
 	}
+
+	// these parts may be improved later 
+	// filesystem 
+	if (copyfdtable(&p->fds, &np->fds) < 0) {
+		freeproc(np);
+		return -1;
+	}
+	np->cwd = idup(p->cwd);
 	
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);

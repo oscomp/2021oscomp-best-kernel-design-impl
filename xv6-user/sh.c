@@ -290,6 +290,14 @@ main(void)
     }
   }
 
+  // for os test
+  if (fork() == 0) {
+    close(0);
+    open("test.sh", O_RDONLY);
+  } else {
+    wait(0);
+  }
+
   // Add an embedded env var(for basic commands in shell)
   fd = open("shrc", O_RDONLY);
   if(fd < 0){
