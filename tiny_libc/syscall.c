@@ -55,7 +55,7 @@ void sys_exit()
 
 pid_t sys_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode)
 {
-    return invoke_syscall(SYSCALL_EXEC, file_name, argc, argv, mode);
+    return invoke_syscall(SYSCALL_EXEC, file_name, argc, argv, mode, IGNORE);
 }
 
 int8_t sys_test(const char* filename)
