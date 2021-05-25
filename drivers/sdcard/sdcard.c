@@ -298,16 +298,28 @@ static uint8 sd_get_csdregister(SD_CSD *SD_csd)
 static uint8 sd_get_cidregister(SD_CID *SD_cid)
 {
 	uint8 cid_tab[18];
-	/*!< Send CMD10 (CID register) */
-	sd_send_cmd(SD_CMD10, 0, 0);
-	/*!< Wait for response in the R1 format (0x00 is no errors) */
-	if (sd_get_response() != 0x00) {
-		sd_end_cmd();
-		return 0xFF;
+	uint8 result;
+	uint32 index;
+	index = 255;
+	while (index--){
+		/*!< Send CMD9 (CSD register) or CMD10(CSD register) */
+		sd_send_cmd(SD_CMD10, 0, 0);
+		/*!< Wait for response in the R1 format (0x00 is no errors) */
+		if (sd_get_response() != 0x00) {
+			printk("here\n"); while(1);
+			sd_end_cmd();
+			return 0xFF;
+		}
+		if ((result = sd_get_response()) != SD_START_DATA_SINGLE_BLOCK_READ) {
+			printk("there\n");
+			printk("result is %d\n", result);
+			sd_end_cmd();
+		}
+		else
+			break;
 	}
-	if (sd_get_response() != SD_START_DATA_SINGLE_BLOCK_READ) {
-		sd_end_cmd();
-		return 0xFF;
+	if (index == 0){
+		printk("error\n"); while(1);
 	}
 	/*!< Store CID register value on cid_tab */
 	/*!< Get CRC bytes (not really needed by us, but required by SD) */
@@ -362,17 +374,16 @@ static uint8 sd_get_cidregister(SD_CID *SD_cid)
 static uint8 sd_get_cardinfo(SD_CardInfo *cardinfo)
 {
 	if (sd_get_csdregister(&(cardinfo->SD_csd))){
-	    printk("12345\n"); while(1);
+	    // printk("12345\n"); while(1);
 		return 0xFF;
 	}
 	if (sd_get_cidregister(&(cardinfo->SD_cid))){
-	    printk("12346\n"); while(1);
+	    // printk("12346\n"); while(1);
 		return 0xFF;
 	}
 	cardinfo->CardCapacity = (cardinfo->SD_csd.DeviceSize + 1) * 1024;
 	cardinfo->CardBlockSize = 1 << (cardinfo->SD_csd.RdBlockLen);
 	cardinfo->CardCapacity *= cardinfo->CardBlockSize;
-	    printk("12347\n"); while(1);
 	/*!< Returns the reponse */
 	return 0;
 }
