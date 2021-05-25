@@ -421,12 +421,12 @@ uint8 sd_init(void)
 		if (result == 0x00)
 			break;
 	}
-    printk("111\n"); while(1);
 	if (index == 0)
 	{
         printk("SD_CMD55 is %x\n", result);  while(1) ;
 		return 0xFF;
     }
+    printk("111\n"); while(1);
 	index = 255;
 	while(index--){
 		sd_send_cmd(SD_CMD58, 0, 1);
