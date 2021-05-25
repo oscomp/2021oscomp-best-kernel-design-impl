@@ -380,7 +380,6 @@ uint8 sd_init(void)
 	for (index = 0; index < 10; index++)
 		frame[index] = 0xFF;
 	sd_write_data(frame, 10);
-	printk("333\n"); while(1) ;
 	/*------------Put SD in SPI mode--------------*/
 	/*!< SD initialized and set to SPI mode properly */
     index = 0xFF;
@@ -398,6 +397,7 @@ uint8 sd_init(void)
         while(1);
         return 0xFF;
     }
+    printk("111\n"); while(1);
     
 	sd_send_cmd(SD_CMD8, 0x01AA, 0x87);
 	/*!< 0x01 or 0x05 */
