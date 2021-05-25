@@ -384,7 +384,6 @@ static uint8 sd_get_cardinfo(SD_CardInfo *cardinfo)
 	cardinfo->CardCapacity = (cardinfo->SD_csd.DeviceSize + 1) * 1024;
 	cardinfo->CardBlockSize = 1 << (cardinfo->SD_csd.RdBlockLen);
 	cardinfo->CardCapacity *= cardinfo->CardBlockSize;
-	    printk("12347\n"); while(1);
 	/*!< Returns the reponse */
 	return 0;
 }
