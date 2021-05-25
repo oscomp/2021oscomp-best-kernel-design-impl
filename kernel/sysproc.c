@@ -102,8 +102,8 @@ sys_sbrk(void)
     if (growproc(n) < 0)  // growproc takes care of p->sz
       return -1;
   } else {                // lazy page allocation
-    struct seg *stack = heap->next;
-    if (addr + n > stack->addr - PGSIZE) {
+    uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
+    if (addr + n > boundary - PGSIZE) {
       return -1;
     }
     heap->sz += n;
@@ -130,8 +130,8 @@ sys_brk(void)
     if (growproc(n) < 0)  // growproc takes care of p->sz
       return -1;
   } else {                // lazy page allocation
-    struct seg *stack = heap->next;
-    if (addr > stack->addr - PGSIZE) {
+    uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
+    if (addr > boundary - PGSIZE) {
       return -1;
     }
     heap->sz += n;

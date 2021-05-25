@@ -307,17 +307,17 @@ struct file *fd2file(int fd, int free)
     prev = head;
     head = head->next;
   }
-  if (!head || fd < head->basefd)
+  if (!head || fd < head->basefd) // not found
     return NULL;
 
   fd %= NOFILE;
   f = head->arr[fd];
   if (free) {
-    head->arr[fd] = NULL;
-    if (fd < head->nextfd) {
+    head->arr[fd] = NULL; // the file should be closed by caller
+    if (fd < head->nextfd) {  // make nextfd the smallest
       head->nextfd = fd;
     }
-    if (--head->used == 0 && prev) {
+    if (--head->used == 0 && prev) {  // if table is empty and is not the head, free it
       prev->next = head->next;
       kfree(head);
       __debug_info("fd2file", "free %p\n", head);
@@ -334,8 +334,10 @@ int fdalloc(struct file *f)
   struct proc *p = myproc();
   struct fdtable *fdt = &p->fds;
   
-  while (fdt->nextfd < 0) {
-    if (!fdt->next || fdt->basefd + NOFILE != fdt->next->basefd) {
+  while (fdt->nextfd == NOFILE) { // table full
+    if (!fdt->next ||                               // no next table
+        fdt->basefd + NOFILE != fdt->next->basefd)  // or next table is not continuous
+    {
       struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
       if (fdnew == NULL) {
         return -1;
@@ -355,10 +357,10 @@ int fdalloc(struct file *f)
   fd = fdt->nextfd;
   fdt->arr[fd] = f;
   fdt->used++;
-  fdt->nextfd = -1;
-  for (int i = 0; i < NOFILE; i++) {
-    if (fdt->arr[i] == NULL) {
-      fdt->nextfd = i;
+  // locate the next smallest free fd
+  // if not found, nextfd will stop at NOFILE, which means this table is full
+  while (++fdt->nextfd < NOFILE) {
+    if (fdt->arr[fdt->nextfd] == NULL) {
       break;
     }
   }
@@ -379,7 +381,7 @@ int fdalloc3(struct file *f, int fd, int flag)
     prev = fdt;
     fdt = fdt->next;
   }
-  if (!fdt || fdt->basefd > fd) {
+  if (!fdt || fdt->basefd > fd) {  // no next table, or next table is not continuous
     struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
     if (fdnew == NULL) {
       return -1;
@@ -403,11 +405,9 @@ int fdalloc3(struct file *f, int fd, int flag)
   } else {
     fdt->arr[fd2] = f;
     fdt->used++;
-    if (fd2 == fdt->nextfd) {
-      fdt->nextfd = -1;
-      for (int i = 0; i < NOFILE; i++) {
-        if (fdt->arr[i] == NULL) {
-          fdt->nextfd = i;
+    if (fd2 == fdt->nextfd) { // unfortunately, we need to update nextfd
+      while (++fdt->nextfd < NOFILE) {
+        if (fdt->arr[fdt->nextfd] == NULL) {
           break;
         }
       }

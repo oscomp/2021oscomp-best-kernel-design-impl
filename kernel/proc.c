@@ -720,13 +720,13 @@ int growproc(int n) {
   struct proc *p = myproc();
 
   struct seg *heap = getseg(p->segment, HEAP);
-  struct seg *stack = heap->next;
+  uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
 
   uint64 oldva = heap->addr + heap->sz;
   uint64 newva = oldva + n;
 
   if(n > 0){
-    if (newva > stack->addr - PGSIZE ||
+    if (newva > boundary - PGSIZE ||
         uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
       return -1;
     }

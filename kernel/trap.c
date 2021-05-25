@@ -205,7 +205,7 @@ kerneltrap() {
 	else if (p && is_page_fault(scause) && NULL != r_stval()) {
 		// This case may happen when kernel is accessing user's lazy-allocated page.
 		// The handler should allocate a real one, but failed for lack of memory.
-      	p->killed = 1;
+      	// p->killed = 1;
 		sepc = kern_pgfault_escape();
 		__debug_error("kerneltrap", "sepc=%p stval=%p escape=%p pid=%d\n", 
 				r_sepc(), r_stval(), sepc, p->pid);
