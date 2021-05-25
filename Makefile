@@ -101,7 +101,7 @@ clean:
 	rm -rf generateMapping disk.img bootblock test/*.elf
 
 asm:
-	cd ./txt
+	cd ./txt/abcde
 	${OBJDUMP} -d main > txt/kernel.txt
 	${OBJDUMP} -d head > txt/head.txt
 	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
