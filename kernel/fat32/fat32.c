@@ -86,7 +86,7 @@ int8 fat32_read_test(const char *filename)
     printk_port("read %d\n", cnt++);
     if (cnt > 32){
         printk_port("???\n");
-        return 1;
+        assert(0);
     }
     // busy
     // for (int i = 1; i < NUM_MAX_TASK; ++i)

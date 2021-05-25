@@ -49,7 +49,7 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
 SRC_USER	= ./test/shell.c
 
-TEST_ELF	= shell.elf
+TEST_ELF	= shell.elf exit.elf fork.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
 				${SRC_SDCARD} ${SRC_FS} ${SRC_FAT32} ${SRC_UNAME}
