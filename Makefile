@@ -62,7 +62,7 @@ K210_SERIALPORT	= /dev/ttyUSB1
 
 .PHONY:all
 
-all: asm# floppy
+all: elf k210 qemu asm# floppy
 
 k210: payload createimage image
 
@@ -101,7 +101,7 @@ clean:
 	rm -rf generateMapping disk.img bootblock test/*.elf
 
 asm:
-	cd ./txt/abcde
+	cd ./txt
 	${OBJDUMP} -d main > txt/kernel.txt
 	${OBJDUMP} -d head > txt/head.txt
 	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
