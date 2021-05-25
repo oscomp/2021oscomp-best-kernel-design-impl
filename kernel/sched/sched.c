@@ -288,6 +288,12 @@ pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode)
     return -1;
 }
 
+pid_t do_getpid()
+{
+    return current_running->pid;
+}
+
+
 
 /***************/
 //DEBUG FUNCTION

@@ -397,8 +397,7 @@ uint8 sd_init(void)
         while(1);
         return 0xFF;
     }
-    printk("111\n"); while(1);
-    
+
 	sd_send_cmd(SD_CMD8, 0x01AA, 0x87);
 	/*!< 0x01 or 0x05 */
 	result = sd_get_response();
@@ -422,6 +421,7 @@ uint8 sd_init(void)
 		if (result == 0x00)
 			break;
 	}
+    printk("111\n"); while(1);
 	if (index == 0)
 	{
         printk("SD_CMD55 is %x\n", result);  while(1) ;

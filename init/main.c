@@ -125,6 +125,7 @@ static void init_syscall(void)
     syscall[SYSCALL_EXEC] = &do_exec;
 
     syscall[SYSCALL_TEST] = &fat32_read;
+    syscall[SYS_getpid] = &do_getpid;
 }
 
 // stop mapping boot_kernel

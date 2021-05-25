@@ -28,7 +28,7 @@
 #ifndef OS_SYSCALL_NUMBER_H_
 #define OS_SYSCALL_NUMBER_H_
 #define IGNORE 0
-#define NUM_SYSCALLS 128
+#define NUM_SYSCALLS 512
 
 /* define */
 #define SYSCALL_SPAWN 0
@@ -37,7 +37,6 @@
 #define SYSCALL_KILL 3
 #define SYSCALL_WAITPID 4
 #define SYSCALL_PS 5
-#define SYSCALL_GETPID 6
 #define SYSCALL_YIELD 7
 #define SYSCALL_TASKSET 8
 
@@ -89,5 +88,7 @@
 
 #define SYSCALL_TESTDISK 58
 #define SYSCALL_TEST 59
+
+#define SYS_getpid 172
 
 #endif
