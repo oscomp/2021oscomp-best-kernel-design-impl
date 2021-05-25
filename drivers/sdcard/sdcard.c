@@ -201,20 +201,28 @@ static uint8 sd_get_dataresponse(void)
 static uint8 sd_get_csdregister(SD_CSD *SD_csd)
 {
 	uint8 csd_tab[18];
-	/*!< Send CMD9 (CSD register) or CMD10(CSD register) */
-	sd_send_cmd(SD_CMD9, 0, 0);
-	/*!< Wait for response in the R1 format (0x00 is no errors) */
-	if (sd_get_response() != 0x00) {
-		printk("here\n"); while(1);
-		sd_end_cmd();
-		return 0xFF;
-	}
 	uint8 result;
-	if ((result = sd_get_response()) != SD_START_DATA_SINGLE_BLOCK_READ) {
-		printk("there\n");
-		printk("result is %d\n", result); while(1);
-		sd_end_cmd();
-		return 0xFF;
+	uint32 index;
+	index = 255;
+	while (index--){
+		/*!< Send CMD9 (CSD register) or CMD10(CSD register) */
+		sd_send_cmd(SD_CMD9, 0, 0);
+		/*!< Wait for response in the R1 format (0x00 is no errors) */
+		if (sd_get_response() != 0x00) {
+			printk("here\n"); while(1);
+			sd_end_cmd();
+			return 0xFF;
+		}
+		if ((result = sd_get_response()) != SD_START_DATA_SINGLE_BLOCK_READ) {
+			printk("there\n");
+			printk("result is %d\n", result);
+			sd_end_cmd();
+		}
+		else
+			break;
+	}
+	if (index == 0){
+		printk("error\n"); while(1);
 	}
 	/*!< Store CSD register value on csd_tab */
 	/*!< Get CRC bytes (not really needed by us, but required by SD) */
