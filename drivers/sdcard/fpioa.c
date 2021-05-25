@@ -6,6 +6,7 @@
 #include "os/string.h"
 #include "os/ioremap.h"
 #include "qemu.h"
+#include "stdio.h"
 
 // #include "include/defs.h"
 /* Copyright 2018 Canaan Inc.
@@ -4943,6 +4944,7 @@ void fpioa_pin_init() {
     #ifndef SUBMIT
     fpioa_set_function(29, FUNC_SPI0_SS3);
     #else
+    printk("It's submit\n");
     fpioa_set_function(29, FUNC_SPI0_SS0);
     #endif
 }

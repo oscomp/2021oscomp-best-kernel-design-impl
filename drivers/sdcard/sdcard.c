@@ -209,8 +209,10 @@ static uint8 sd_get_csdregister(SD_CSD *SD_csd)
 		sd_end_cmd();
 		return 0xFF;
 	}
-	if (sd_get_response() != SD_START_DATA_SINGLE_BLOCK_READ) {
-		printk("there\n"); while(1);
+	uint8 result;
+	if ((result = sd_get_response()) != SD_START_DATA_SINGLE_BLOCK_READ) {
+		printk("there\n");
+		printk("result is %d\n", result); while(1);
 		sd_end_cmd();
 		return 0xFF;
 	}
