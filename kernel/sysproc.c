@@ -1,3 +1,8 @@
+#ifndef __DEBUG_sysproc 
+#undef DEBUG 
+#endif 
+
+#define __module_name__ 	"sysproc"
 
 #include "include/types.h"
 #include "include/riscv.h"
@@ -11,6 +16,7 @@
 #include "include/usrmm.h"
 #include "include/string.h"
 #include "include/printf.h"
+#include "include/debug.h"
 
 extern int execve(char *path, char **argv, char **envp);
 
@@ -60,12 +66,37 @@ sys_getpid(void)
   return myproc()->pid;
 }
 
+uint64 
+sys_getppid(void) {
+	struct proc *p = myproc();
+	int pid;
+
+	acquire(&p->parent->lk);
+	__debug_assert("sys_getppid", NULL != p->parent, 
+			"NULL == p->parent\n");
+	pid = p->parent->pid;
+	release(&p->parent->lk);
+
+	return pid;
+}
+
 uint64
 sys_fork(void)
 {
   extern int fork_cow();
   return fork_cow();
   // return fork();
+}
+
+uint64 
+sys_clone(void) {
+	uint64 flag, stack;
+	if (argaddr(0, &flag) < 0) 
+		return -1;
+	if (argaddr(1, &stack) < 0) 
+		return -1;
+	
+	return clone(flag, stack);
 }
 
 uint64
@@ -81,11 +112,34 @@ sys_wait(void)
   if (mask) {
     printf(") ...\n");
   }
-  int ret = wait(p);
+  __debug_info("sys_wait", "p = %p\n", p);
+  int ret = wait4(-1, p, 0);
   if (mask) {
     printf("pid %d: return from wait(0x%x", pr->pid, p);
   }
   return ret;
+}
+
+uint64 sys_wait4(void) {
+	int pid;
+	uint64 status, options;
+
+	// extract syscall args 
+	if (argint(0, &pid) < 0) 
+		return -1;
+	if (argaddr(1, &status) < 0) 
+		return -1;
+	if (argaddr(2, &options) < 0) 
+		return -1;
+
+	struct proc *pr = myproc();
+	int mask = pr->tmask;
+	int ret = wait4(pid, status, options);
+	if (mask) {
+		printf("pid %d: return from wait4(%p", pr->pid, status);
+	}
+
+	return ret;
 }
 
 uint64

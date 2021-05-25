@@ -84,6 +84,9 @@ struct proc {
 	`cow` means that fork implements 'Copy-On-Write' strategy */
 int fork_cow(void);
 
+/* Create a process-level thread, partly copying the parent. */
+int clone(uint64 flag, uint64 stack);
+
 /* Exit the current process. does not return. 
 	An exited process remains in the zombie state until its 
 	parent calls wait(). */
@@ -101,8 +104,9 @@ int kill(int pid);
 void proc_tick(void);
 
 /* Wait for a child process to exit and return its pid. 
-	Return -1 if this process has no children. */
-int wait(uint64 addr);
+	`options` indicates whether wait4() will block. 
+	Return -1 if this process has no children */
+int wait4(int pid, uint64 status, uint64 options);
 
 /* Give up CPU and enter scheduler */
 void yield(void);

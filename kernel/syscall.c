@@ -149,6 +149,9 @@ extern uint64 sys_rename(void);
 extern uint64 sys_execve(void);
 extern uint64 sys_mount(void);
 extern uint64 sys_umount(void);
+extern uint64 sys_clone(void);
+extern uint64 sys_getppid(void);
+extern uint64 sys_wait4(void);
 
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
@@ -182,6 +185,11 @@ static uint64 (*syscalls[])(void) = {
   [SYS_execve]      sys_execve,
   [SYS_mount]       sys_mount,
   [SYS_umount]      sys_umount,
+  [SYS_clone]       sys_clone, 
+  [SYS_execve]      sys_exec, 
+  [SYS_wait4]       sys_wait4, 
+  [SYS_getpid]      sys_getpid, 
+  [SYS_getppid]     sys_getppid, 
 };
 
 static char *sysnames[] = {
@@ -216,6 +224,10 @@ static char *sysnames[] = {
   [SYS_execve]      "execve",
   [SYS_mount]       "mount",
   [SYS_umount]      "umount",
+  [SYS_clone]       "sys_clone", 
+  [SYS_wait4]       "sys_wait", 
+  [SYS_getpid]      "sys_getpid", 
+  [SYS_getppid]     "sys_getppid", 
 };
 
 void
