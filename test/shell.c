@@ -16,14 +16,15 @@ int main()
 
     /* for K210 do all test */
 
-    // while(sys_test(NULL))
-    //     ;
+    while(sys_test(NULL))
+        ;
 
     /* for qemu singal test*/
     /* systest(filename) */
-    sys_test("loop");
-    printf("Success1!\n\r");
-    sys_test("loop");    
-    printf("Success2!\n\r");
+    
+    // sys_test("loop");
+    // printf("Success1!\n\r");
+    // sys_test("loop");    
+    // printf("Success2!\n\r");
     while(1);
 }

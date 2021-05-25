@@ -113,6 +113,10 @@ int8 fat32_read(const char *filename)
     _elf_binary = file;
     length = p->length;
 
+    printk("filename: %s\n\r", p->filename);
+    printk("length: %d\n\r", p->length);
+    return 1;
+
 #else
 
     get_elf_file(filename,&_elf_binary,&length);
@@ -160,7 +164,7 @@ int8 fat32_read(const char *filename)
             allocfree();
             p++;
             #endif
-            
+
             return -1;
         }
     assert(0);
