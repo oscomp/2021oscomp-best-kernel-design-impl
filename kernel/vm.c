@@ -719,6 +719,7 @@ int
 copyout2(uint64 dstva, char *src, uint64 len)
 {
   if (partofseg(myproc()->segment, dstva, dstva + len) == NONE) {
+	__debug_error("copyout2", "%p, %p, %d\n", myproc()->segment, dstva, len);
     return -1;
   }
   return safememmove((void *)dstva, src, len);

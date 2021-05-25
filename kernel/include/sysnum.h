@@ -33,8 +33,16 @@
 #define SYS_write       64
 #define SYS_fstat       80
 #define SYS_exit        93
+#define SYS_nanosleep  101
+#define SYS_sched_yield 124
+#define SYS_times      153
+#define SYS_uname      160
+#define SYS_gettimeofday 169
 #define SYS_getpid     172
+#define SYS_getppid    173
 #define SYS_brk        214
+#define SYS_clone      220
 #define SYS_execve     221
+#define SYS_wait4      260
 
 #endif

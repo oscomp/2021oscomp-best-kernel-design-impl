@@ -42,7 +42,10 @@ OBJS += \
   $K/plic.o \
   $K/console.o \
   $K/usrmm.o \
-  $K/imgfs.o
+  $K/imgfs.o \
+  $K/systime.o \
+  $K/sysuname.o \
+  $K/uname.o 
 
 ifeq ($(platform), k210)
 OBJS += \
