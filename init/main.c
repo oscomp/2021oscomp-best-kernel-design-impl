@@ -119,7 +119,7 @@ static void init_syscall(void)
 
     syscall[SYSCALL_GET_TIMEBASE] = &sbi_read_fdt;
     syscall[SYSCALL_GET_TICK] = &get_ticks;
-    syscall[SYSCALL_EXIT] = &do_exit;
+    syscall[SYS_exit] = &do_exit;
 
     syscall[SYSCALL_TESTDISK] = &do_testdisk;
     syscall[SYSCALL_EXEC] = &do_exec;
@@ -208,6 +208,7 @@ int main()
     // init screen (QAQ)
     init_screen();
     printk("> [INIT] SCREEN initialization succeeded.\n\r");
+    while(1);
     // Setup timer interrupt and enable all interrupt
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
     /* setup exception */
