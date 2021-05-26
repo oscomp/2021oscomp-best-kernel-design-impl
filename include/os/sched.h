@@ -140,6 +140,10 @@ typedef struct pcb
 
     /* exit status */
     int32_t exit_status;
+
+    /* systime */
+    uint64_t stime;
+    uint64_t utime;
 } pcb_t;
 
 #define DEFAULT_PRIORITY 1
@@ -201,8 +205,6 @@ uint8_t do_nanosleep(struct timespec *sleep_time);
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;
 extern int LATTER_TICKS_COUNTER;
-void start_counter();
-void end_counter();
 
 extern pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 extern void do_show_exec();
@@ -223,6 +225,10 @@ static inline void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
     pcb_underinit->mask = 0xf; 
     pcb_underinit->parent.parent = NULL;
+
+    // systime
+    pcb_underinit->stime = 0;
+    pcb_underinit->utime = 0;
 }
 
 /* set stack base as normal */

@@ -3,16 +3,16 @@
 #include <os/irq.h>
 #include <type.h>
 
-/*for debug*/
 #include <stdio.h>
 #include <os/sched.h>
-/*         */
-
 
 LIST_HEAD(timers);
 
 uint64_t time_elapsed = 0;
 uint32_t time_base = 0;
+
+uint64_t stime = 0; /*ticks*/
+uint32_t utime = 0; /*ticks*/
 
 /* create a timer to sleep */
 /* call func(parameter) when timeout */
@@ -65,6 +65,22 @@ int8_t do_gettimeofday(struct timespec *ts)
     }
     return 0;
 }
+
+/* start and end counter */
+/* for cpu compute SYS cpu time and USER cpu time */
+/* start: enter kernel, end: exit kernel */
+static uint64_t last_time;
+void start_counter()
+{
+    uint64_t timepass = get_ticks() - last_time;
+    current_running->utime += timepass;
+}
+void end_counter()
+{
+    uint64_t timepass = get_ticks() - last_time;
+    current_running->stime += timepass;
+}
+
 
 uint64_t get_ticks()
 {

@@ -252,6 +252,8 @@ ENTRY(exception_handler_entry)
    * when interrupt_help complete.
    */
   
+  # call start_counter
+
   la ra, ret_from_exception
 
   /* TODO: call interrupt_helper

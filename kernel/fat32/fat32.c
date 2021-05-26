@@ -26,8 +26,8 @@ fd_t fd[NUM_FD];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  11
-uchar accept_table[ACCEPT_NUM][10] = {{"SLEEP"}, {"GETPID"}, {"UNAME"}, {"CLONE"}, {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"YIELD"},
+#define ACCEPT_NUM  10
+uchar accept_table[ACCEPT_NUM][10] = {{"SLEEP"}, {"GETPID"}, {"UNAME"}, {"CLONE"}, {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
     {"WAIT"}, {"WAITPID"}, {"EXIT"}};
 
 void sd_read(char *buf, uint32_t sec)
