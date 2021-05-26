@@ -365,7 +365,7 @@ int clone(uint64 flag, uint64 stack) {
 
 	// parenting 
 	np->parent = p;
-	np->sibling_prev = &(np->child);
+	np->sibling_prev = &(p->child);
 	np->sibling_next = p->child;
 	if (NULL != p->child) {
 		p->child->sibling_prev = &(np->sibling_next);
@@ -891,8 +891,9 @@ static void __print_list_no_lock(struct proc *list) {
 				heap = s->sz;
 			}
 		}
-		printf("%d\t%s\t%d\t%s\t%d\t%d\n", 
+		printf("%d\t%d\t%s\t%d\t%s\t%d\t%d\n", 
 			list->pid, 
+			__initproc == list ? 0 : list->parent->pid, 
 			__state_to_str(list->state),
 			list->killed, 
 			list->name, 
@@ -905,7 +906,7 @@ static void __print_list_no_lock(struct proc *list) {
 // print current processes to console 
 void procdump(void) {
 	printf("epc = %p\n", r_sepc());
-	printf("\nPID\tSTATE\tKILLED\tNAME\tMEM_LOAD\tMEM_HEAP\n");
+	printf("\nPID\tPPID\tSTATE\tKILLED\tNAME\tMEM_LOAD\tMEM_HEAP\n");
 	__enter_proc_cs 
 
 	// display runnable 

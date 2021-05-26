@@ -16,8 +16,11 @@ int write(int fd, const void *buf, int len);
 int read(int fd, void *buf, int len);
 int close(int fd);
 int kill(int pid);
-int exec(char*, char**);
+// int exec(char*, char**);
 int execve(char *name, char *argv[], char *envp[]);
+static inline int exec(char *name, char *argv[]) {
+    return execve(name, argv, NULL);
+}
 int openat(int fd, const char *filename, int flag, int mode);
 static inline int open(const char *filename, int flag) {
     return openat(AT_FDCWD, filename, flag, 0600);

@@ -191,7 +191,7 @@ static uint64 (*syscalls[])(void) = {
   [SYS_mount]       sys_mount,
   [SYS_umount]      sys_umount,
   [SYS_clone]       sys_clone, 
-  [SYS_execve]      sys_exec, 
+  [SYS_execve]      sys_execve, 
   [SYS_wait4]       sys_wait4, 
   [SYS_getpid]      sys_getpid, 
   [SYS_getppid]     sys_getppid, 

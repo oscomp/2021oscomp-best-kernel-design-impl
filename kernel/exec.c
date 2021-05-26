@@ -63,8 +63,9 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
     if (argp == 0)
       break;
     int arglen = fetchstr(argp, buf, PGSIZE);   // '\0' included in PGSIZE, but not in envlen
+    __debug_info("pushstack", "arglen = %d\n", arglen);
     if (arglen++ < 0) {                               // including '\0'
-      // __debug_warn("pushstack", "didn't get null\n");
+      __debug_warn("pushstack", "didn't get null\n");
       goto bad;
     }
     sp -= arglen;
@@ -196,7 +197,7 @@ int execve(char *path, char **argv, char **envp)
   // arguments to user main(argc, argv, envp)
   // argc is returned via the system call return
   // value, which goes in a0.
-  uint64 argc, envc;
+  int64 argc, envc;
   uint64 uargv[MAXARG + 1], uenvp[MAXENV + 1];
   if ((envc = pushstack(pagetable, uenvp, envp, MAXENV, &sp)) < 0 ||
       (argc = pushstack(pagetable, uargv, argv, MAXARG, &sp)) < 0) {
