@@ -119,6 +119,7 @@ static void init_syscall(void)
     syscall[SYS_clone] = &do_clone;
     syscall[SYS_wait4] = &do_wait4;
     syscall[SYS_getppid] = &do_getppid;
+    syscall[SYS_nanosleep] = &do_nanosleep;
     // syscall[SYS_mmap] = &do_mmap;
 }
 
@@ -129,7 +130,7 @@ int main()
     init_pcb();
     printk("> [INIT] PCB initialization succeeded.\n\r");
     // // read CPU frequency
-    time_base = sbi_read_fdt(TIMEBASE);
+    time_base = TIMEBASE / TICKCOUNT;
     // init interrupt (^_^)
     init_exception();
     printk("> [INIT] Interrupt processing initialization succeeded.\n\r");
@@ -138,10 +139,9 @@ int main()
     printk("> [INIT] System call initialized successfully.\n\r");
 
 #ifdef K210
-    // init sdcard
+    // init sdcard (@—.—@)
     fpioa_pin_init();
     printk("> [INIT] FPIOA initialized successfully.\n\r");
-    // printk("fpioa is at %lx\n\r", get_kva_of(FPIOA_BASE_ADDR, pa2kva(PGDIR_PA)));
     ioremap(UARTHS, NORMAL_PAGE_SIZE);
 #else
     ioremap(UART0, NORMAL_PAGE_SIZE);
@@ -188,6 +188,7 @@ int main()
     printk("> [INIT] SCREEN initialization succeeded.\n\r");
     // Setup timer interrupt and enable all interrupt
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
+    printk("timebase :%d, ticks: %d", time_base, get_ticks());
     /* setup exception */
     clear_interrupt();
     setup_exception();

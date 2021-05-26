@@ -14,7 +14,9 @@ LIST_HEAD(timers);
 uint64_t time_elapsed = 0;
 uint32_t time_base = 0;
 
-
+/* create a timer to sleep */
+/* call func(parameter) when timeout */
+/* tick is sleep interval ticks */
 void timer_create(TimerCallback func, void* parameter, uint64_t tick)
 {
     disable_preempt();
@@ -33,19 +35,16 @@ void timer_create(TimerCallback func, void* parameter, uint64_t tick)
 void timer_check()
 {
     disable_preempt();
-    list_node_t *pointer = timers.next;
+    timer_t *handling_timer, *next_timer;
     uint64_t nowtick = get_ticks();
     // check all timers
-    while (pointer != &timers)
+    list_for_each_entry_safe(handling_timer, next_timer, &timers, list)
     {
-        timer_t *handling_timer = pointer->ptr;
-        timer_t *temp = pointer->next;
-        if (handling_timer->timeout_tick <= nowtick)
+        if (handling_timer->timeout_tick < nowtick)
         {            
-            list_del(pointer);
+            list_del(&handling_timer->list);
             (*handling_timer->callback_func)(handling_timer->parameter);
         }
-        pointer = temp;
     }
     enable_preempt();
 }
@@ -59,7 +58,7 @@ int8_t do_gettimeofday(struct timespec *ts)
     uint64_t left = nowtick % time_base;
     ts->tv_nsec = 0;
 
-    for (uint i = 0; i < 9; ++i)
+    for (uint i = 0; i < NANO; ++i)
     {
         ts->tv_nsec = 10*ts->tv_nsec + left * 10 / time_base;
         left = (left * 10) % time_base;

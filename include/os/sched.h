@@ -35,6 +35,7 @@
 #include <os/list.h>
 #include <os/mm.h>
 #include <os/smp.h>
+#include <os/time.h>
 
 #define NUM_MAX_TASK 16
 
@@ -137,9 +138,12 @@ typedef struct pcb
         uint32_t flag;
     }parent;
 
+    /* exit status */
+    int32_t exit_status;
 } pcb_t;
 
 #define DEFAULT_PRIORITY 1
+#define WEXITSTATUS(status,exit_status) (*((uint16_t *)status) = ((exit_status) << 8) & 0xff00)
 
 /* task information, used to init PCB */
 typedef struct task_info
@@ -173,7 +177,7 @@ extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
 
 pid_t do_spawn(task_info_t *task, void* arg, spawn_mode_t mode);
-void do_exit(void);
+void do_exit(int32_t exit_status);
 void do_sleep(uint32_t);
 
 void do_block(list_node_t *, list_head *queue);
@@ -190,7 +194,9 @@ void do_exit();
 pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 
 pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid);
-pid_t do_wait4(pid_t pid, int32_t *status, int32_t options);
+pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
+
+uint8_t do_nanosleep(struct timespec *sleep_time);
 
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;

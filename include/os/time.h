@@ -31,6 +31,10 @@
 #include <type.h>
 #include <os/list.h>
 
+#define NANO 9
+#define TIMEBASE 403000000
+#define TICKCOUNT 62
+
 typedef void (*TimerCallback)(void *parameter);
 typedef uint32_t time_t;
 

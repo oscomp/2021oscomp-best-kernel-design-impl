@@ -12,8 +12,6 @@
 
 #define SXLEN 64
 
-int PREEMPT_FREQUENCY = 20000;
-
 handler_t irq_table[IRQC_COUNT];
 handler_t exc_table[EXCC_COUNT];
 uintptr_t riscv_dtb;

@@ -49,7 +49,7 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
 SRC_USER	= ./test/shell.c 
 
-TEST_ELF	= shell.elf
+TEST_ELF	= shell.elf yield.elf
 # clone.elf brk.elf chdir.elf close.elf dup.elf dup2.elf \
 # 			execve.elf exit.elf fork.elf fstat.elf getcwd.elf getdents.elf getppid.elf gettimeofday.elf mkdir_.elf mmap.elf mount.elf \
 # 			munmap.elf open.elf openat.elf pipe.elf read.elf sleep.elf test_echo.elf times.elf umount.elf unlink.elf wait.elf waitpid.elf \

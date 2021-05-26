@@ -67,7 +67,7 @@ void do_scheduler(void)
     pcb_t *previous_running = current_running;
 
     // put previous running into queue
-    if (previous_running->pid && previous_running->status == TASK_RUNNING)
+    if (previous_running->status == TASK_RUNNING)
     {        
         previous_running->status = TASK_READY;
         previous_running->temp_priority = previous_running->priority;
@@ -242,8 +242,10 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
     return -1;
 }
 
-pid_t do_wait4(pid_t pid, int32_t *status, int32_t options)
+pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
+    uint64_t status_ker = NULL;
+    if (status) status_ker = get_kva_of(status,current_running->pgdir);
     pid_t ret = -1;
     for (int i = 1; i < NUM_MAX_TASK; ++i)
     {
@@ -253,8 +255,9 @@ pid_t do_wait4(pid_t pid, int32_t *status, int32_t options)
                 current_running->status = TASK_BLOCKED;
                 list_add_tail(&current_running->list, &pcb[i].wait_list);
                 ret = pcb[i].pid;
-                i = 1; // start from beginning when wake up
                 do_scheduler();
+                if (status_ker) WEXITSTATUS(status_ker,pcb[i].exit_status);
+                i = 1; // start from beginning when wake up
             }
             else
                 ret = pcb[i].pid;
@@ -264,36 +267,45 @@ pid_t do_wait4(pid_t pid, int32_t *status, int32_t options)
 }
 
 
-void do_sleep(uint32_t sleep_time)
+uint8 do_nanosleep(struct timespec *ts)
 {
     // 1. block the current_running
     // 2. create a timer which calls `do_unblock` when timeout
     // 3. reschedule because the current_running is blocked.
-    
     do_block(&current_running->list,&general_block_queue);
-    timer_create(&do_unblock, &current_running->list, sleep_time * time_base);
+    uint64_t sleep_ticks = 0, nsec = ts->tv_nsec;
+
+    // printk_port("time: %d, %d\n", ts->tv_sec, ts->tv_nsec);
+    for (uint i = 0; i < NANO; ++i){
+        sleep_ticks = (sleep_ticks / 10)+ time_base * (nsec % 10);
+        nsec /= 10;
+    }
+
+    sleep_ticks += ts->tv_sec * time_base;
+    timer_create(&do_unblock, &current_running->list, sleep_ticks);
     do_scheduler();
+    return 0;
 }
 
-void do_block(list_node_t *pcb_node, list_head *queue)
+void do_block(list_node_t *list, list_head *queue)
 {
-    // TODO: block the pcb task into the block queue
-    pcb_t *pcb = pcb_node->ptr;
+    pcb_t *pcb = list_entry(list, pcb_t, list);
 
     pcb->status = TASK_BLOCKED;
-    list_add_tail(pcb_node,queue);   
+    list_add_tail(list,queue);   
 }
 
+/* pcb_node is of type list_node_t */
 void do_unblock(void *pcb_node)
 {
-    // TODO: unblock the `pcb` from the block queue   
+    // unblock the `pcb` from the block queue   
     list_del(pcb_node);
     pcb_t *pcb = (pcb_t *)((list_node_t *)pcb_node)->ptr;
     pcb->status = TASK_READY;
     list_add_tail(pcb_node,&ready_queue);
 }
 
-void do_exit()
+void do_exit(int32_t exit_status)
 {
     // check if some other thread is waiting
     // if there is, unblock them
@@ -306,13 +318,13 @@ void do_exit()
 
         pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
         if (pt_pcb->status != TASK_EXITED){
-            pt_pcb->status = TASK_READY;
-            list_add_tail(temp,&ready_queue);
+            do_unblock(temp);
         }
         
         temp = tempnext;
     }
 
+    current_running->exit_status = exit_status;
     // decide terminal state by mode
     if (current_running->type == USER_THREAD || current_running->mode == ENTER_ZOMBIE_ON_EXIT)
         current_running->status = TASK_ZOMBIE;

@@ -60,6 +60,7 @@ enum ExcCode
 };
 
 #define TIMER_INTERVAL 150000
+#define PREEMPT_FREQUENCY 200
 
 typedef void (*handler_t)(regs_context_t*, uint64_t, uint64_t);
 
@@ -91,7 +92,5 @@ extern void disable_preempt(void);
 extern uint64_t read_satp();
 
 extern uintptr_t riscv_dtb;
-
-extern int PREEMPT_FREQUENCY;
 
 #endif

@@ -41,6 +41,8 @@
 
 #define SYS_exit 93
 
+#define SYS_nanosleep 101
+
 #define SYS_sched_yield 124
 #define SYS_times 153
 #define SYS_uname 160

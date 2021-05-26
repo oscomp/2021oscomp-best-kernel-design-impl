@@ -113,16 +113,5 @@ static inline void sbi_remote_sfence_vma_asid(
     SBI_CALL_1(SBI_REMOTE_SFENCE_VMA_ASID, hart_mask);
 }
 
-enum SBI_READY_FDT_TYPE {
-    TIMEBASE,
-    SLCR_BADE_ADDR,
-    ETHERNET_ADDR,
-    PLIC_ADDR,
-    NR_IRQS
-};
-static inline uint32_t sbi_read_fdt(enum SBI_READY_FDT_TYPE type)
-{
-    return SBI_CALL_1(SBI_FDT_READ, (int)type);
-}
 
 #endif
