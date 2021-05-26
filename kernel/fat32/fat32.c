@@ -26,8 +26,8 @@ fd_t fd[NUM_FD];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  3
-uchar accept_table[ACCEPT_NUM][10] = {{"GETPID"}, {"UNAME"}, {"CLONE"}};
+#define ACCEPT_NUM  4
+uchar accept_table[ACCEPT_NUM][10] = {{"GETPID"}, {"UNAME"}, {"CLONE"}, {"FORK"}};
 
 void sd_read(char *buf, uint32_t sec)
 {

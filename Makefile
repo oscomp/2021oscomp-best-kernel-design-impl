@@ -65,7 +65,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker-k210.ld
 
-K210_SERIALPORT	= /dev/ttyUSB0
+K210_SERIALPORT	= /dev/ttyUSB1
 
 .PHONY:all
 
