@@ -1,1 +1,0 @@
-riscv64-unknown-elf-gcc -march=rv64imac -mabi=lp64 -mcmodel=medany -fno-builtin -nostdinc -fno-stack-protector -ggdb -Wall -O3 -DNDEBUG  -nostdlib -T /home/ubuntu/rust/ultra-os/codes/riscv-syscalls-testing/user/lib/arch/riscv/user.ld -Ttext 0x1000 CMakeFiles/yield_C.dir/src/oscomp/yield_C.c.o -o riscv64/yield_C  libulib.a 
