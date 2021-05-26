@@ -385,7 +385,7 @@ impl ArgMachine{
         testsuits.push("dup2\0");
         testsuits.push("dup\0");
         testsuits.push("execve\0");
-        // testsuits.push("exit\0");
+        testsuits.push("exit\0");
         testsuits.push("fork\0");
         testsuits.push("fstat\0");
         testsuits.push("getcwd\0");
@@ -408,7 +408,7 @@ impl ArgMachine{
         testsuits.push("wait\0");
         testsuits.push("waitpid\0");
         testsuits.push("write\0");
-        // testsuits.push("testsuites_yield_A");
+        testsuits.push("yield\0");
         // testsuits.push("testsuites_yield_B");
         // testsuits.push("testsuites_yield_C");
         for programname in testsuits.iter(){
