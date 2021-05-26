@@ -102,7 +102,8 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             match file {
                 FileClass::File(f) => {
                     let oflags = OpenFlags::from_bits(flags).unwrap();
-                    if oflags.contains(OpenFlags::CREATE){
+                    // 需要新建文件
+                    if oflags.contains(OpenFlags::CREATE){ 
                         if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
                             let fd = inner.alloc_fd();
                             inner.fd_table[fd] = Some(FileClass::File(tar_f));
@@ -111,6 +112,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                             return -1;
                         }
                     }
+                    // 正常打开文件
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
                         let fd = inner.alloc_fd();
                         inner.fd_table[fd] = Some(FileClass::File(tar_f));
@@ -119,7 +121,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                         return -1;
                     }
                 },
-                _ => return -1,
+                _ => return -1, // 如果是抽象类文件，不能open
             }
         } else {
             return -1
@@ -472,16 +474,51 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
+    //println!("openat: path = {}", path);
     let mut inner = task.acquire_inner_lock();
-    if let Some(inode) = open(
-        inner.get_work_path().as_str(),
-        path.as_str(),
-        OpenFlags::WRONLY,
-        DiskInodeType::File
-    ) {
-        inode.delete();
-        return 0
-    } else {
-        return -1
+    //println!("openat: fd = {}", dirfd);
+    if fd as isize == AT_FDCWD {
+        //println!("cwd = {}", inner.get_work_path().as_str());
+        if let Some(inode) = open(
+            inner.get_work_path().as_str(),
+            path.as_str(),
+            OpenFlags::from_bits(flags).unwrap(),
+            DiskInodeType::File
+        ) {
+            inode.delete();
+            return 0
+        } else {
+            return -1
+        }
+    } else {    
+        let fd_usz = fd as usize;
+        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
+            return -1
+        }
+        if let Some(file) = &inner.fd_table[fd_usz] {
+            // TODO
+            match file {
+                FileClass::File(f) => {
+                    let oflags = OpenFlags::from_bits(flags).unwrap();
+                    if oflags.contains(OpenFlags::CREATE){
+                        if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
+                            tar_f.delete();
+                            return 0
+                        }else{
+                            return -1
+                        }
+                    }
+                    if let Some(tar_f) = f.find(path.as_str(), oflags){
+                        tar_f.delete();
+                        return 0
+                    }else{
+                        return -1
+                    }
+                },
+                _ => return -1,
+            }
+        } else {
+            return -1
+        }
     }
 }
