@@ -31,7 +31,7 @@ int main()
     /* for qemu singal test*/
     /* systest(filename) */
 
-    sys_test("yield");
+    sys_test("times");
     // printf("Success1!\n\r");
     // sys_test("loop");    
     // printf("Success2!\n\r");

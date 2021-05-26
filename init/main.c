@@ -188,7 +188,6 @@ int main()
     printk("> [INIT] SCREEN initialization succeeded.\n\r");
     // Setup timer interrupt and enable all interrupt
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
-    printk("timebase :%d, ticks: %d", time_base, get_ticks());
     /* setup exception */
     clear_interrupt();
     setup_exception();
