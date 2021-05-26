@@ -194,10 +194,10 @@ kerneltrap() {
 
 	//__debug_info("kerneltrap", "enter %d\n", scause);
 	if (0 == handle_intr(scause)) {
-		if (NULL != p && NULL != get_runnable()) {
-			__debug_info("kerneltrap", "yield()\n");
-			yield();
-		}
+		/*if (NULL != p && NULL != get_runnable()) {*/
+			/*__debug_info("kerneltrap", "yield()\n");*/
+			/*yield();*/
+		/*}*/
 	}
 	else if (0 == handle_excp(scause)) {
 		// handle exception 

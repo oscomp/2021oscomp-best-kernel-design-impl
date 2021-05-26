@@ -30,13 +30,13 @@ void swtch(struct context*, struct context*);
 void forkret(void);
 
 // pid management 
-int pid;
+int __pid;
 struct spinlock pid_lock;
 static int allocpid(void) {
 	int ret;
 	acquire(&pid_lock);
-	ret = pid;
-	pid = pid + 1;
+	ret = __pid;
+	__pid = __pid + 1;
 	release(&pid_lock);
 
 	return ret;
@@ -162,11 +162,11 @@ proc_pagetable(struct proc *p)
 void
 proc_freepagetable(pagetable_t pagetable, struct seg *head)
 {
-	__debug_info("proc_freepagetable", "enter\n");
+	// __debug_info("proc_freepagetable", "enter\n");
   unmappages(pagetable, TRAPFRAME, 1, 0);
-  __debug_info("proc_freepagetable", "leave\n");
+//   __debug_info("proc_freepagetable", "leave\n");
   delsegs(pagetable, head);
-  __debug_info("proc_freepagetable", "leave 2\n");
+//   __debug_info("proc_freepagetable", "leave 2\n");
   uvmfree(pagetable);
   kvmfree(pagetable, 1);
 }
@@ -270,6 +270,7 @@ int fork_cow(void) {
 	np->trapframe->a0 = 0;
 
 	// parenting 
+	__enter_proc_cs
 	np->parent = p;
 	np->sibling_prev = &(p->child);
 	np->sibling_next = p->child;
@@ -277,6 +278,14 @@ int fork_cow(void) {
 		p->child->sibling_prev = &(np->sibling_next);
 	}
 	p->child = np;
+	// __debug_info("fork_cow", "%d check children: ", p->pid);
+	// for (struct proc *tmp = p->child; tmp != NULL; tmp = tmp->sibling_next) {
+	// 	printf("%d ", tmp->pid);
+	// }
+	// printf("\n");
+	__leave_proc_cs
+
+    //__debug_assert("fork_cow", p->pid < np->pid, "child pid bigger\n");
 
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
@@ -291,7 +300,7 @@ int fork_cow(void) {
 	__insert_runnable(PRIORITY_NORMAL, np);
 	__leave_proc_cs 
 
-	__debug_info("fork_cow", "leave from fork\n");
+	__debug_info("fork_cow", "leave %d -> %d\n", p->pid, pid);
 
 	return pid;
 }
@@ -372,6 +381,8 @@ int clone(uint64 flag, uint64 stack) {
 	}
 	p->child = np;
 
+    __debug_assert("clone", p->pid < np->pid, "child pid bigger\n");
+
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
 	np->tmask = p->tmask;
@@ -415,7 +426,7 @@ void exit(int xstate) {
 	extern struct proc *__initproc;
 	__debug_assert("exit", __initproc != p, "init exiting\n");
 
-	__debug_info("exit", "p %s\n", p->name);
+	__debug_info("exit", "pid %d %s\n", p->pid, p->name);
 
 	// close all open files 
 	dropfdtable(&p->fds);
@@ -430,10 +441,18 @@ void exit(int xstate) {
 	// re-parent all it's child to `__initproc`
 	struct proc *tmp = p->child;
 	while (NULL != tmp) {
+		// printf("%d\t%d\t%d\n", p->parent->pid, p->pid, tmp->pid);
 		__debug_assert("exit", tmp != tmp->sibling_next, "dead loop\n");
 		tmp->parent = __initproc;	// re-parent to init 
-		tmp = tmp->sibling_next;
+		struct proc *tmp2 = tmp->sibling_next;
+		tmp->sibling_prev = &(__initproc->child);
+		tmp->sibling_next = __initproc->child;
+		if (NULL != __initproc->child)
+			__initproc->child->sibling_prev = &(tmp->sibling_next);
+		__initproc->child = tmp;
+		tmp = tmp2;
 	}
+	// printf("%d %d done\n", p->parent->pid, p->pid);
 	__debug_info("exit", "leave\n");
 
 	// jump into scheduler 
@@ -473,6 +492,7 @@ int wait4(int pid, uint64 status, uint64 options) {
 		np = proc_zombie;
 		while (NULL != np) {
 			if (__is_child_no_lock(pid, p, np)) {
+				__debug_info("wait", "%d picks up %d\n", p->pid, np->pid);
 				// find one 
 				int child_pid = np->pid;
 				// remove child from parent's child list 
@@ -626,7 +646,7 @@ void sleep(void *chan, struct spinlock *lk) {
 	__debug_assert("sleep", NULL != p, "p == NULL\n");
 	__debug_assert("sleep", NULL != lk, "lk == NULL\n");
 
-	__debug_info("sleep", "enter\n");
+	// __debug_info("sleep", "enter\n");
 	// either proc_lock or lk must be held at any time, 
 	// so that proc would sleep atomically 
 	if (&proc_lock != lk) {
@@ -693,7 +713,7 @@ void scheduler(void) {
 			// switch back to kernel pagetable 
 			w_satp(MAKE_SATP(kernel_pagetable));
 			sfence_vma();
-			__debug_info("scheduler()", "swtch from %s\n", tmp->name);
+			/*__debug_info("scheduler()", "swtch from %s\n", tmp->name);*/
 		}
 		c->proc = NULL;
 		__leave_proc_cs
@@ -709,7 +729,7 @@ void sched(void) {
 	struct proc *p = myproc();
 
 	__debug_assert("sched", NULL != p, "NULL == p\n");
-	__debug_info("sched", "p %s\n", p->name);
+	// __debug_info("sched", "p %s\n", p->name);
 	if (!holding(&proc_lock)) 
 		panic("sched proc_lock\n");
 	if (1 != mycpu()->noff) 
@@ -726,7 +746,7 @@ void sched(void) {
 
 void procinit(void) {
 	// init pid 
-	pid = 1;
+	__pid = 1;
 	initlock(&pid_lock, "pid_lock");
 
 	// init cpus 
@@ -881,10 +901,10 @@ static inline char const *__state_to_str(enum procstate state) {
 	}
 }
 
-static void __print_list_no_lock(struct proc *list) {
+static void __print_list_no_lock(struct proc const *list) {
 	while (list) {
 		uint64 load = 0, heap = 0;
-		for (struct seg *s = list->segment; s != NULL; s = s->next) {
+		for (struct seg const *s = list->segment; s != NULL; s = s->next) {
 			if (s->type == LOAD) {
 				load += s->sz;
 			} else if (s->type == HEAP) {
@@ -906,6 +926,9 @@ static void __print_list_no_lock(struct proc *list) {
 // print current processes to console 
 void procdump(void) {
 	printf("epc = %p\n", r_sepc());
+    acquire(&pid_lock);
+    printf("pid = %d\n", __pid);
+    release(&pid_lock);
 	printf("\nPID\tPPID\tSTATE\tKILLED\tNAME\tMEM_LOAD\tMEM_HEAP\n");
 	__enter_proc_cs 
 
