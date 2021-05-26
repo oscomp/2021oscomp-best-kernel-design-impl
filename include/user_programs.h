@@ -1,10 +1,10 @@
 
 extern unsigned char _elf___test_shell_elf[];
 int _length___test_shell_elf;
-extern unsigned char _elf___test_waitpid_elf[];
-int _length___test_waitpid_elf;
 extern unsigned char _elf___test_clone_elf[];
 int _length___test_clone_elf;
+extern unsigned char _elf___test_uname_elf[];
+int _length___test_uname_elf;
 typedef struct ElfFile {
   char *file_name;
   unsigned char* file_content;

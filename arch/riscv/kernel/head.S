@@ -39,10 +39,10 @@ clear_bss:
   add a3, a3, 4
   blt a3, a4, clear_bss
 clear_bss_done:
-  li sp, 0x80280000
+  li sp, 0x802a0000
   j boot_kernel
 secondary:
-  li sp, 0x80288000
+  li sp, 0x802a8000
   j boot_kernel
 
 loop:

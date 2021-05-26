@@ -60,17 +60,7 @@ static void init_pcb()
     ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
     ptr_t user_stack = USER_STACK_ADDR;
 
-    pcb_underinit->preempt_count = 0;
-    pcb_underinit->list.ptr = pcb_underinit;
-    pcb_underinit->pid = process_id++;
-    pcb_underinit->type = KERNEL_PROCESS;
-    pcb_underinit->wait_list.next = &pcb_underinit->wait_list;pcb_underinit->wait_list.prev = &pcb_underinit->wait_list;
-    pcb_underinit->status = TASK_READY;
-    pcb_underinit->priority = 1;
-    pcb_underinit->temp_priority = pcb_underinit->priority;
-    pcb_underinit->spawn_num = 0;
-    pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
-    pcb_underinit->mask = 0xf;
+    init_pcb_default(pcb_underinit, KERNEL_PROCESS);
     
     unsigned char *_elf_shell;
     int length;
@@ -130,27 +120,18 @@ static void init_syscall(void)
     syscall[SYSCALL_TEST] = &fat32_read_test;
     syscall[SYS_getpid] = &do_getpid;
     syscall[SYS_uname] = &do_uname;
-}
 
-// stop mapping boot_kernel
-static void init_kpgtable()
-{
-    for (uint64_t i = BOOT_KERNEL; i < BOOT_KERNEL_END; i += LARGE_PAGE_SIZE)
-    {
-        uint64_t va = i, pgdir = pa2kva(PGDIR_PA);
-        uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-        uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-        PTE *ptr1 = pgdir + vpn2*sizeof(PTE);
-        PTE *ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT);
-        clear_pgdir(ptr2);
-        *ptr1 = 0lu;
-    }
+    syscall[SYS_sched_yield] = &do_scheduler;
+    // syscall[SYS_times] = &do_gettime;
+    syscall[SYS_gettimeofday] = &do_gettimeofday;
+    syscall[SYS_clone] = &do_clone;
+    syscall[SYS_wait4] = &do_wait4;
+    // syscall[SYS_mmap] = &do_mmap;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~
 int main()
 {
-    // init_kpgtable();
     // // init Process Control Block (-_-!)
     init_pcb();
     printk("> [INIT] PCB initialization succeeded.\n\r");

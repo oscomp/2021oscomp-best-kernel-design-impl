@@ -49,10 +49,11 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
 SRC_USER	= ./test/shell.c
 
-TEST_ELF	= shell.elf clone.elf brk.elf chdir.elf close.elf dup.elf dup2.elf \
-			execve.elf exit.elf fork.elf fstat.elf getcwd.elf getdents.elf getppid.elf gettimeofday.elf mkdir_.elf mmap.elf mount.elf \
-			munmap.elf open.elf openat.elf pipe.elf read.elf sleep.elf test_echo.elf times.elf umount.elf unlink.elf wait.elf waitpid.elf \
-			write.elf yield.elf
+TEST_ELF	= shell.elf clone.elf uname.elf
+# clone.elf brk.elf chdir.elf close.elf dup.elf dup2.elf \
+# 			execve.elf exit.elf fork.elf fstat.elf getcwd.elf getdents.elf getppid.elf gettimeofday.elf mkdir_.elf mmap.elf mount.elf \
+# 			munmap.elf open.elf openat.elf pipe.elf read.elf sleep.elf test_echo.elf times.elf umount.elf unlink.elf wait.elf waitpid.elf \
+# 			write.elf yield.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
 				${SRC_SDCARD} ${SRC_FS} ${SRC_FAT32} ${SRC_UNAME}
@@ -64,7 +65,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker-k210.ld
 
-K210_SERIALPORT	= /dev/ttyUSB1
+K210_SERIALPORT	= /dev/ttyUSB0
 
 .PHONY:all
 

@@ -26,8 +26,8 @@ fd_t fd[NUM_FD];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  2
-uchar accept_table[2][10] = {{"GETPID"}, {"UNAME"}};
+#define ACCEPT_NUM  3
+uchar accept_table[ACCEPT_NUM][10] = {{"GETPID"}, {"UNAME"}, {"CLONE"}};
 
 void sd_read(char *buf, uint32_t sec)
 {
@@ -251,18 +251,7 @@ int8 fat32_read_test(const char *filename)
             ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
             ptr_t user_stack = USER_STACK_ADDR;
 
-            pcb_underinit->preempt_count = 0;
-            pcb_underinit->list.ptr = pcb_underinit;
-            pcb_underinit->pid = process_id++;
-            pcb_underinit->type = USER_PROCESS;
-            pcb_underinit->wait_list.next = &pcb_underinit->wait_list;pcb_underinit->wait_list.prev = &pcb_underinit->wait_list;
-            pcb_underinit->status = TASK_READY;
-            pcb_underinit->priority = 1;
-            pcb_underinit->temp_priority = pcb_underinit->priority;
-            pcb_underinit->mode = AUTO_CLEANUP_ON_EXIT;
-            pcb_underinit->spawn_num = 0;
-            pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1;
-            pcb_underinit->mask = current_running->mask;
+            init_pcb_default(pcb_underinit, USER_PROCESS);
 
             // load file to memory
             uintptr_t pgdir = allocPage();

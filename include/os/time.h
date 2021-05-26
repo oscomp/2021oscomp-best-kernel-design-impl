@@ -32,6 +32,7 @@
 #include <os/list.h>
 
 typedef void (*TimerCallback)(void *parameter);
+typedef uint32_t time_t;
 
 typedef struct timer
 {
@@ -41,12 +42,29 @@ typedef struct timer
     void *parameter;
 } timer_t;
 
+/* for gettimes */
+struct tms              
+{                     
+    uint32_t tms_utime;  
+    uint32_t tms_stime;  
+    uint32_t tms_cutime; 
+    uint32_t tms_cstime; 
+};
+
+/* for gettimeofday */
+struct timespec {
+    time_t tv_sec; // seconds
+    uint32_t tv_nsec; // and nanoseconds
+};
+
 extern uint32_t time_base;
 extern uint64_t time_elapsed;
 extern uint64_t MHZ;
 
 uint64_t get_timer(void);
 uint64_t get_ticks(void);
+
+int8_t do_gettimeofday(struct timespec *ts);
 
 extern uint64_t get_time_base();
 

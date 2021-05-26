@@ -63,7 +63,6 @@
 #define SYSCALL_GET_TIMEBASE 30
 #define SYSCALL_GET_TICK 31
 #define SYSCALL_GET_CHAR 32
-
 #define SYSCALL_COND_GET 33
 #define SYSCALL_COND_WAIT 34
 #define SYSCALL_COND_SIGNAL 35
@@ -92,7 +91,17 @@
 #define SYS_write 64
 
 #define SYS_exit 93
+
+#define SYS_sched_yield 124
+#define SYS_times 153
 #define SYS_uname 160
+#define SYS_gettimeofday 169
 #define SYS_getpid 172
+
+#define SYS_clone 220
+
+#define SYS_mmap 222
+
+#define SYS_wait4 260
 
 #endif

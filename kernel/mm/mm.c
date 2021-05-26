@@ -189,6 +189,7 @@ void freePage(ptr_t baseAddr)
         }
     }
     if (clear){
+        // printk_port("free : ;%lx;", baseAddr);
         list_node_t* tmp = (list_node_t *)kmalloc(sizeof(list_node_t));
         tmp->next=tmp;tmp->prev=tmp;tmp->ptr=baseAddr;
         list_add_tail(tmp,&freePageList);

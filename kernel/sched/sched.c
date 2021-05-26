@@ -129,6 +129,7 @@ void do_scheduler(void)
     switch_to(previous_running,current_running);
 }
 
+/* prepare pcb stack for ready process */
 void init_pcb_stack(
     ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, int argc ,void *arg,
     pcb_t *pcb)
@@ -143,8 +144,7 @@ void init_pcb_stack(
 
     pcb->kernel_sp = (reg_t)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     pcb->user_sp = (reg_t)user_stack;
-    pcb->kernel_stack_base = kernel_stack - NORMAL_PAGE_SIZE;
-    pcb->user_stack_base = user_stack - NORMAL_PAGE_SIZE;
+    set_stack_base(pcb, kernel_stack, user_stack);
     pcb->pgdir = pgdir;
 
     reg_t *regs = pt_regs->regs;    
@@ -167,11 +167,105 @@ void init_pcb_stack(
     switch_to_reg->regs[0] = &ret_from_exception;
 }
 
+/* copy context */
+/* kernel_stack and user_stack are stack top addr */
+static void copy_to(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack)
+{
+    uint64_t ker_stack_size, user_stack_size;
+    ker_stack_size = current_running->kernel_stack_base + NORMAL_PAGE_SIZE - current_running->kernel_sp;
+    user_stack_size = current_running->user_stack_base + NORMAL_PAGE_SIZE - current_running->user_sp;
+    
+    pcb_underinit->kernel_stack_base = kernel_stack_top - NORMAL_PAGE_SIZE;
+    pcb_underinit->user_stack_base = user_stack; //wrong but no use
+    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size;
+    pcb_underinit->user_sp = user_stack;
+    copy_stack(pcb_underinit, ker_stack_size, user_stack_size);
+}
+
+/* clone a child thread for current thread */
+/* for now, use tls as entry point */
+/* stack : ADDR OF CHILD STACK POINT */
+/* success: child pid; fail: -1 */
+pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
+{
+    for (int i = 1; i < NUM_MAX_TASK; ++i)
+        if (pcb[i].status == TASK_EXITED)
+        {
+            pcb_t *pcb_underinit = &pcb[i];
+            init_pcb_default(pcb_underinit, USER_THREAD);
+            /* set current_running pcb */
+            // init_list_head(&current_running->child_list.list);
+            // current_running->child_list.list.ptr = current_running;
+            current_running->spawn_num++;
+
+            // pcb_underinit->child_list.list.ptr = pcb_underinit;
+            // pcb_underinit->child_list.flag = flag;
+            // list_add_tail(&pcb_underinit->child_list.list, &current_running->child_list.list);
+            pcb_underinit->parent.parent = current_running;
+            pcb_underinit->parent.flag = flag;
+
+            /* init child pcb */
+            ptr_t kernel_stack_top = allocPage() + NORMAL_PAGE_SIZE;  
+            // if stack = NULL, automatically set up      
+            ptr_t user_stack = (stack)? stack : USER_STACK_ADDR + current_running->spawn_num * NORMAL_PAGE_SIZE;
+
+            // pgdir
+            pcb_underinit->pgdir = current_running->pgdir;
+           
+            // pid
+            pcb_underinit->pid = ctid;
+            process_id = ctid + 1;
+
+            // prepare stack
+            copy_to(pcb_underinit, kernel_stack_top, user_stack);
+
+            // return 0 if child
+            regs_context_t *pt_regs =
+                (regs_context_t *)(kernel_stack_top - sizeof(regs_context_t));
+            pt_regs->regs[4] = pcb_underinit;
+            pt_regs->regs[10] = 0;
+
+            // prepare switch context
+            pcb_underinit->kernel_sp -= sizeof(switchto_context_t);
+            switchto_context_t *switch_to_reg = 
+                (switchto_context_t *)(pcb_underinit->kernel_sp);
+                // it doesn't matter if kernel stack are different
+            // switchto_context_t *switch_to_reg2 = 
+            //     (switchto_context_t *)(current_running->kernel_stack_base + NORMAL_PAGE_SIZE - sizeof(regs_context_t) - sizeof(switchto_context_t));
+
+            switch_to_reg->regs[0] = &ret_from_exception;
+            // add to ready queue
+            list_del(&pcb_underinit->list);
+            list_add_tail(&pcb_underinit->list,&ready_queue);
+            return pcb_underinit->pid;
+        }
+    return -1;
+}
+
+pid_t do_wait4(pid_t pid, int32_t *status, int32_t options)
+{
+    pid_t ret = -1;
+    for (int i = 1; i < NUM_MAX_TASK; ++i)
+    {
+        if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
+            // confirm pid
+            if (pcb[i].status == TASK_READY){
+                current_running->status = TASK_BLOCKED;
+                list_add_tail(&current_running->list, &pcb[i].wait_list);
+                ret = pcb[i].pid;
+                i = 1; // start from beginning when wake up
+                do_scheduler();
+            }
+            else
+                ret = pcb[i].pid;
+        }
+    }
+    return ret;
+}
+
 
 void do_sleep(uint32_t sleep_time)
 {
-    // TODO: sleep(seconds)
-    // note: you can assume: 1 second = `timebase` ticks
     // 1. block the current_running
     // 2. create a timer which calls `do_unblock` when timeout
     // 3. reschedule because the current_running is blocked.
@@ -208,22 +302,28 @@ void do_exit()
     while (temp != &current_running->wait_list)
     {
         list_node_t *tempnext = temp->next;
-        pcb_t *waitting = temp->ptr;
-        pid_t waitting_pid = waitting->pid;
         list_del(temp);
 
-        pcb_t *pt_pcb = temp->ptr;
-        pt_pcb->status = TASK_READY;
-        list_add_tail(temp,&ready_queue);
-
+        pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
+        if (pt_pcb->status != TASK_EXITED){
+            pt_pcb->status = TASK_READY;
+            list_add_tail(temp,&ready_queue);
+        }
+        
         temp = tempnext;
     }
 
     // decide terminal state by mode
-    if (current_running->mode == ENTER_ZOMBIE_ON_EXIT)
+    if (current_running->type == USER_THREAD || current_running->mode == ENTER_ZOMBIE_ON_EXIT)
         current_running->status = TASK_ZOMBIE;
     else if (current_running->mode == AUTO_CLEANUP_ON_EXIT)
     {
+        for (int i = 0; i < NUM_MAX_TASK; ++i)
+            if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
+                pcb[i].status = TASK_EXITED;
+                list_add_tail(&current_running->list,&available_queue);
+                freePage(pcb[i].kernel_stack_base);
+            }
         current_running->status = TASK_EXITED;
         list_add_tail(&current_running->list,&available_queue);
         free_all_pages(current_running->pgdir, current_running->kernel_stack_base);
@@ -246,7 +346,7 @@ pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode)
             pcb_underinit->pid = process_id++;
             pcb_underinit->type = USER_PROCESS;
             pcb_underinit->status = TASK_READY;
-            pcb_underinit->priority = 1;
+            pcb_underinit->priority = DEFAULT_PRIORITY;
             pcb_underinit->temp_priority = pcb_underinit->priority;
             pcb_underinit->mode = mode;
             pcb_underinit->spawn_num = 0;

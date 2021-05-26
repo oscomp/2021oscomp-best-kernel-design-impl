@@ -72,6 +72,8 @@ typedef enum {
     AUTO_CLEANUP_ON_EXIT,
 } spawn_mode_t;
 
+#define DEFAULT_MODE AUTO_CLEANUP_ON_EXIT
+
 typedef enum {
     KERNEL_PROCESS,
     KERNEL_THREAD,
@@ -125,7 +127,19 @@ typedef struct pcb
     /* cursor position */
     int32_t cursor_x;
     int32_t cursor_y;
+
+    /* time */
+    uint64_t time_start;
+
+    /* point to parent */
+    struct parent{
+        struct pcb *parent;
+        uint32_t flag;
+    }parent;
+
 } pcb_t;
+
+#define DEFAULT_PRIORITY 1
 
 /* task information, used to init PCB */
 typedef struct task_info
@@ -174,6 +188,9 @@ int do_taskset(uint32_t pid,uint32_t mask);
 void do_exit();
 pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 
+pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid);
+pid_t do_wait4(pid_t pid, int32_t *status, int32_t options);
+
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;
 extern int LATTER_TICKS_COUNTER;
@@ -182,5 +199,51 @@ void end_counter();
 
 extern pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 extern void do_show_exec();
+
+/* default setup pcb */
+static inline void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
+{
+    pcb_underinit->preempt_count = 0; 
+    pcb_underinit->list.ptr = pcb_underinit; 
+    pcb_underinit->pid = process_id++; 
+    pcb_underinit->type = type; 
+    init_list_head(&pcb_underinit->wait_list);
+    pcb_underinit->status = TASK_READY; 
+    pcb_underinit->priority = DEFAULT_PRIORITY; 
+    pcb_underinit->temp_priority = pcb_underinit->priority; 
+    pcb_underinit->mode = DEFAULT_MODE; 
+    pcb_underinit->spawn_num = 0;
+    pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
+    pcb_underinit->mask = 0xf; 
+    pcb_underinit->parent.parent = NULL;
+}
+
+/* set stack base as normal */
+/* set kernel_stack_base, user_stack_base */
+static inline void set_stack_base(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
+{
+    pcb_underinit->kernel_stack_base = kernel_stack_top - NORMAL_PAGE_SIZE;
+    pcb_underinit->user_stack_base = user_stack_top - NORMAL_PAGE_SIZE;
+}
+
+/* set sp as normal */
+/* set kernel_sp, user_sp */
+/* make sure you do set_stack_base first */
+static inline void set_stack_sp(pcb_t *pcb_underinit, uint64_t ker_stack_size, uint64_t user_stack_size)
+{
+    pcb_underinit->kernel_sp = pcb_underinit->kernel_stack_base + NORMAL_PAGE_SIZE - ker_stack_size;
+    pcb_underinit->user_sp = pcb_underinit->user_stack_base + NORMAL_PAGE_SIZE - user_stack_size;
+}
+
+
+/* copy parent thread's both stack to child thread */
+/* copy necesaary size */
+static inline void copy_stack(pcb_t *pcb_underinit, uint64_t ker_stack_size, uint64_t user_stack_size)
+{
+    memcpy(pcb_underinit->kernel_sp, current_running->kernel_sp, ker_stack_size);
+    /* maybe no need to copy this */
+    // memcpy(pcb_underinit->user_sp, current_running->user_sp, user_stack_size);
+}
+
 
 #endif

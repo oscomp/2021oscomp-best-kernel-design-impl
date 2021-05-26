@@ -109,4 +109,22 @@ static inline int list_empty(const list_head *head)
     return head->next == head;
 }
 
+// get the *real* node from the list node
+#define list_entry(ptr, type, member) \
+        (type *)((char *)ptr - offsetof(type, member))
+
+// iterate the list 
+#define list_for_each_entry(pos, head, member) \
+    for (pos = list_entry((head)->next, typeof(*pos), member); \
+            &pos->member != (head); \
+            pos = list_entry(pos->member.next, typeof(*pos), member)) 
+
+// iterate the list safely, during which node could be added or removed in the list
+#define list_for_each_entry_safe(pos, q, head, member) \
+    for (pos = list_entry((head)->next, typeof(*pos), member), \
+            q = list_entry(pos->member.next, typeof(*pos), member); \
+            &pos->member != (head); \
+            pos = q, q = list_entry(pos->member.next, typeof(*q), member))
+
+
 #endif
