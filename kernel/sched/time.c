@@ -53,8 +53,17 @@ void timer_check()
 int8_t do_gettimeofday(struct timespec *ts)
 {
     uint64_t nowtick = get_ticks();
+
     ts->tv_sec = (uint32)(nowtick / time_base);
-    ts->tv_nsec = (nowtick % time_base) * (1000000000 / (float)time_base);
+
+    uint64_t left = nowtick % time_base;
+    ts->tv_nsec = 0;
+
+    for (uint i = 0; i < 9; ++i)
+    {
+        ts->tv_nsec = 10*ts->tv_nsec + left * 10 / time_base;
+        left = (left * 10) % time_base;
+    }
     return 0;
 }
 

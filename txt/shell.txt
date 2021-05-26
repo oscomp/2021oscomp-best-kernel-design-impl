@@ -11,7 +11,7 @@ Disassembly of section .text:
    10006:	1000                	addi	s0,sp,32
    10008:	0001                	nop
    1000a:	4501                	li	a0,0
-   1000c:	469000ef          	jal	ra,10c74 <sys_test>
+   1000c:	333000ef          	jal	ra,10b3e <sys_test>
    10010:	87aa                	mv	a5,a0
    10012:	fef42623          	sw	a5,-20(s0)
    10016:	fec42783          	lw	a5,-20(s0)
@@ -551,7 +551,7 @@ Disassembly of section .text:
    106c0:	ee078823          	sb	zero,-272(a5)
    106c4:	ee040793          	addi	a5,s0,-288
    106c8:	853e                	mv	a0,a5
-   106ca:	41e000ef          	jal	ra,10ae8 <sys_write>
+   106ca:	3f4000ef          	jal	ra,10abe <sys_write>
    106ce:	fec42783          	lw	a5,-20(s0)
    106d2:	853e                	mv	a0,a5
    106d4:	70b2                	ld	ra,296(sp)
@@ -597,7 +597,7 @@ Disassembly of section .text:
    10734:	fea43423          	sd	a0,-24(s0)
    10738:	fe843583          	ld	a1,-24(s0)
    1073c:	00000517          	auipc	a0,0x0
-   10740:	5cc50513          	addi	a0,a0,1484 # 10d08 <loop+0x6>
+   10740:	48450513          	addi	a0,a0,1156 # 10bc0 <loop+0xa>
    10744:	f99ff0ef          	jal	ra,106dc <printf>
    10748:	87aa                	mv	a5,a0
    1074a:	853e                	mv	a0,a5
@@ -616,7 +616,7 @@ Disassembly of section .text:
    10762:	fec42783          	lw	a5,-20(s0)
    10766:	85be                	mv	a1,a5
    10768:	00000517          	auipc	a0,0x0
-   1076c:	5a850513          	addi	a0,a0,1448 # 10d10 <loop+0xe>
+   1076c:	46050513          	addi	a0,a0,1120 # 10bc8 <loop+0x12>
    10770:	f6dff0ef          	jal	ra,106dc <printf>
    10774:	87aa                	mv	a5,a0
    10776:	853e                	mv	a0,a5
@@ -952,282 +952,126 @@ Disassembly of section .text:
    10aa8:	4601                	li	a2,0
    10aaa:	4581                	li	a1,0
    10aac:	03a00513          	li	a0,58
-   10ab0:	1f4000ef          	jal	ra,10ca4 <invoke_syscall>
+   10ab0:	0c0000ef          	jal	ra,10b70 <invoke_syscall>
    10ab4:	0001                	nop
    10ab6:	60a2                	ld	ra,8(sp)
    10ab8:	6402                	ld	s0,0(sp)
    10aba:	0141                	addi	sp,sp,16
    10abc:	8082                	ret
 
-0000000000010abe <sys_sleep>:
+0000000000010abe <sys_write>:
    10abe:	1101                	addi	sp,sp,-32
    10ac0:	ec06                	sd	ra,24(sp)
    10ac2:	e822                	sd	s0,16(sp)
    10ac4:	1000                	addi	s0,sp,32
-   10ac6:	87aa                	mv	a5,a0
-   10ac8:	fef42623          	sw	a5,-20(s0)
-   10acc:	fec46583          	lwu	a1,-20(s0)
-   10ad0:	4781                	li	a5,0
-   10ad2:	4701                	li	a4,0
-   10ad4:	4681                	li	a3,0
-   10ad6:	4601                	li	a2,0
-   10ad8:	4509                	li	a0,2
-   10ada:	1ca000ef          	jal	ra,10ca4 <invoke_syscall>
-   10ade:	0001                	nop
-   10ae0:	60e2                	ld	ra,24(sp)
-   10ae2:	6442                	ld	s0,16(sp)
-   10ae4:	6105                	addi	sp,sp,32
-   10ae6:	8082                	ret
+   10ac6:	fea43423          	sd	a0,-24(s0)
+   10aca:	fe843583          	ld	a1,-24(s0)
+   10ace:	4781                	li	a5,0
+   10ad0:	4701                	li	a4,0
+   10ad2:	4681                	li	a3,0
+   10ad4:	4601                	li	a2,0
+   10ad6:	4551                	li	a0,20
+   10ad8:	098000ef          	jal	ra,10b70 <invoke_syscall>
+   10adc:	0001                	nop
+   10ade:	60e2                	ld	ra,24(sp)
+   10ae0:	6442                	ld	s0,16(sp)
+   10ae2:	6105                	addi	sp,sp,32
+   10ae4:	8082                	ret
 
-0000000000010ae8 <sys_write>:
-   10ae8:	1101                	addi	sp,sp,-32
-   10aea:	ec06                	sd	ra,24(sp)
-   10aec:	e822                	sd	s0,16(sp)
-   10aee:	1000                	addi	s0,sp,32
-   10af0:	fea43423          	sd	a0,-24(s0)
-   10af4:	fe843583          	ld	a1,-24(s0)
-   10af8:	4781                	li	a5,0
-   10afa:	4701                	li	a4,0
-   10afc:	4681                	li	a3,0
-   10afe:	4601                	li	a2,0
-   10b00:	4551                	li	a0,20
-   10b02:	1a2000ef          	jal	ra,10ca4 <invoke_syscall>
-   10b06:	0001                	nop
-   10b08:	60e2                	ld	ra,24(sp)
-   10b0a:	6442                	ld	s0,16(sp)
-   10b0c:	6105                	addi	sp,sp,32
-   10b0e:	8082                	ret
+0000000000010ae6 <sys_move_cursor>:
+   10ae6:	1101                	addi	sp,sp,-32
+   10ae8:	ec06                	sd	ra,24(sp)
+   10aea:	e822                	sd	s0,16(sp)
+   10aec:	1000                	addi	s0,sp,32
+   10aee:	87aa                	mv	a5,a0
+   10af0:	872e                	mv	a4,a1
+   10af2:	fef42623          	sw	a5,-20(s0)
+   10af6:	87ba                	mv	a5,a4
+   10af8:	fef42423          	sw	a5,-24(s0)
+   10afc:	fec42583          	lw	a1,-20(s0)
+   10b00:	fe842603          	lw	a2,-24(s0)
+   10b04:	4781                	li	a5,0
+   10b06:	4701                	li	a4,0
+   10b08:	4681                	li	a3,0
+   10b0a:	4559                	li	a0,22
+   10b0c:	064000ef          	jal	ra,10b70 <invoke_syscall>
+   10b10:	0001                	nop
+   10b12:	60e2                	ld	ra,24(sp)
+   10b14:	6442                	ld	s0,16(sp)
+   10b16:	6105                	addi	sp,sp,32
+   10b18:	8082                	ret
 
-0000000000010b10 <sys_reflush>:
-   10b10:	1141                	addi	sp,sp,-16
-   10b12:	e406                	sd	ra,8(sp)
-   10b14:	e022                	sd	s0,0(sp)
-   10b16:	0800                	addi	s0,sp,16
-   10b18:	4781                	li	a5,0
-   10b1a:	4701                	li	a4,0
-   10b1c:	4681                	li	a3,0
-   10b1e:	4601                	li	a2,0
-   10b20:	4581                	li	a1,0
-   10b22:	455d                	li	a0,23
-   10b24:	180000ef          	jal	ra,10ca4 <invoke_syscall>
-   10b28:	0001                	nop
-   10b2a:	60a2                	ld	ra,8(sp)
-   10b2c:	6402                	ld	s0,0(sp)
-   10b2e:	0141                	addi	sp,sp,16
-   10b30:	8082                	ret
+0000000000010b1a <sys_exit>:
+   10b1a:	1141                	addi	sp,sp,-16
+   10b1c:	e406                	sd	ra,8(sp)
+   10b1e:	e022                	sd	s0,0(sp)
+   10b20:	0800                	addi	s0,sp,16
+   10b22:	4781                	li	a5,0
+   10b24:	4701                	li	a4,0
+   10b26:	4681                	li	a3,0
+   10b28:	4601                	li	a2,0
+   10b2a:	4581                	li	a1,0
+   10b2c:	05d00513          	li	a0,93
+   10b30:	040000ef          	jal	ra,10b70 <invoke_syscall>
+   10b34:	0001                	nop
+   10b36:	60a2                	ld	ra,8(sp)
+   10b38:	6402                	ld	s0,0(sp)
+   10b3a:	0141                	addi	sp,sp,16
+   10b3c:	8082                	ret
 
-0000000000010b32 <sys_move_cursor>:
-   10b32:	1101                	addi	sp,sp,-32
-   10b34:	ec06                	sd	ra,24(sp)
-   10b36:	e822                	sd	s0,16(sp)
-   10b38:	1000                	addi	s0,sp,32
-   10b3a:	87aa                	mv	a5,a0
-   10b3c:	872e                	mv	a4,a1
-   10b3e:	fef42623          	sw	a5,-20(s0)
-   10b42:	87ba                	mv	a5,a4
-   10b44:	fef42423          	sw	a5,-24(s0)
-   10b48:	fec42583          	lw	a1,-20(s0)
-   10b4c:	fe842603          	lw	a2,-24(s0)
-   10b50:	4781                	li	a5,0
-   10b52:	4701                	li	a4,0
-   10b54:	4681                	li	a3,0
-   10b56:	4559                	li	a0,22
-   10b58:	14c000ef          	jal	ra,10ca4 <invoke_syscall>
-   10b5c:	0001                	nop
-   10b5e:	60e2                	ld	ra,24(sp)
-   10b60:	6442                	ld	s0,16(sp)
-   10b62:	6105                	addi	sp,sp,32
-   10b64:	8082                	ret
-
-0000000000010b66 <sys_futex_wait>:
-   10b66:	1101                	addi	sp,sp,-32
-   10b68:	ec06                	sd	ra,24(sp)
-   10b6a:	e822                	sd	s0,16(sp)
-   10b6c:	1000                	addi	s0,sp,32
-   10b6e:	fea43423          	sd	a0,-24(s0)
-   10b72:	feb43023          	sd	a1,-32(s0)
-   10b76:	fe843583          	ld	a1,-24(s0)
-   10b7a:	4781                	li	a5,0
-   10b7c:	4701                	li	a4,0
-   10b7e:	4681                	li	a3,0
-   10b80:	fe043603          	ld	a2,-32(s0)
-   10b84:	4529                	li	a0,10
-   10b86:	11e000ef          	jal	ra,10ca4 <invoke_syscall>
-   10b8a:	0001                	nop
-   10b8c:	60e2                	ld	ra,24(sp)
-   10b8e:	6442                	ld	s0,16(sp)
-   10b90:	6105                	addi	sp,sp,32
-   10b92:	8082                	ret
-
-0000000000010b94 <sys_futex_wakeup>:
-   10b94:	1101                	addi	sp,sp,-32
-   10b96:	ec06                	sd	ra,24(sp)
-   10b98:	e822                	sd	s0,16(sp)
-   10b9a:	1000                	addi	s0,sp,32
-   10b9c:	fea43423          	sd	a0,-24(s0)
-   10ba0:	87ae                	mv	a5,a1
-   10ba2:	fef42223          	sw	a5,-28(s0)
-   10ba6:	fe843583          	ld	a1,-24(s0)
-   10baa:	fe442603          	lw	a2,-28(s0)
-   10bae:	4781                	li	a5,0
-   10bb0:	4701                	li	a4,0
-   10bb2:	4681                	li	a3,0
-   10bb4:	452d                	li	a0,11
-   10bb6:	0ee000ef          	jal	ra,10ca4 <invoke_syscall>
-   10bba:	0001                	nop
-   10bbc:	60e2                	ld	ra,24(sp)
-   10bbe:	6442                	ld	s0,16(sp)
-   10bc0:	6105                	addi	sp,sp,32
-   10bc2:	8082                	ret
-
-0000000000010bc4 <sys_get_timebase>:
-   10bc4:	1141                	addi	sp,sp,-16
-   10bc6:	e406                	sd	ra,8(sp)
-   10bc8:	e022                	sd	s0,0(sp)
-   10bca:	0800                	addi	s0,sp,16
-   10bcc:	4781                	li	a5,0
-   10bce:	4701                	li	a4,0
-   10bd0:	4681                	li	a3,0
-   10bd2:	4601                	li	a2,0
-   10bd4:	4581                	li	a1,0
-   10bd6:	4579                	li	a0,30
-   10bd8:	0cc000ef          	jal	ra,10ca4 <invoke_syscall>
-   10bdc:	87aa                	mv	a5,a0
-   10bde:	853e                	mv	a0,a5
-   10be0:	60a2                	ld	ra,8(sp)
-   10be2:	6402                	ld	s0,0(sp)
-   10be4:	0141                	addi	sp,sp,16
-   10be6:	8082                	ret
-
-0000000000010be8 <sys_get_tick>:
-   10be8:	1141                	addi	sp,sp,-16
-   10bea:	e406                	sd	ra,8(sp)
-   10bec:	e022                	sd	s0,0(sp)
-   10bee:	0800                	addi	s0,sp,16
-   10bf0:	4781                	li	a5,0
-   10bf2:	4701                	li	a4,0
-   10bf4:	4681                	li	a3,0
-   10bf6:	4601                	li	a2,0
-   10bf8:	4581                	li	a1,0
-   10bfa:	457d                	li	a0,31
-   10bfc:	0a8000ef          	jal	ra,10ca4 <invoke_syscall>
-   10c00:	87aa                	mv	a5,a0
-   10c02:	853e                	mv	a0,a5
-   10c04:	60a2                	ld	ra,8(sp)
-   10c06:	6402                	ld	s0,0(sp)
-   10c08:	0141                	addi	sp,sp,16
-   10c0a:	8082                	ret
-
-0000000000010c0c <sys_exit>:
-   10c0c:	1141                	addi	sp,sp,-16
-   10c0e:	e406                	sd	ra,8(sp)
-   10c10:	e022                	sd	s0,0(sp)
-   10c12:	0800                	addi	s0,sp,16
-   10c14:	4781                	li	a5,0
-   10c16:	4701                	li	a4,0
-   10c18:	4681                	li	a3,0
-   10c1a:	4601                	li	a2,0
-   10c1c:	4581                	li	a1,0
-   10c1e:	4505                	li	a0,1
-   10c20:	084000ef          	jal	ra,10ca4 <invoke_syscall>
-   10c24:	0001                	nop
-   10c26:	60a2                	ld	ra,8(sp)
-   10c28:	6402                	ld	s0,0(sp)
-   10c2a:	0141                	addi	sp,sp,16
-   10c2c:	8082                	ret
-
-0000000000010c2e <sys_exec>:
-   10c2e:	7179                	addi	sp,sp,-48
-   10c30:	f406                	sd	ra,40(sp)
-   10c32:	f022                	sd	s0,32(sp)
-   10c34:	1800                	addi	s0,sp,48
-   10c36:	fea43423          	sd	a0,-24(s0)
-   10c3a:	87ae                	mv	a5,a1
-   10c3c:	fcc43c23          	sd	a2,-40(s0)
-   10c40:	8736                	mv	a4,a3
-   10c42:	fef42223          	sw	a5,-28(s0)
-   10c46:	87ba                	mv	a5,a4
-   10c48:	fef42023          	sw	a5,-32(s0)
-   10c4c:	fe843583          	ld	a1,-24(s0)
-   10c50:	fe442603          	lw	a2,-28(s0)
-   10c54:	fd843683          	ld	a3,-40(s0)
-   10c58:	fe046703          	lwu	a4,-32(s0)
-   10c5c:	4781                	li	a5,0
-   10c5e:	03600513          	li	a0,54
-   10c62:	042000ef          	jal	ra,10ca4 <invoke_syscall>
-   10c66:	87aa                	mv	a5,a0
-   10c68:	2781                	sext.w	a5,a5
-   10c6a:	853e                	mv	a0,a5
-   10c6c:	70a2                	ld	ra,40(sp)
-   10c6e:	7402                	ld	s0,32(sp)
-   10c70:	6145                	addi	sp,sp,48
-   10c72:	8082                	ret
-
-0000000000010c74 <sys_test>:
-   10c74:	1101                	addi	sp,sp,-32
-   10c76:	ec06                	sd	ra,24(sp)
-   10c78:	e822                	sd	s0,16(sp)
-   10c7a:	1000                	addi	s0,sp,32
-   10c7c:	fea43423          	sd	a0,-24(s0)
-   10c80:	fe843583          	ld	a1,-24(s0)
-   10c84:	4781                	li	a5,0
-   10c86:	4701                	li	a4,0
-   10c88:	4681                	li	a3,0
-   10c8a:	4601                	li	a2,0
-   10c8c:	03b00513          	li	a0,59
-   10c90:	014000ef          	jal	ra,10ca4 <invoke_syscall>
-   10c94:	87aa                	mv	a5,a0
-   10c96:	0ff7f793          	andi	a5,a5,255
-   10c9a:	853e                	mv	a0,a5
-   10c9c:	60e2                	ld	ra,24(sp)
-   10c9e:	6442                	ld	s0,16(sp)
-   10ca0:	6105                	addi	sp,sp,32
-   10ca2:	8082                	ret
-
-0000000000010ca4 <invoke_syscall>:
-   10ca4:	88aa                	mv	a7,a0
-   10ca6:	852e                	mv	a0,a1
-   10ca8:	85b2                	mv	a1,a2
-   10caa:	8636                	mv	a2,a3
-   10cac:	86ba                	mv	a3,a4
-   10cae:	873e                	mv	a4,a5
-   10cb0:	87c2                	mv	a5,a6
-   10cb2:	00000073          	ecall
-   10cb6:	8082                	ret
+0000000000010b3e <sys_test>:
+   10b3e:	1101                	addi	sp,sp,-32
+   10b40:	ec06                	sd	ra,24(sp)
+   10b42:	e822                	sd	s0,16(sp)
+   10b44:	1000                	addi	s0,sp,32
+   10b46:	fea43423          	sd	a0,-24(s0)
+   10b4a:	fe843583          	ld	a1,-24(s0)
+   10b4e:	4781                	li	a5,0
+   10b50:	4701                	li	a4,0
+   10b52:	4681                	li	a3,0
+   10b54:	4601                	li	a2,0
+   10b56:	03b00513          	li	a0,59
+   10b5a:	016000ef          	jal	ra,10b70 <invoke_syscall>
+   10b5e:	87aa                	mv	a5,a0
+   10b60:	0ff7f793          	andi	a5,a5,255
+   10b64:	853e                	mv	a0,a5
+   10b66:	60e2                	ld	ra,24(sp)
+   10b68:	6442                	ld	s0,16(sp)
+   10b6a:	6105                	addi	sp,sp,32
+   10b6c:	8082                	ret
 	...
 
-0000000000010cba <clock>:
-   10cba:	1141                	addi	sp,sp,-16
-   10cbc:	e406                	sd	ra,8(sp)
-   10cbe:	e022                	sd	s0,0(sp)
-   10cc0:	0800                	addi	s0,sp,16
-   10cc2:	f27ff0ef          	jal	ra,10be8 <sys_get_tick>
-   10cc6:	87aa                	mv	a5,a0
-   10cc8:	853e                	mv	a0,a5
-   10cca:	60a2                	ld	ra,8(sp)
-   10ccc:	6402                	ld	s0,0(sp)
-   10cce:	0141                	addi	sp,sp,16
-   10cd0:	8082                	ret
+0000000000010b70 <invoke_syscall>:
+   10b70:	88aa                	mv	a7,a0
+   10b72:	852e                	mv	a0,a1
+   10b74:	85b2                	mv	a1,a2
+   10b76:	8636                	mv	a2,a3
+   10b78:	86ba                	mv	a3,a4
+   10b7a:	873e                	mv	a4,a5
+   10b7c:	87c2                	mv	a5,a6
+   10b7e:	00000073          	ecall
+   10b82:	8082                	ret
+   10b84:	0000                	unimp
 	...
 
-0000000000010cd4 <_start>:
-   10cd4:	00001197          	auipc	gp,0x1
-   10cd8:	83f18193          	addi	gp,gp,-1985 # 11513 <__global_pointer$>
-   10cdc:	00000e17          	auipc	t3,0x0
-   10ce0:	037e0e13          	addi	t3,t3,55 # 10d13 <__DATA_BEGIN__>
-   10ce4:	00000e97          	auipc	t4,0x0
-   10ce8:	034e8e93          	addi	t4,t4,52 # 10d18 <__BSS_END__>
-   10cec:	01de5763          	bge	t3,t4,10cfa <clear_bss_done>
+0000000000010b88 <_start>:
+   10b88:	00001197          	auipc	gp,0x1
+   10b8c:	84318193          	addi	gp,gp,-1981 # 113cb <__global_pointer$>
+   10b90:	00000e17          	auipc	t3,0x0
+   10b94:	03be0e13          	addi	t3,t3,59 # 10bcb <__DATA_BEGIN__>
+   10b98:	00000e97          	auipc	t4,0x0
+   10b9c:	038e8e93          	addi	t4,t4,56 # 10bd0 <__BSS_END__>
+   10ba0:	01de5763          	bge	t3,t4,10bae <clear_bss_done>
 
-0000000000010cf0 <clear_bss>:
-   10cf0:	000e0023          	sb	zero,0(t3)
-   10cf4:	0e05                	addi	t3,t3,1
-   10cf6:	ffde4de3          	blt	t3,t4,10cf0 <clear_bss>
+0000000000010ba4 <clear_bss>:
+   10ba4:	000e0023          	sb	zero,0(t3)
+   10ba8:	0e05                	addi	t3,t3,1
+   10baa:	ffde4de3          	blt	t3,t4,10ba4 <clear_bss>
 
-0000000000010cfa <clear_bss_done>:
-   10cfa:	b06ff0ef          	jal	ra,10000 <main>
-   10cfe:	f0fff0ef          	jal	ra,10c0c <sys_exit>
+0000000000010bae <clear_bss_done>:
+   10bae:	c52ff0ef          	jal	ra,10000 <main>
+   10bb2:	f69ff0ef          	jal	ra,10b1a <sys_exit>
 
-0000000000010d02 <loop>:
-   10d02:	a001                	j	10d02 <loop>
+0000000000010bb6 <loop>:
+   10bb6:	a001                	j	10bb6 <loop>
 	...

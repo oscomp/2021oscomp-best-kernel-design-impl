@@ -47,7 +47,7 @@ SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tin
 SRC_LIBC_ASM	= $(filter %.S %.s,$(SRC_LIBC))
 SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
-SRC_USER	= ./test/shell.c
+SRC_USER	= ./test/shell.c 
 
 TEST_ELF	= shell.elf
 # clone.elf brk.elf chdir.elf close.elf dup.elf dup2.elf \
@@ -65,7 +65,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker-k210.ld
 
-K210_SERIALPORT	= /dev/ttyUSB1
+K210_SERIALPORT	= /dev/ttyUSB2
 
 .PHONY:all
 

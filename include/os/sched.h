@@ -183,6 +183,7 @@ int do_kill(pid_t pid);
 int do_waitpid(pid_t pid);
 void do_process_show();
 pid_t do_getpid();
+pid_t do_getppid();
 int do_taskset(uint32_t pid,uint32_t mask);
 
 void do_exit();

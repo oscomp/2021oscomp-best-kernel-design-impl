@@ -98,23 +98,15 @@ extern void do_testdisk();
 static void init_syscall(void)
 {
     // initialize system call table.
-    syscall[SYSCALL_SLEEP] = &do_sleep;
-
-    syscall[SYSCALL_FUTEX_WAIT] = &futex_wait;
-    syscall[SYSCALL_FUTEX_WAKEUP] = &futex_wakeup;
 
     /* for shell to use */
     syscall[SYSCALL_WRITE] = &screen_write;
     // syscall[SYSCALL_READ] = ???;
     syscall[SYSCALL_CURSOR] = &screen_move_cursor;
-    syscall[SYSCALL_REFLUSH] = &screen_reflush;
 
-    syscall[SYSCALL_GET_TIMEBASE] = &sbi_read_fdt;
-    syscall[SYSCALL_GET_TICK] = &get_ticks;
     syscall[SYS_exit] = &do_exit;
 
     syscall[SYSCALL_TESTDISK] = &do_testdisk;
-    syscall[SYSCALL_EXEC] = &do_exec;
 
     syscall[SYS_write] = &fat32_write;
     syscall[SYSCALL_TEST] = &fat32_read_test;
@@ -126,6 +118,7 @@ static void init_syscall(void)
     syscall[SYS_gettimeofday] = &do_gettimeofday;
     syscall[SYS_clone] = &do_clone;
     syscall[SYS_wait4] = &do_wait4;
+    syscall[SYS_getppid] = &do_getppid;
     // syscall[SYS_mmap] = &do_mmap;
 }
 

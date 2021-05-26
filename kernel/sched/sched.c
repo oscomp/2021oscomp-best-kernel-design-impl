@@ -394,6 +394,13 @@ pid_t do_getpid()
     return current_running->pid;
 }
 
+pid_t do_getppid()
+{
+    if (current_running->parent.parent == NULL)
+        return 1;
+    return current_running->parent.parent->pid;
+}
+
 
 
 /***************/
