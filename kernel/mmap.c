@@ -1,9 +1,11 @@
 #include "types.h"
 #include "memlayout.h"
 #include "vm.h"
+#include "pm.h"
 #include "usrmm.h"
 #include "file.h"
 #include "proc.h"
+#include "string.h"
 
 uint64
 _mmap(uint64 start, int len, int prot, int flags, int fd, int off){
@@ -11,13 +13,18 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off){
 
   newseg(p->pagetable, p->segment, MMAP, MAXUVA, PGSIZE, prot);
 
-  if(flags && fd2file(fd, 0)->mmap_ph_addr){
-    // 已经有其他进程映射过并且允许共享，直接将物理地址与虚拟地址关联
-    // TODO: 关联物理地址与虚拟地址
+
+  struct file * f = fd2file(fd, 0);
+  uint64 * ph_addr = NULL;
+  if(f)
+    ph_addr = f->mmap_ph_addr;
+  
+  if(!ph_addr){
+    // 分配物理页面
   }
-  else{
-    // TODO: 分配物理页面
-  }
+
+  // 添加映射
+  mappages(p->pagetable, MAXUVA - PGSIZE, PGSIZE, ph_addr, prot);
 
   // TODO: 将文件中的内容拷贝到映射处
 }
