@@ -6,7 +6,10 @@ use crate::task::{
     add_task,
     TaskControlBlock,
 };
-use crate::timer::get_time_ms;
+use crate::timer::{
+    get_time_ms,
+    get_time_us
+};
 use crate::mm::{
     translated_str,
     translated_refmut,
@@ -24,6 +27,12 @@ use alloc::vec::Vec;
 use alloc::string::String;
 //use easy_fs::DiskInodeType;
 
+
+pub struct TimeVal{
+    sec: u64,
+    usec: u64,
+}
+
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next(exit_code);
     panic!("Unreachable in sys_exit!");
@@ -34,8 +43,13 @@ pub fn sys_yield() -> isize {
     0
 }
 
-pub fn sys_get_time() -> isize {
-    get_time_ms() as isize
+pub fn sys_get_time(time: *mut u64) -> isize {
+    let token = current_user_token();
+    let sec = get_time_us() as u64;
+    *translated_refmut(token, time) = sec;
+    *translated_refmut(token, unsafe { time.add(1) }) = sec;
+    0
+
 }
 
 pub fn sys_getpid() -> isize {
@@ -131,12 +145,17 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
         // println!{"acquiring lock......"};
         let waited = inner.children
             .iter()
-            .find(|p| {
+            .enumerate()
+            .find(|(_, p)| {
                 // ++++ temporarily hold child PCB lock
                 p.acquire_inner_lock().is_zombie() && (pid == -1 || pid as usize == p.getpid())
+                // ++++ release child PCB lock
             });
         // println!{"drop lock......"};
-        if let Some(waited_child) = waited {
+        if let Some((idx,_)) = waited {
+            let waited_child = inner.children.remove(idx);
+            // confirm that child will be deallocated after being removed from children list
+            assert_eq!(Arc::strong_count(&waited_child), 1);
             let found_pid = waited_child.getpid();
             // ++++ temporarily hold child lock
             // println!{"acquiring lock......"};

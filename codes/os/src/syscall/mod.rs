@@ -14,7 +14,7 @@ const SYSCALL_WRITE: usize = 64;
 const SYSCALL_FSTAT:usize = 80;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
-const SYSCALL_GET_TIME: usize = 169;
+const SYSCALL_GET_TIME_OF_DAY: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_GETPPID: usize = 173;
 const SYSCALL_SBRK: usize = 213;
@@ -37,6 +37,7 @@ use crate::sbi::shutdown;
 //use crate::fs::Dirent;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
+    // print!("({})",syscall_id);
     match syscall_id {
         SYSCALL_GETCWD=> sys_getcwd(args[0] as *mut u8, args[1] as usize),
         SYSCALL_DUP=> sys_dup(args[0]),
@@ -55,7 +56,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_FSTAT=>sys_fstat(args[0] as isize, args[1] as *mut u8),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_YIELD => sys_yield(),
-        SYSCALL_GET_TIME => sys_get_time(),
+        SYSCALL_GET_TIME_OF_DAY => sys_get_time(args[0] as *mut u64),
         SYSCALL_SBRK => sys_sbrk(args[0] as isize, args[1]) as isize,
         SYSCALL_BRK => sys_brk(args[0]),
         SYSCALL_GETPID => sys_getpid(),
@@ -63,9 +64,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_FORK => sys_fork(),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
-        SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
-        SYSCALL_LS => sys_ls(args[0] as *const u8),
-        SYSCALL_SHUTDOWN => {shutdown();0}
+        // SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
+        SYSCALL_LS => {println!("kernel ls"); sys_ls(args[0] as *const u8)},
+        SYSCALL_SHUTDOWN => shutdown(),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

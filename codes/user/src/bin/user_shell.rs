@@ -291,6 +291,7 @@ impl ArgMachine{
         if self.args.is_empty(){
             return false;
         }
+        // cd
         if self.args[0].clone().as_str() == "cd\0" {
             if self.argc != 2 {
                 println!("cd: Arg expression not right, should be: cd <addr>");
@@ -301,6 +302,7 @@ impl ArgMachine{
             return false;
         }
         // print!("changed!");
+        // autorun
         if self.args[0].clone().as_str() == "run_testsuites\0" {
             let mut testsuits :Vec<&str>= Vec::new();
             testsuits.push("testsuites_brk\0");
@@ -359,7 +361,9 @@ impl ArgMachine{
             }
             return false;
         }
+        // autorun
         if self.args[0].clone().as_str() == "ls\0" {
+            // println!("(into ls)");
             if !(self.argc == 2 || self.argc == 1) {
                 println!("ls: Arg expression not right");
                 return false
@@ -392,7 +396,7 @@ impl ArgMachine{
         testsuits.push("getdents\0");
         testsuits.push("getpid\0");
         testsuits.push("getppid\0");
-        // testsuits.push("gettimeofday");
+        testsuits.push("gettimeofday\0");
         testsuits.push("mkdir_\0");
         // testsuits.push("mmap");
         testsuits.push("mount\0");
@@ -510,7 +514,7 @@ impl ArgMachine{
 
 #[no_mangle]
 pub fn main() -> i32 {
-    ArgMachine::auto_run_testsuites();
+    // ArgMachine::auto_run_testsuites();
     // println!("Rust user shell");
     // println!("听说能输出中文?");
     let mut line: String;

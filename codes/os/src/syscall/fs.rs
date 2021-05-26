@@ -240,13 +240,14 @@ pub fn sys_chdir(path: *const u8) -> isize{
 }
 
 pub fn sys_ls(path: *const u8) -> isize{
+    // println!("ls");
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
     let path = translated_str(token, path);
     let work_path = inner.current_path.clone();
-    //println!("work path = {}", work_path);
-    //println!("path  = {}, len = {}", path, path.len());
+    // println!("work path = {}", work_path);
+    // println!("path  = {}, len = {}", path, path.len());
     list_files(work_path.as_str(), path.as_str());
     //list_files(inner.current_inode);
     //list_files(inner.current_inode);

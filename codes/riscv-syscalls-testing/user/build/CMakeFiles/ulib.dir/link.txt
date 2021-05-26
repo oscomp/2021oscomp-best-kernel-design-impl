@@ -1,0 +1,2 @@
+/usr/bin/ar qc libulib.a CMakeFiles/ulib.dir/lib/arch/riscv/crt.S.o CMakeFiles/ulib.dir/src/oscomp/clone.s.o CMakeFiles/ulib.dir/lib/main.c.o CMakeFiles/ulib.dir/lib/stdio.c.o CMakeFiles/ulib.dir/lib/stdlib.c.o CMakeFiles/ulib.dir/lib/string.c.o CMakeFiles/ulib.dir/lib/syscall.c.o
+riscv64-unknown-elf-ranlib libulib.a

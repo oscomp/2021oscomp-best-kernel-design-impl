@@ -107,7 +107,7 @@ pub fn add_initproc_into_fs() {
     }
 
 
-    println!("Write apps(initproc & user_shell) to disk from mem ");
+    // println!("Write apps(initproc & user_shell) to disk from mem ");
 
     //Write apps(initproc & user_shell) to disk from mem
     if let Some(inode) = open(

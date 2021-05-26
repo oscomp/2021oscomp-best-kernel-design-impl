@@ -1,0 +1,1 @@
+riscv64-unknown-elf-gcc -march=rv64imac -mabi=lp64 -mcmodel=medany -fno-builtin -nostdinc -fno-stack-protector -ggdb -Wall -O3 -DNDEBUG  -nostdlib -T /home/ubuntu/rust/ultra-os/codes/riscv-syscalls-testing/user/lib/arch/riscv/user.ld -Ttext 0x1000 CMakeFiles/unlink.dir/src/oscomp/unlink.c.o -o riscv64/unlink  libulib.a 
