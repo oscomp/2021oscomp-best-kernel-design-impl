@@ -383,7 +383,7 @@ impl ArgMachine{
         // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("brk\0");
-        //testsuits.push("chdir\0");
+        testsuits.push("chdir\0");
         testsuits.push("clone\0");
         testsuits.push("close\0");
         testsuits.push("dup2\0");

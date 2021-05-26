@@ -391,7 +391,9 @@ impl VFile{
             self.modify_short_dirent(|se:&mut ShortDirEntry|{
                 se.set_size(new_size);
             });
-        } 
+        } else {
+            panic!("SD Card no space!!!");
+        }
     }
 
     /* 
