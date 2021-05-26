@@ -514,7 +514,7 @@ impl ArgMachine{
 
 #[no_mangle]
 pub fn main() -> i32 {
-    // ArgMachine::auto_run_testsuites();
+    ArgMachine::auto_run_testsuites();
     // println!("Rust user shell");
     // println!("听说能输出中文?");
     let mut line: String;
