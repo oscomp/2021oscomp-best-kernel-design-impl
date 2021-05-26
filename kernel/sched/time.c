@@ -11,9 +11,6 @@ LIST_HEAD(timers);
 uint64_t time_elapsed = 0;
 uint32_t time_base = 0;
 
-uint64_t stime = 0; /*ticks*/
-uint32_t utime = 0; /*ticks*/
-
 /* create a timer to sleep */
 /* call func(parameter) when timeout */
 /* tick is sleep interval ticks */
@@ -70,15 +67,17 @@ int8_t do_gettimeofday(struct timespec *ts)
 /* for cpu compute SYS cpu time and USER cpu time */
 /* start: enter kernel, end: exit kernel */
 static uint64_t last_time;
-void start_counter()
+void kernel_time_count()
 {
-    uint64_t timepass = get_ticks() - last_time;
-    current_running->utime += timepass;
+    uint64_t now_tick = get_ticks();
+    current_running->stime += now_tick - last_time;
+    last_time = now_tick;
 }
-void end_counter()
+void user_time_count()
 {
-    uint64_t timepass = get_ticks() - last_time;
-    current_running->stime += timepass;
+    uint64_t now_tick = get_ticks();
+    current_running->utime += now_tick - last_time;
+    last_time = now_tick;
 }
 
 

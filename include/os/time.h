@@ -67,8 +67,8 @@ extern uint64_t MHZ;
 
 uint64_t get_timer(void);
 uint64_t get_ticks(void);
-void start_counter();
-void end_counter();
+void kernel_time_count();
+void user_time_count();
 
 
 int8_t do_gettimeofday(struct timespec *ts);

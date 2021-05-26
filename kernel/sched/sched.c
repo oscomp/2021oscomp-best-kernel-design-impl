@@ -73,6 +73,8 @@ void do_scheduler(void)
         previous_running->temp_priority = previous_running->priority;
         list_add_tail(&previous_running->list,&ready_queue);
     }
+    /* kernel time count */
+    kernel_time_count();
     // choose next running
     /* priority schedule*/
     current_running = NULL;

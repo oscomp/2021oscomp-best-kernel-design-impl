@@ -252,7 +252,7 @@ ENTRY(exception_handler_entry)
    * when interrupt_help complete.
    */
   
-  # call start_counter
+  call user_time_count
 
   la ra, ret_from_exception
 
