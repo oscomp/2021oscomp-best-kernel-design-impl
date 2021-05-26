@@ -82,13 +82,13 @@ uint8_t fat32_init()
     fat.data_clus_cnt = fat.data_sec_cnt / fat.bpb.sec_per_clus;
     fat.byts_per_clus = fat.bpb.sec_per_clus * fat.bpb.byts_per_sec;
 
-    printk("> [FAT32 init] byts_per_sec: %d\n", fat.bpb.byts_per_sec);
-    printk("> [FAT32 init] root_clus: %d\n", fat.bpb.root_clus);
-    printk("> [FAT32 init] sec_per_clus: %d\n", fat.bpb.sec_per_clus);
-    printk("> [FAT32 init] fat_cnt: %d\n", fat.bpb.fat_cnt);
-    printk("> [FAT32 init] fat_sz: %d\n", fat.bpb.fat_sz);
-    printk("> [FAT32 init] fat_rsvd: %d\n", fat.bpb.rsvd_sec_cnt);
-    printk("> [FAT32 init] fat_hid: %d\n", fat.bpb.hidd_sec);
+    // printk("> [FAT32 init] byts_per_sec: %d\n", fat.bpb.byts_per_sec);
+    // printk("> [FAT32 init] root_clus: %d\n", fat.bpb.root_clus);
+    // printk("> [FAT32 init] sec_per_clus: %d\n", fat.bpb.sec_per_clus);
+    // printk("> [FAT32 init] fat_cnt: %d\n", fat.bpb.fat_cnt);
+    // printk("> [FAT32 init] fat_sz: %d\n", fat.bpb.fat_sz);
+    // printk("> [FAT32 init] fat_rsvd: %d\n", fat.bpb.rsvd_sec_cnt);
+    // printk("> [FAT32 init] fat_hid: %d\n", fat.bpb.hidd_sec);
 
     /* read root dir and store it for now*/
     cwd_clus = fat.bpb.root_clus;

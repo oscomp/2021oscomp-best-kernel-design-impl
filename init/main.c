@@ -128,20 +128,20 @@ int main()
 {
     // // init Process Control Block (-_-!)
     init_pcb();
-    printk("> [INIT] PCB initialization succeeded.\n\r");
+    // printk("> [INIT] PCB initialization succeeded.\n\r");
     // // read CPU frequency
     time_base = TIMEBASE / TICKCOUNT;
     // init interrupt (^_^)
     init_exception();
-    printk("> [INIT] Interrupt processing initialization succeeded.\n\r");
+    // printk("> [INIT] Interrupt processing initialization succeeded.\n\r");
     // init system call table (0_0)
     init_syscall();
-    printk("> [INIT] System call initialized successfully.\n\r");
+    // printk("> [INIT] System call initialized successfully.\n\r");
 
 #ifdef K210
     // init sdcard (@—.—@)
     fpioa_pin_init();
-    printk("> [INIT] FPIOA initialized successfully.\n\r");
+    // printk("> [INIT] FPIOA initialized successfully.\n\r");
     ioremap(UARTHS, NORMAL_PAGE_SIZE);
 #else
     ioremap(UART0, NORMAL_PAGE_SIZE);
@@ -166,26 +166,26 @@ int main()
     ioremap(SPI2, 0x1000);
 #endif
 
-    printk("> [INIT] IOREMAP initialized successfully.\n\r");
+    // printk("> [INIT] IOREMAP initialized successfully.\n\r");
 
     share_pgtable(shell_pgdir,pa2kva(PGDIR_PA));
-    printk("> [INIT] SHARE PGTABLE initialized successfully.\n\r");
+    // printk("> [INIT] SHARE PGTABLE initialized successfully.\n\r");
 
 #ifdef K210
     sdcard_init();
-    printk("> [INIT] SD card initialized successfully.\n\r");
+    // printk("> [INIT] SD card initialized successfully.\n\r");
     fat32_init();
-    printk("> [INIT] FAT32 initialized successfully.\n\r");
+    // printk("> [INIT] FAT32 initialized successfully.\n\r");
 #else
     plicinit();      // set up interrupt controller
     plicinithart();  // ask PLIC for device interrupts
-    printk("> [INIT] PLIC initialized successfully.\n\r");
+    // printk("> [INIT] PLIC initialized successfully.\n\r");
     disk_init();
-    printk("> [INIT] Virtio Disk initialized successfully.\n\r");
+    // printk("> [INIT] Virtio Disk initialized successfully.\n\r");
 #endif
     // init screen (QAQ)
     init_screen();
-    printk("> [INIT] SCREEN initialization succeeded.\n\r");
+    // printk("> [INIT] SCREEN initialization succeeded.\n\r");
     // Setup timer interrupt and enable all interrupt
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
     /* setup exception */
