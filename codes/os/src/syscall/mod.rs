@@ -49,7 +49,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         //SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
         SYSCALL_OPENAT=> sys_open_at(args[0] as isize, args[1] as *const u8, args[2] as u32, args[3] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
-        SYSCALL_PIPE => sys_pipe(args[0] as *mut usize),
+        SYSCALL_PIPE => sys_pipe(args[0] as *mut u32),
         SYSCALL_GETDENTS64 => sys_getdents64(args[0] as isize, args[1] as *mut u8, args[2] as usize),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
@@ -65,7 +65,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
         // SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
-        SYSCALL_LS => {println!("kernel ls"); sys_ls(args[0] as *const u8)},
+        SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => shutdown(),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }

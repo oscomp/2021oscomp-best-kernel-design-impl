@@ -5,13 +5,16 @@ TARGET_DIR := target/$(TARGET)/$(MODE)
 APPS := $(wildcard $(APP_DIR)/*.rs)
 ELFS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%, $(APPS))
 BINS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(APPS))
+TESTDIR := ../riscv-syscalls-testing/user
 
 OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
 update:
-	cd ../riscv-syscalls-testing/user && make clean && rm -r riscv64 && make all
-	cp -r ../riscv-syscalls-testing/user/riscv64/ riscv64/
+	cd ${TESTDIR} && make clean
+	cd ${TESTDIR} && make all
+	cp -r ${TESTDIR}/riscv64/ ./riscv64/
+	rm -r ${TESTDIR}/riscv64
 
 elf: $(APPS)
 	rustup target add $(TARGET)

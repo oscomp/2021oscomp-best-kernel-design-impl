@@ -19,22 +19,14 @@ void test_pipe(void){
     printf("cpid: %d\n", cpid);
     if(cpid > 0){
 	close(fd[1]);
-    printf("Start read data \n");
-
 	while(read(fd[0], buf, 1) > 0)
             write(STDOUT, buf, 1);
 	write(STDOUT, "\n", 1);
-    printf("Read data finished\n");
-
 	close(fd[0]);
 	wait(NULL);
     }else{
 	close(fd[0]);
-    printf("Start write data \n");
-
 	write(fd[1], data, strlen(data));
-    printf("Write data finished\n");
-
 	close(fd[1]);
 	exit(0);
     }

@@ -383,7 +383,6 @@ impl ArgMachine{
         // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("brk\0");
-        testsuits.push("chdir\0");
         testsuits.push("clone\0");
         testsuits.push("close\0");
         testsuits.push("dup2\0");
@@ -403,7 +402,7 @@ impl ArgMachine{
         // testsuits.push("munmap");
         testsuits.push("openat\0");
         testsuits.push("open\0");
-        // testsuits.push("pipe\0");
+        testsuits.push("pipe\0");
         testsuits.push("read\0");
         // testsuits.push("testsuites_times");
         testsuits.push("umount\0");
@@ -413,8 +412,7 @@ impl ArgMachine{
         testsuits.push("waitpid\0");
         testsuits.push("write\0");
         testsuits.push("yield\0");
-        // testsuits.push("testsuites_yield_B");
-        // testsuits.push("testsuites_yield_C");
+        testsuits.push("chdir\0");
         for programname in testsuits.iter(){
             let mut exit_code = 0;
             let mut args_addr: Vec<*const u8> = Vec::new();
