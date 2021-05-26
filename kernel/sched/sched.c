@@ -74,7 +74,7 @@ void do_scheduler(void)
         list_add_tail(&previous_running->list,&ready_queue);
     }
     /* kernel time count */
-    kernel_time_count();
+    kernel_time_count(); // kernel trans?
     // choose next running
     /* priority schedule*/
     current_running = NULL;
@@ -335,6 +335,7 @@ void do_exit(int32_t exit_status)
         for (int i = 0; i < NUM_MAX_TASK; ++i)
             if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
                 pcb[i].status = TASK_EXITED;
+                pcb[i].parent.parent = NULL;
                 list_add_tail(&current_running->list,&available_queue);
                 freePage(pcb[i].kernel_stack_base);
             }

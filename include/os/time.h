@@ -37,6 +37,7 @@
 
 typedef void (*TimerCallback)(void *parameter);
 typedef uint32_t time_t;
+typedef uint64_t clock_t;
 
 typedef struct timer
 {
@@ -49,10 +50,10 @@ typedef struct timer
 /* for gettimes */
 struct tms              
 {                     
-    uint32_t tms_utime;  
-    uint32_t tms_stime;  
-    uint32_t tms_cutime; 
-    uint32_t tms_cstime; 
+    clock_t tms_utime;  
+    clock_t tms_stime;  
+    clock_t tms_cutime; 
+    clock_t tms_cstime; 
 };
 
 /* for gettimeofday */
@@ -70,7 +71,7 @@ uint64_t get_ticks(void);
 void kernel_time_count();
 void user_time_count();
 
-
+uint64_t do_times(struct tms *tms);
 int8_t do_gettimeofday(struct timespec *ts);
 
 extern uint64_t get_time_base();

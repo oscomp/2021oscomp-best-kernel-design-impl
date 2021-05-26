@@ -46,6 +46,20 @@ void timer_check()
     enable_preempt();
 }
 
+uint64_t do_times(struct tms *tms)
+{
+    uint64_t now_tick = get_ticks();
+    tms->tms_utime = current_running->utime;
+    tms->tms_stime = current_running->stime;
+    tms->tms_cutime = 0; tms->tms_cstime = 0;
+    for (uint i = 0; i < NUM_MAX_TASK; ++i)
+        if (pcb[i].parent.parent == current_running){
+            tms->tms_cutime += pcb[i].utime;
+            tms->tms_cstime += pcb[i].stime;
+        }
+    return now_tick;
+}
+
 int8_t do_gettimeofday(struct timespec *ts)
 {
     uint64_t nowtick = get_ticks();

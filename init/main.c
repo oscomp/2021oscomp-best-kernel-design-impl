@@ -114,7 +114,7 @@ static void init_syscall(void)
     syscall[SYS_uname] = &do_uname;
 
     syscall[SYS_sched_yield] = &do_scheduler;
-    // syscall[SYS_times] = &do_gettime;
+    syscall[SYS_times] = &do_times;
     syscall[SYS_gettimeofday] = &do_gettimeofday;
     syscall[SYS_clone] = &do_clone;
     syscall[SYS_wait4] = &do_wait4;

@@ -34,6 +34,8 @@ void reset_irq_timer()
 
 void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause, uint64_t tp)
 {
+    /* user time count */
+    user_time_count();
     // call corresponding handler by the value of `cause`
     int is_interrupt = (cause >> (SXLEN - 1));
     is_interrupt = !(is_interrupt == 0);
@@ -42,6 +44,8 @@ void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause, uint
         (*irq_table[exception_code])(regs,stval,exception_code);
     else
         (*exc_table[exception_code])(regs,stval,exception_code);
+    /* kernel time count */
+    kernel_time_count(); // syscall or interrupt
 }
 
 void handle_int(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
