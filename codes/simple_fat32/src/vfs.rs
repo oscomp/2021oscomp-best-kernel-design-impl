@@ -780,9 +780,11 @@ impl VFile{
         })
     }
 
-    /* WAITING */
-    pub fn remove(){
-        
+    /* WAITING 目前只支持删除自己*/
+    pub fn remove(&self){
+        self.modify_short_dirent(|sdent: &mut ShortDirEntry|{
+            sdent.delete();
+        });
     }
 
     /* WAITING */

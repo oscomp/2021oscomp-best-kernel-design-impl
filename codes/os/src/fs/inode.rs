@@ -166,6 +166,17 @@ impl OSInode {
             }
         }
     }
+
+    pub fn clear(&self){
+        let inner = self.inner.lock();
+        inner.inode.clear();
+    }
+
+    pub fn delete(&self){
+        let inner = self.inner.lock();
+        inner.inode.remove();
+    }
+
     // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
     //     let inner = self.inner.lock();
     //     if whence == SeekWhence::SEEK_END {

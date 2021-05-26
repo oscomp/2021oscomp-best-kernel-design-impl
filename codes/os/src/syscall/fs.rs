@@ -443,5 +443,45 @@ pub fn sys_umount( p_special:*const u8, flags:usize )->isize{
     MNT_TABLE.lock().umount(special, flags as u32)
 }
 
+pub fn sys_clear( path:*const u8 )->isize{
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
+    let path = translated_str(token, path);
+    let mut inner = task.acquire_inner_lock();
+    if let Some(inode) = open(
+        inner.get_work_path().as_str(),
+        path.as_str(),
+        OpenFlags::WRONLY,
+        DiskInodeType::File
+    ) {
+        inode.clear();
+        return 0
+    } else {
+        return -1
+    }
+}
 
 
+//pub fn sys_linkat(oldfd:i32, old_path:*const u8, newfd:i32, newpath:*const u8, flags:u32)->isize{
+//    return 0
+//}
+
+pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
+    let path = translated_str(token, path);
+    let mut inner = task.acquire_inner_lock();
+    if let Some(inode) = open(
+        inner.get_work_path().as_str(),
+        path.as_str(),
+        OpenFlags::WRONLY,
+        DiskInodeType::File
+    ) {
+        inode.delete();
+        return 0
+    } else {
+        return -1
+    }
+}
