@@ -1,7 +1,5 @@
 # 软硬协同的用户态中断
 
-[题目地址](https://github.com/oscomp/proj6-RV64N-on-NutShell)
-
 ## 目标
 
 本项目旨在提供一种符合 [RISC-V 用户态中断扩展规范（草案）](https://five-embeddev.com/riscv-isa-manual/latest/n.html) 的模拟器和 FPGA 实现，并基于用户态中断在内核中实现优化的信号和 io_uring 等跨进程通信机制，展示其设计和性能优势。
@@ -10,7 +8,7 @@
 
 项目架构设计如下：
 
-![arch](docs/assets/arch.svg)
+![arch](../../image/arch.svg)
 
 - 模拟器：修改 QEMU 5.0，在其中添加 N 扩展支持
 - FPGA：基于中科院计算所的[标签化 RISC-V 架构](https://github.com/LvNA-system/labeled-RISC-V/tree/master/fpga)，添加 N 扩展支持
