@@ -412,8 +412,8 @@ impl ArgMachine{
         testsuits.push("waitpid\0");
         testsuits.push("write\0");
         testsuits.push("yield\0");
-        testsuits.push("chdir\0");
         testsuits.push("unlink\0");
+        testsuits.push("chdir\0");
         for programname in testsuits.iter(){
             let mut exit_code = 0;
             let mut args_addr: Vec<*const u8> = Vec::new();

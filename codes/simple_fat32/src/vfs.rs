@@ -782,13 +782,13 @@ impl VFile{
     }
 
     /* WAITING 目前只支持删除自己*/
-    pub fn remove(&self){
+    pub fn remove(&self)->usize{
         //self.modify_short_dirent(|sdent: &mut ShortDirEntry|{
         //    sdent.delete();
         //});
         let first_cluster:u32 = self.first_cluster();
         if self.is_dir() || first_cluster == 0 {
-            return;
+            return 0;
         }
         for i in 0..self.long_pos_vec.len() {
             self.modify_long_dirent(i , |long_ent: &mut LongDirEntry|{
@@ -801,7 +801,8 @@ impl VFile{
         let all_clusters = self.fs.read()
             .get_fat().read()
             .get_all_cluster_of(first_cluster, self.block_device.clone());
-        self.fs.write().dealloc_cluster(all_clusters);
+        self.fs.write().dealloc_cluster(all_clusters.clone());
+        return all_clusters.len()
     }
 
     /* WAITING */

@@ -172,9 +172,9 @@ impl OSInode {
         inner.inode.clear();
     }
 
-    pub fn delete(&self){
+    pub fn delete(&self)->usize{
         let inner = self.inner.lock();
-        inner.inode.remove();
+        inner.inode.remove()
     }
 
     // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{

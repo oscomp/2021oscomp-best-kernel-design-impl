@@ -220,7 +220,7 @@ impl FAT32Manager {
                 free_clusters + num as u32, 
                 self.block_device.clone());
             // 如果释放的簇号小于开始空闲簇字段，更新该字段
-            if clusters[0] > 2 &&clusters[0] < self.fsinfo.first_free_cluster(self.block_device.clone()) {
+            if clusters[0] > 2 && clusters[0] < self.fsinfo.first_free_cluster(self.block_device.clone()) {
                 self.fsinfo.write_first_free_cluster(clusters[0] - 1, self.block_device.clone());
             }
         }
