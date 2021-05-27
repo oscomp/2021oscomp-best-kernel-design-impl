@@ -109,9 +109,7 @@ pub fn rust_main() -> ! {
     fs::list_apps();
     task::add_initproc();
     let mask:usize = 1 << 1;
-    unsafe {
-        sbi_send_ipi(&mask as *const usize as usize);
-    }
+    sbi_send_ipi(&mask as *const usize as usize);
     // CORE2_FLAG.lock().set_in();
     task::run_tasks();
     panic!("Unreachable in rust_main!");
