@@ -787,9 +787,6 @@ impl VFile{
         //    sdent.delete();
         //});
         let first_cluster:u32 = self.first_cluster();
-        if self.is_dir() || first_cluster == 0 {
-            return 0;
-        }
         for i in 0..self.long_pos_vec.len() {
             self.modify_long_dirent(i , |long_ent: &mut LongDirEntry|{
                 long_ent.delete();
