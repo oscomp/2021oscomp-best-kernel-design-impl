@@ -9,9 +9,18 @@
 
 uint64
 _mmap(uint64 start, int len, int prot, int flags, int fd, int off){
+  if(off % PGSIZE){
+    // TODO: exception
+    return -1;
+  }
+
   struct proc *p = myproc();
 
-  newseg(p->pagetable, p->segment, MMAP, MAXUVA, PGSIZE, prot);
+  int sz = PGROUNDUP(len);
+  if(!newseg(p->pagetable, p->segment, MMAP, MAXUVA - sz, sz, prot)){
+    // TODO: exception
+    return -1;
+  }
 
 
   struct file * f = fd2file(fd, 0);
@@ -20,11 +29,13 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off){
     ph_addr = f->mmap_ph_addr;
   
   if(!ph_addr){
-    // 分配物理页面
+    // TODO: 分配物理页面
   }
 
   // 添加映射
-  mappages(p->pagetable, MAXUVA - PGSIZE, PGSIZE, ph_addr, prot);
+  mappages(p->pagetable, MAXUVA - sz, sz, ph_addr, prot);
 
   // TODO: 将文件中的内容拷贝到映射处
+
+  return MAXUVA - sz;
 }
