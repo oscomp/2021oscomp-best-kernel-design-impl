@@ -472,7 +472,7 @@ impl VFile{
             short_ent.set_case(ALL_LOWER_CASE);
             drop(manager_reader);
         }
-        println!("*** aft format, diernt offset = {}", dirent_offset);
+        //println!("*** aft format, diernt offset = {}", dirent_offset);
         // 写短目录项
         assert_eq!(
             self.write_at(dirent_offset, short_ent.as_bytes_mut()),
@@ -485,7 +485,7 @@ impl VFile{
         if let Some(vfile) = self.find_vfile_byname(name){
             //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
             if attribute & ATTRIBUTE_DIRECTORY != 0 {
-                print!("\n");
+                //print!("\n");
                 let manager_reader = self.fs.read();
                 let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
                 let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
@@ -801,7 +801,7 @@ impl VFile{
                 long_ent.delete();
             });
         }
-        println!("[fs]: rm file");
+        //println!("[fs]: rm file");
         self.modify_short_dirent(|short_ent:&mut ShortDirEntry|{
             short_ent.delete();
         });
