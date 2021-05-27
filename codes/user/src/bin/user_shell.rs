@@ -387,9 +387,9 @@ impl ArgMachine{
     pub fn auto_run_testsuites(){
         // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
+        testsuits.push("sleep\0");
         testsuits.push("times\0");
         testsuits.push("gettimeofday\0");
-        testsuits.push("sleep\0");
         testsuits.push("brk\0");
         testsuits.push("clone\0");
         testsuits.push("close\0");
@@ -522,7 +522,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    // ArgMachine::auto_run_testsuites();
+    ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
     // cursor_move_right!(left);
