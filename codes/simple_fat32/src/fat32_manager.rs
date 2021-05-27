@@ -186,6 +186,7 @@ impl FAT32Manager {
         for i in 1..num {
             self.clear_cluster(current_cluster);
             let next_cluster = fat_writer.next_free_cluster(current_cluster, self.block_device.clone());
+            assert_ne!( next_cluster, 0);
             fat_writer.set_next_cluster(current_cluster, next_cluster, self.block_device.clone());
             //cluster_vec.push(next_cluster);
             //println!("alloc: next = {}", fat_writer.get_next_cluster(current_cluster, self.block_device.clone()));

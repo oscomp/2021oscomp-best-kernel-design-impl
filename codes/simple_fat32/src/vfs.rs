@@ -370,20 +370,21 @@ impl VFile{
         //println!("first cluster = {} nxt = {}", first_cluster, manager_writer.get_fat().read().get_next_cluster(first_cluster, self.block_device.clone()));
         if let Some(cluster) = manager_writer.alloc_cluster(needed) {
             //println!("*** cluster alloc = {}",cluster);
-            if first_cluster == 0 {
+            if first_cluster == 0 { //未分配簇
                 drop(manager_writer);
                 self.modify_short_dirent(|se:&mut ShortDirEntry|{
                     se.set_first_cluster(cluster);
                 });
                 //println!("fc = {}",self.first_cluster());
                 //println!("================== increase end ====================");
-            }else{
+            }else{  // 已经分配簇
                 //let fs_reader = self.fs.read();
                 let fat = manager_writer.get_fat();
                 //println!("try lock1");
                 let fat_writer = fat.write();
                 //println!("get lock1");
                 let final_cluster = fat_writer.final_cluster(first_cluster, self.block_device.clone());
+                assert_ne!( cluster, 0);
                 fat_writer.set_next_cluster(final_cluster, cluster, self.block_device.clone());
                 drop(manager_writer);
             }

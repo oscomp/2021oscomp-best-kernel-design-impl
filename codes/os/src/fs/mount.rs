@@ -19,6 +19,7 @@ impl MountTable {
     pub fn umount(&mut self, special:String, flags:u32)->isize{
         let len = self.mnt_list.len();
         for i in 0..len {
+            println!("in mntlist = {}", self.mnt_list[i].0);
             if self.mnt_list[i].0 == special {
                 self.mnt_list.remove(i);
                 return 0

@@ -1025,6 +1025,7 @@ impl FAT{
     pub fn set_next_cluster(&self, cluster:u32, next_cluster:u32, block_device: Arc<dyn BlockDevice>){
         // 同步修改两个FAT
         // 注意设置末尾项为 0x0FFFFFF8 
+        assert_ne!(next_cluster, 0);
         let (fat1_sec,fat2_sec,offset) = self.calculate_pos(cluster);
         get_info_cache( fat1_sec as usize, block_device.clone(), CacheMode::WRITE)
         .write()
