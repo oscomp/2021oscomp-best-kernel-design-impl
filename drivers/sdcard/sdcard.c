@@ -426,16 +426,21 @@ uint8 sd_init(void)
         return 0xFF;
     }
 
-	sd_send_cmd(SD_CMD8, 0x01AA, 0x87);
-	/*!< 0x01 or 0x05 */
-	result = sd_get_response();
-	sd_read_data(frame, 4);
-	sd_end_cmd();
-	if (result != 0x01)
-	{
-        printk("SD_CMD8 is %x\n", result); while(1) ;
+    index = 0xFF;
+    while (index--){
+		sd_send_cmd(SD_CMD8, 0x01AA, 0x87);
+		/*!< 0x01 or 0x05 */
+		result = sd_get_response();
+		sd_read_data(frame, 4);
+		sd_end_cmd();
+		if (result == 0x01)
+			break;
+	}
+	if (index == 0){
+		printk("SD_CMD8 is %x\n", result); while(1) ;
 		return 0xFF;
-    }
+	}
+
 	index = 0xFF;
 	while (index--) {
 		sd_send_cmd(SD_CMD55, 0, 0);

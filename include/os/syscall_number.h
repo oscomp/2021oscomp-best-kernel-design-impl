@@ -34,6 +34,8 @@
 #define SYSCALL_WRITE 20
 #define SYSCALL_CURSOR 22
 
+#define SYS_mkdirat 34
+
 #define SYSCALL_TESTDISK 58
 #define SYSCALL_TEST 59
 

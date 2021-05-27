@@ -26,12 +26,17 @@ typedef struct fat{
 
 /* first cluster numer of cwd */
 typedef uint32_t ientry_t;
+typedef uint32_t isec_t;
 
+#define SHORT_DENTRY_FILENAME_LEN 8
+#define SHORT_DENTRY_EXTNAME_LEN 3
+
+#pragma pack(1)
 /* directory entry */
 typedef struct dentry{
 
-    uchar filename[8];  //7:0
-    uchar extname[3];   //10:8
+    uchar filename[SHORT_DENTRY_FILENAME_LEN];  //7:0
+    uchar extname[SHORT_DENTRY_EXTNAME_LEN];   //10:8
     uchar attribute;    //11
     uchar reserved;     //12
     uint8 create_time_ms;   //13
@@ -45,6 +50,38 @@ typedef struct dentry{
     uint32 length;          //31:28
 
 }dentry_t;
+#pragma pack()
+
+#define LONG_DENTRY_NAME1_LEN 5
+#define LONG_DENTRY_NAME2_LEN 6
+#define LONG_DENTRY_NAME3_LEN 2
+#define LONG_DENTRY_NAME_LEN (LONG_DENTRY_NAME1_LEN+LONG_DENTRY_NAME2_LEN+LONG_DENTRY_NAME3_LEN)
+
+#pragma pack(1)
+/* long dentry */
+typedef struct long_dentry{
+
+    uchar sequence;   //0
+    uint16_t name1[LONG_DENTRY_NAME1_LEN];    //10:1
+    uchar attribute;  //11
+    uchar reserved;   //12
+    uchar checksum;    //13
+    uint16_t name2[LONG_DENTRY_NAME2_LEN]; //25:14
+    uint16_t reserved2; //27:26
+    uint16_t name3[LONG_DENTRY_NAME3_LEN]; //31:28 
+
+}long_dentry_t;
+#pragma pack()
+
+typedef enum{
+    SEARCH_FILE,
+    SEARCH_DIR,
+}search_mode_t;
+
+enum{
+    FD_UNUSED,
+    FD_USED,
+};
 
 /* file discriptor */
 #define O_RDONLY 1 /* read only open */
@@ -53,10 +90,12 @@ typedef struct dentry{
 typedef struct fd{
     uint8 dev;
     uint32 first_clus_num;
-    uint8 privilege;
+    uint8 flags;
     uint64 pos;
     uint8 used;
 }fd_t;
+
+typedef uint16_t unicode_t;
 
 #define NUM_FD 16
 
@@ -72,15 +111,28 @@ typedef struct fd{
 #define FILE_ATTRIBUTE_VOL 0x08
 #define FILE_ATTRIBUTE_CHDIR 0x10
 #define FILE_ATTRIBUTE_GDIR 0x20
+#define FILE_ATTRIBUTE_LONG 0x0f
 
+#define O_RDONLY 0x00
+#define O_WRONLY 0x01
+#define O_RDWR 0x02
+
+#define AT_FDCWD 0xffffff9c
+
+#define stdin 0
 #define stdout 1
 
 #define MAX_PATHLEN 60
 
 extern fat_t fat;
 
+uint16 fat32_open(uint32 fd, const uchar *path, uint32 flags, uint32 mode);
 int8 fat32_read_test(const char *filename);
 size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
+dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode);
+uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path, uint32_t mode);
+dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
+uint32_t search_empty_fat(uchar *buf);
 
 
 /* get the first sector num of this cluster */
@@ -114,5 +166,13 @@ static inline uint32_t get_next_cluster(uint32_t cluster)
     // printk("offset: %x\n", fat_offset_of_clus(cluster));
     return (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
 }
+
+static inline uint32_t clus_of_sec(uint32_t sector)
+{
+    return (sector - fat.first_data_sec) / fat.bpb.sec_per_clus + 2;
+}
+
+uint8 is_zero_dentry(dentry_t *p);
+uint8_t filenamecmp(const char *name1, const char *name2);
 
 #endif

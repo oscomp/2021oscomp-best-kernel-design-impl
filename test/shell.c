@@ -31,7 +31,7 @@ int main()
     /* for qemu singal test*/
     /* systest(filename) */
 
-    sys_test("times");
+    sys_test("mkdir");
     // printf("Success1!\n\r");
     // sys_test("loop");    
     // printf("Success2!\n\r");

@@ -120,6 +120,7 @@ static void init_syscall(void)
     syscall[SYS_wait4] = &do_wait4;
     syscall[SYS_getppid] = &do_getppid;
     syscall[SYS_nanosleep] = &do_nanosleep;
+    syscall[SYS_mkdirat] = &fat32_mkdir;
     // syscall[SYS_mmap] = &do_mmap;
 }
 

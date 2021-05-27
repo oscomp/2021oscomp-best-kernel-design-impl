@@ -175,6 +175,7 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
 
 void freePage(ptr_t baseAddr)
 {   
+    // printk_port("free :%lx\n", baseAddr);
     uint8_t clear = 1;
     for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
     {
@@ -189,8 +190,9 @@ void freePage(ptr_t baseAddr)
         }
     }
     if (clear){
-        // printk_port("free : ;%lx;", baseAddr);
+        // printk_port("sizeof : %d\n", sizeof(list_node_t));
         list_node_t* tmp = (list_node_t *)kmalloc(sizeof(list_node_t));
+        // printk_port("addr: %lx\n", tmp);
         tmp->next=tmp;tmp->prev=tmp;tmp->ptr=baseAddr;
         list_add_tail(tmp,&freePageList);
     }
@@ -201,6 +203,7 @@ void freePage(ptr_t baseAddr)
 void *kmalloc(size_t size)
 {
     memalloc -= size;
+    memalloc -= 64 - (size%64);
     return memalloc;
 }
 
