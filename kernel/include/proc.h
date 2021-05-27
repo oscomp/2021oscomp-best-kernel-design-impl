@@ -37,6 +37,13 @@ enum procstate {
 	SLEEPING, ZOMBIE, 
 };
 
+struct tms {
+	uint64 utime;		// user time 
+	uint64 stime;		// system time 
+	uint64 cutime;		// user time of children 
+	uint64 cstime;		// system time of children 
+};
+
 // Process Control Block 
 struct proc {
 	// a useless lock 
@@ -54,6 +61,9 @@ struct proc {
 	int timer;				// timer 
 	enum procstate state;	// process state 
 	void *chan;				// the reason this proc is sleeping for 
+
+	// times for process performance 
+	struct tms proc_tms;
 
 	// parenting
 	// these fields can only be operated by proc itself 
