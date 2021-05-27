@@ -517,7 +517,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    // ArgMachine::auto_run_testsuites();
+    ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
     // cursor_move_right!(left);
