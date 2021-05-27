@@ -4,6 +4,7 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
+    println
 };
 use alloc::sync::Arc;
 use alloc::string::String;
@@ -379,6 +380,8 @@ impl VFile{
                 //println!("================== increase end ====================");
             }else{  // 已经分配簇
                 //let fs_reader = self.fs.read();
+                println!("[fs-inc]: file: {}, newsz = {}", self.get_name(), new_size);
+                println!("          cluster alloc = {}",cluster);
                 let fat = manager_writer.get_fat();
                 //println!("try lock1");
                 let fat_writer = fat.write();
