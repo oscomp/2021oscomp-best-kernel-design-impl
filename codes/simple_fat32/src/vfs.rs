@@ -435,13 +435,10 @@ impl VFile{
             drop(manager_reader);
             // 写长名目录项
             for i in 0..long_ent_num {
-                //println!("dirent_offset = {}", dirent_offset);
-                //println!("{:#?}", v_long_name);
                 let mut order:u8 = (long_ent_num - i) as u8;
                 if i == 0 {
                     order |= 0x40;
                 }
-                //println!("{:X}", order);
                 long_ent.initialize(
                     v_long_name.pop().unwrap().as_bytes(), 
                     order, 
@@ -459,7 +456,6 @@ impl VFile{
             short_ent.set_case(ALL_LOWER_CASE);
             drop(manager_reader);
         }
-        //println!("*** aft format, diernt offset = {}", dirent_offset);
         // 写短目录项
         assert_eq!(
             self.write_at(dirent_offset, short_ent.as_bytes_mut()),
@@ -467,12 +463,9 @@ impl VFile{
         );
         
         // 如果是目录类型，需要创建.和..
-        //println!("name = {}", name);
 
         if let Some(vfile) = self.find_vfile_byname(name){
-            //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
             if attribute & ATTRIBUTE_DIRECTORY != 0 {
-                //print!("\n");
                 let manager_reader = self.fs.read();
                 let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
                 let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
