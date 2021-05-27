@@ -75,7 +75,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
-    //println!("openat: path = {}", path);
+    println!("openat: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
     if dirfd == AT_FDCWD {
@@ -476,7 +476,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
     print!("\n");
-    //println!("unlink: path = {}", path);
+    println!("unlink: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
     if fd as isize == AT_FDCWD {
