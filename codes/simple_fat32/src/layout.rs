@@ -860,6 +860,10 @@ impl LongDirEntry{
         //self.order = 0xE5;
     }
 
+    pub fn delete(&mut self){
+        self.order = 0xE5;
+    }
+
     /* 获取长文件名，此处完成unicode至ascii的转换，暂不支持中文！*/
     // 这里直接将几个字段拼合，不考虑填充字符0xFF等
     // 需要和manager的long_name_split配合使用

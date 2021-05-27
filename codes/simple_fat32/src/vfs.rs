@@ -783,9 +783,25 @@ impl VFile{
 
     /* WAITING 目前只支持删除自己*/
     pub fn remove(&self){
-        self.modify_short_dirent(|sdent: &mut ShortDirEntry|{
-            sdent.delete();
+        //self.modify_short_dirent(|sdent: &mut ShortDirEntry|{
+        //    sdent.delete();
+        //});
+        let first_cluster:u32 = self.first_cluster();
+        if self.is_dir() || first_cluster == 0 {
+            return;
+        }
+        for i in 0..self.long_pos_vec.len() {
+            self.modify_long_dirent(i , |long_ent: &mut LongDirEntry|{
+                long_ent.delete();
+            });
+        }
+        self.modify_short_dirent(|short_ent:&mut ShortDirEntry|{
+            short_ent.delete();
         });
+        let all_clusters = self.fs.read()
+            .get_fat().read()
+            .get_all_cluster_of(first_cluster, self.block_device.clone());
+        self.fs.write().dealloc_cluster(all_clusters);
     }
 
     /* WAITING */
