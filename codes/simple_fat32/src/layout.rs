@@ -1070,7 +1070,7 @@ impl FAT{
             //println!("in fianl cl {};{}", curr_cluster, next_cluster);
             //assert_ne!(next_cluster, 0);
             if next_cluster == END_CLUSTER || next_cluster == 0 {
-                return curr_cluster
+                return curr_cluster & 0x0FFFFFFF
             } else {
                 curr_cluster = next_cluster;
             }
@@ -1081,7 +1081,7 @@ impl FAT{
         let mut curr_cluster = start_cluster;
         let mut v_cluster:Vec<u32> = Vec::new();
         loop{
-            v_cluster.push(curr_cluster);
+            v_cluster.push(curr_cluster & 0x0FFFFFFF);
             let next_cluster = self.get_next_cluster(curr_cluster, block_device.clone());
             //println!("in all, curr = {}, next = {}", curr_cluster, next_cluster);
             //assert_ne!(next_cluster, 0);
