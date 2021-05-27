@@ -45,7 +45,8 @@ OBJS += \
   $K/driver_fs.o \
   $K/systime.o \
   $K/sysuname.o \
-  $K/uname.o 
+  $K/uname.o \
+  $K/mmap.o 
 
 ifeq ($(platform), k210)
 OBJS += \
@@ -107,7 +108,7 @@ linker = ./linker/qemu.ld
 endif
 
 # Compile Kernel
-$T/kernel: $(OBJS) $(linker) $U/initcode
+$T/kernel: $(OBJS) $(linker) $U/initcode $U/ostest 
 	@if [ ! -d "./target" ]; then mkdir target; fi
 	@$(LD) $(LDFLAGS) -T $(linker) -o $T/kernel $(OBJS)
 	@$(OBJDUMP) -S $T/kernel > $T/kernel.asm
@@ -157,7 +158,7 @@ ifeq ($(platform), k210)
 	@sudo chmod 777 $(k210-serialport)
 	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t $(k210)
 else
-	@$(QEMU) $(QEMUOPTS)
+	$(QEMU) $(QEMUOPTS)
 endif
 
 ulinker = ./linker/user.ld
@@ -167,6 +168,13 @@ $U/initcode: $U/initcode.S
 	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
 	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
 	$(OBJDUMP) -S $U/initcode.o > $U/initcode.asm
+
+$U/ostest: $U/ostest.c $U/ostest_asm.S 
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/ostest.c -o $U/ostest.o
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/ostest_asm.S -o $U/ostest_asm.o
+	$(LD) $(LDFLAGS) -N -e _entry -Ttext 0 -o $U/ostest.out $U/ostest.o $U/ostest_asm.o 
+	$(OBJCOPY) -S -O binary $U/ostest.out $U/ostest
+	$(OBJDUMP) -S $U/ostest.out > $U/ostest.asm
 
 tags: $(OBJS) _init
 	@etags *.S *.c
@@ -224,6 +232,7 @@ UPROGS=\
 	$U/_mount\
 	$U/_umount\
 	$U/_dup3\
+	$U/_mmap_test
 
 userprogs: $(UPROGS)
 
@@ -255,6 +264,7 @@ clean:
 	*/*.o */*.d */*.asm */*.sym \
 	$T/* \
 	$U/initcode $U/initcode.out \
+	$U/ostest $U/ostest.out \
 	$K/kernel \
 	.gdbinit \
 	$U/usys.S \

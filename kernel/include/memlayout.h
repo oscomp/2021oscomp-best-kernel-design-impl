@@ -108,11 +108,12 @@
 // in both user and kernel space.
 #define TRAMPOLINE              (MAXVA - PGSIZE)
 
+#define VU_MMAP                 0x70000000
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.
 // #define KSTACK(p)               (TRAMPOLINE - ((p) + 1) * 2 * PGSIZE)
 #define VKSTACK                 0x3EC0000000L
-#define VUSTACK                 (RUSTSBI_BASE - PGSIZE)
+#define VUSTACK                 VU_MMAP
 
 // User memory layout.
 // Address zero first:

@@ -46,3 +46,4 @@ entry("execve");
 entry("mount");
 entry("umount");
 entry("uname");
+entry("mmap");

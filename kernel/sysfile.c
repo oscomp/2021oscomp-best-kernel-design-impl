@@ -586,3 +586,21 @@ sys_umount(void)
 
   return 0;
 }
+
+uint64
+sys_mmap(void)
+{
+  uint64 start;
+  int len, prot, flags, fd, off;
+  if(argaddr(0, &start) < 0 || argint(1, &len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &off) < 0)
+    return -1;
+  
+  if(off % PGSIZE)
+    return -1;
+
+  struct file * f = fd2file(fd, 0);
+  if(!f)
+    return -1;
+
+  return _mmap(start, len, prot, flags, f, off);
+}

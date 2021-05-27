@@ -60,6 +60,7 @@ int mount(char *dev, char *dir, char *fstype, uint64 flag, void *data);
 int getdents(int fd, struct dirent *buf, unsigned long len);
 int umount(char *dir, uint64 flag);
 int uname(void *buf);
+void *mmap(void *start, int len, int prot, int flags, int fd, int off);
 
 // ulib.c
 int stat(const char*, struct kstat*);

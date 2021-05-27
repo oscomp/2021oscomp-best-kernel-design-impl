@@ -17,6 +17,7 @@
 #include "stat.h"
 #include "spinlock.h"
 #include "sleeplock.h"
+#include "mmap.h"
 
 struct superblock;
 struct inode;
@@ -97,6 +98,7 @@ struct inode {
 	struct inode_op		*op;
 	struct file_op		*fop;
 	// struct spinlock		lock;
+	struct mapped 		*maphead;
 
 	struct dentry		*entry;
 };
