@@ -4,7 +4,8 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
-    println
+    println,
+    print
 };
 use alloc::sync::Arc;
 use alloc::string::String;
@@ -323,6 +324,7 @@ impl VFile{
         let mut current_vfile = self.clone();
         for i in 0 .. len {
             // DEBUG
+            print!("\n");
             if path[i] == "" || path[i] == "."{
                 continue;
             }
@@ -390,7 +392,7 @@ impl VFile{
                 let final_cluster = fat_writer.final_cluster(first_cluster, self.block_device.clone());
                 assert_ne!( cluster, 0);
                 fat_writer.set_next_cluster(final_cluster, cluster, self.block_device.clone());
-                let allc = fat_writer.get_all_cluster_of(first_cluster, self.block_device.clone());
+                //let allc = fat_writer.get_all_cluster_of(first_cluster, self.block_device.clone());
                 //println!("  finish set next cluster, cluster chain:{:?}", allc);
                 drop(manager_writer);
             }
