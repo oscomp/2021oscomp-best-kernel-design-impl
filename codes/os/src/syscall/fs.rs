@@ -475,6 +475,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
+    print!("\n");
     //println!("unlink: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
@@ -501,6 +502,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
             // TODO
             match file {
                 FileClass::File(f) => {
+                    print!("\n");
                     let oflags = OpenFlags::from_bits(flags).unwrap();
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
                         tar_f.delete();
