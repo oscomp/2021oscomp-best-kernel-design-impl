@@ -94,9 +94,7 @@ impl VFile{
     pub fn read_short_dirent<V>(&self, f: impl FnOnce(&ShortDirEntry) -> V)->V{ 
         if self.short_sector == 0 {
             let root_dirent = self.fs.read().get_root_dirent();
-            //println!("read_short_dirent try lock");
             let rr = root_dirent.read();
-            //println!("read_short_dirent get lock");
             f(& rr)
         } else {
             get_info_cache(
@@ -173,7 +171,6 @@ impl VFile{
                 &self.block_device
             );
             if read_sz != DIRENT_SZ || long_ent.is_empty() {return None}
-            //println!("lname_part = {:?}; name_last = {:?}", long_ent.get_name_raw(),name_last);
             if long_ent.get_name_raw() == name_last
             && long_ent.attribute() == ATTRIBUTE_LFN {
                 // 匹配：如果名一致，且第一字段为0x4*，获取该order，以及校验和
@@ -193,9 +190,6 @@ impl VFile{
                         &self.block_device
                     );
                     if read_sz != DIRENT_SZ {return None}
-
-                    //println!("  lname_part = {}; name_last = {}", long_ent.get_name_raw(), name_vec[ long_ent_num - 1 - i ] );
-
                     if long_ent.get_name_raw() != name_vec[ long_ent_num - 1 - i ] 
                     || long_ent.attribute() != ATTRIBUTE_LFN {
                         is_match = false;
@@ -268,14 +262,12 @@ impl VFile{
                 if short_ent.is_valid() && name_upper == short_ent.get_name_uppercase() {
                     let (short_sector, short_offset) = self.get_pos(offset);
                     let long_pos_vec:Vec<(usize, usize)> = Vec::new(); 
-                    //println!("****** find short name offset = {}", offset);
                     return Some(
                         VFile::new(
                             String::from(name),
                             short_sector, 
                             short_offset, 
                             long_pos_vec,
-                            //short_ent.first_cluster(),
                             short_ent.attribute(),
                             short_ent.get_size(),
                             self.fs.clone(),
@@ -305,10 +297,8 @@ impl VFile{
         // FAT32目录没有大小，只能搜，read_at已经做了完善的适配
         self.read_short_dirent(|short_ent:&ShortDirEntry|{
             if name_.len() > 8 || ext_.len() > 3 { //长文件名
-                //println!("find long");
                 return self.find_long_name(name, short_ent)
             } else { // 短文件名
-                //println!("find short, name = {}",name);
                 return self.find_short_name(name, short_ent) 
             }
         })
@@ -421,7 +411,6 @@ impl VFile{
         //    //println!("already exist：{}",name);
         //    return None
         //}
-        //println!("*** aft find");
         let manager_reader = self.fs.read();
         let (name_, ext_) = manager_reader.split_name_ext(name);
         // 搜索空处
@@ -429,10 +418,8 @@ impl VFile{
         if let Some(offset) = self.find_free_dirent(){
             dirent_offset = offset;
         } else {
-            //println!("no space");
             return None
         }
-        println!("*** aft search free: dirent_offset = {}",dirent_offset);
         let mut short_ent = ShortDirEntry::empty();
         if name_.len() > 8 || ext_.len() > 3 { 
             // 长文件名拆分
@@ -754,7 +741,9 @@ impl VFile{
         }
         let mut offset = 0;
         loop {
-            print!("\n");
+            if (offset/DIRENT_SZ)%5 == 0 {
+                print!("\n");
+            }
             let mut tmp_dirent = ShortDirEntry::empty();
             let read_sz = self.read_short_dirent(|short_ent:&ShortDirEntry|{
                 short_ent.read_at(
