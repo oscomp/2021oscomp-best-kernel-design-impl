@@ -396,7 +396,6 @@ impl ArgMachine{
         testsuits.push("getdents\0");
         testsuits.push("getpid\0");
         testsuits.push("getppid\0");
-        testsuits.push("gettimeofday\0");
         testsuits.push("mkdir_\0");
         // testsuits.push("mmap\0");
         testsuits.push("mount\0");
@@ -414,6 +413,7 @@ impl ArgMachine{
         testsuits.push("write\0");
         testsuits.push("yield\0");
         testsuits.push("chdir\0");
+        testsuits.push("gettimeofday\0");
         for programname in testsuits.iter(){
             let mut exit_code = 0;
             let mut args_addr: Vec<*const u8> = Vec::new();
