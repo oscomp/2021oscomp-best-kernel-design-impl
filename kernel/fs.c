@@ -83,17 +83,20 @@ void rootfs_init()
 	if ((rootfs.root = de_root_generate(NULL, "/", 0, I_MODE_DIR, 0, 0)) == NULL)
 		panic("rootfs_init 1");
 
-	struct dentry *de, *data;
+	struct dentry *de, *home, *con;
 	if ((de = de_root_generate(rootfs.root, "dev", 1, I_MODE_DIR, 0, 0)) == NULL)
 		panic("rootfs_init 2");
-	if ((data = de_root_generate(rootfs.root, "home", 2, I_MODE_DIR, 0, 1)) == NULL)
+	if ((home = de_root_generate(rootfs.root, "home", 2, I_MODE_DIR, 0, 1)) == NULL)
 		panic("rootfs_init 3");
-	if (de_root_generate(de, "console", 3, 0, 2, 0) == NULL)
+	if ((con = de_root_generate(de, "console", 3, 0, 2, 0)) == NULL)
 		panic("rootfs_init 4");
-	if ((de = de_root_generate(de, "vda", 4, 0, ROOTDEV, 1)) == NULL)
+	if ((de = de_root_generate(de, "vda2", 4, 0, ROOTDEV, 1)) == NULL)
 		panic("rootfs_init 5");
 
-	if (do_mount(de->inode, data->inode, "fat32", 0, 0) < 0)
+	extern struct file_op console_op;
+	con->inode->fop = &console_op;
+
+	if (do_mount(de->inode, home->inode, "fat32", 0, 0) < 0)
 		panic("rootfs_init 6");
 
 	__debug_info("rootfs_init", "done\n");
@@ -162,6 +165,7 @@ static int rootfs_getattr(struct inode *ip, struct kstat *st) {
     st->size = ip->size;
     st->blocks = (st->size + st->blksize - 1) / st->blksize;
     st->dev = ip->sb->devnum;
+	st->rdev = ip->dev;
     st->ino = ip->inum;
     st->mode = ip->mode;
 	return 0;
@@ -187,13 +191,14 @@ static int root_file_readdir(struct inode *ip, struct dirent *dent, uint off) {
 	release(&rootfs.cache_lock);
 
 	if (child) {
+		struct inode *ip = child->inode;
 		safestrcpy(dent->name, child->filename, 128);
 		int size = sizeof(struct dirent) - sizeof(dent->name) + strlen(dent->name) + 1;
 		size += (sizeof(uint64) - (size % sizeof(uint64))) % sizeof(uint64); // Align to 8.
-		dent->ino = child->inode->inum;
+		dent->ino = ip->inum;
 		dent->off = off;
 		dent->reclen = size;
-		dent->type = (child->inode->mode & I_MODE_DIR) ? T_DIR : T_FILE;
+		dent->type = (ip->mode & I_MODE_DIR) ? T_DIR : (ip->dev ? T_DEVICE : T_FILE);
 		return 32;
 	}
 	return 0;

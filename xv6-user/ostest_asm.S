@@ -18,9 +18,9 @@ wait:
  ecall
  ret
 
-.global dev
-dev:
- li a7, SYS_dev
+.global openat
+openat:
+ li a7, SYS_openat
  ecall
  ret
 

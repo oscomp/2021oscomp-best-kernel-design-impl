@@ -17,7 +17,8 @@ main(void)
   //   mknod("console", CONSOLE, 0);
   //   open("console", O_RDWR);
   // }
-  dev(O_RDWR, CONSOLE, 0);
+  // dev(O_RDWR, CONSOLE, 0);
+  open("/dev/console", O_RDWR);
   dup(0);  // stdout
   dup(0);  // stderr
 

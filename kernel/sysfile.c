@@ -195,8 +195,13 @@ sys_openat(void)
     ip->op->truncate(ip);
   }
 
-  f->type = FD_INODE;
-  f->off = (omode & O_APPEND) ? ip->size : 0;
+  if (ip->dev) {
+    f->type = FD_DEVICE;
+  } else {
+    f->type = FD_INODE;
+    f->off = (omode & O_APPEND) ? ip->size : 0;
+  }
+
   f->ip = ip;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
@@ -290,35 +295,35 @@ sys_pipe(void)
 uint64
 sys_dev(void)
 {
-  int fd, omode;
-  int major, minor;
-  struct file *f;
+//   int fd, omode;
+//   int major, minor;
+//   struct file *f;
 
-  if(argint(0, &omode) < 0 || argint(1, &major) < 0 || argint(2, &minor) < 0){
+//   if(argint(0, &omode) < 0 || argint(1, &major) < 0 || argint(2, &minor) < 0){
     return -1;
-  }
+//   }
 
-  if(omode & O_CREATE){
-    panic("dev file on FAT");
-  }
+//   if(omode & O_CREATE){
+//     panic("dev file on FAT");
+//   }
 
-  if(major < 0 || major >= NDEV)
-    return -1;
+//   if(major < 0 || major >= NDEV)
+//     return -1;
 
-  if((f = filealloc()) == NULL || (fd = fdalloc(f)) < 0){
-    if(f)
-      fileclose(f);
-    return -1;
-  }
+//   if((f = filealloc()) == NULL || (fd = fdalloc(f)) < 0){
+//     if(f)
+//       fileclose(f);
+//     return -1;
+//   }
 
-  f->type = FD_DEVICE;
-  f->off = 0;
-  f->ip = 0;
-  f->major = major;
-  f->readable = !(omode & O_WRONLY);
-  f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+//   f->type = FD_DEVICE;
+//   f->off = 0;
+//   f->ip = 0;
+//   f->major = major;
+//   f->readable = !(omode & O_WRONLY);
+//   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
 
-  return fd;
+//   return fd;
 }
 
 // To support ls command

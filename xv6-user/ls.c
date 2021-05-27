@@ -21,8 +21,9 @@ ls(char *path)
 	int fd;
 	struct kstat st;
 	char *types[] = {
-		[T_DIR]   "DIR ",
-		[T_FILE]  "FILE",
+		[T_DIR]     "DIR ",
+		[T_FILE]    "FILE",
+		[T_DEVICE]  "DEV ",
 	};
 	char sizes[] = "BKMGT";
 
@@ -63,8 +64,7 @@ ls(char *path)
 						st.size /= 1024;
 						szno++;
 					}
-					int t = (st.mode & ST_MODE_DIR) ? T_DIR : T_FILE;
-					printf("%x\t%d\t%s\t%l%c\t%s\n", st.dev, st.ino, types[t], st.size, sizes[szno], d->name);
+					printf("%x\t%d\t%s\t%l%c\t%s\n", st.dev, st.ino, types[d->type], st.size, sizes[szno], d->name);
 				}
 				i += d->reclen;
 			}
@@ -75,8 +75,9 @@ ls(char *path)
 			st.size /= 1024;
 			szno++;
 		}
+		int t = st.rdev ? T_DEVICE : T_FILE;
 		printf("%x\t%d\t%s\t%l%c\t%s\n",
-				st.dev, st.ino, types[T_FILE], st.size, sizes[szno], getname(path));
+				st.dev, st.ino, types[t], st.size, sizes[szno], getname(path));
 	}
 	close(fd);
 }

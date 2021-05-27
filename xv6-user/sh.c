@@ -283,7 +283,8 @@ main(void)
   int fd;
 
   // Ensure that three file descriptors are open.
-  while((fd = dev(O_RDWR, 1, 0)) >= 0){
+  // while((fd = dev(O_RDWR, 1, 0)) >= 0){
+  while((fd = open("/dev/console", O_RDWR)) >= 0){
     if(fd >= 3){
       close(fd);
       break;
