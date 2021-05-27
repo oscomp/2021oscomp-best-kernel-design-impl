@@ -1,11 +1,16 @@
 #![no_std]
+#![feature(llvm_asm)]
 extern crate alloc;
+
 
 mod block_dev;
 mod layout;
 mod fat32_manager;
 mod vfs;
 mod block_cache;
+#[macro_use]
+mod console;
+mod sbi;
 
 pub const BLOCK_SZ:usize = 512;
 pub use block_dev::BlockDevice;
@@ -15,7 +20,6 @@ pub use layout::ShortDirEntry;
 pub use fat32_manager::FAT32Manager;
 pub use layout::*;
 use block_cache::{get_block_cache,get_info_cache,write_to_dev,set_start_sec, CacheMode};
-
 /*
 pub trait w_field {
     fn set(&self, value:Self);

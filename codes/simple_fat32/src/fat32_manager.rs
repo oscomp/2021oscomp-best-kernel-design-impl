@@ -9,12 +9,15 @@ use super::{
     FSInfo, 
     FatBS, 
     FatExtBS,
-    FAT
+    FAT,
+    println,
 };
+//#[macro_use]
 use crate::{ layout::*, VFile};
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::RwLock;
+//use console;
 
 pub struct FAT32Manager {
     block_device: Arc<dyn BlockDevice>,
@@ -67,6 +70,7 @@ impl FAT32Manager {
     /* 打开现有的FAT32  */
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>>{
         // 读入分区偏移
+        println!("[fs]: Load FAT32");
         let start_sector:u32 = get_info_cache(
             0, 
             Arc::clone(&block_device),
@@ -110,13 +114,14 @@ impl FAT32Manager {
         let fsinfo = FSInfo::new(ext_boot_sec.fat_info_sec());
         // 校验签名
         assert!(fsinfo.check_signature(Arc::clone(&block_device)),"Error loading fat32! Illegal signature");
-        //println!( "first free clu = {}", fsinfo.first_free_cluster(block_device.clone()) );
+        println!("[fs]: first free cluster = {}", fsinfo.first_free_cluster(block_device.clone()) );
         
         let sectors_per_cluster = boot_sec.sectors_per_cluster as u32;
         let bytes_per_sector = boot_sec.bytes_per_sector as u32;
         let bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
 
-        //println!("bytes per sec = {}", bytes_per_sector);
+        println!("[fs]: bytes per sec = {}", bytes_per_sector);
+        println!("[fs]: bytes per cluster = {}", bytes_per_cluster);
 
         let fat_n_sec = ext_boot_sec.fat_size();
         let fat1_sector = boot_sec.first_fat_sector();
@@ -220,10 +225,11 @@ impl FAT32Manager {
                 free_clusters + num as u32, 
                 self.block_device.clone());
             // 如果释放的簇号小于开始空闲簇字段，更新该字段
-            if clusters[0] > 2 &&clusters[0] < self.fsinfo.first_free_cluster(self.block_device.clone()) {
+            if clusters[0] > 2 && clusters[0] < self.fsinfo.first_free_cluster(self.block_device.clone()) {
                 self.fsinfo.write_first_free_cluster(clusters[0] - 1, self.block_device.clone());
             }
         }
+        println!("[fs]: after dealloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
     }    
 
     pub fn clear_cluster(&self,  cluster_id: u32 ){

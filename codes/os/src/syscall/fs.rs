@@ -475,7 +475,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
-    //println!("openat: path = {}", path);
+    //println!("unlink: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
     if fd as isize == AT_FDCWD {
@@ -486,6 +486,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
             OpenFlags::from_bits(flags).unwrap(),
             DiskInodeType::File
         ) {
+            //println!("unlink dealloc {} clusters",inode.delete());
             inode.delete();
             return 0
         } else {
@@ -501,14 +502,6 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
             match file {
                 FileClass::File(f) => {
                     let oflags = OpenFlags::from_bits(flags).unwrap();
-                    if oflags.contains(OpenFlags::CREATE){
-                        if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
-                            tar_f.delete();
-                            return 0
-                        }else{
-                            return -1
-                        }
-                    }
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
                         tar_f.delete();
                         return 0
