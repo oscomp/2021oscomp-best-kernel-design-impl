@@ -36,6 +36,8 @@
 #include <os/mm.h>
 #include <os/smp.h>
 #include <os/time.h>
+#include <os/fat32.h>
+
 
 #define NUM_MAX_TASK 16
 
@@ -144,6 +146,10 @@ typedef struct pcb
     /* systime */
     uint64_t stime;
     uint64_t utime;
+
+    /* file descriptor */
+    fd_t fd[NUM_FD];
+
 } pcb_t;
 
 #define DEFAULT_PRIORITY 1
@@ -225,6 +231,12 @@ static inline void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
     pcb_underinit->mask = 0xf; 
     pcb_underinit->parent.parent = NULL;
+
+    /* file descriptors */
+    pcb_underinit->fd[0].dev = 0; pcb_underinit->fd[0].used = 1; pcb_underinit->fd[0].privilege = O_WRONLY; 
+    pcb_underinit->fd[1].dev = 0; pcb_underinit->fd[1].used = 1; pcb_underinit->fd[1].privilege = O_WRONLY; 
+    for (int i = 2; i < NUM_FD; ++i)
+        pcb_underinit->fd[i].used = 0; // remember to set up other props when use it
 
     // systime
     pcb_underinit->stime = 0;

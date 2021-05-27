@@ -21,14 +21,13 @@ ientry_t cwd_first_clus;
 ientry_t cwd_clus;
 ientry_t cwd_sec;
 uchar cwd_path[MAX_PATHLEN];
-fd_t fd[NUM_FD];
 
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  11
+#define ACCEPT_NUM  12
 uchar accept_table[ACCEPT_NUM][10] = {{"CLONE"}, {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
-    {"WAIT"}, {"WAITPID"}, {"EXIT"},{"YIELD"}, {"TIMES"}};
+    {"WAIT"}, {"WAITPID"}, {"EXIT"},{"YIELD"}, {"TIMES"}, {"SLEEP"}};
 
 void sd_read(char *buf, uint32_t sec)
 {
@@ -100,12 +99,6 @@ uint8_t fat32_init()
     // fat32_read(NULL);
     // printk("success");
     kfree(b);
-
-    /* init fs */
-    fd[0].used = 1; fd[0].privilege = O_WRONLY; 
-    fd[1].used = 1; fd[1].privilege = O_WRONLY; 
-    for (int i = 2; i < NUM_FD; ++i)
-        fd[i].used = 0; // remember to set up other props when use it
 
     return 0;
 }
@@ -285,6 +278,25 @@ int8 fat32_read_test(const char *filename)
           -1: fail
         */
 size_t fat32_write(uint32 fd, uchar *buff, uint64_t count)
+{
+    // for (uint32 i = 0; i < 30000000; ++i)
+    // {
+    //     ;
+    // }
+    if (count == 0) return 0;
+    if (fd == stdout){
+        memcpy(stdout_buf, buff, count);
+        stdout_buf[count] = 0;
+        return printk_port(stdout_buf);
+    }
+
+}
+
+/* write count bytes from buff to file in fd */
+/* return count: success
+          -1: fail
+        */
+size_t fat32_open(uint32 fd, uchar *buff, uint64_t count)
 {
     // for (uint32 i = 0; i < 30000000; ++i)
     // {

@@ -36,7 +36,6 @@ SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
 SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c
 SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c
-SRC_FS		= ./kernel/fs/fs.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_FAT32	= ./kernel/fat32/fat32.c
@@ -56,7 +55,7 @@ TEST_ELF	= shell.elf
 # 			write.elf yield.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_SDCARD} ${SRC_FS} ${SRC_FAT32} ${SRC_UNAME}
+				${SRC_SDCARD} ${SRC_FAT32} ${SRC_UNAME}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c
@@ -65,7 +64,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker-k210.ld
 
-K210_SERIALPORT	= /dev/ttyUSB2
+K210_SERIALPORT	= /dev/ttyUSB3
 
 .PHONY:all
 

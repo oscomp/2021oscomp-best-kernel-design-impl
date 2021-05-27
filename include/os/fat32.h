@@ -1,5 +1,9 @@
+#ifndef _FAT32_INCLUDE_
+#define _FAT32_INCLUDE_
+
 #include <type.h>
 #include <pgtable.h>
+#include <../../drivers/sdcard/include/sdcard.h>
 
 typedef struct fat{
     uint32_t  first_data_sec;
@@ -47,13 +51,14 @@ typedef struct dentry{
 #define O_WRONLY 2 /* write only open */
 #define O_RDWR 3 /* read/write open */
 typedef struct fd{
+    uint8 dev;
     uint32 first_clus_num;
     uint8 privilege;
     uint64 pos;
     uint8 used;
 }fd_t;
+
 #define NUM_FD 16
-extern fd_t fd[NUM_FD];
 
 #define SECTOR_SIZE (fat.bpb.byts_per_sec)
 #define CLUSTER_SIZE (fat.byts_per_clus)
@@ -71,7 +76,6 @@ extern fd_t fd[NUM_FD];
 #define stdout 1
 
 #define MAX_PATHLEN 60
-
 
 extern fat_t fat;
 
@@ -110,3 +114,5 @@ static inline uint32_t get_next_cluster(uint32_t cluster)
     // printk("offset: %x\n", fat_offset_of_clus(cluster));
     return (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
 }
+
+#endif
