@@ -210,7 +210,7 @@ impl FAT32Manager {
         // 写入分配的最后一个簇
         self.fsinfo.write_first_free_cluster(current_cluster, self.block_device.clone());
         self.cache_write_back();
-        println!("[fs]: after alloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
+        //println!("[fs]: after alloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
         Some(first_cluster)
     }
 
@@ -232,7 +232,7 @@ impl FAT32Manager {
                 self.fsinfo.write_first_free_cluster(clusters[0] - 1, self.block_device.clone());
             }
         }
-        println!("[fs]: after dealloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
+        //println!("[fs]: after dealloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
     }    
 
     pub fn clear_cluster(&self,  cluster_id: u32 ){
