@@ -387,9 +387,6 @@ impl ArgMachine{
     pub fn auto_run_testsuites(){
         // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
-        testsuits.push("sleep\0");
-        testsuits.push("times\0");
-        testsuits.push("gettimeofday\0");
         testsuits.push("brk\0");
         testsuits.push("clone\0");
         testsuits.push("close\0");
@@ -417,6 +414,9 @@ impl ArgMachine{
         testsuits.push("waitpid\0");
         testsuits.push("write\0");
         testsuits.push("yield\0");
+        testsuits.push("sleep\0");
+        testsuits.push("times\0");
+        testsuits.push("gettimeofday\0");
         testsuits.push("unlink\0");
         testsuits.push("chdir\0");
         for programname in testsuits.iter(){
