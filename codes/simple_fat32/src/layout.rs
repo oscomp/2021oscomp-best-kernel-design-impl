@@ -534,7 +534,7 @@ impl ShortDirEntry{
             block_device
         );
         //println!("curr_clu = {} sec = {}", c_clu, c_sec);
-        if c_clu == END_CLUSTER {return 0};
+        if c_clu >= END_CLUSTER {return 0};
         let mut current_cluster = c_clu;
         let mut current_sector = c_sec;
         /*
@@ -590,7 +590,7 @@ impl ShortDirEntry{
                 // 读完一个簇
                 //println!("in read_at");
                 current_cluster = fat_reader.get_next_cluster(current_cluster, Arc::clone(block_device));
-                if current_cluster == END_CLUSTER { break; } //没有下一个簇
+                if current_cluster >= END_CLUSTER { break; } //没有下一个簇
                 //println!("read at current_cluster = {}", current_cluster);
                 // 计算所在扇区
                 current_sector = manager_reader.first_sector_of_cluster(current_cluster);
@@ -694,7 +694,7 @@ impl ShortDirEntry{
                 // 读完一个簇
                 //println!("finish writing a cluster");
                 current_cluster = fat_reader.get_next_cluster(current_cluster, Arc::clone(block_device));
-                if current_cluster == END_CLUSTER { panic!("END_CLUSTER"); break; } //没有下一个簇
+                if current_cluster >= END_CLUSTER { panic!("END_CLUSTER"); break; } //没有下一个簇
                 // 计算所在扇区
                 //println!("write at current_cluster = {}", current_cluster);
                 current_sector = manager_reader.first_sector_of_cluster(current_cluster);
@@ -1069,7 +1069,7 @@ impl FAT{
             let next_cluster = self.get_next_cluster(curr_cluster, block_device.clone());
             //println!("in fianl cl {};{}", curr_cluster, next_cluster);
             //assert_ne!(next_cluster, 0);
-            if next_cluster == END_CLUSTER || next_cluster == 0 {
+            if next_cluster >= END_CLUSTER || next_cluster == 0 {
                 return curr_cluster & 0x0FFFFFFF
             } else {
                 curr_cluster = next_cluster;
@@ -1081,11 +1081,11 @@ impl FAT{
         let mut curr_cluster = start_cluster;
         let mut v_cluster:Vec<u32> = Vec::new();
         loop{
-            v_cluster.push(curr_cluster & 0x0FFFFFFF);
+            v_cluster.push( curr_cluster & 0x0FFFFFFF );
             let next_cluster = self.get_next_cluster(curr_cluster, block_device.clone());
             //println!("in all, curr = {}, next = {}", curr_cluster, next_cluster);
             //assert_ne!(next_cluster, 0);
-            if next_cluster == END_CLUSTER || next_cluster == 0{
+            if next_cluster >= END_CLUSTER || next_cluster == 0{
                 return v_cluster
             } else {
                 curr_cluster = next_cluster;
@@ -1103,7 +1103,7 @@ impl FAT{
             count += 1;
             let next_cluster = self.get_next_cluster(curr_cluster, block_device.clone());
             //println!("next_cluster = {:X}",next_cluster);
-            if next_cluster == END_CLUSTER || next_cluster > 0xF000000{
+            if next_cluster >= END_CLUSTER || next_cluster > 0xF000000{
                 return count
             } else {
                 curr_cluster = next_cluster;
