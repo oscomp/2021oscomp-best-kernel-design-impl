@@ -42,7 +42,7 @@ OBJS += \
   $K/plic.o \
   $K/console.o \
   $K/usrmm.o \
-  $K/imgfs.o \
+  $K/driver_fs.o \
   $K/systime.o \
   $K/sysuname.o \
   $K/uname.o 
@@ -247,7 +247,6 @@ sdcard: userprogs
 	@sudo cp $U/_init $(dst)/init
 	@sudo cp $U/_sh $(dst)/sh
 	@sudo cp $U/shrc $(dst)/shrc
-	@sudo cp $U/test.sh $(dst)/test.sh
 	@sudo cp $U/_echo $(dst)/echo
 	@sudo cp README $(dst)/README
 

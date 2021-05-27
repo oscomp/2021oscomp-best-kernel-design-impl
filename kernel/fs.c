@@ -17,11 +17,22 @@
 #include "include/debug.h"
 
 
-static int rootfs_write(struct superblock *sb, int usr, char *src, uint64 sectorno, uint64 off, uint64 len);
-static int rootfs_read(struct superblock *sb, int usr, char *dst, uint64 sectorno, uint64 off, uint64 len);
-static int rootfs_clear(struct superblock *sb, uint64 sectorno, uint64 sectorcnt);
+extern struct superblock *disk_fs_init(struct inode *dev);
+extern int diskfs_write(struct superblock *sb, int usr, char *src, uint64 sectorno, uint64 off, uint64 len);
+extern int diskfs_read(struct superblock *sb, int usr, char *dst, uint64 sectorno, uint64 off, uint64 len);
+extern int diskfs_clear(struct superblock *sb, uint64 sectorno, uint64 sectorcnt);
+
+static struct dentry *de_root_generate(struct dentry *parent,
+						char *name, int inum, int mode, int devnum, int childnum);
 static struct dentry *de_check_cache(struct dentry *parent, char *name);
 int de_delete(struct dentry *de);
+
+static struct inode *rootfs_create(struct inode *ip, char *name, int mode);
+static struct inode *rootfs_lookup(struct inode *dir, char *filename, uint *poff);
+static int rootfs_iop1(struct inode *ip);
+static int rootfs_getattr(struct inode *ip, struct kstat *st);
+static int root_file_rw(struct inode *ip, int usr, uint64 dst, uint off, uint n);
+static int root_file_readdir(struct inode *ip, struct dirent *dent, uint off);
 
 /**
  * Root file system functions.
@@ -36,99 +47,154 @@ static struct superblock rootfs = {
 	.dev = NULL,
 	.op.alloc_inode = fat_alloc_inode,
 	.op.destroy_inode = fat_destroy_inode,
-	.op.write = rootfs_write,
-	.op.read = rootfs_read,
-	.op.clear = rootfs_clear,
+	.op.write = diskfs_write,
+	.op.read = diskfs_read,
+	.op.clear = diskfs_clear,
 };
 
 struct dentry_op rootfs_dentry_op = {
 	.delete = de_delete,
 };
 
+struct file_op rootfs_file_op = {
+	.read = root_file_rw,
+	.write = root_file_rw,
+	.readdir = root_file_readdir,
+};
+
+struct inode_op rootfs_inode_op = {
+	.create = rootfs_create,
+	.lookup = rootfs_lookup,
+	.truncate = rootfs_iop1,
+	.unlink = rootfs_iop1,
+	.update = rootfs_iop1,
+	.getattr = rootfs_getattr,
+};
+
 // Must be called by initcode.
 void rootfs_init()
 {
 	__debug_info("rootfs_init", "enter\n");
-	rootfs.next = NULL;
 	rootfs.ref = 0;
 	initsleeplock(&rootfs.sb_lock, "rootfs_sb");
 	initlock(&rootfs.cache_lock, "rootfs_dcache");
 
-	// Read superblock from sector 0.
-	struct buf *b = bread(ROOTDEV, 0);
-	__debug_info("rootfs_init", "read superblock\n");
-	struct fat32_sb *fat = fat32_init((char*)b->data);
-	brelse(b);
-	
-    // make sure that byts_per_sec has the same value with BSIZE 
-    if (fat == NULL || BSIZE != fat->bpb.byts_per_sec) {
-        __debug_error("fat32_init", "byts_per_sec: %d != BSIZE: %d\n", fat->bpb.byts_per_sec, BSIZE);
-		panic("rootfs_init: superblock");
-    }
-	rootfs.real_sb = fat;
-	rootfs.blocksz = fat->bpb.byts_per_sec;
+	rootfs.real_sb = NULL;
+	if ((rootfs.root = de_root_generate(NULL, "/", 0, I_MODE_DIR, 0, 0)) == NULL)
+		panic("rootfs_init 1");
 
-	// Initialize in-mem root.
-	struct inode *iroot = fat32_root_init(&rootfs);
-	rootfs.root = kmalloc(sizeof(struct dentry));
-	if (iroot == NULL || rootfs.root == NULL)
-		panic("rootfs_init fail to get root");
+	struct dentry *de, *data;
+	if ((de = de_root_generate(rootfs.root, "dev", 1, I_MODE_DIR, 0, 0)) == NULL)
+		panic("rootfs_init 2");
+	if ((data = de_root_generate(rootfs.root, "home", 2, I_MODE_DIR, 0, 1)) == NULL)
+		panic("rootfs_init 3");
+	if (de_root_generate(de, "console", 3, 0, 2, 0) == NULL)
+		panic("rootfs_init 4");
+	if ((de = de_root_generate(de, "vda", 4, 0, ROOTDEV, 1)) == NULL)
+		panic("rootfs_init 5");
 
-	iroot->entry = rootfs.root;
+	if (do_mount(de->inode, data->inode, "fat32", 0, 0) < 0)
+		panic("rootfs_init 6");
 
-	// Initialize in-mem dentry struct for root.
-	memset(rootfs.root, 0, sizeof(struct dentry));
-	rootfs.root->inode = iroot;
-	rootfs.root->op = &rootfs_dentry_op;
-	rootfs.root->filename[0] = '/';
-	rootfs.root->filename[1] = '\0';
 	__debug_info("rootfs_init", "done\n");
 }
 
 
-static int rootfs_write(struct superblock *sb, int usr, char *src, uint64 sectorno, uint64 off, uint64 len)
+static struct dentry *de_root_generate(struct dentry *parent,
+			char *name, int inum, int mode, int devnum, int childnum)
 {
-	if (off + len > BSIZE)
-		panic("rootfs_write");
-
-	// __debug_info("rootfs_write", "sec:%d off:%d len:%d\n", sectorno, off, len);
-	struct buf *b = bread(ROOTDEV, sectorno);
-	int ret = either_copyin(b->data + off, usr, (uint64)src, len);
-	
-	if (ret < 0) { // fail to write
-		b->valid = 0;  // invalidate the buf
-	} else {
-		ret = len;
-		bwrite(b);
+	struct dentry *de;
+	struct inode *ip;
+	if ((de = kmalloc(sizeof(struct dentry))) == NULL ||
+		(ip = kmalloc(sizeof(struct inode))) == NULL)
+	{
+		__debug_warn("de_root_generate", "fail\n");
+		if (de)
+			kfree(de);
+		return NULL;
 	}
-	brelse(b);
+	memset(de, 0, sizeof(struct dentry));
+	memset(ip, 0, sizeof(struct inode));
 
-	return ret;
+	// let's play some tricks
+	*(int *)(de->filename + 128) = childnum;
+
+	// insert those files into root's dentry tree
+	de->inode = ip;
+	ip->entry = de;
+	ip->sb = &rootfs;
+	
+	if (parent) {
+		de->next = parent->child;
+		parent->child = de;
+		de->parent = parent;
+	}
+
+	ip->inum = inum;
+	ip->dev = devnum;
+	ip->op = &rootfs_inode_op;
+	ip->fop = &rootfs_file_op;
+	ip->state = I_STATE_VALID;	// not necessary
+	ip->mode = mode;
+	
+	initsleeplock(&ip->lock, "inode");
+	safestrcpy(de->filename, name, MAXNAME);
+	__debug_info("de_root_generate", "done\n");
+
+	return de;
 }
 
-
-static int rootfs_read(struct superblock *sb, int usr, char *dst, uint64 sectorno, uint64 off, uint64 len)
-{
-	if (off + len > BSIZE)
-		panic("rootfs_read");
-
-	// __debug_info("rootfs_read", "sec:%d off:%d len:%d\n", sectorno, off, len);
-	struct buf *b = bread(ROOTDEV, sectorno);
-	int ret = either_copyout(usr, (uint64)dst, b->data + off, len);
-	brelse(b);
-
-	return ret < 0 ? -1 : len;
+static struct inode *rootfs_create(struct inode *ip, char *name, int mode) {
+	return NULL;
 }
 
+static struct inode *rootfs_lookup(struct inode *dir, char *filename, uint *poff) {
+	return NULL;
+}
 
-static int rootfs_clear(struct superblock *sb, uint64 sectorno, uint64 sectorcnt)
-{
-	struct buf *b;
-	while (sectorcnt--) {
-		b = bread(ROOTDEV, sectorno++);
-		memset(b->data, 0, BSIZE);
-		bwrite(b);
-		brelse(b);
+static int rootfs_iop1(struct inode *ip) {
+	return -1;
+}
+
+static int rootfs_getattr(struct inode *ip, struct kstat *st) {
+	memset(st, 0, sizeof(struct kstat));
+    st->blksize = ip->sb->blocksz;
+    st->size = ip->size;
+    st->blocks = (st->size + st->blksize - 1) / st->blksize;
+    st->dev = ip->sb->devnum;
+    st->ino = ip->inum;
+    st->mode = ip->mode;
+	return 0;
+}
+
+static int root_file_rw(struct inode *ip, int usr, uint64 dst, uint off, uint n) {
+	return 0;
+}
+
+static int root_file_readdir(struct inode *ip, struct dirent *dent, uint off) {
+	struct dentry *entry = ip->entry;
+	if (!(ip->mode & I_MODE_DIR))
+		return -1;
+
+	int childnum = off >> 5;
+	acquire(&rootfs.cache_lock);
+	struct dentry *child;
+	for (child = entry->child; child != NULL; child = child->next)
+	{
+		if (*(int*)(child->filename + 128) == childnum)
+			break;
+	}
+	release(&rootfs.cache_lock);
+
+	if (child) {
+		safestrcpy(dent->name, child->filename, 128);
+		int size = sizeof(struct dirent) - sizeof(dent->name) + strlen(dent->name) + 1;
+		size += (sizeof(uint64) - (size % sizeof(uint64))) % sizeof(uint64); // Align to 8.
+		dent->ino = child->inode->inum;
+		dent->off = off;
+		dent->reclen = size;
+		dent->type = (child->inode->mode & I_MODE_DIR) ? T_DIR : T_FILE;
+		return 32;
 	}
 	return 0;
 }
@@ -456,6 +522,7 @@ struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 	if (!(dir->mode & I_MODE_DIR))
 		panic("dirlookup");
 
+	__debug_info("dirlookup", "start searching %s\n", filename);
 	struct superblock *sb = dir->sb;
 	struct dentry *de, *parent;
 	if (strncmp(filename, ".", MAXNAME) == 0) {
@@ -476,8 +543,11 @@ struct inode *dirlookup(struct inode *dir, char *filename, uint *poff)
 		return idup(de->inode);
 	}
 
+	__debug_info("dirlookup", "not dots\n");
 	acquire(&sb->cache_lock);
+	__debug_info("dirlookup", "checking cache\n");
 	de = de_check_cache(dir->entry, filename);
+	__debug_info("dirlookup", "check done\n");
 	release(&sb->cache_lock);
 	if (de != NULL) {
 		__debug_info("dirlookup", "cache hit: %s\n", filename);
@@ -661,7 +731,7 @@ int namepath(struct inode *ip, char *path, int max)
  */
 
 extern struct superblock *image_fs_init(struct inode *img);
-extern void image_fs_uninstall(struct superblock *sb);
+extern void fs_uninstall(struct superblock *sb);
 
 // Ignore flag and data in our implement.
 // Caller must hold all inodes' locks.
@@ -695,14 +765,15 @@ int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, vo
 		panic("do_mount");
 	}
 
-	// if (dev->mode == T_DEVICE) {
-	// 	// On FAT32 volume, there is no file with device type.
-	// 	__debug_warn("do_mount", "How do you put a device on FAT32???\n");
-	// 	return -1;
-	// }
-	// else if (dev->mode == T_FILE) {
-	struct superblock *imgsb = image_fs_init(dev);
-	if (imgsb == NULL)
+	struct superblock *sb;
+	if (dev->dev == ROOTDEV) {
+		// On FAT32 volume, there is no file with device type.
+		sb = disk_fs_init(dev);
+	}
+	else {
+		sb = image_fs_init(dev);
+	}
+	if (sb == NULL)
 		return -1;
 
 	acquire(&rootfs.cache_lock); // borrow this lock
@@ -710,16 +781,14 @@ int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, vo
 	struct superblock *psb = &rootfs;
 	while (psb->next != NULL)
 		psb = psb->next;
-	psb->next = imgsb;
-	imgsb->root->parent = dmnt;
-	safestrcpy(imgsb->root->filename, dmnt->filename, sizeof(dmnt->filename));
-	dmnt->mount = imgsb;
+	psb->next = sb;
+	sb->root->parent = dmnt;
+	safestrcpy(sb->root->filename, dmnt->filename, sizeof(dmnt->filename));
+	dmnt->mount = sb;
 
 	release(&rootfs.cache_lock);
 
 	idup(mntpoint);
-
-	// }
 
 	return 0;
 }
@@ -766,12 +835,14 @@ int do_umount(struct inode *mntpoint, int flag)
 	iput(de->parent->inode);
 
 	// Remove from superblock list.
+	acquire(&rootfs.cache_lock);
 	sb_prnt = &rootfs;
 	while (sb_prnt->next != sb)
 		sb_prnt = sb_prnt->next;
 	sb_prnt->next = sb->next;
+	release(&rootfs.cache_lock);
 
-	image_fs_uninstall(sb);
+	fs_uninstall(sb);
 
 	return 0;
 }

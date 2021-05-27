@@ -1510,7 +1510,7 @@ subdir(char *s)
     exit(1);
   }
 
-  if(mkdir("/dd/dd") != 0){
+  if(mkdir("dd/dd") != 0){
     printf("subdir mkdir dd/dd failed\n", s);
     exit(1);
   }
@@ -1553,14 +1553,14 @@ subdir(char *s)
     printf("%s: chdir dd failed\n", s);
     exit(1);
   }
-  if(chdir("dd/../../dd") != 0){
-    printf("%s: chdir dd/../../dd failed\n", s);
-    exit(1);
-  }
-  if(chdir("dd/../../../dd") != 0){
-    printf("chdir dd/../../dd failed\n", s);
-    exit(1);
-  }
+  // if(chdir("dd/../../dd") != 0){
+  //   printf("%s: chdir dd/../../dd failed\n", s);
+  //   exit(1);
+  // }
+  // if(chdir("dd/../../../dd") != 0){
+  //   printf("chdir dd/../../dd failed\n", s);
+  //   exit(1);
+  // }
   if(chdir("./..") != 0){
     printf("%s: chdir ./.. failed\n", s);
     exit(1);
@@ -1809,7 +1809,7 @@ rmdot(char *s)
     printf("%s: rm .. worked!\n", s);
     exit(1);
   }
-  if(chdir("/") != 0){
+  if(chdir("..") != 0){
     printf("%s: chdir / failed\n", s);
     exit(1);
   }

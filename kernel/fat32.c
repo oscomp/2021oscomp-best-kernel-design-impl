@@ -110,6 +110,8 @@ struct fat32_sb *fat32_init(char *boot_sector)
     __debug_info("FAT32 init", "fat_sz: %d\n", fat->bpb.fat_sz);
     __debug_info("FAT32 init", "first_data_sec: %d\n", fat->first_data_sec);
 
+    __debug_info("FAT32 init", "done\n");
+
     return fat;
 }
 
@@ -141,6 +143,7 @@ struct inode *fat32_root_init(struct superblock *sb)
     iroot->ref = 0;
 	iroot->inum = 0;
 	iroot->mode = I_MODE_DIR | 0x1ff;
+	iroot->dev = 0;
 	iroot->state |= I_STATE_VALID;
 	iroot->op = &fat32_inode_op;
 	iroot->fop = &fat32_file_op;
@@ -333,6 +336,7 @@ struct inode *fat_alloc_inode(struct superblock *sb)
     ip->ref = 0;
     ip->state = 0;
     ip->mode = 0;
+    ip->dev = 0;
     ip->size = 0;
     ip->nlink = 0;
     initsleeplock(&ip->lock, "inode");
@@ -492,6 +496,8 @@ static char *formatname(char *name)
 {
     static char illegal[] = { '\"', '*', '/', ':', '<', '>', '?', '\\', '|', 0 };
     char *p;
+    if (*name == '\0')
+        return NULL;
     while (*name == ' ' || *name == '.') { name++; }
     for (p = name; *p; p++) {
         char c = *p;

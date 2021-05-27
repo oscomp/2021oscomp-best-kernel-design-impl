@@ -86,7 +86,8 @@ struct inode {
 	uint64				inum;
 	int					ref;
 	int					state;
-	int					mode;
+	int16				mode;
+	int16				dev;
 	int					size;
 	int					nlink;	// useless on FAT
 	void				*real_i;

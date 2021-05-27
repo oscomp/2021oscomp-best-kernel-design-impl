@@ -60,6 +60,7 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
   for (argc = 0; utable; argc++) {
     if (argc >= maxc || fetchaddr((uint64)(utable + argc), &argp) < 0)
       goto bad;
+    __debug_info("pushstack", "argp=%p\n", argp);
     if (argp == 0)
       break;
     int arglen = fetchstr(argp, buf, PGSIZE);   // '\0' included in PGSIZE, but not in envlen

@@ -202,7 +202,7 @@ kerneltrap() {
 	else if (0 == handle_excp(scause)) {
 		// handle exception 
 	}
-	else if (p && is_page_fault(scause) && NULL != r_stval()) {
+	else if (p && is_page_fault(scause) && PGSIZE <= r_stval() && r_stval() < MAXUVA) {
 		// This case may happen when kernel is accessing user's lazy-allocated page.
 		// The handler should allocate a real one, but failed for lack of memory.
       	//p->killed = 1;
