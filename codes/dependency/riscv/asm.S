@@ -24,6 +24,149 @@ __sfence_vma:
     sfence.vma a0, a1
     ret
 
+// RISC-V hypervisor instructions.
+
+// The switch for enabling LLVM support for asm generation.
+// #define LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+
+
+.section .text.__hfence_gvma
+.global __hfence_gvma
+__hfence_gvma:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hfence.gvma a0, a1
+#else
+    .word 1656029299
+#endif
+    ret
+.section .text.__hfence_vvma
+.global __hfence_vvma
+__hfence_vvma:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hfence.vvma a0, a1
+#else
+    .word 582287475
+#endif
+    ret
+.section .text.__hlv_b
+.global __hlv_b
+__hlv_b:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.b a0, a0
+#else
+    .word 1610958195
+#endif
+    ret
+.section .text.__hlv_bu
+.global __hlv_bu
+__hlv_bu:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.bu a0, a0
+#else
+    .word 1612006771
+#endif
+    ret
+.section .text.__hlv_h
+.global __hlv_h
+__hlv_h:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.h a0, a0
+#else
+    .word 1678067059
+#endif
+    ret
+.section .text.__hlv_hu
+.global __hlv_hu
+__hlv_hu:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.hu a0, a0
+#else
+    .word 1679115635
+#endif
+    ret
+.section .text.__hlvx_hu
+.global __hlvx_hu
+__hlvx_hu:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlvx.hu a0, a0
+#else
+    .word 1681212787
+#endif
+    ret
+.section .text.__hlv_w
+.global __hlv_w
+__hlv_w:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.w a0, a0
+#else
+    .word 1745175923
+#endif
+    ret
+.section .text.__hlvx_wu
+.global __hlvx_wu
+__hlvx_wu:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlvx.wu a0, a0
+#else
+    .word 1748321651
+#endif
+    ret
+.section .text.__hsv_b
+.global __hsv_b
+__hsv_b:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hsv.b a0, a1
+#else
+    .word 1656045683
+#endif
+    ret
+.section .text.__hsv_h
+.global __hsv_h
+__hsv_h:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hsv.h a0, a1
+#else
+    .word 1723154547
+#endif
+    ret
+.section .text.__hsv_w
+.global __hsv_w
+__hsv_w:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hsv.w a0, a1
+#else
+    .word 1790263411
+#endif
+    ret
+.section .text.__hlv_wu
+.global __hlv_wu
+__hlv_wu:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.wu a0, a0
+#else
+    .word 1746224499
+#endif
+    ret
+.section .text.__hlv_d
+.global __hlv_d
+__hlv_d:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hlv.d a0, a0
+#else
+    .word 1812284787
+#endif
+    ret
+.section .text.__hsv_d
+.global __hsv_d
+__hsv_d:
+#ifdef LLVM_RISCV_HYPERVISOR_EXTENSION_SUPPORT
+    hsv.d a0, a1
+#else
+    .word 1857372275
+#endif
+    ret
+
+
 // User Trap Setup
 RW(0x000, ustatus)  // User status register
 RW(0x004, uie)      // User interrupt-enable register
@@ -273,3 +416,39 @@ RW(0x7A3, tdata3)   // Third Debug/Trace trigger data register
 RW(0x7B0, dcsr)     // Debug control and status register
 RW(0x7B1, dpc)      // Debug PC
 RW(0x7B2, dscratch) // Debug scratch register
+
+// Hypervisor Trap Setup
+RW(0x600, hstatus)    // Hypervisor status register
+RW(0x602, hedeleg)    // Hypervisor exception delegation register
+RW(0x603, hideleg)    // Hypervisor interrupt delegation register
+RW(0x604, hie)        // Hypervisor interrupt-enable register
+RW(0x606, hcounteren) // Hypervisor counter enable
+RW(0x607, hgeie)      // Hypervisor guest external interrupt-enable register
+
+// Hypervisor Trap Handling
+RW(0x643, htval)  // Hypervisor bad guest physical address
+RW(0x644, hip)    // Hypervisor interrupt pending
+RW(0x645, hvip)   // Hypervisor virtual interrupt pending
+RW(0x64a, htinst) // Hypervisor trap instruction (transformed)
+RW(0xe12, hgeip)  // Hypervisor guest external interrupt pending
+
+// Hypervisor Protection and Translation
+RO(0x680, hgatp) // Hypervisor guest address translation and protection
+
+// Debug/Trace Registers
+RW(0x6a8, hcontext) // Hypervisor-mode context register
+
+// Hypervisor Counter/Timer Virtualization Registers
+RW(0x605, htimedelta)    // Delta for VS/VU-mode timer
+RW32(0x615, htimedeltah) // Upper 32 bits of {\tt htimedelta}, RV32 only
+
+// Virtual Supervisor Registers
+RW(0x200, vsstatus)  // Virtual supervisor status register
+RW(0x204, vsie)      // Virtual supervisor interrupt-enable register
+RW(0x205, vstvec)    // Virtual supervisor trap handler base address
+RW(0x240, vsscratch) // Virtual supervisor scratch register
+RW(0x241, vsepc)     // Virtual supervisor exception program counter
+RW(0x242, vscause)   // Virtual supervisor trap cause
+RW(0x243, vstval)    // Virtual supervisor bad address or instruction
+RW(0x244, vsip)      // Virtual supervisor interrupt pending
+RW(0x280, vsatp)     // Virtual supervisor address translation and protection

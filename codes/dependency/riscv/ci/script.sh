@@ -2,6 +2,8 @@
 
 set -euxo pipefail
 
+export PATH=$PATH:~/.cargo/bin
+
 if [ -n "${TARGET:-}" ]; then
     cargo check --target $TARGET
 

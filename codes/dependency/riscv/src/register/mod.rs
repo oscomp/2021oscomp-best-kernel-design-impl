@@ -98,3 +98,7 @@ pub use self::mhpmeventx::*;
 // TODO: Debug/Trace Registers (shared with Debug Mode)
 
 // TODO: Debug Mode Registers
+
+// Hypervisor Extension Registers
+mod hypervisorx64;
+pub use self::hypervisorx64::*;

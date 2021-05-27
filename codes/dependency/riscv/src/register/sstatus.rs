@@ -18,6 +18,12 @@ pub enum SPP {
 }
 
 impl Sstatus {
+    /// Returns the contents of the register as raw bits
+    #[inline]
+    pub fn bits(&self) -> usize {
+        self.bits
+    }
+
     /// User Interrupt Enable
     #[inline]
     pub fn uie(&self) -> bool {
