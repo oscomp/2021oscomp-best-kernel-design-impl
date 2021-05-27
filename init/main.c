@@ -121,6 +121,8 @@ static void init_syscall(void)
     syscall[SYS_getppid] = &do_getppid;
     syscall[SYS_nanosleep] = &do_nanosleep;
     syscall[SYS_mkdirat] = &fat32_mkdir;
+    syscall[SYS_openat] = &fat32_open;
+    syscall[SYS_close] = &fat32_close;
     // syscall[SYS_mmap] = &do_mmap;
 }
 

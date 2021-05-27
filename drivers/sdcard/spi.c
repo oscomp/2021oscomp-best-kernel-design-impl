@@ -213,6 +213,7 @@ void spi_receive_data_standard(spi_device_num_t spi_num, spi_chip_select_t chip_
                                uint64 cmd_len, uint8 *rx_buff, uint64 rx_len)
 {
     // configASSERT(spi_num < SPI_DEVICE_MAX && spi_num != 2);
+
     uint64 index, fifo_len;
     if(cmd_len == 0)
         spi_set_tmod(spi_num, SPI_TMOD_RECV);
@@ -278,6 +279,7 @@ void spi_receive_data_standard(spi_device_num_t spi_num, spi_chip_select_t chip_
     i = 0;
     while(v_rx_len)
     {
+
         fifo_len = spi_handle->rxflr;
         fifo_len = fifo_len < v_rx_len ? fifo_len : v_rx_len;
         switch(frame_width)

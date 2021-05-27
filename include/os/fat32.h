@@ -78,6 +78,11 @@ typedef enum{
     SEARCH_DIR,
 }search_mode_t;
 
+typedef enum{
+    FILE_FILE,
+    FILE_DIR,
+}file_mode_t;
+
 enum{
     FD_UNUSED,
     FD_USED,
@@ -116,6 +121,7 @@ typedef uint16_t unicode_t;
 #define O_RDONLY 0x00
 #define O_WRONLY 0x01
 #define O_RDWR 0x02
+#define O_DIRECTORY 0x200000
 
 #define AT_FDCWD 0xffffff9c
 
@@ -131,9 +137,11 @@ int8 fat32_read_test(const char *filename);
 size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode);
 uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path, uint32_t mode);
+uint8 fat32_close(uint32 fd);
+
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_fat(uchar *buf);
-
+ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -160,11 +168,12 @@ static inline uint32 fat_offset_of_clus(uint32 cluster)
 
 static inline uint32_t get_next_cluster(uint32_t cluster)
 {
-    uchar buf2[fat.bpb.byts_per_sec];
+    uchar buf2[SECTOR_SIZE];
     // printk("cluster is %d, fatsec is %d\n",cluster, fat_sec_of_clus(cluster));
     sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
     // printk("offset: %x\n", fat_offset_of_clus(cluster));
-    return (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
+    uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
+    return ret;
 }
 
 static inline uint32_t clus_of_sec(uint32_t sector)

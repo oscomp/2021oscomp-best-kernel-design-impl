@@ -36,6 +36,8 @@
 
 #define SYS_mkdirat 34
 
+#define SYS_openat 56
+#define SYS_close 57
 #define SYSCALL_TESTDISK 58
 #define SYSCALL_TEST 59
 
