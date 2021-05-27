@@ -321,10 +321,10 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
             )))
         } else {
             // create file
-            // println!("start create");
+            println!("start create");
             let name = pathv.pop().unwrap();
             //println!("name = {}", name);
-            print!("\n");
+            print!("1\n");
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
                 let attribute = {
                     match type_ {
@@ -332,10 +332,10 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                         DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
                     }
                 };
-                print!("\n");
+                print!("2\n");
                 temp_inode.create( name, attribute)
                 .map(|inode| {
-                    print!("\n");
+                    print!("3\n");
                     //println!("end create");
                     Arc::new(OSInode::new(
                         readable,

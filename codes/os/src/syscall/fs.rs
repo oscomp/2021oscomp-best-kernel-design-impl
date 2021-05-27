@@ -79,7 +79,6 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
     if dirfd == AT_FDCWD {
-        //println!("cwd = {}", inner.get_work_path().as_str());
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
             path.as_str(),
