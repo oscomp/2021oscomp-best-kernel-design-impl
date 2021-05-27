@@ -404,7 +404,6 @@ impl ArgMachine{
         testsuits.push("open\0");
         testsuits.push("pipe\0");
         testsuits.push("read\0");
-        testsuits.push("times\0");
         testsuits.push("umount\0");
         testsuits.push("uname\0");
         testsuits.push("unlink\0");
@@ -413,6 +412,7 @@ impl ArgMachine{
         testsuits.push("write\0");
         testsuits.push("yield\0");
         testsuits.push("chdir\0");
+        testsuits.push("times\0");
         testsuits.push("gettimeofday\0");
         for programname in testsuits.iter(){
             let mut exit_code = 0;
@@ -517,7 +517,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    ArgMachine::auto_run_testsuites();
+    // ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
     // cursor_move_right!(left);

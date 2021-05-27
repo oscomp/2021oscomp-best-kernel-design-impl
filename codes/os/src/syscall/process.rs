@@ -8,8 +8,9 @@ use crate::task::{
     utsname
 };
 use crate::timer::{
-    get_time_ms,
-    get_time_us
+    // get_time_ms,
+    get_time_us,
+    get_time_s,
 };
 use crate::mm::{
     UserBuffer,
@@ -48,6 +49,13 @@ pub fn sys_yield() -> isize {
     0
 }
 pub fn sys_times(time: *mut i64) -> isize {
+    // struct tms              
+    // {                     
+    //     long tms_utime;  
+    //     long tms_stime;  
+    //     long tms_cutime; 
+    //     long tms_cstime; 
+    // };
     let token = current_user_token();
     let sec = get_time_us() as i64;
     *translated_refmut(token, time) = sec;
@@ -64,8 +72,8 @@ pub fn sys_get_time(time: *mut u64) -> isize {
     // }
     let token = current_user_token();
     let sec = get_time_us() as u64;
-    *translated_refmut(token, time) = sec;
-    *translated_refmut(token, unsafe { time.add(1) }) = sec;
+    *translated_refmut(token, time) = get_time_s() as u64;
+    *translated_refmut(token, unsafe { time.add(1) }) = get_time_us() as u64;
     0
 
 }
