@@ -4,12 +4,14 @@ mod task;
 mod manager;
 mod processor;
 mod pid;
+mod info;
 
 use crate::fs::{open, OpenFlags, DiskInodeType, File};
 use crate::mm::UserBuffer;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+pub use info::utsname;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use manager::fetch_task;

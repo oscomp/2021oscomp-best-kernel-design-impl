@@ -8,6 +8,7 @@
         "unistd.h": "c",
         "*.tcc": "c",
         "bitset": "c",
-        "complex": "c"
+        "complex": "c",
+        "stddef.h": "c"
     }
 }

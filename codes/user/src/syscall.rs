@@ -1,5 +1,6 @@
 // const SYSCALL_WAITPID: usize = 7;
 const SYSCALL_DUP: usize = 24;
+const SYSCALL_UNLINKAT: usize = 35;
 const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
@@ -37,6 +38,10 @@ pub fn sys_dup(fd: usize) -> isize {
 
 pub fn sys_chdir(path: &str) -> isize {
     syscall(SYSCALL_CHDIR, [path.as_ptr() as usize, 0, 0])
+}
+
+pub fn sys_unlinkat(fd:i32, path: &str, flags:u32) -> isize {
+    syscall(SYSCALL_UNLINKAT, [fd as usize, path.as_ptr() as usize, flags as usize])
 }
 
 pub fn sys_open(path: &str, flags: u32) -> isize {

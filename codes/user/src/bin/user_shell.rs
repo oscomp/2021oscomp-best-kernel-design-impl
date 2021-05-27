@@ -60,7 +60,8 @@ use user_lib::{
     dup,
     chdir,
     shutdown,
-    ls
+    ls,
+    unlink
 };
 use user_lib::console::getchar;
 
@@ -397,17 +398,17 @@ impl ArgMachine{
         testsuits.push("getppid\0");
         testsuits.push("gettimeofday\0");
         testsuits.push("mkdir_\0");
-        // testsuits.push("mmap");
+        // testsuits.push("mmap\0");
         testsuits.push("mount\0");
-        // testsuits.push("munmap");
+        // testsuits.push("munmap\0");
         testsuits.push("openat\0");
         testsuits.push("open\0");
         testsuits.push("pipe\0");
         testsuits.push("read\0");
-        // testsuits.push("testsuites_times");
+        testsuits.push("times\0");
         testsuits.push("umount\0");
-        // testsuits.push("testsuites_uname");
-        // testsuits.push("testsuites_unlink");
+        testsuits.push("uname\0");
+        testsuits.push("unlink\0");
         testsuits.push("wait\0");
         testsuits.push("waitpid\0");
         testsuits.push("write\0");
@@ -512,9 +513,11 @@ impl ArgMachine{
 
 #[no_mangle]
 pub fn main() -> i32 {
-    ArgMachine::auto_run_testsuites();
-    // println!("Rust user shell");
-    // println!("听说能输出中文?");
+    // delete init programs in fs
+    unlink("initproc\0");
+    unlink("user_shell\0");
+    println!("Delete init programs initproc and user_shell in FS");
+    // ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
     // cursor_move_right!(left);
@@ -532,20 +535,8 @@ pub fn main() -> i32 {
     // println!("sth_in:{}",sth_in);
     // let mut sth = 3;
     // println!("{}","TTTTTTTTTTTTTTTTTTEST  test end");
-    // print!("Password:");
-    // loop{
-    //     let c = getchar();
-    //     cursor_move_left!(sth);
-    //     cursor_move_right!(sth);
-    //     if c == '!' as u8{
-    //         println!("");
-    //         break;
-    //     }
-    // }
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();
-    // print!(">> ");
-    // print!("{}",27 as char);//test 27
     loop {
         let c = getchar();
         let is_exec = shellmachine.operate(c as char);

@@ -5,15 +5,18 @@ use crate::task::{
     current_user_token,
     add_task,
     TaskControlBlock,
+    utsname
 };
 use crate::timer::{
     get_time_ms,
     get_time_us
 };
 use crate::mm::{
+    UserBuffer,
     translated_str,
     translated_refmut,
     translated_ref,
+    translated_byte_buffer,
 };
 use crate::fs::{
     open,
@@ -25,6 +28,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 //use alloc::vec;
 use alloc::string::String;
+use core::mem::size_of;
 //use easy_fs::DiskInodeType;
 
 
@@ -32,6 +36,7 @@ pub struct TimeVal{
     sec: u64,
     usec: u64,
 }
+
 
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next(exit_code);
@@ -42,14 +47,45 @@ pub fn sys_yield() -> isize {
     suspend_current_and_run_next();
     0
 }
+pub fn sys_times(time: *mut i64) -> isize {
+    let token = current_user_token();
+    let sec = get_time_us() as i64;
+    *translated_refmut(token, time) = sec;
+    *translated_refmut(token, unsafe { time.add(1) }) = sec;
+    *translated_refmut(token, unsafe { time.add(2) }) = sec;
+    *translated_refmut(token, unsafe { time.add(3) }) = sec;
+    0
+}
 
 pub fn sys_get_time(time: *mut u64) -> isize {
+    // pub struct TimeVal{
+    //     sec: u64,
+    //     usec: u64,
+    // }
     let token = current_user_token();
     let sec = get_time_us() as u64;
     *translated_refmut(token, time) = sec;
     *translated_refmut(token, unsafe { time.add(1) }) = sec;
     0
 
+}
+
+pub fn sys_uname(buf: *mut u8) -> isize {
+    // let uname = utsname {
+    //     sysname: b"UltraOS\0",
+    //     nodename:  b"UltraOS\0",
+    //     release:  b"Alpha\0",
+    //     version:  b"1.1\0",
+    //     machine:  b"RISC-V64\0",
+    //     domainname: b"UltraTEAM/UltraOS\0"
+    // };
+    let token = current_user_token();
+    let mut buf_vec = translated_byte_buffer(token, buf, size_of::<utsname>());
+    let uname = utsname::new();
+    // 使用UserBuffer结构，以便于跨页读写
+    let mut userbuf = UserBuffer::new(buf_vec);
+    userbuf.write(uname.as_bytes());
+    0
 }
 
 pub fn sys_getpid() -> isize {

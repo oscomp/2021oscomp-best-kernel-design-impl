@@ -4,13 +4,14 @@ use crate::config::CLOCK_FREQ;
 
 const TICKS_PER_SEC: usize = 100;
 const MSEC_PER_SEC: usize = 1000;
+const USEC_PER_SEC: usize = 1000000;
 
 pub fn get_time() -> usize {
     time::read()
 }
 
 pub fn get_time_us() -> usize {
-    time::read() / CLOCK_FREQ 
+    time::read() / (CLOCK_FREQ / USEC_PER_SEC) 
 }
 
 pub fn get_time_ms() -> usize {
