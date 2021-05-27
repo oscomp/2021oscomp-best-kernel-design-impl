@@ -11,7 +11,7 @@ use crate::mm::UserBuffer;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
-pub use info::utsname;
+pub use info::*;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use manager::fetch_task;

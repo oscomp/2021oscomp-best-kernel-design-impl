@@ -5,13 +5,10 @@ use crate::task::{
     current_user_token,
     add_task,
     TaskControlBlock,
-    utsname
+    utsname,
+    SIGCHILD
 };
-use crate::timer::{
-    // get_time_ms,
-    get_time_us,
-    get_time_s,
-};
+use crate::timer::*;
 use crate::mm::{
     UserBuffer,
     translated_str,
@@ -90,6 +87,31 @@ pub fn sys_uname(buf: *mut u8) -> isize {
     0
 }
 
+pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
+    // pub struct TimeVal{
+    //     sec: u64,
+    //     usec: u64,
+    // }
+    let token = current_user_token();
+    let sec = *translated_ref(token, time_req) as usize;
+    let usec = *translated_ref(token, unsafe{time_req.add(1)}) as usize;
+    println!("sys_sleep: sec:{} usec:{}", sec, usec);
+    let (end_sec,end_usec) = sum_time(sec, usec, get_time_s(), get_time_us());
+    loop{
+        let cur_sec = get_time_s();
+        let cur_usec = get_time_us();
+        if compare_time(end_sec, end_usec, cur_sec, cur_usec) {
+            suspend_current_and_run_next();
+        }
+        else{
+            *translated_refmut(token, time_remain) = 0 as u64;
+            *translated_refmut(token, unsafe { time_remain.add(1) }) = 0 as u64;
+            return 0;
+        }
+    }
+    0
+}
+
 pub fn sys_getpid() -> isize {
     current_task().unwrap().pid.0 as isize
 }
@@ -108,8 +130,8 @@ pub fn sys_getppid() -> isize {
 }
 
 
-pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> usize {
-    current_task().unwrap().grow_proc(grow_size)
+pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
+    current_task().unwrap().grow_proc(grow_size) as isize
 }
 
 pub fn sys_brk(brk_addr: usize) -> isize{
@@ -122,9 +144,17 @@ pub fn sys_brk(brk_addr: usize) -> isize{
     0
 }
 
-pub fn sys_fork() -> isize {
+pub fn sys_fork(flags: usize, stack_ptr: usize) -> isize {
+    if flags != SIGCHILD{
+        return -1;
+    }
+    
     let current_task = current_task().unwrap();
     let new_task = current_task.fork();
+    if stack_ptr != 0{
+        let trap_cx = new_task.acquire_inner_lock().get_trap_cx();
+        trap_cx.set_sp(stack_ptr);
+    }
     let new_pid = new_task.pid.0;
     // modify trap context of new_task, because it returns immediately after switching
     let trap_cx = new_task.acquire_inner_lock().get_trap_cx();

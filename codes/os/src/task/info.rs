@@ -1,3 +1,5 @@
+pub const SIGCHILD:usize = 17;
+
 pub struct utsname{
     sysname: [u8; 65],
     nodename: [u8; 65],

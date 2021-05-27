@@ -440,7 +440,7 @@ pub fn sys_mount( p_special:*const u8, p_dir:*const u8, p_fstype: *const u8, fla
 
 pub fn sys_umount( p_special:*const u8, flags:usize )->isize{
     // TODO
-    println!("sys umount");
+    // println!("sys umount");
     let token = current_user_token();
     let special = translated_str(token, p_special);
     MNT_TABLE.lock().umount(special, flags as u32)
