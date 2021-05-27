@@ -158,7 +158,7 @@ ifeq ($(platform), k210)
 	@sudo chmod 777 $(k210-serialport)
 	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t $(k210)
 else
-	@$(QEMU) $(QEMUOPTS)
+	$(QEMU) $(QEMUOPTS)
 endif
 
 ulinker = ./linker/user.ld
@@ -232,6 +232,7 @@ UPROGS=\
 	$U/_mount\
 	$U/_umount\
 	$U/_dup3\
+	$U/_mmap_test
 
 userprogs: $(UPROGS)
 

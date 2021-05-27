@@ -94,7 +94,7 @@ _mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
     new_seg->type = MMAP;
     new_seg->addr = base;
     new_seg->sz = sz;
-    new_seg->flag = (flags >> 1) & 0x7;
+    new_seg->flag = (flags << 1) & 0xE;
     new_seg->next = s->next;
     s->next = new_seg;
   }
@@ -125,7 +125,7 @@ _mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
     if(flags)
     { // share
       if(map->ph_addr)    // not the first one to share
-        mappages(p->pagetable, base + i * PGSIZE, PGSIZE, map->ph_addr, prot);
+        mappages(p->pagetable, base + i * PGSIZE, PGSIZE, map->ph_addr, new_seg->flag);
       else                // the first one to share
       {
         ph_addr = (uint64) allocpage();
