@@ -117,6 +117,7 @@ impl VFile{
 
     pub fn modify_short_dirent<V>(&self, f: impl FnOnce(&mut ShortDirEntry) -> V)->V{
         if self.short_sector == 0 {
+            println!("[fs]: modify vroot dent");
             let root_dirent = self.fs.read().get_root_dirent();
             let mut rw = root_dirent.write();
             f(&mut rw)
@@ -381,7 +382,7 @@ impl VFile{
             }else{  // 已经分配簇
                 //let fs_reader = self.fs.read();
                 println!("[fs-inc]: file: {}, newsz = {}", self.get_name(), new_size);
-                println!("          cluster alloc = {}",cluster);
+                println!("  cluster alloc = {}",cluster);
                 let fat = manager_writer.get_fat();
                 //println!("try lock1");
                 let fat_writer = fat.write();
@@ -389,6 +390,8 @@ impl VFile{
                 let final_cluster = fat_writer.final_cluster(first_cluster, self.block_device.clone());
                 assert_ne!( cluster, 0);
                 fat_writer.set_next_cluster(final_cluster, cluster, self.block_device.clone());
+                let allc = fat_writer.get_all_cluster_of(first_cluster, self.block_device.clone());
+                println!("  finish set next cluster, cluster chain:{:?}", allc);
                 drop(manager_writer);
             }
             //self.size = new_size;
