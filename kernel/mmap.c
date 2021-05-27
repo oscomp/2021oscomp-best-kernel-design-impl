@@ -1,11 +1,4 @@
-#include "types.h"
-#include "memlayout.h"
-#include "vm.h"
-#include "pm.h"
-#include "usrmm.h"
-#include "file.h"
-#include "proc.h"
-#include "string.h"
+#include "include/mmap.h"
 
 struct mapped*
 add_map(struct inode* ind, int off, int flags)
@@ -33,7 +26,7 @@ add_map(struct inode* ind, int off, int flags)
   return NULL;
 }
 
-struct mapped*
+void
 del_map(struct inode* ind, int off)
 {
 	struct mapped *p = ind->maphead;
@@ -66,20 +59,20 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off)
   struct file * f = fd2file(fd, 0);
   if(!f)
   {
-    _debug_warn("mmap", "No such file descriptor!\n");
+    __debug_warn("mmap", "No such file descriptor!\n");
     return -1;
   }
 
   struct inode *ip = f->ip;
   if(off + len > ip->size)
   {
-    _debug_warn("mmap", "length overflows!\n");
+    __debug_warn("mmap", "length overflows!\n");
     return -1;
   }
 
   if(((f->readable) ^ (flags & 0x1)) || ((f->writable) ^ ((flags >> 1) & 0x1)))
   {
-    _debug_warn("mmap" "unmatched priviledge");
+    __debug_warn("mmap" "unmatched priviledge");
     return -1;
   }
 
@@ -89,30 +82,30 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off)
   int sz = PGROUNDUP(len);
 
   struct seg* s = getseg(p->segment, STACK);
-  uint64 start = VU_MMAP;
+  uint64 base = VU_MMAP;
   if(!(s->next)){
     if(s->next->addr < VU_MMAP + sz){
       s = s->next;
       while(s->next){
-        start = s->addr + s->sz;
-        if(s->next->addr - start >= sz)
+        base = s->addr + s->sz;
+        if(s->next->addr - base >= sz)
         break;
         s = s->next;
       }
     }
   }
 
-  if(start + len > MAXUVA)
+  if(base + len > MAXUVA)
   {
-    _debug_warn("mmap", "Not enough user space in mmap!\n");
+    __debug_warn("mmap", "Not enough user space in mmap!\n");
     return -1;
   }
 
   struct seg* new_seg;
-  if(new_seg = (struct seg*) kmalloc(sizeof(struct seg)))
+  if((new_seg = (struct seg*) kmalloc(sizeof(struct seg))))
   {
     new_seg->type = MMAP;
-    new_seg->addr = start;
+    new_seg->addr = base;
     new_seg->sz = sz;
     new_seg->flag = (flags >> 1) & 0x7;
     new_seg->next = s->next;
@@ -120,7 +113,7 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off)
   }
   else
   {
-    _debug_warn("mmap", "newseg failed in mmap!\n");
+    __debug_warn("mmap", "newseg failed in mmap!\n");
     return -1;
   }
 
@@ -135,7 +128,7 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off)
     if(flags)
     {
       if(!map){
-        _debug_warn("mmap", "add_map failed in mmap!\n");
+        __debug_warn("mmap", "add_map failed in mmap!\n");
         return -1;
       }
     }
@@ -145,45 +138,45 @@ _mmap(uint64 start, int len, int prot, int flags, int fd, int off)
     if(flags)
     { // share
       if(map->ph_addr)    // not the first one to share
-        mappages(p->pagetable, start + i * PGSIZE, PGSIZE, map->ph_addr, prot);
+        mappages(p->pagetable, base + i * PGSIZE, PGSIZE, map->ph_addr, prot);
       else                // the first one to share
       {
-        ph_addr = allocpage();
-        if((!ph_addr) || mappages(p->pagetable, start + i * PGSIZE, PGSIZE, ph_addr, new_seg->flag))
+        ph_addr = (uint64) allocpage();
+        if((!ph_addr) || mappages(p->pagetable, base + i * PGSIZE, PGSIZE, ph_addr, new_seg->flag))
         {
           del_map(ip, off);
-          _debug_warn("mmap", "allocpage failed!\n");
+          __debug_warn("mmap", "allocpage failed!\n");
           return -1;
         }
         ilock(ip);
-          if((ip->fop->read(ip, 1, start + i * PGSIZE, off + i * PGSIZE, PGSIZE)) > 0)
+          if((ip->fop->read(ip, 1, base + i * PGSIZE, off + i * PGSIZE, PGSIZE)) > 0)
             ;
         iunlock(ip);
       }
     }
     else
     { // not share
-      ph_addr = allocpage();
-      if((!ph_addr) || mappages(p->pagetable, start + i * PGSIZE, PGSIZE, ph_addr, new_seg->flag))
+      ph_addr = (uint64) allocpage();
+      if((!ph_addr) || mappages(p->pagetable, base + i * PGSIZE, PGSIZE, ph_addr, new_seg->flag))
       {
         del_map(ip, off);
-        _debug_warn("mmap", "allocpage failed!\n");
+        __debug_warn("mmap", "allocpage failed!\n");
         return -1;
       }
       if(map)
       { // mapped by others
-        memmove(ph_addr, map->ph_addr, PGSIZE);
+        memmove((void *)ph_addr, (void *)map->ph_addr, PGSIZE);
       }
       else
       { // not mapped by others
         ilock(ip);
         if(i == n - 1)
-          memset(start + i * PGSIZE, 0, PGSIZE);
-        if((ip->fop->read(ip, 1, start + i * PGSIZE, off + i * PGSIZE, PGSIZE)) > 0)
+          memset((void *) (base + i * PGSIZE), 0, PGSIZE);
+        if((ip->fop->read(ip, 1, base + i * PGSIZE, off + i * PGSIZE, PGSIZE)) > 0)
           ;
         iunlock(ip);
       }
     }
   }
-  return start;
+  return base;
 }

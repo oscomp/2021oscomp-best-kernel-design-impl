@@ -45,7 +45,8 @@ OBJS += \
   $K/imgfs.o \
   $K/systime.o \
   $K/sysuname.o \
-  $K/uname.o 
+  $K/uname.o \
+  $K/mmap.o 
 
 ifeq ($(platform), k210)
 OBJS += \
