@@ -417,10 +417,10 @@ impl VFile{
     pub fn create(& self, name: &str, attribute: u8) -> Option<Arc<VFile>> {
         // 检测同名文件
         assert!(self.is_dir());
-        if self.find_vfile_byname(name).is_some() {  
-            //println!("already exist：{}",name);
-            return None
-        }
+        //if self.find_vfile_byname(name).is_some() {  
+        //    //println!("already exist：{}",name);
+        //    return None
+        //}
         //println!("*** aft find");
         let manager_reader = self.fs.read();
         let (name_, ext_) = manager_reader.split_name_ext(name);
@@ -432,7 +432,7 @@ impl VFile{
             //println!("no space");
             return None
         }
-        //println!("*** aft search free: dirent_offset = {}",dirent_offset);
+        println!("*** aft search free: dirent_offset = {}",dirent_offset);
         let mut short_ent = ShortDirEntry::empty();
         if name_.len() > 8 || ext_.len() > 3 { 
             // 长文件名拆分
@@ -472,7 +472,7 @@ impl VFile{
             short_ent.set_case(ALL_LOWER_CASE);
             drop(manager_reader);
         }
-        //println!("*** aft format, diernt offset = {}", dirent_offset);
+        println!("*** aft format, diernt offset = {}", dirent_offset);
         // 写短目录项
         assert_eq!(
             self.write_at(dirent_offset, short_ent.as_bytes_mut()),
@@ -485,7 +485,7 @@ impl VFile{
         if let Some(vfile) = self.find_vfile_byname(name){
             //println!("*** aft write short, first_cluster = {}", vfile.first_cluster());
             if attribute & ATTRIBUTE_DIRECTORY != 0 {
-                //println!("");
+                print!("\n");
                 let manager_reader = self.fs.read();
                 let (name_bytes,ext_bytes) = manager_reader.short_name_format(".");
                 let mut self_dir = ShortDirEntry::new(&name_bytes,&ext_bytes, ATTRIBUTE_DIRECTORY);
@@ -754,6 +754,7 @@ impl VFile{
         }
         let mut offset = 0;
         loop {
+            print!("\n");
             let mut tmp_dirent = ShortDirEntry::empty();
             let read_sz = self.read_short_dirent(|short_ent:&ShortDirEntry|{
                 short_ent.read_at(
