@@ -7,19 +7,26 @@ const MSEC_PER_SEC: usize = 1000;
 const USEC_PER_SEC: usize = 1000000;
 
 pub fn get_time() -> usize {
-    time::read()
+    let mut time:usize = 0;
+    unsafe{
+        asm!(
+            "rdtime a0",
+            inout("a0") time
+        );
+    }
+    time
 }
 
 pub fn get_time_us() -> usize {
-    time::read() / (CLOCK_FREQ / USEC_PER_SEC) 
+    get_time() / (CLOCK_FREQ / USEC_PER_SEC) 
 }
 
 pub fn get_time_ms() -> usize {
-    time::read() / (CLOCK_FREQ / MSEC_PER_SEC)
+    get_time() / (CLOCK_FREQ / MSEC_PER_SEC)
 }
 
 pub fn get_time_s() -> usize {
-    time::read() / CLOCK_FREQ
+    get_time() / CLOCK_FREQ
 }
 
 pub fn sum_time(t_sec:usize, t_usec:usize, f_sec:usize, f_usec:usize) -> (usize,usize){
