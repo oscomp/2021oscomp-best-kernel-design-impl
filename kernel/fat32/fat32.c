@@ -235,6 +235,8 @@ int8 fat32_read_test(const char *filename)
     assert(0);
 }
 
+
+
 /* write count bytes from buff to file in fd */
 /* return count: success
           -1: fail
@@ -278,6 +280,7 @@ unicode_t char2unicode(char ch)
 /* now_clus : now dir cluster */
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode)
 {
+    printk_port("temp: %s\n", temp1);
     uint32_t length = strlen(temp1);
     uint32_t parent_first_clus = now_clus;
     dentry_t *p;
