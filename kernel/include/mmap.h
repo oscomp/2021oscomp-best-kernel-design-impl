@@ -19,8 +19,8 @@ struct mapped{
 	struct mapped *next;
 };
 
-struct mapped* add_map(struct inode* ip, int off, int flags);
-void del_map(struct inode* ip, int off);
-uint64 _mmap(uint64 start, int len, int prot, int flags, int fd, int off);
+struct mapped* add_map(struct inode* ind, int off, int flags);
+void del_map(struct inode* ind, int off);
+uint64 _mmap(uint64 start, int len, int prot, int flags, struct file *f, int off);
 
 #endif

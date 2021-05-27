@@ -48,21 +48,8 @@ del_map(struct inode* ind, int off)
 }
 
 uint64
-_mmap(uint64 start, int len, int prot, int flags, int fd, int off)
+_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 {
-  if(off % PGSIZE)
-  {
-    panic("offset is not multiples of PGSIZE in mmap!\n");
-    return -1;
-  }
-
-  struct file * f = fd2file(fd, 0);
-  if(!f)
-  {
-    __debug_warn("mmap", "No such file descriptor!\n");
-    return -1;
-  }
-
   struct inode *ip = f->ip;
   if(off + len > ip->size)
   {
