@@ -306,39 +306,38 @@ impl ArgMachine{
         // autorun
         if self.args[0].clone().as_str() == "run_testsuites\0" {
             let mut testsuits :Vec<&str>= Vec::new();
+            testsuits.push("testsuites_times\0");
+            testsuits.push("testsuites_gettimeofday\0");
+            testsuits.push("testsuites_sleep\0");
             testsuits.push("testsuites_brk\0");
-            // testsuits.push("testsuites_chdir\0");
             testsuits.push("testsuites_clone\0");
             testsuits.push("testsuites_close\0");
             testsuits.push("testsuites_dup2\0");
             testsuits.push("testsuites_dup\0");
             testsuits.push("testsuites_execve\0");
-            // testsuits.push("testsuites_exit\0");
+            testsuits.push("testsuites_exit\0");
             testsuits.push("testsuites_fork\0");
             testsuits.push("testsuites_fstat\0");
             testsuits.push("testsuites_getcwd\0");
             testsuits.push("testsuites_getdents\0");
             testsuits.push("testsuites_getpid\0");
             testsuits.push("testsuites_getppid\0");
-            // testsuits.push("testsuites_gettimeofday\0");
-            testsuits.push("testsuites_mkdir_\0");
+            // testsuits.push("testsuites_mkdir_\0");
             // testsuits.push("testsuites_mmap\0");
-            testsuits.push("testsuites_mount\0");
             // testsuits.push("testsuites_munmap\0");
+            testsuits.push("testsuites_mount\0");
             testsuits.push("testsuites_openat\0");
             testsuits.push("testsuites_open\0");
             testsuits.push("testsuites_pipe\0");
             testsuits.push("testsuites_read\0");
-            testsuits.push("testsuites_times\0");
             testsuits.push("testsuites_umount\0");
-            // testsuits.push("testsuites_uname\0");
-            // testsuits.push("testsuites_unlink\0");
+            testsuits.push("testsuites_uname\0");
             testsuits.push("testsuites_wait\0");
             testsuits.push("testsuites_waitpid\0");
             testsuits.push("testsuites_write\0");
-            // testsuits.push("testsuites_yield_A");
-            // testsuits.push("testsuites_yield_B");
-            // testsuits.push("testsuites_yield_C");
+            testsuits.push("testsuites_yield\0");
+            testsuits.push("testsuites_unlink\0");
+            testsuits.push("testsuites_chdir\0");
             if self.argc != 1 {
                 println!("cd: Arg expression not right, should be: run_testsuits");
             }
@@ -362,7 +361,12 @@ impl ArgMachine{
             }
             return false;
         }
-        // autorun
+        // Standard autorun
+        if self.args[0].clone().as_str() == "autorun\0" {
+            ArgMachine::auto_run_testsuites();
+            return false
+        }
+        // ls
         if self.args[0].clone().as_str() == "ls\0" {
             // println!("(into ls)");
             if !(self.argc == 2 || self.argc == 1) {
@@ -518,7 +522,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    ArgMachine::auto_run_testsuites();
+    // ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
     // cursor_move_right!(left);

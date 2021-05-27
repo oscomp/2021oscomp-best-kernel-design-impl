@@ -95,7 +95,7 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
     let token = current_user_token();
     let sec = *translated_ref(token, time_req) as usize;
     let usec = *translated_ref(token, unsafe{time_req.add(1)}) as usize;
-    println!("sys_sleep: sec:{} usec:{}", sec, usec);
+    // println!("sys_sleep: sec:{} usec:{}", sec, usec);
     let (end_sec,end_usec) = sum_time(sec, usec, get_time_s(), get_time_us());
     loop{
         let cur_sec = get_time_s();
