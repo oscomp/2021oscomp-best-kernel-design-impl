@@ -487,7 +487,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
             DiskInodeType::File
         ) {
             //println!("unlink dealloc {} clusters",inode.delete());
-            //inode.delete();
+            inode.delete();
             return 0
         } else {
             return -1
