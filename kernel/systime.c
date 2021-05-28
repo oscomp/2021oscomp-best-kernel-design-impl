@@ -39,7 +39,6 @@ uint64 sys_gettimeofday(void) {
 	tval.sec = tmp_ticks / CLK_FREQ;
 	tval.usec = tmp_ticks / (CLK_FREQ / 100000);
 	tval.usec = (tval.usec % 100000) * 10;
-	printf("sec = %d, usec = %d\n", tval.sec, tval.usec);
 
 	uint64 ptval;
 	if (argaddr(0, &ptval) < 0) {

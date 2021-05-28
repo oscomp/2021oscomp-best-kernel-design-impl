@@ -61,10 +61,10 @@ main(unsigned long hartid, unsigned long dtb_pa)
     printf("hart 0 init done\n");
 
 	// is ipi necessary here?
-	for(int i = 1; i < NCPU; i++) {
-	  unsigned long mask = 1 << i;
-	  sbi_send_ipi(&mask);
-	}
+	//for(int i = 1; i < NCPU; i++) {
+	//  unsigned long mask = 1 << i;
+	//  sbi_send_ipi(&mask);
+	//}
     __sync_synchronize();
     started = 1;
   }
