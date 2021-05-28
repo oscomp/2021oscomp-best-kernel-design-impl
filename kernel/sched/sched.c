@@ -12,6 +12,7 @@
 #include <csr.h>
 #include <qemu.h>
 #include <os/elf.h>
+#include <os/fat32.h>
 
 #define TOO_LARGE_PRIORITY 10000000
 #define true 1
@@ -131,6 +132,39 @@ void do_scheduler(void)
     switch_to(previous_running,current_running);
 }
 
+/* default setup pcb */
+void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
+{
+    pcb_underinit->preempt_count = 0; 
+    pcb_underinit->list.ptr = pcb_underinit; 
+    pcb_underinit->pid = process_id++; 
+    pcb_underinit->type = type; 
+    init_list_head(&pcb_underinit->wait_list);
+    pcb_underinit->status = TASK_READY; 
+    pcb_underinit->priority = DEFAULT_PRIORITY; 
+    pcb_underinit->temp_priority = pcb_underinit->priority; 
+    pcb_underinit->mode = DEFAULT_MODE; 
+    pcb_underinit->spawn_num = 0;
+    pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
+    pcb_underinit->mask = 0xf; 
+    pcb_underinit->parent.parent = NULL;
+
+    /* file descriptors */
+    // number default
+    for (int i = 0; i < NUM_FD; ++i)
+        pcb_underinit->fd[i].fd_num = i;
+    // open stdin , stdout and stderr
+    pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
+    pcb_underinit->fd[1].dev = STDOUT; pcb_underinit->fd[1].used = FD_USED; pcb_underinit->fd[1].flags = O_WRONLY;
+    pcb_underinit->fd[2].dev = STDERR; pcb_underinit->fd[2].used = FD_USED; pcb_underinit->fd[2].flags = O_WRONLY;
+    for (int i = 3; i < NUM_FD; ++i)
+        pcb_underinit->fd[i].used = FD_UNUSED; // remember to set up other props when use it
+
+    // systime
+    pcb_underinit->stime = 0;
+    pcb_underinit->utime = 0;
+}
+
 /* prepare pcb stack for ready process */
 void init_pcb_stack(
     ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, int argc ,void *arg,
@@ -196,13 +230,8 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             pcb_t *pcb_underinit = &pcb[i];
             init_pcb_default(pcb_underinit, USER_THREAD);
             /* set current_running pcb */
-            // init_list_head(&current_running->child_list.list);
-            // current_running->child_list.list.ptr = current_running;
             current_running->spawn_num++;
 
-            // pcb_underinit->child_list.list.ptr = pcb_underinit;
-            // pcb_underinit->child_list.flag = flag;
-            // list_add_tail(&pcb_underinit->child_list.list, &current_running->child_list.list);
             pcb_underinit->parent.parent = current_running;
             pcb_underinit->parent.flag = flag;
 
@@ -214,10 +243,6 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             // pgdir
             pcb_underinit->pgdir = current_running->pgdir;
            
-            // pid
-            pcb_underinit->pid = ctid;
-            process_id = ctid + 1;
-
             // prepare stack
             copy_to(pcb_underinit, kernel_stack_top, user_stack);
 
@@ -231,9 +256,7 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             pcb_underinit->kernel_sp -= sizeof(switchto_context_t);
             switchto_context_t *switch_to_reg = 
                 (switchto_context_t *)(pcb_underinit->kernel_sp);
-                // it doesn't matter if kernel stack are different
-            // switchto_context_t *switch_to_reg2 = 
-            //     (switchto_context_t *)(current_running->kernel_stack_base + NORMAL_PAGE_SIZE - sizeof(regs_context_t) - sizeof(switchto_context_t));
+            // kernel stack should be different
 
             switch_to_reg->regs[0] = &ret_from_exception;
             // add to ready queue
@@ -346,7 +369,10 @@ void do_exit(int32_t exit_status)
     do_scheduler();
 }
 
-pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode)
+/* execvc a process */
+/* success: no return value */
+/* fail: return -1 */
+int8 do_exec(const char* file_name, char* argv[], char *const envp)
 {
     for (int i = 1; i < NUM_MAX_TASK; ++i)
         if (pcb[i].status == TASK_EXITED)
@@ -356,50 +382,51 @@ pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode)
             ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
             ptr_t user_stack = USER_STACK_ADDR;
 
-            pcb_underinit->preempt_count = 0;
-            pcb_underinit->list.ptr = pcb_underinit;
-            pcb_underinit->pid = process_id++;
-            pcb_underinit->type = USER_PROCESS;
-            pcb_underinit->status = TASK_READY;
-            pcb_underinit->priority = DEFAULT_PRIORITY;
-            pcb_underinit->temp_priority = pcb_underinit->priority;
-            pcb_underinit->mode = mode;
-            pcb_underinit->spawn_num = 0;
-            pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1;
-            pcb_underinit->mask = current_running->mask;
+            init_pcb_default(pcb_underinit, USER_PROCESS);
 
             // get file
             unsigned char *_elf_binary = NULL;
-            int length;
+            uint64 length;
+            int32 fd;
 
-            get_elf_file(file_name,&_elf_binary,&length);
+            if ((fd = fat32_open(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
+                return -1;
+            }
+            length = current_running->fd[fd].length;
+            _elf_binary = (char *)kmalloc(length);
+            fat32_read(fd, _elf_binary, length);
+
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
             uint64_t user_stack_page_kva = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper);
+            uint64_t edata;
+            uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper, &edata);
+            pcb_underinit->edata = edata;
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
 
             // copy argc & argv
+            uint argc = 0;
+            while (argv[argc] != NULL) argc++;
             if (argc){
-                unsigned char **pointers = user_stack_page_kva;
-                unsigned char *strings = user_stack_page_kva + argc*sizeof(unsigned char *);
-                uint64_t write_to_stack = user_stack - NORMAL_PAGE_SIZE + argc*sizeof(unsigned char*);
+                unsigned char **pointers = user_stack_page_kva; // point to argv[i] in i-th iteration
+                unsigned char *strings = user_stack_page_kva + argc*sizeof(unsigned char *) + 1; // + 1 for NULL
+                uint64_t write_to_stack = user_stack - NORMAL_PAGE_SIZE + argc*sizeof(unsigned char*) + 1; // virtual addr for user
                 for (int i = 0; i < argc; ++i)
                 {
-                    // memcpy(pointers,&argv[i],sizeof(char *));pointers += sizeof(char*);
                     memcpy(strings,argv[i],strlen(argv[i])+1);
                     pointers[i] = write_to_stack;
-                    strings += (strlen(argv[i])+1);write_to_stack += (strlen(argv[i])+1);
+                    strings += (strlen(argv[i])+1); write_to_stack += (strlen(argv[i])+1);
                 }
+                pointers[argc] = 0;
             }
 
-            // prepare stack
+            // prepare stack(give argc and argv)(argv = user_stack - NORMAL_PAGE_SIZE)
             init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argc, user_stack - NORMAL_PAGE_SIZE, pcb_underinit);
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
-            // prints("mem:%lx",memalloc);
-            return pcb[i].pid;
+
+            return pcb[i].pid; // no need but do
         }
     return -1;
 }

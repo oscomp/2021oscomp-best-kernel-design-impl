@@ -142,8 +142,6 @@ static void write_segment(Elf64_Ehdr ehdr, Elf64_Phdr phdr, FILE * fp,
 static void write_os_size(int nbytes, FILE * img, int extended)
 {
 	short sector_num = nbytes / 512 - 1;
- //    fseek(img,0x1fc,0);
- //    fwrite(&sector_num,2,1,img);
     if (extended)
     	printf("os_size: %d sectors\n", sector_num);
 }

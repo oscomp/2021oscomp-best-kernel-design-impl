@@ -95,9 +95,10 @@ int boot_kernel(unsigned long mhartid, uintptr_t riscv_dtb)
     if (mhartid == 0) {
         setup_vm();
         // load kernel
+        uint64_t edata;
         start_kernel =
                 (kernel_entry_t)load_elf(_elf_main, _length_main,
-                                         PGDIR_PA, directmap);
+                                         PGDIR_PA, directmap, &edata);
     } else {
         // TODO: what should we do for other cores?
         while (1) sbi_console_putchar('6');

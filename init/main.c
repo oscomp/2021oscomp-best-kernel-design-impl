@@ -68,7 +68,9 @@ static void init_pcb()
     uintptr_t pgdir = allocPage();
     clear_pgdir(pgdir);
     alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-    uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper);
+    uint64_t edata;
+    uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper, &edata);
+    pcb_underinit->edata = edata;
     shell_pgdir = pgdir;
 
     init_pcb_stack(pgdir, kernel_stack, user_stack, test_shell, 0, NULL, pcb_underinit);
@@ -126,6 +128,12 @@ static void init_syscall(void)
     syscall[SYS_chdir] = &fat32_chdir;
     syscall[SYS_getcwd] = &fat32_getcwd;
     syscall[SYS_read] = &fat32_read;
+    syscall[SYS_execve] = &do_exec;
+    syscall[SYS_brk] = &do_brk;
+    syscall[SYS_dup] = &fat32_dup;
+    syscall[SYS_dup3] = &fat32_dup3;
+    syscall[SYS_fstat] = &fat32_fstat;
+    syscall[SYS_getdents64] = &fat32_getdent;
     // syscall[SYS_mmap] = &do_mmap;
 }
 

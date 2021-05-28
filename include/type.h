@@ -65,6 +65,19 @@ typedef uint64_t uintptr_t;
 typedef int64_t intptr_t;
 typedef uint64_t size_t;
 
+typedef uint32_t fd_num_t;
+typedef uint16_t unicode_t;
+
+typedef uint64_t dev_t;
+typedef uint64_t ino_t;
+typedef unsigned int mode_t;
+typedef uint32_t nlink_t;
+typedef uint32_t uid_t;
+typedef uint32_t gid_t;
+typedef long int off_t;
+typedef uint32_t blksize_t;
+typedef uint64_t blkcnt_t;
+
 /* Minimum of signed integral types.  */
 # define INT8_MIN               (-128)
 # define INT16_MIN              (-32767-1)
@@ -86,15 +99,5 @@ typedef uint64_t size_t;
 #define O_RDONLY 1 /* read only open */
 #define O_WRONLY 2 /* write only open */
 #define O_RDWR 3 /* read/write open */
-typedef struct fd{
-    uint8 dev;
-    uint32 first_clus_num;
-    uint8 flags;
-    uint64 pos;
-    uint32 length;
-    uint8 mapped;
-    uint32 fd_num;
-    uint8 used;
-}fd_t;
 
 #endif

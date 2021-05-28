@@ -411,6 +411,19 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
     return ret;
 }
 
+/* modify data top addr */
+/* success return 0, fail return -1*/
+uint64_t do_brk(uintptr_t ptr)
+{
+    if (ptr > USER_STACK_ADDR - NORMAL_PAGE_SIZE) return -1; // larger than stack
+    else if (!ptr) return current_running->edata; // probe edata
+    else if (ptr < current_running->edata) return -1; // cannot be smaller than current addr
+    else{
+        current_running->edata = ptr;
+        return ptr;
+    }
+}
+
 uintptr_t directmap(uintptr_t kva, uintptr_t pgdir)
 {
     return kva;

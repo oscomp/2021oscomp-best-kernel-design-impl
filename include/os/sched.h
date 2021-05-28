@@ -36,7 +36,6 @@
 #include <os/mm.h>
 #include <os/smp.h>
 #include <os/time.h>
-#include <os/fat32.h>
 
 #define NUM_MAX_TASK 16
 
@@ -84,6 +83,40 @@ typedef enum {
 } task_type_t;
 
 #define NUM_FD 16
+
+typedef struct fd{
+    /* dev number */
+    uint8 dev;
+    /* first clus number */
+    uint32 first_clus_num;
+    /* open flags */
+    uint8 flags;
+    /* position */
+    uint64 pos;
+    /* length */
+    uint32 length;
+    /* remapped number */
+    /* default: index in fd array*/
+    fd_num_t fd_num;
+
+    uint8 used;
+
+    uint8 nlink;
+
+    uid_t uid;
+    gid_t gid;
+
+    dev_t rdev;
+
+    blksize_t blksize;
+
+    long atime_sec;
+    long atime_nsec;
+    long mtime_sec;
+    long mtime_nsec;
+    long ctime_sec;
+    long ctime_nsec;
+}fd_t;
 
 /* Process Control Block */
 typedef struct pcb
@@ -151,6 +184,8 @@ typedef struct pcb
     /* file descriptor */
     fd_t fd[NUM_FD];
 
+    /* edata */
+    uint64_t edata;
 } pcb_t;
 
 #define DEFAULT_PRIORITY 1
@@ -182,6 +217,7 @@ extern const ptr_t pid0_stack2;
 
 extern void __global_pointer$();
 
+void init_pcb_default(pcb_t *pcb_underinit,task_type_t type);
 void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,int argc, void* arg,pcb_t *pcb);
 extern void ret_from_exception();
 extern void switch_to(pcb_t *prev, pcb_t *next);
@@ -202,49 +238,19 @@ pid_t do_getppid();
 int do_taskset(uint32_t pid,uint32_t mask);
 
 void do_exit();
-pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 
 pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid);
 pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
 
 uint8_t do_nanosleep(struct timespec *sleep_time);
+int8 do_exec(const char* file_name, char* argv[], char *const envp);
 
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;
 extern int LATTER_TICKS_COUNTER;
 
-extern pid_t do_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
 extern void do_show_exec();
 
-/* default setup pcb */
-static inline void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
-{
-    pcb_underinit->preempt_count = 0; 
-    pcb_underinit->list.ptr = pcb_underinit; 
-    pcb_underinit->pid = process_id++; 
-    pcb_underinit->type = type; 
-    init_list_head(&pcb_underinit->wait_list);
-    pcb_underinit->status = TASK_READY; 
-    pcb_underinit->priority = DEFAULT_PRIORITY; 
-    pcb_underinit->temp_priority = pcb_underinit->priority; 
-    pcb_underinit->mode = DEFAULT_MODE; 
-    pcb_underinit->spawn_num = 0;
-    pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
-    pcb_underinit->mask = 0xf; 
-    pcb_underinit->parent.parent = NULL;
-
-    /* file descriptors */
-    pcb_underinit->fd[0].dev = 0; pcb_underinit->fd[0].used = 1; pcb_underinit->fd[0].flags = O_RDONLY; 
-    pcb_underinit->fd[1].dev = 0; pcb_underinit->fd[1].used = 1; pcb_underinit->fd[1].flags = O_WRONLY; 
-    for (int i = 2; i < NUM_FD; ++i){
-        pcb_underinit->fd[i].used = 0; // remember to set up other props when use it
-        pcb_underinit->fd[i].mapped = 0;
-    }
-
-    // systime
-    pcb_underinit->stime = 0;
-    pcb_underinit->utime = 0;
-}
 
 /* set stack base as normal */
 /* set kernel_stack_base, user_stack_base */

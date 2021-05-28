@@ -75,6 +75,7 @@ uintptr_t directmap(uintptr_t kva, uintptr_t pgdir);
 void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base);
 
 uint64_t do_mmap(uint64_t start,uint32_t len, uint8 prot, uint8 flags,uint32_t fd,uint32_t off);
+uint64_t do_brk(uintptr_t ptr);
 
 void *kalloc(void);
 void kfree(void *p);

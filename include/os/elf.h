@@ -74,6 +74,19 @@ typedef struct elf64_hdr
     Elf64_Half e_shstrndx;
 } Elf64_Ehdr;
 
+typedef struct {
+    Elf64_Half    sh_name;    /* section name */
+    Elf64_Half    sh_type;    /* section type */
+    Elf64_Xword   sh_flags;    /* section flags */
+    Elf64_Addr    sh_addr;    /* virtual address */
+    Elf64_Off     sh_offset;    /* file offset */
+    Elf64_Xword   sh_size;    /* section size */
+    Elf64_Half    sh_link;    /* link to another */
+    Elf64_Half    sh_info;    /* misc info */
+    Elf64_Xword   sh_addralign;    /* memory alignment */
+    Elf64_Xword   sh_entsize;    /* table entry size */
+} Elf64_Shdr;
+
 /* These constants define the permissions on sections in the
    program header, p_flags. */
 #define PF_X (1 << 0)          /* Segment is executable */
@@ -109,6 +122,30 @@ typedef struct elf64_hdr
 #define PT_LOPROC 0x70000000 /* Start of processor-specific */
 #define PT_HIPROC 0x7fffffff /* End of processor-specific */
 
+/* sh_type */
+#define SHT_NULL 0
+#define SHT_PROGBITS 1
+#define SHT_SYMTAB 2
+#define SHT_STRTAB 3
+#define SHT_RELA 4
+#define SHT_HASH 5
+#define SHT_DYNAMIC 6
+#define SHT_NOTE 7
+#define SHT_NOBITS 8
+#define SHT_REL 9
+#define SHT_SHLIB 10
+#define SHT_DYNSYM 11
+#define SHT_LOPROC 0x70000000
+#define SHT_HIPROC 0x7fffffff
+#define SHT_LOUSER 0x80000000
+#define SHT_HIUSER 0x8fffffff
+
+/* sh_flags */
+#define SHF_WRITE 0x1
+#define SHF_ALLOC 0x2
+#define SHF_EXECINSTR 0x4
+#define SHF_MASKPROC 0xF0000000
+
 typedef struct elf64_phdr
 {
     Elf64_Word p_type;
@@ -138,18 +175,25 @@ static inline int is_elf_format(unsigned char *binary)
 }
 
 /* prepare_page_for_kva should return a kernel virtual address */
+/* return entry point va of this elf */
+/* modify *edata as end of all data */
 static inline uintptr_t load_elf(
     unsigned char elf_binary[], unsigned length, uintptr_t pgdir,
-    uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask))
+    uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask),
+    uint64_t *edata)
 {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)elf_binary;
     Elf64_Phdr *phdr = NULL;
+    Elf64_Shdr *shdr = NULL;
     /* As a loader, we just care about segment,
      * so we just parse program headers.
      */
     unsigned char *ptr_ph_table = NULL;
+    unsigned char *ptr_sh_table = NULL;
     Elf64_Half ph_entry_count;
     Elf64_Half ph_entry_size;
+    Elf64_Half sh_entry_count;
+    Elf64_Half sh_entry_size;
     int i = 0;
 
     // check whether `binary` is a ELF file.
@@ -158,8 +202,11 @@ static inline uintptr_t load_elf(
     }
 
     ptr_ph_table   = elf_binary + ehdr->e_phoff;
+    ptr_sh_table   = elf_binary + ehdr->e_shoff;
     ph_entry_count = ehdr->e_phnum;
     ph_entry_size  = ehdr->e_phentsize;
+    sh_entry_count = ehdr->e_shnum;
+    sh_entry_size  = ehdr->e_shentsize;
 
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
@@ -197,6 +244,14 @@ static inline uintptr_t load_elf(
         ptr_ph_table += ph_entry_size;
     }
 
+    ptr_sh_table += sh_entry_size;
+    shdr = (Elf64_Shdr *)ptr_sh_table; // ignore NULL sec
+    while (shdr->sh_flags & SHF_ALLOC){        
+        ptr_sh_table += sh_entry_size;
+        shdr = (Elf64_Shdr *)ptr_sh_table;
+    }
+    shdr = ptr_sh_table - sh_entry_size; // last data
+    *edata = shdr->sh_addr + shdr->sh_size;
     return ehdr->e_entry;
 }
 

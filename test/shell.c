@@ -31,7 +31,7 @@ int main()
     /* for qemu singal test*/
     /* systest(filename) */
 
-    sys_test("mkdir");
+    sys_test("clone");
     // printf("Success1!\n\r");
     // sys_test("loop");    
     // printf("Success2!\n\r");

@@ -53,6 +53,38 @@ typedef struct dentry{
 }dentry_t;
 #pragma pack()
 
+/* kstatus */
+struct kstat {
+    dev_t st_dev;
+    ino_t st_ino;
+    mode_t st_mode;
+    nlink_t st_nlink;
+    uid_t st_uid;
+    gid_t st_gid;
+    dev_t st_rdev;
+    unsigned long __pad;
+    off_t st_size;
+    blksize_t st_blksize;
+    int __pad2;
+    blkcnt_t st_blocks;
+    long st_atime_sec;
+    long st_atime_nsec;
+    long st_mtime_sec;
+    long st_mtime_nsec;
+    long st_ctime_sec;
+    long st_ctime_nsec;
+    unsigned __unused[2];
+}kstat_t;
+
+/* dir entry for linux */
+struct linux_dirent64 {
+    uint64        d_ino;
+    int64         d_off;
+    unsigned short  d_reclen;
+    unsigned char   d_type;
+    char            d_name[];
+};
+
 #define LONG_DENTRY_NAME1_LEN 5
 #define LONG_DENTRY_NAME2_LEN 6
 #define LONG_DENTRY_NAME3_LEN 2
@@ -85,11 +117,14 @@ typedef enum{
 }file_mode_t;
 
 enum{
+    NO_EXT_NAME,
+    EXT_NAME,
+};
+
+enum{
     FD_UNUSED,
     FD_USED,
 };
-
-typedef uint16_t unicode_t;
 
 #define SECTOR_SIZE (fat.bpb.byts_per_sec)
 #define CLUSTER_SIZE (fat.byts_per_clus)
@@ -112,8 +147,10 @@ typedef uint16_t unicode_t;
 
 #define AT_FDCWD 0xffffff9c
 
-#define stdin 0
-#define stdout 1
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
+#define DEFAULT_DEV 3
 
 #define MAX_PATHLEN 60
 
@@ -121,19 +158,27 @@ extern fat_t fat;
 
 uint16 fat32_open(uint32 fd, const uchar *path, uint32 flags, uint32 mode);
 int8 fat32_read_test(const char *filename);
-size_t fat32_read(uint32 fd, uchar *buf, size_t count);
-size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
-dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode);
+int64 fat32_read(uint32 fd, uchar *buf, size_t count);
+int64 fat32_write(uint32 fd, uchar *buff, uint64_t count);
+dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore);
 uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path, uint32_t mode);
 uint8 fat32_close(uint32 fd);
 uint8 fat32_chdir(const char* path_t);
 uchar *fat32_getcwd(uchar *buf, size_t size);
+fd_num_t fat32_dup(fd_num_t fd);
+fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use);
+int16 fat32_fstat(fd_num_t fd, struct kstat *kst);
+size_t fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
 
+
+dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
 uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
-uint32_t search_empty_fat(uchar *buf);
+uint32_t search_empty_clus(uchar *buf);
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode);
-uint8 set_fd_from_dentry(void *pcb, uint i,dentry_t *p, uint32_t flags);
+uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags);
+int16 get_fd_index(fd_num_t fd);
+
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -153,9 +198,15 @@ static inline uint32 get_cluster_from_dentry(dentry_t *p)
     return ((uint32_t)p->HI_clusnum << 16) + p->LO_clusnum;
 }
 
+static inline void set_dentry_cluster(dentry_t *p, uint32 cluster)
+{
+    p->HI_clusnum = (cluster >> 16) & ((1lu << 16) - 1);
+    p->LO_clusnum = cluster & ((1lu << 16) - 1);
+}
+
 static inline uint32 get_length_from_dentry(dentry_t *p)
 {
-    return ((uint32_t)(p->length));
+    return p->length;
 }
 
 static inline uint32 fat_offset_of_clus(uint32 cluster)
