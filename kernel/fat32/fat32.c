@@ -49,12 +49,18 @@ dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_
 {
     p++;
     if ((uintptr_t)p - (uintptr_t)dirbuff == BUFSIZE){
+        printk_port("exceeding\n");
         // read another
         *now_sec += BUFSIZE / SECTOR_SIZE;
+        printk_port("now_sec: %d, now_clus: %d\n", *now_sec, *now_clus);
         if (*now_sec - first_sec_of_clus(*now_clus) == fat.bpb.sec_per_clus){
+            printk_port("line1\n");
             *now_clus = get_next_cluster(*now_clus); //another cluster
+            printk_port("line2\n");
             *now_sec = first_sec_of_clus(*now_clus);
+            printk_port("line3\n");
         }
+        printk_port("now_sec: %d, now_clus: %d\n", *now_sec, *now_clus);
         sd_read(dirbuff, *now_sec);
         p = dirbuff;
     }
