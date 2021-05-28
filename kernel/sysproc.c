@@ -229,8 +229,36 @@ sys_sleep(void)
 }
 
 uint64 sys_nanosleep(void) {
-	printf("not implemented yet!\n");
-	return -1;
+	uint64 addr_sec, addr_usec;
+
+	if (argaddr(0, &addr_sec) < 0) 
+		return -1;
+	if (argaddr(1, &addr_usec) < 0) 
+		return -1;
+
+	struct proc *p = myproc();
+	uint64 sec, usec;
+	if (copyin2((char*)&sec, addr_sec, sizeof(sec)) < 0) 
+		return -1;
+	if (copyin2((char*)&usec, addr_usec, sizeof(usec)) < 0) 
+		return -1;
+	int n = sec * 20 + usec / 50000000;
+
+	int mask = p->tmask;
+	if (mask) {
+		printf(") ...\n");
+	}
+	acquire(&p->lk);
+	uint64 tick0 = ticks;
+	while (ticks - tick0 < n) {
+		if (p->killed) {
+			return -1;
+		}
+		sleep(&ticks, &p->lk);
+	}
+	release(&p->lk);
+
+	return 0;
 }
 
 uint64

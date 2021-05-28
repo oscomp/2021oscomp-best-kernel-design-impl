@@ -43,6 +43,7 @@ char *test_files[] = {
 	"waitpid", 
 	"write", 
 	"yield", 
+	"sleep", 
 };
 int const test_file_num = sizeof(test_files) / sizeof(char const*);
 
