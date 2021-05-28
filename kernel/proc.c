@@ -235,33 +235,39 @@ int fork_cow(void) {
 	}
 
 	// copy parent's memory layout 
-	struct seg *seg;
-	struct seg **s2 = &(np->segment);
-	for (seg = p->segment; seg != NULL; seg = seg->next) {
-		struct seg *s = kmalloc(sizeof(struct seg));
-		if (s == NULL) {
-			__debug_warn("fork_cow", "seg kmalloc fail\n");
-			freeproc(np);
-			return -1;
-		}
-		// Copy user memory from parent to child.
-		if (uvmcopy_cow(p->pagetable, np->pagetable, 
-				seg->addr, seg->addr + seg->sz, seg->type) < 0) 
-		{
-			__debug_warn("fork_cow", "uvmcopy_cow fails\n");
-			__debug_warn("fork_cow", "p %s\n", p->name);
-			__debug_warn("fork_cow", "%p, %p, %d\n", 
-					seg->addr, seg->addr + seg->sz, seg->type);
-			kfree(s);
-			__debug_warn("fork_cow", "exit kfree\n");
-			freeproc(np);
-			return -1;
-		}
-		memmove(s, seg, sizeof(struct seg));
-		s->next = NULL;
-		*s2 = s;
-		s2 = &s->next;
+	np->segment = copysegs(p->pagetable, p->segment, np->pagetable);
+	if (np->segment == NULL) {
+		__debug_warn("fork", "fail to copy segments\n");
+		freeproc(np);
+		return -1;
 	}
+	// struct seg *seg;
+	// struct seg **s2 = &(np->segment);
+	// for (seg = p->segment; seg != NULL; seg = seg->next) {
+	// 	struct seg *s = kmalloc(sizeof(struct seg));
+	// 	if (s == NULL) {
+	// 		__debug_warn("fork_cow", "seg kmalloc fail\n");
+	// 		freeproc(np);
+	// 		return -1;
+	// 	}
+	// 	// Copy user memory from parent to child.
+	// 	if (uvmcopy_cow(p->pagetable, np->pagetable, 
+	// 			seg->addr, seg->addr + seg->sz, seg->type) < 0) 
+	// 	{
+	// 		__debug_warn("fork_cow", "uvmcopy_cow fails\n");
+	// 		__debug_warn("fork_cow", "p %s\n", p->name);
+	// 		__debug_warn("fork_cow", "%p, %p, %d\n", 
+	// 				seg->addr, seg->addr + seg->sz, seg->type);
+	// 		kfree(s);
+	// 		__debug_warn("fork_cow", "exit kfree\n");
+	// 		freeproc(np);
+	// 		return -1;
+	// 	}
+	// 	memmove(s, seg, sizeof(struct seg));
+	// 	s->next = NULL;
+	// 	*s2 = s;
+	// 	s2 = &s->next;
+	// }
 
 	// filesystem 
 	if (copyfdtable(&p->fds, &np->fds) < 0) {
@@ -328,33 +334,39 @@ int clone(uint64 flag, uint64 stack) {
 	}
 
 	// copy parent's memory layout 
-	struct seg *seg;
-	struct seg **s2 = &(np->segment);
-	for (seg = p->segment; seg != NULL; seg = seg->next) {
-		struct seg *s = kmalloc(sizeof(struct seg));
-		if (s == NULL) {
-			__debug_warn("fork_cow", "seg kmalloc fail\n");
-			freeproc(np);
-			return -1;
-		}
-		// Copy user memory from parent to child.
-		if (uvmcopy_cow(p->pagetable, np->pagetable, 
-				seg->addr, seg->addr + seg->sz, seg->type) < 0) 
-		{
-			__debug_warn("fork_cow", "uvmcopy_cow fails\n");
-			__debug_warn("fork_cow", "p %s\n", p->name);
-			__debug_warn("fork_cow", "%p, %p, %d\n", 
-					seg->addr, seg->addr + seg->sz, seg->type);
-			kfree(s);
-			__debug_warn("fork_cow", "exit kfree\n");
-			freeproc(np);
-			return -1;
-		}
-		memmove(s, seg, sizeof(struct seg));
-		s->next = NULL;
-		*s2 = s;
-		s2 = &s->next;
+	np->segment = copysegs(p->pagetable, p->segment, np->pagetable);
+	if (np->segment == NULL) {
+		__debug_warn("fork", "fail to copy segments\n");
+		freeproc(np);
+		return -1;
 	}
+	// struct seg *seg;
+	// struct seg **s2 = &(np->segment);
+	// for (seg = p->segment; seg != NULL; seg = seg->next) {
+	// 	struct seg *s = kmalloc(sizeof(struct seg));
+	// 	if (s == NULL) {
+	// 		__debug_warn("fork_cow", "seg kmalloc fail\n");
+	// 		freeproc(np);
+	// 		return -1;
+	// 	}
+	// 	// Copy user memory from parent to child.
+	// 	if (uvmcopy_cow(p->pagetable, np->pagetable, 
+	// 			seg->addr, seg->addr + seg->sz, seg->type) < 0) 
+	// 	{
+	// 		__debug_warn("fork_cow", "uvmcopy_cow fails\n");
+	// 		__debug_warn("fork_cow", "p %s\n", p->name);
+	// 		__debug_warn("fork_cow", "%p, %p, %d\n", 
+	// 				seg->addr, seg->addr + seg->sz, seg->type);
+	// 		kfree(s);
+	// 		__debug_warn("fork_cow", "exit kfree\n");
+	// 		freeproc(np);
+	// 		return -1;
+	// 	}
+	// 	memmove(s, seg, sizeof(struct seg));
+	// 	s->next = NULL;
+	// 	*s2 = s;
+	// 	s2 = &s->next;
+	// }
 
 	// these parts may be improved later 
 	// filesystem 

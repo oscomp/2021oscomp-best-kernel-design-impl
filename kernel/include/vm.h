@@ -38,8 +38,9 @@ void            kvmfree(pagetable_t kpt, int stack_free);
 
 void            uvminit(pagetable_t, uchar *, uint);
 pagetable_t     uvmcreate(void);
-int             uvmcopy(pagetable_t, pagetable_t, pagetable_t, uint64);
-int             uvmcopy_cow(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype);
+// int             uvmcopy(pagetable_t, pagetable_t, pagetable_t, uint64);
+// int             uvmcopy_cow(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype);
+int             uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype, int cow);
 uint64          uvmalloc(pagetable_t, uint64 start, uint64 end, int perm);
 uint64          uvmdealloc(pagetable_t, uint64, uint64, enum segtype);
 void            uvmclear(pagetable_t, uint64);

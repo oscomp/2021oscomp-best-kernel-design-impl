@@ -519,8 +519,10 @@ uvmfree(pagetable_t pagetable)
 /**
  * @param     segt  segment type, the kernel won't panic 
  *                  where pte == NULL or pte invalid if segt is HEAP
+ * @param     cow   whether to activate COW mechanism
+ *                  only mapping shared pages without this, e.g. shared mmap pages
  */
-int uvmcopy_cow(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype segt)
+int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype segt, int cow)
 {
   pte_t *pte;
   uint64 pa, i;
@@ -533,7 +535,7 @@ int uvmcopy_cow(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum
 			panic("uvmcopy_cow: funny pte");	
 	  }
 		pa = PTE2PA(*pte);
-		if (*pte & PTE_W) {
+		if (cow && (*pte & PTE_W)) {
 			*pte = (*pte|PTE_COW) & ~PTE_W;  // cancel 'W', and mark COW
 		}
     flags = PTE_FLAGS(*pte);
