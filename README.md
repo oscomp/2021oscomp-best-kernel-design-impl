@@ -136,12 +136,12 @@ We are team "HOIT-23o2" from harbin institute of technology,shenzhen. We are now
 |-- UpdateREADME.bat -- 自动生成README标题工具
 |-- images -- 图片
 |-- tree.exe -- 文件树生成程序
-`-- 初赛报告文档.pdf
+`-- HoitFS设计开发文档.pdf
 ```
 
 ## Docs
 
-- This is the main doc for stage 1 submit: [初赛报告文档](./初赛报告文档.pdf)
+- This is the main doc for stage 1 submit: [初赛报告文档](./HoitFS设计开发文档.pdf)
 - This is the link of development doc for stage 1 submit: [README_HOITFS](./README_HOITFS.md)
 - **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the newest repo, this repo is a replica of that, only for submit.
 

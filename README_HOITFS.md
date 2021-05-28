@@ -162,7 +162,7 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 ### Week11~17 - 里程碑
 > 本周总结：第11~17周处于开发阶段，文档以及会议工作落了下来，由于学校事情也比较多，因此开发时间不是很够……不过好在交出了初稿
 >
-> HoitFS V1.0：[初赛报告文档.pdf](./初赛报告文档.pdf)
+> HoitFS V1.0：[初赛报告文档.pdf](./HoitFS设计开发文档.pdf)
 >
 > HoitFS 答辩：[初赛PPT](./Records/Files/PPT/hoitfs-swb-final-presentation.pptx)
 
