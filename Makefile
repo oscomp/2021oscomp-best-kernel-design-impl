@@ -107,9 +107,6 @@ ifeq ($(platform), qemu)
 linker = ./linker/qemu.ld
 endif
 
-all: build 
-	cp $T/kernel ./k210.bin 
-
 # Compile Kernel
 $T/kernel: $(OBJS) $(linker) $U/initcode $U/ostest 
 	@if [ ! -d "./target" ]; then mkdir target; fi
@@ -163,6 +160,12 @@ ifeq ($(platform), k210)
 else
 	$(QEMU) $(QEMUOPTS)
 endif
+
+all: build 
+	@$(OBJCOPY) $T/kernel --strip-all -O binary $(image)
+	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $(k210)
+	@dd if=$(image) of=$(k210) bs=128k seek=1
+	cp $(k210) ./k210.bin
 
 ulinker = ./linker/user.ld
 
