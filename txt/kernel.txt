@@ -15106,7 +15106,7 @@ ffffffff8040aa7a:	e822                	sd	s0,16(sp)
 ffffffff8040aa7c:	1000                	addi	s0,sp,32
 ffffffff8040aa7e:	d75fa0ef          	jal	ra,ffffffff804057f2 <kalloc>
 ffffffff8040aa82:	fea43423          	sd	a0,-24(s0)
-ffffffff8040aa86:	4611                	li	a2,4
+ffffffff8040aa86:	4605                	li	a2,1
 ffffffff8040aa88:	4581                	li	a1,0
 ffffffff8040aa8a:	fe843503          	ld	a0,-24(s0)
 ffffffff8040aa8e:	af7fc0ef          	jal	ra,ffffffff80407584 <sd_read_sector>

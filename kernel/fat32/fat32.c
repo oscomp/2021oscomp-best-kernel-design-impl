@@ -66,7 +66,7 @@ uint8_t fat32_init()
     /* read FAT32 info */
     uint8_t *b = kalloc();
     // read superblock
-    sd_read_sector(b, 0, 4);
+    sd_read_sector(b, 0, 1);
     // store basic messages
     if (memcmp((char const*)(b + 82), "FAT32", 5))
         printk("not FAT32 volume");
@@ -101,6 +101,7 @@ uint8_t fat32_init()
     root_sec = cwd_sec;
     /* from root sector read buffsize */
     sd_read(buf, cwd_sec);
+    
     kfree(b);
 
     return 0;
@@ -931,7 +932,6 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
     }
     
-    // if (mode == SEARCH_DIR && )
     return NULL;
 }
 
