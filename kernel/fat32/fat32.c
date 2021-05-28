@@ -309,7 +309,9 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_
     else
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
     // find empty entry
+    printk_port("444\n");
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
+    printk_port("555\n");
     now_clus = clus_of_sec(sec);
     ientry_t new_clus = search_empty_fat(tempbuf);
 
@@ -585,8 +587,9 @@ uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path_const, uint32_t mode)
                 kfree(tempbuf);
                 return 0;
             }
-
+            printk_port("222\n");
             _create_new(temp1, now_clus, tempbuf, FILE_DIR);
+            printk_port("333\n");
 
             kfree(tempbuf);
             return 0;
