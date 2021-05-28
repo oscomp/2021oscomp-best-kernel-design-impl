@@ -12,20 +12,22 @@ pub struct MountTable {
 impl MountTable {
 
     pub fn mount(&mut self, special:String,dir:String,fstype:String, flag:u32)->isize{
+        //println!("[mount] mnt {} to {}", special, dir);
         self.mnt_list.push((special, dir, fstype));
         return 0
     }
 
     pub fn umount(&mut self, special:String, flags:u32)->isize{
         let len = self.mnt_list.len();
+        //println!("[umount] special={}", special);
         for i in 0..len {
-            //println!("in mntlist = {}", self.mnt_list[i].0);
-            if self.mnt_list[i].0 == special {
+            //println!("[umount] in mntlist = {}", self.mnt_list[i].0);
+            if self.mnt_list[i].0 == special || self.mnt_list[i].1 == special{
                 self.mnt_list.remove(i);
                 return 0
             }
         }
-        return 0
+        return -1
     }
 }
 
