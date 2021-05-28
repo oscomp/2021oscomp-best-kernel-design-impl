@@ -609,3 +609,18 @@ sys_mmap(void)
 
   return do_mmap(start, len, prot, flags, f, off);
 }
+
+uint64
+sys_munmap(void)
+{
+  uint64 start, len;
+  if (argaddr(0, &start) < 0 || argaddr(1, &len) < 0) {
+    return -1;
+  }
+
+  if (start % PGSIZE) {
+    __debug_info("sys_munmap", "start=%p not aligned\n", start);
+  }
+
+  return do_munmap(start, len);
+}

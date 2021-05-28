@@ -64,16 +64,20 @@ get_prevmap(struct mapped **phead, int off)
 void
 del_map(struct mapped *p, int off, int npages)
 {
+	struct mapped *next = NULL;
 	while (npages--) {
 		__debug_assert("del_map", p->offset == off,
 						"p->off=%p off=%p\n", p->offset, off);
+		next = p->next;
 		p->n_ref--;
 		if (p->n_ref == 0) {
 			*(p->pprev) = p->next;
 			if (p->next != NULL) {
 				p->next->pprev = p->pprev;
 			}
+			kfree(p);
 		}
+		p = next;
 		off += PGSIZE;
 	}
 }
@@ -82,27 +86,22 @@ uint64
 do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 {
 	struct inode *ip = f->ip;
-	if(off + len > ip->size)
-	{
+	if(off + len > ip->size) {
 		__debug_warn("mmap", "length overflows!\n");
 		return -1;
 	}
-
 	if (ip->mode & I_MODE_DIR) {
 		return -1;
 	}
-
 	// Must provide one of them.
 	if (!(flags & (MAP_SHARED|MAP_PRIVATE))) {
 		return -1;
 	}
-
 	if((f->readable ^ (prot & PROT_READ)) || (f->writable ^ ((prot & PROT_WRITE) >> 1)))
 	{
 		__debug_warn("mmap", "unmatched priviledge");
 		return -1;
 	}
-
 
 	struct proc *p = myproc();
 
@@ -110,8 +109,6 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 
 	struct seg* s = getseg(p->segment, STACK);
 	uint64 base = VUMMAP;
-	
-
 	for (struct seg *ss = s->next; ss != NULL; ss = ss->next) {
 		if (ss->addr >= base + sz) {
 			break;
@@ -132,7 +129,7 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 		new_seg->type = MMAP;
 		new_seg->addr = base;
 		new_seg->sz = sz;
-		new_seg->flag = (flags << 1) & 0xE;
+		new_seg->flag = (prot << 1) & 0xE;
 	}
 	else
 	{
@@ -148,6 +145,8 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 	ilock(ip);
 	for(i = 0; i < n; i++)
 	{
+		int len2 = len >= PGSIZE ? PGSIZE : len; 
+		len -= len2;
 		if(flags & MAP_SHARED)
 		{ // share
 			pmap = get_prevmap(pmap, off);
@@ -157,6 +156,7 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 				if (map == NULL)
 					goto fail;
 				map->offset = off;
+				map->len = len2;
 				map->n_ref = 0;
 				map->ph_addr = (uint64) allocpage();
 
@@ -164,14 +164,14 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 					kfree(map);
 					goto fail;
 				}
-				if((ip->fop->read(ip, 0, map->ph_addr, off + i * PGSIZE, PGSIZE)) != PGSIZE) {
-					if (i == n - 1) {	// last part of the file, fill with 0 in the last empty part
-						memset((void*)(map->ph_addr + len % PGSIZE), 0, PGSIZE - (len % PGSIZE));
-					} else {	// not last part, fail to read
-						freepage((void*)map->ph_addr);
-						kfree(map);
-						goto fail;
-					}
+
+				if((ip->fop->read(ip, 0, map->ph_addr, off + i * PGSIZE, len2)) != len2) {
+					freepage((void*)map->ph_addr);
+					kfree(map);
+					goto fail;
+				}
+				if (i == n - 1) {	// last part of the file, fill with 0 in the last empty part
+					memset((void*)(map->ph_addr + len2), 0, PGSIZE - len2);
 				}
 			} else {
 				map = *pmap;
@@ -192,6 +192,9 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 			if (isnew) {
 				map->next = *pmap;
 				map->pprev = pmap;
+				*pmap = map;
+				if (map->next)
+					map->next->pprev = &(map->next);
 			}
 			map->n_ref++;
 			pmap = &(map->next);	// hook at the present mapped node, start searching from it in the next loop
@@ -207,13 +210,12 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 			if (map && map->offset == off) { // found a mapped page
 				memmove((void*)ph_addr, (void*)map->ph_addr, PGSIZE);
 			} else {
-				if((ip->fop->read(ip, 0, ph_addr, off + i * PGSIZE, PGSIZE)) != PGSIZE) {
-					if (i == n - 1) {	// last part of the file, fill with 0 in the last empty part
-						memset((void*)(ph_addr + len % PGSIZE), 0, PGSIZE - (len % PGSIZE));
-					} else {	// not last part, fail to read
-						freepage((void*)ph_addr);
-						goto fail;
-					}
+				if((ip->fop->read(ip, 0, ph_addr, off + i * PGSIZE, len2)) != len2) {
+					freepage((void*)ph_addr);
+					goto fail;
+				}
+				if (i == n - 1) {	// last part of the file, fill with 0 in the last empty part
+					memset((void*)(ph_addr + len2), 0, PGSIZE - len2);
 				}
 			}
 
@@ -223,25 +225,16 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 				freepage((void*)ph_addr);
 				goto fail;
 			}
-			// if(map)
-			// { // mapped by others
-			// 	memmove((void *)ph_addr, (void *)map->ph_addr, PGSIZE);
-			// }
-			// else
-			// { // not mapped by others
-			// 	if(i == n - 1)
-			// 	memset((void *) (base + i * PGSIZE), 0, PGSIZE);
-			// 	if((ip->fop->read(ip, 1, base + i * PGSIZE, off + i * PGSIZE, PGSIZE)) > 0)
-			// 	;
-			// }
 		}
 	}
 
 	iunlock(ip);
 	new_seg->next = s->next;
 	s->next = new_seg;
+	new_seg->mmap = filedup(f);
+	new_seg->f_off = off;
 
-	sfence_vma();
+	// sfence_vma();
 
 	return base;
 
@@ -252,4 +245,90 @@ fail:
 	uvmdealloc(p->pagetable, base, base + i * PGSIZE, MMAP);
 	kfree(new_seg);
 	return -1;
+}
+
+
+int do_munmap(uint64 start, uint64 len)
+{
+	struct proc *p = myproc();
+	struct seg *stack = getseg(p->segment, STACK);
+	struct seg *s = locateseg(stack, start);
+	struct seg *s2 = NULL;
+	uint64 sz = PGROUNDUP(len);
+
+	if (s == NULL || s->type != MMAP) {
+		__debug_warn("do_munmap", "no such seg or not a mmap seg at %p\n", start);
+		return -1;
+	}
+	if (s->sz > sz) {
+		__debug_warn("do_munmap", "seg->sz=%d is less than the given pgsz=%d\n", s->sz, sz);
+		return -1;
+	}
+
+	uint64 end = start + sz;
+	// In this case, the segment will split into two part
+	if (start > s->addr && end < s->addr + s->sz) {
+		s2 = kmalloc(sizeof(struct seg));
+		if (s2 == NULL) {
+			__debug_warn("do_munmap", "segment splits fail\n");
+			return -1;
+		}
+	}
+
+	// cal the off of file corresponding to start
+	uint64 off = s->f_off + (start - s->addr);
+
+	struct inode *ip = s->mmap->ip;
+	ilock(ip);
+	struct mapped *map = *get_prevmap(&ip->maphead, off);
+
+	__debug_assert("do_munmap", off == map->offset,
+					"funny mmap: s->off=%d map->off=%d\n", off, map->offset);
+
+	uint64 sz2 = sz;
+	for (struct mapped *m = map; sz2 > 0 && m; sz2 -= PGSIZE, off += PGSIZE, m = m->next) {
+		
+		__debug_assert("do_munmap", off == m->offset,
+						"funny mmap: s->off=%d map->off=%d\n", off, m->offset);
+		
+		// This op may fail, but what can we do about it?
+		ip->fop->write(ip, 0, m->ph_addr, off, m->len);
+	}
+	del_map(map, map->offset, sz / PGSIZE);
+	iunlock(ip);
+
+	// Now handle segment
+	uvmdealloc(p->pagetable, start, end, s->type);
+	sfence_vma();
+
+	// start end sz
+	if (s2) { // the segment splits
+		s2->addr = end;
+		s2->sz = s->sz - (end - s->addr);
+		s2->flag = s->flag;
+		s2->type = s->type;
+		s2->mmap = filedup(s->mmap);
+		s2->f_off = off;
+		s2->next = s->next;
+		
+		s->sz = start - s->addr;
+		s->next = s2;
+	} else {
+		if (start == s->addr && sz == s->sz) { // the segment is all free
+			while (stack->next != s) {
+				stack = stack->next;
+			}
+			stack->next = s->next;
+			fileclose(s->mmap);
+			kfree(s);
+		} else if (start == s->addr) {
+			s->addr = end;
+		} else if (end == s->addr + s->sz) {
+			s->sz -= sz;
+		} else {
+			panic("do_munmap: funny case");
+		}
+	}
+
+	return 0;
 }

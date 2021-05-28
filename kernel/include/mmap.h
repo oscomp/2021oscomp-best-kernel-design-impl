@@ -18,8 +18,9 @@
 #define MAP_FAILED ((void *) -1)
 
 struct mapped {
-	int offset;
-	int n_ref;
+	uint32 offset;
+	uint16 len;
+	uint16 n_ref;
 	uint64 ph_addr;
 	struct mapped *next;
 	struct mapped **pprev;
@@ -30,5 +31,6 @@ struct mapped* add_map(struct mapped **phead, int off, int share);
 // void del_map(struct inode* ind, int off);
 void del_map(struct mapped *p, int off, int npages);
 uint64 do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off);
+int do_munmap(uint64 start, uint64 len);
 
 #endif
