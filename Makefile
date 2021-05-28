@@ -107,6 +107,9 @@ ifeq ($(platform), qemu)
 linker = ./linker/qemu.ld
 endif
 
+all: build 
+	cp $T/kernel ./k210.bin 
+
 # Compile Kernel
 $T/kernel: $(OBJS) $(linker) $U/initcode $U/ostest 
 	@if [ ! -d "./target" ]; then mkdir target; fi

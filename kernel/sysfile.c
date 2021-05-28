@@ -607,5 +607,7 @@ sys_mmap(void)
   if(!f)
     return -1;
 
-  return _mmap(start, len, prot, flags, f, off);
+  /*return _mmap(start, len, prot, flags, f, off);*/
+  // not implemented well!
+  return -1;
 }
