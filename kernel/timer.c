@@ -1,6 +1,5 @@
 // Timer Interrupt handler
 
-
 #include "include/types.h"
 #include "include/param.h"
 #include "include/riscv.h"
@@ -11,7 +10,7 @@
 #include "include/proc.h"
 
 struct spinlock tickslock;
-uint ticks;
+uint64 ticks;
 
 void timerinit() {
     initlock(&tickslock, "time");
@@ -35,10 +34,8 @@ set_next_timeout() {
 
 void timer_tick() {
     if (cpuid() == 0) {
-        // acquire(&tickslock);
         ticks++;
         wakeup(&ticks);
-        // release(&tickslock);
     }
     set_next_timeout();
 }
