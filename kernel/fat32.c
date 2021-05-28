@@ -25,13 +25,13 @@ typedef struct short_name_entry {
     char        name[CHAR_SHORT_NAME];
     uint8       attr;
     uint8       _nt_res;
-    uint8       _crt_time_tenth;
-    uint16      _crt_time;
-    uint16      _crt_date;
-    uint16      _lst_acce_date;
+    uint8       crt_time_tenth;
+    uint16      crt_time;
+    uint16      crt_date;
+    uint16      lst_acce_date;
     uint16      fst_clus_hi;
-    uint16      _lst_wrt_time;
-    uint16      _lst_wrt_date;
+    uint16      lst_wrt_time;
+    uint16      lst_wrt_date;
     uint16      fst_clus_lo;
     uint32      file_size;
 } __attribute__((packed, aligned(4))) short_name_entry_t;
@@ -338,7 +338,8 @@ struct inode *fat_alloc_inode(struct superblock *sb)
     ip->mode = 0;
     ip->dev = 0;
     ip->size = 0;
-    ip->nlink = 0;
+    ip->nlink = 1;
+    ip->maphead = NULL;
     initsleeplock(&ip->lock, "inode");
 
     return ip;
@@ -762,6 +763,9 @@ int fat_remove_entry(struct inode *ip)
 {
     if (ip->state & I_STATE_FREE)
         return -1;
+    if (ip->nlink == 0)
+        return -1;
+    ip->nlink--;
 
     struct fat32_sb *fat = sb2fat(ip->sb);
     struct fat32_entry *entry = i2fat(ip);
@@ -819,6 +823,13 @@ int fat_stat_file(struct inode *ip, struct kstat *st)
     struct fat32_entry *ep = i2fat(ip);
     struct fat32_sb *fat = sb2fat(ip->sb);
 
+    // printf("1. c_t_t\t%d\n", ep->create_time_tenth);
+    // printf("2. c_t  \t%d\n", ep->create_time);
+    // printf("3. c_d  \t%d\n", ep->create_date);
+    // printf("4. l_a_d\t%d\n", ep->last_access_date);
+    // printf("5. l_w_t\t%d\n", ep->last_write_time);
+    // printf("6. l_w_d\t%d\n", ep->last_write_date);
+
     memset(st, 0, sizeof(struct kstat));
     st->blksize = fat->byts_per_clus;
     st->size = ep->file_size;
@@ -826,6 +837,7 @@ int fat_stat_file(struct inode *ip, struct kstat *st)
     st->dev = ip->sb->devnum;
     st->ino = ep->first_clus;
     st->mode = ip->mode;
+    st->nlink = ip->nlink;
 
     return 0;
 }
@@ -871,6 +883,14 @@ static void read_entry_info(struct fat32_entry *entry, union fat_disk_entry *d)
 {
     entry->attribute = d->sne.attr;
     entry->first_clus = ((uint32)d->sne.fst_clus_hi << 16) | d->sne.fst_clus_lo;
+
+    entry->create_time_tenth = d->sne.crt_time_tenth;
+    entry->create_time = d->sne.crt_time;
+    entry->create_date = d->sne.crt_date;
+    entry->last_access_date = d->sne.lst_acce_date;
+    entry->last_write_time = d->sne.lst_wrt_time;
+    entry->last_write_date = d->sne.lst_wrt_date;
+    
     entry->file_size = d->sne.file_size;
     entry->cur_clus = entry->first_clus;
     entry->clus_cnt = 0;
