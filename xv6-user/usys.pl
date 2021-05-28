@@ -47,3 +47,4 @@ entry("mount");
 entry("umount");
 entry("uname");
 entry("mmap");
+entry("munmap");

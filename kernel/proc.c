@@ -937,6 +937,7 @@ int growproc(int n) {
 	}
 
 	uvmdealloc(p->pagetable, newva, oldva, HEAP);
+	sfence_vma();
   }
   heap->sz += n;
   return 0;
