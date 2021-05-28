@@ -98,7 +98,7 @@ static void sd_end_cmd(void) {
  * Read sdcard response in R1 type. 
  */
 static uint8 sd_get_response_R1(void) {
-	uint8 result;
+	uint8 result = 0xff;
 	uint16 timeout = 0xff;
 
 	while (timeout--) {
@@ -147,7 +147,7 @@ static int switch_to_SPI_mode(void) {
 
 // verify supply voltage range 
 static int verify_operation_condition(void) {
-	uint64 result;
+	uint64 result = 0xff;
 
 	// Stores the response reversely. 
 	// That means 
@@ -175,12 +175,10 @@ static int verify_operation_condition(void) {
 // read OCR register to check if the voltage range is valid 
 // this step is not mandotary, but I advise to use it 
 static int read_OCR(void) {
-	uint64 result;
+	uint64 result = 0xff;
 	uint8 ocr[4];
 
-	int timeout;
-
-	timeout = 0xff;
+	int timeout = 0xffffff;
 	while (--timeout) {
 		sd_send_cmd(SD_CMD58, 0, 0);
 		result = sd_get_response_R1();
@@ -205,7 +203,7 @@ static int read_OCR(void) {
 static int set_SDXC_capacity(void) {
 	uint8 result = 0xff;
 
-	int timeout = 0xfff;
+	int timeout = 0xffffff;
 	while (--timeout) {
 		sd_send_cmd(SD_CMD55, 0, 0);
 		result = sd_get_response_R1();
@@ -238,7 +236,7 @@ static int check_block_size(void) {
 	uint8 result = 0xff;
 	uint8 ocr[4];
 
-	int timeout = 0xffff;
+	int timeout = 0xffffff;
 	while (timeout --) {
 		sd_send_cmd(SD_CMD58, 0, 0);
 		result = sd_get_response_R1();
@@ -334,7 +332,7 @@ void sdcard_init(void) {
 }
 
 void sdcard_read_sector(uint8 *buf, int sectorno) {
-	uint8 result;
+	uint8 result = 0xff;
 	uint32 address;
 	uint8 dummy_crc[2];
 
@@ -404,8 +402,8 @@ void sdcard_write_sector(uint8 *buf, int sectorno) {
 	sd_write_data(dummy_crc, 2);
 
 	// waiting for sdcard to finish programming 
-	uint8 result;
-	int timeout = 0xfff;
+	uint8 result = 0xff;
+	int timeout = 0xffffff;
 	while (--timeout) {
 		sd_read_data(&result, 1);
 		if (0x05 == (result & 0x1f)) {
