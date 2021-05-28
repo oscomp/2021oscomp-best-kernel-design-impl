@@ -22,12 +22,12 @@ struct file {
 // #define	mkdev(m,n)  ((uint)((m)<<16| (n)))
 
 // map major device number to device functions.
-struct devsw {
-  int (*read)(int, uint64, int);
-  int (*write)(int, uint64, int);
-};
+// struct devsw {
+//   int (*read)(int, uint64, int);
+//   int (*write)(int, uint64, int);
+// };
 
-extern struct devsw devsw[];
+// extern struct devsw devsw[];
 
 struct fdtable {
   uint16 basefd;

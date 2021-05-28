@@ -201,6 +201,24 @@ consoleinit(void)
   
   // connect read and write system calls
   // to consoleread and consolewrite.
-  devsw[CONSOLE].read = consoleread;
-  devsw[CONSOLE].write = consolewrite;
+  // devsw[CONSOLE].read = consoleread;
+  // devsw[CONSOLE].write = consolewrite;
 }
+
+#include "include/fs.h"
+
+int __consoleread(struct inode *ip, int usr, uint64 dst, uint off, uint n)
+{
+  return consoleread(usr, dst, n);
+}
+
+int __consolewrite(struct inode *ip, int usr, uint64 dst, uint off, uint n)
+{
+  return consolewrite(usr, dst, n);
+}
+
+struct file_op console_op = {
+  .read = __consoleread,
+  .write = __consolewrite,
+  .readdir = NULL,
+};

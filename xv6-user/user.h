@@ -41,7 +41,7 @@ char* sbrk(int size);
 int sleep(int ticks);
 int uptime(void);
 int test_proc(int);
-int dev(int, short, short);
+// int dev(int, short, short);
 char *getcwd(char *buf, uint size);
 int unlinkat(int fd, char *filename, int flag);
 static inline int unlink(char *filename) {

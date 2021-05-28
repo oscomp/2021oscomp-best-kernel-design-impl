@@ -119,7 +119,7 @@ locateseg(struct seg *head, uint64 addr)
     else if(addr >= end)
       head = head->next;
     else{
-      __debug_error("locateseg", "va=%p in no segment\n", addr);
+      __debug_warn("locateseg", "va=%p in no segment\n", addr);
 	  return NULL;
     }
   }

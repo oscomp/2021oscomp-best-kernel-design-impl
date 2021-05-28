@@ -1,20 +1,13 @@
 #include "kernel/include/sysnum.h"
+#include "kernel/include/fcntl.h"
 
 #define NULL ((void*)0)
 
-#define O_RDONLY  0x000
-#define O_WRONLY  0x001
-#define O_RDWR    0x002
-#define O_APPEND  0x004
-#define O_CREATE  0x040
-#define O_TRUNC   0x400
-#define O_DIRECTORY 0x0200000
-#define CONSOLE 1
 
 int exec(char *name, char *argv[]);
 int fork(void);
 int wait(int*);
-int dev(int, short, short);
+int openat(int fd, const char *filename, int flag, int mode);
 int dup(int);
 int exit(int) __attribute__((noreturn));
 
@@ -33,16 +26,16 @@ char *test_files[] = {
 	"getdents", 
 	"getpid", 
 	"getppid", 
-	/*"gettimeofday", */
+	"gettimeofday",
 	"mkdir_", 
-	/*"mmap", */
+	"mmap",
 	"mount", 
-	/*"munmap", */
+	"munmap",
 	"openat", 
 	"open", 
 	"pipe", 
 	"read", 
-	/*"times", */
+	"times",
 	"umount", 
 	"uname", 
 	"unlink", 
@@ -53,9 +46,11 @@ char *test_files[] = {
 };
 int const test_file_num = sizeof(test_files) / sizeof(char const*);
 
+const char *cons = "/dev/console";
+
 void _entry(void) __attribute__((naked));
 void _entry(void) {
-	dev(O_RDWR, CONSOLE, 0);
+	openat(AT_FDCWD, cons, O_RDWR, 0666);
 	dup(0);  // stdout
 	dup(0);  // stderr
 

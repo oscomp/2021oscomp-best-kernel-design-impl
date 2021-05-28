@@ -1,21 +1,26 @@
 /**
- * Driver for file system image file.
+ * Driver for file system.
  * 
  * A image file with file system can be mounted,
  * This module provide the interface to operate
  * the file as if it is a real device.
  * 
- * Only FAT32 supported.
+ * SD card can be mounted, too.
  * 
  */
 
-#ifndef __DEBUG_imgfs
+#ifndef __DEBUG_driver_fs
 #undef DEBUG
 #endif
 
+#define __module_name__     "driver_fs"
+
 #include "include/types.h"
+#include "include/param.h"
 #include "include/fs.h"
 #include "include/fat32.h"
+#include "include/buf.h"
+#include "include/proc.h"
 #include "include/kmalloc.h"
 #include "include/string.h"
 #include "include/debug.h"
@@ -149,6 +154,126 @@ fail:
 }
 
 
+int diskfs_write(struct superblock *sb, int usr, char *src, uint64 sectorno, uint64 off, uint64 len)
+{
+	if (off + len > BSIZE)
+		panic("diskfs_write");
+
+	// __debug_info("diskfs_write", "sec:%d off:%d len:%d\n", sectorno, off, len);
+	struct buf *b = bread(sb->devnum, sectorno);
+	int ret = either_copyin(b->data + off, usr, (uint64)src, len);
+	
+	if (ret < 0) { // fail to write
+		b->valid = 0;  // invalidate the buf
+	} else {
+		ret = len;
+		bwrite(b);
+	}
+	brelse(b);
+
+	return ret;
+}
+
+
+int diskfs_read(struct superblock *sb, int usr, char *dst, uint64 sectorno, uint64 off, uint64 len)
+{
+	if (off + len > BSIZE)
+		panic("diskfs_read");
+
+	// __debug_info("diskfs_read", "sec:%d off:%d len:%d\n", sectorno, off, len);
+	struct buf *b = bread(sb->devnum, sectorno);
+	int ret = either_copyout(usr, (uint64)dst, b->data + off, len);
+	brelse(b);
+
+	return ret < 0 ? -1 : len;
+}
+
+
+int diskfs_clear(struct superblock *sb, uint64 sectorno, uint64 sectorcnt)
+{
+	struct buf *b;
+	while (sectorcnt--) {
+		b = bread(sb->devnum, sectorno++);
+		memset(b->data, 0, BSIZE);
+		bwrite(b);
+		brelse(b);
+	}
+	return 0;
+}
+
+
+struct superblock *disk_fs_init(struct inode *dev)
+{
+	__debug_info("sdfd_init", "enter\n");
+
+	struct superblock *sb = kmalloc(sizeof(struct superblock));
+	if (sb == NULL) {
+		return NULL;
+	}
+
+	struct fat32_sb *fat;
+	struct inode *iroot = NULL;
+
+	// Read superblock from sector 0.
+	__debug_info("diskfs_init", "read superblock\n");
+	struct buf *b = bread(dev->dev, 0);
+	fat = fat32_init((char*)b->data);
+	__debug_info("disk_fs_init", "stub 0\n");
+	brelse(b);
+	if (fat == NULL || BSIZE != fat->bpb.byts_per_sec) {
+		__debug_error("fat32_init", "byts_per_sec: %d != BSIZE: %d\n", fat->bpb.byts_per_sec, BSIZE);
+		goto fail;
+	}
+
+	__debug_info("disk_fs_init", "stub 1\n");
+	sb->real_sb = fat;
+	sb->blocksz = fat->bpb.byts_per_sec;
+	sb->op.alloc_inode = fat_alloc_inode;
+	sb->op.destroy_inode = fat_destroy_inode;
+	sb->op.read = diskfs_read;
+	sb->op.write = diskfs_write;
+	sb->op.clear = diskfs_clear;
+	initsleeplock(&sb->sb_lock, "diskfs_sb");
+	initlock(&sb->cache_lock, "diskfs_dcache");
+	sb->next = NULL;
+	sb->devnum = dev->dev;
+	sb->ref = 0;
+	sb->blocksz = fat->bpb.byts_per_sec;
+
+	__debug_info("disk_fs_init", "stub 2\n");
+	// Initialize in-mem root.
+	if ((iroot = fat32_root_init(sb)) == NULL || 
+		(sb->root = kmalloc(sizeof(struct dentry))) == NULL)
+	{
+		goto fail;
+	}
+
+	__debug_info("disk_fs_init", "stub 3\n");
+
+	iroot->entry = sb->root;
+
+	// Initialize in-mem dentry struct for root.
+	memset(sb->root, 0, sizeof(struct dentry));
+	sb->root->inode = iroot;
+	sb->root->op = &rootfs_dentry_op;
+	__debug_info("rootfs_init", "done\n");
+
+	sb->dev = idup(dev);
+
+	return sb;
+
+fail:
+	__debug_warn("sd_fs_init", "fail\n");
+	if (iroot)
+		fat_destroy_inode(iroot);
+	if (fat)
+		kfree(fat);
+	if (sb)
+		kfree(sb);
+	return NULL;
+}
+
+
 static void fs_clean(struct superblock *sb, struct dentry *de)
 {
 	sb->op.destroy_inode(de->inode);
@@ -160,7 +285,7 @@ static void fs_clean(struct superblock *sb, struct dentry *de)
 	kfree(de);
 }
 
-void image_fs_uninstall(struct superblock *sb)
+void fs_uninstall(struct superblock *sb)
 {
 	iput(sb->dev);
 	fs_clean(sb, sb->root);

@@ -24,7 +24,7 @@
 #include "include/kmalloc.h"
 #include "include/debug.h"
 
-struct devsw devsw[NDEV];
+// struct devsw devsw[NDEV];
 // struct {
 //   struct spinlock lock;
 //   struct file file[NFILE];
@@ -108,11 +108,12 @@ fileclose(struct file *f)
   release(&f->lock);
   if(f->type == FD_PIPE){
     pipeclose(f->pipe, f->writable);
-  } else if (f->type == FD_INODE) {
+  } else if (f->type == FD_INODE || f->type == FD_DEVICE) {
     iput(f->ip);
-  } else if (f->type == FD_DEVICE) {
-
   }
+  // else if () {
+
+  // }
   kfree(f);
 }
 
@@ -128,12 +129,15 @@ filestat(struct file *f, uint64 addr)
     ilock(f->ip);
     f->ip->op->getattr(f->ip, &st);
     iunlock(f->ip);
-    // if(copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
-    if(copyout2(addr, (char *)&st, sizeof(st)) < 0)
-      return -1;
-    return 0;
+  } else if (f->type == FD_DEVICE) {
+    f->ip->op->getattr(f->ip, &st);
+  } else {
+    return -1;
   }
-  return -1;
+  // if(copyout(p->pagetable, addr, (char *)&st, sizeof(st)) < 0)
+  if(copyout2(addr, (char *)&st, sizeof(st)) < 0)
+    return -1;
+  return 0;
 }
 
 // Read from file f.
@@ -142,7 +146,7 @@ int
 fileread(struct file *f, uint64 addr, int n)
 {
   int r = 0;
-  struct inode *ip;
+  struct inode *ip = f->ip;
 
   if(f->readable == 0)
     return -1;
@@ -152,12 +156,12 @@ fileread(struct file *f, uint64 addr, int n)
         r = piperead(f->pipe, addr, n);
         break;
     case FD_DEVICE:
-        if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
-          return -1;
-        r = devsw[f->major].read(1, addr, n);
+        // if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
+        //   return -1;
+        // r = devsw[f->major].read(1, addr, n);
+        r = ip->fop->read(ip, 1, addr, 0, n);
         break;
     case FD_INODE:
-        ip = f->ip;
         ilock(ip);
           if((r = ip->fop->read(ip, 1, addr, f->off, n)) > 0)
             f->off += r;
@@ -183,9 +187,10 @@ filewrite(struct file *f, uint64 addr, int n)
   if(f->type == FD_PIPE){
     ret = pipewrite(f->pipe, addr, n);
   } else if(f->type == FD_DEVICE){
-    if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
-      return -1;
-    ret = devsw[f->major].write(1, addr, n);
+    // if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
+    //   return -1;
+    // ret = devsw[f->major].write(1, addr, n);
+    ret = f->ip->fop->write(f->ip, 1, addr, 0, n);
   } else if(f->type == FD_INODE){
     struct inode *ip = f->ip;
     ilock(ip);
