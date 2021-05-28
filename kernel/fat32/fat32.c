@@ -49,18 +49,12 @@ dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_
 {
     p++;
     if ((uintptr_t)p - (uintptr_t)dirbuff == BUFSIZE){
-        printk_port("exceeding\n");
         // read another
         *now_sec += BUFSIZE / SECTOR_SIZE;
-        printk_port("now_sec: %d, now_clus: %d\n", *now_sec, *now_clus);
         if (*now_sec - first_sec_of_clus(*now_clus) == fat.bpb.sec_per_clus){
-            printk_port("line1\n");
             *now_clus = get_next_cluster(*now_clus); //another cluster
-            printk_port("line2\n");
             *now_sec = first_sec_of_clus(*now_clus);
-            printk_port("line3\n");
         }
-        printk_port("now_sec: %d, now_clus: %d\n", *now_sec, *now_clus);
         sd_read(dirbuff, *now_sec);
         p = dirbuff;
     }
@@ -315,9 +309,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_
     else
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
     // find empty entry
-    printk_port("444\n");
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
-    printk_port("555\n");
     now_clus = clus_of_sec(sec);
     ientry_t new_clus = search_empty_fat(tempbuf);
 
@@ -549,7 +541,6 @@ uint8 fat32_chdir(const char* path_t)
 /* success 0, fail -1 */
 uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path_const, uint32_t mode)
 {
-    printk_port("dirfd %x\n", dirfd);
     uchar *tempbuf = kalloc(); // for search
 
     uchar path[strlen(path_const)+1]; strcpy(path, path_const);
@@ -593,9 +584,7 @@ uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path_const, uint32_t mode)
                 kfree(tempbuf);
                 return 0;
             }
-            printk_port("222\n");
             _create_new(temp1, now_clus, tempbuf, FILE_DIR);
-            printk_port("333\n");
 
             kfree(tempbuf);
             return 0;
@@ -678,11 +667,9 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
     uint32_t cnt = 0;
     dentry_t *ret_p = p;
     uint32_t ret_sec = *sec;
-    printk_port("buf: %lx\n", buf);
 
     for (uint i = 0; i < 255; i++){
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
-            printk_port("111\n");
             cnt = 0;
             p = get_next_dentry(p, buf, &now_clus, sec);
             ret_p = p; ret_sec = *sec;
@@ -692,7 +679,6 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
             cnt++;
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
             else{
-                printk_port("222\n");
                 p = get_next_dentry(p, buf, &now_clus, sec);
             }
         }
