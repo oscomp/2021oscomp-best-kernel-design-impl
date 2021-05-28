@@ -75,12 +75,25 @@ del_map(struct mapped *p, int off, int npages)
 			if (p->next != NULL) {
 				p->next->pprev = p->pprev;
 			}
+			__debug_info("del_map", "freeing %p\n", p);
 			kfree(p);
 		}
 		p = next;
 		off += PGSIZE;
 	}
 }
+
+void del_segmap(struct seg *seg)
+{
+	__debug_assert("del_segmap", seg->type == MMAP, "funny type %d\n", seg->type);
+	struct inode *ip = seg->mmap->ip;
+	ilock(ip);
+	struct mapped *map = *get_prevmap(&ip->maphead, seg->f_off);
+	del_map(map, map->offset, seg->sz / PGSIZE);
+	iunlock(ip);
+	fileclose(seg->mmap);
+}
+
 
 uint64
 do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)

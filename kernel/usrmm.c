@@ -162,6 +162,9 @@ delseg(pagetable_t pagetable, struct seg *s)
   struct seg *next = s->next;
   __debug_info("delseg", "s = %p\n", s);
   __debug_info("delseg", "s->type: %d\n", s->type);
+  if (s->type == MMAP) {
+    del_segmap(s);
+  }
   uvmdealloc(pagetable, s->addr, s->addr + s->sz, s->type);
   kfree(s);
   return next;
