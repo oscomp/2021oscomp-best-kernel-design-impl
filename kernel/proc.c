@@ -190,6 +190,11 @@ static struct proc *allocproc(void) {
 
 	p->child = NULL;
 
+	p->proc_tms.utime = 0;
+	p->proc_tms.stime = 0;
+	p->proc_tms.cutime = 0;
+	p->proc_tms.cstime = 0;
+
 	// allocate a page trapframe 
 	p->trapframe = (struct trapframe*)allocpage();
 	if (NULL == p->trapframe) {
@@ -499,6 +504,9 @@ int wait4(int pid, uint64 status, uint64 options) {
 				*(np->sibling_prev) = np->sibling_next;
 				if (NULL != np->sibling_next) 
 					np->sibling_next->sibling_prev = np->sibling_prev;
+				// add child's tms time 
+				p->proc_tms.cstime += np->proc_tms.stime + np->proc_tms.cstime;
+				p->proc_tms.cutime += np->proc_tms.utime + np->proc_tms.cutime;
 				// copyout child's xstate 
 				np->xstate <<= 8;
 				if (status && copyout2(status, (char*)&np->xstate, sizeof(np->xstate))) {
@@ -559,6 +567,7 @@ int wait4(int pid, uint64 status, uint64 options) {
 void proc_tick(void) {
 	__enter_proc_cs 
 
+	// runnable 
 	for (int i = PRIORITY_IRQ; i < PRIORITY_NUMBER; i ++) {
 		struct proc *p = proc_runnable[i];
 		while (NULL != p) {
@@ -570,9 +579,20 @@ void proc_tick(void) {
 					__insert_runnable(PRIORITY_TIMEOUT, p);
 				}
 			}
+			else {
+				p->proc_tms.utime += 1;
+			}
+			p->proc_tms.stime += 1;
 			p = next;
 		}
 	} 
+
+	// sleep 
+	struct proc *tmp = proc_sleep;
+	while (NULL != tmp) {
+		tmp->proc_tms.stime += 1;
+		tmp = tmp->next;
+	}
 
 	__leave_proc_cs 
 }
