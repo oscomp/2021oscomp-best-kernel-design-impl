@@ -31,11 +31,12 @@
 #define NUM_SYSCALLS 512
 
 /* define */
+#define SYS_getcwd 17
 #define SYSCALL_WRITE 20
 #define SYSCALL_CURSOR 22
 
 #define SYS_mkdirat 34
-
+#define SYS_chdir 49
 #define SYS_openat 56
 #define SYS_close 57
 #define SYSCALL_TESTDISK 58

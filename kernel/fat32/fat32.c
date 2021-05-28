@@ -18,15 +18,14 @@ fat_t fat;
 uchar buf[NORMAL_PAGE_SIZE];
 uchar filebuf[NORMAL_PAGE_SIZE];
 ientry_t cwd_first_clus;
-ientry_t cwd_clus;
-isec_t cwd_sec;
-uchar cwd_path[MAX_PATHLEN];
+ientry_t cwd_clus, root_clus;
+isec_t cwd_sec, root_sec;
 
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 #define ACCEPT_NUM  1
-uchar accept_table[14][10] = {{"MKDIR"}, {"OPEN"},  {"CLONE"}, {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
+uchar accept_table[15][10] = {{"CHDIR"}, {"MKDIR"}, {"OPEN"},  {"CLONE"}, {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
     {"WAIT"}, {"WAITPID"}, {"EXIT"},{"YIELD"}, {"TIMES"}, {"SLEEP"}};
 
 /* read as many sectors as we can */
@@ -96,8 +95,9 @@ uint8_t fat32_init()
     /* read root dir and store it for now*/
     cwd_first_clus = fat.bpb.root_clus;
     cwd_clus = fat.bpb.root_clus;
-    strcpy(cwd_path, "/");
     cwd_sec = first_sec_of_clus(fat.bpb.root_clus);
+    root_clus = cwd_clus;
+    root_sec = cwd_sec;
     /* from root sector read buffsize */
     sd_read(buf, cwd_sec);
     kfree(b);
@@ -114,6 +114,15 @@ int8 fat32_read_test(const char *filename)
 {
     static uint32 cnt = 0;
 
+    fat32_mkdir(AT_FDCWD, "test_mkdir", 1);
+    printk_port("cwd: %d\n", cwd_first_clus);
+    fat32_chdir("test_mkdir");
+    uchar *test;
+    test = fat32_getcwd(NULL, 10);
+    printk_port("getcwd:%s\n", test);
+
+    while(1);
+
     /* busy */
     for (int i = 1; i < NUM_MAX_TASK; ++i)
     {
@@ -129,7 +138,7 @@ int8 fat32_read_test(const char *filename)
     static dentry_t *p = (dentry_t *)buf;
     // 0x0f: long dentry
     while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
-        p = get_next_dentry(p, buf, &cwd_clus, &cwd_sec);
+        p = get_next_dentry(p, buf, &root_clus, &root_sec);
     }
     /* now we are at a real dentry */
 
@@ -149,13 +158,13 @@ int8 fat32_read_test(const char *filename)
     // no length or deleted
     if (p->length == 0) {
         // printk_port("<cause 1>\n");
-        p = get_next_dentry(p, buf, &cwd_clus, &cwd_sec); 
+        p = get_next_dentry(p, buf, &root_clus, &root_sec); 
         return 1;
     }
     // not rw-able
     if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
         // printk_port("<cause 2>\n");
-        p = get_next_dentry(p, buf, &cwd_clus, &cwd_sec); return 1;
+        p = get_next_dentry(p, buf, &root_clus, &root_sec); return 1;
     }
     /* debug return */
     uint8 i;
@@ -167,7 +176,7 @@ int8 fat32_read_test(const char *filename)
         }
     }
     if (i == ACCEPT_NUM){
-        p = get_next_dentry(p, buf, &cwd_clus, &cwd_sec);
+        p = get_next_dentry(p, buf, &root_clus, &root_sec);
         return 1;
     }
 
@@ -227,7 +236,7 @@ int8 fat32_read_test(const char *filename)
             #ifdef K210
             // free resource
             allocfree();
-            p = get_next_dentry(p, buf, &cwd_clus, &cwd_sec);
+            p = get_next_dentry(p, buf, &root_clus, &root_sec);
             #endif
 
             return -1;
@@ -249,7 +258,8 @@ size_t fat32_write(uint32 fd, uchar *buff, uint64_t count)
         stdout_buf[count] = 0;
         return printk_port(stdout_buf);
     }
-
+    else
+        ;
 }
 
 uchar unicode2char(uint16_t unich)
@@ -280,7 +290,13 @@ unicode_t char2unicode(char ch)
 /* now_clus : now dir cluster */
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode)
 {
-    printk_port("temp: %s\n", temp1);
+    int noextname = 1;
+    uchar *temp3 = temp1;
+    while (*temp3 != '.' && *temp3 != '\0') temp3++;
+    if (*temp3 == '.'){
+        noextname = 0; *temp3 = '\0';temp3++;
+    }
+
     uint32_t length = strlen(temp1);
     uint32_t parent_first_clus = now_clus;
     dentry_t *p;
@@ -313,13 +329,21 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_
     }
     else{
         for (uint i = 0; i < 6; ++i)
-            new_dentry.filename[i] = *(temp1+i);
+            new_dentry.filename[i] = (*(temp1+i) <= 'z' && *(temp1+i) >= 'a')? *(temp1+i) - 'a' + 'A' : *(temp1+i);
         new_dentry.filename[6] = '~'; new_dentry.filename[7] = '1'; // dont think about 2 or more
     }
     // printk_port("name : %s\n",new_dentry.filename);
     // extname:
-    for (uint i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
-        new_dentry.extname[i] = ' ';
+    if (mode == FILE_DIR || noextname)
+        for (uint i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
+            new_dentry.extname[i] = ' ';
+    else{
+        uint i = 0;
+        while (*temp3 != 0)
+            new_dentry.extname[i++] = *temp3++;
+        for (uint j = i; j < 3; ++j)
+            new_dentry.extname[j] = ' ';
+    }
     // attribute
     if (mode == FILE_DIR)
         new_dentry.attribute = FILE_ATTRIBUTE_CHDIR;
@@ -350,22 +374,22 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_
             {
                 now_len = j*LONG_DENTRY_NAME_LEN + i;
                 long_entries[j].name1[i] = (now_len < length)? char2unicode(*(temp1+now_len)) :
-                                            (now_len == length)? 0x00 :
-                                            0xff;
+                                            (now_len == length)? 0x0000 :
+                                            0xffffu;
             }
             for (uint i = 0; i < LONG_DENTRY_NAME2_LEN; ++i)
             {
                 now_len = j*LONG_DENTRY_NAME_LEN + LONG_DENTRY_NAME1_LEN + i;
                 long_entries[j].name2[i] = (now_len < length)? char2unicode(*(temp1+now_len)) :
-                                            (now_len == length)? 0x00 :
-                                            0xff;
+                                            (now_len == length)? 0x0000 :
+                                            0xffffu;
             }
             for (uint i = 0; i < LONG_DENTRY_NAME3_LEN; ++i)
             {
                 now_len = j*LONG_DENTRY_NAME_LEN + LONG_DENTRY_NAME1_LEN + LONG_DENTRY_NAME2_LEN + i;
                 long_entries[j].name3[i] = (now_len < length)? char2unicode(*(temp1+now_len)) :
-                                            (now_len == length)? 0x00 :
-                                            0xff;
+                                            (now_len == length)? 0x0000 :
+                                            0xffffu;
             }
             long_entries[j].sequence = (0x40 | (j + 1)) & 0x4f;   
             long_entries[j].attribute = FILE_ATTRIBUTE_LONG;
@@ -375,7 +399,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_
             for (int i = 0; i < 11; ++i)
                 sum = (sum & 0x1 ? 0x80 : 0) + (sum >> 1) + *fcb++;
             long_entries[j].checksum = sum;
-            long_entries[j].reserved = 0lu;
+            long_entries[j].reserved2 = 0lu;
         }
     }
     // 3. write entry
@@ -451,6 +475,66 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_
     return new_clus;
 }
 
+/* go to child dir */
+/* success 0, fail -1 */
+uint8 fat32_chdir(const char* path_t)
+{
+    uchar *buff = kalloc();
+
+    uchar path[strlen(path_t) + 1];
+    strcpy(path, path_t);
+    char *temp1, *temp2;
+
+    uint isend = 0;
+
+    dentry_t *p;
+    ientry_t now_clus;
+
+    if (path[0] == '/'){
+        now_clus = fat.bpb.root_clus;
+        temp1 = &path[1], temp2 = &path[1];
+    }
+    else{
+        now_clus = cwd_first_clus;
+        temp1 = path; temp2 = path;
+    }
+
+    while (1)
+    {
+        while (*temp2 != '/' && *temp2 != '\0') temp2++;
+        if (*temp2 == '\0' || *(temp2+1) == '\0' ) isend = 1;
+        *temp2 = '\0';
+
+        if (isend){
+            // 1. not found
+            if ((p = search(temp1, now_clus, buf, SEARCH_DIR)) == NULL){
+                // no available dx
+                kfree(buff);
+                return -1;
+            }
+            // 2. found
+            else{
+                // printk_port("goto %d\n", get_cluster_from_dentry(p));
+                // printk_port("HI: %d, LO: %d", p->HI_clusnum, p->LO_clusnum);
+                cwd_first_clus = get_cluster_from_dentry(p);
+                cwd_clus = cwd_first_clus;
+                cwd_sec = first_sec_of_clus(cwd_clus);
+                kfree(buff);
+                return 0;
+            }
+        }
+        else{
+            // search dir until fail or goto search file
+            while (p = search(temp1, now_clus, buf, SEARCH_DIR)){
+                now_clus = get_cluster_from_dentry(p);
+                ++temp2;
+                temp1 = temp2;
+            }
+            kfree(buff);
+            return -1;
+        }
+    }
+}
 
 
 /* make a directory */
@@ -501,7 +585,7 @@ uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path_const, uint32_t mode)
                 return 0;
             }
 
-            _create_new(*temp1, now_clus, tempbuf, FILE_DIR);
+            _create_new(temp1, now_clus, tempbuf, FILE_DIR);
 
             kfree(tempbuf);
             return 0;
@@ -602,6 +686,97 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
     return NULL;
 }
 
+/* search if cluster exists in dir now_clus */
+/* make sure buf size is BUFSIZE */
+/* return filename if success, NULL if fail */
+uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
+{
+    uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
+    sd_read(buf, now_sec);
+    dentry_t *p = (dentry_t *)buf;
+    uchar *filename = kalloc();
+
+    // dont care deleted dir
+    while (!is_zero_dentry(p)){
+
+        while (0xE5 == p->filename[0]){
+            p = get_next_dentry(p, buf, &now_clus, &now_sec);
+        }
+        
+        long_dentry_t *q = (long_dentry_t *)p;
+        // if long dentry
+        if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
+
+            uint8 item_num = q->sequence & 0x0f; // entry num
+
+            /* get filename */
+            uint8 isbreak = 0;
+            uint16_t unich; // unicode
+
+            while (item_num--){
+                uint8 name_cnt = 0;
+                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
+                    // name1
+                    unich = q->name1[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
+                    name_cnt++;           
+                }
+                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
+                    // name1
+                    unich = q->name2[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
+                    name_cnt++;            
+                }
+                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
+                    // name1
+                    unich = q->name3[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);  
+                    name_cnt++;             
+                }
+                p = get_next_dentry(p, buf, &now_clus, &now_sec);
+                q = (long_dentry_t *)p;
+            }
+        }
+        // short dentry
+        else{
+            /* filename */
+            uint8 name_cnt = 0;
+            for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
+            {
+                if (p->filename[i] == ' ') break;
+                else filename[name_cnt++] = p->filename[i];
+            }
+            if (p->extname[0] != ' ') filename[name_cnt++] = '.';
+            for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
+            {
+                if (p->extname[i] == ' ') break;
+                else filename[name_cnt++] = p->filename[i];
+            }
+            filename[name_cnt++] = 0;
+        }
+
+        if (get_cluster_from_dentry(p) == cluster)
+            return filename;
+        else
+            p = get_next_dentry(p, buf, &now_clus, &now_sec);
+    }
+    
+    kfree(filename);
+
+    return NULL;
+}
 
 
 /* search if name.file exists in dir now_clus */
@@ -637,7 +812,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
                 for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
                     // name1
                     unich = q->name1[i];
-                    if (unich == 0x0000 || unich == 0xffff){
+                    if (unich == 0x0000 || unich == 0xffffu){
                         filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
                         break;
                     }
@@ -647,7 +822,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
                 for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
                     // name1
                     unich = q->name2[i];
-                    if (unich == 0x0000 || unich == 0xffff){
+                    if (unich == 0x0000 || unich == 0xffffu){
                         filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
                         break;
                     }
@@ -657,7 +832,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
                 for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
                     // name1
                     unich = q->name3[i];
-                    if (unich == 0x0000 || unich == 0xffff){
+                    if (unich == 0x0000 || unich == 0xffffu){
                         filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
                         break;
                     }
@@ -798,6 +973,72 @@ uint16 fat32_open(uint32 fd, const uchar *path_const, uint32 flags, uint32 mode)
             return -1;
         }
     }
+}
+
+/* get current working dir name */
+/* success: return pt to filename*/
+/* fail: NULL */
+uchar *fat32_getcwd(uchar *buf, size_t size)
+{
+    // printk_port("cwd66: %d\n", cwd_first_clus);
+    if (size < 2) // at leaat for '/' and '\0'
+        return NULL;
+
+    uchar *buff = kalloc(); // for sdread
+    uchar *output = kalloc(); // for final output
+    uchar *temp_filename = kalloc(); // for temp store
+    uchar *filename;
+    size_t temp_size;
+    ientry_t old_clus, now_clus = cwd_first_clus;
+    dentry_t *p ;
+
+    *temp_filename = 0; // for strlen and strcat
+    temp_size = 0;
+
+    uint8 is_root_dir = 1;
+
+    while ((p = search("..", now_clus, buff, SEARCH_DIR)) != NULL){
+
+        is_root_dir = 0;
+
+        old_clus = now_clus; // old_clus = now_clus
+        now_clus = get_cluster_from_dentry(p); // now_clus = parent_dir_first_clus
+        filename = search_clus(old_clus, now_clus, buff); // filename = myname
+
+        // must found
+        assert(filename != NULL);
+
+        strcpy(output, "/");
+        // printk_port("output :%s\n", output);
+        strcat(output, filename);
+        // printk_port("output :%s\n", output);
+        strcat(output, temp_filename);
+        // printk_port("output :%s\n", output);
+        strcpy(temp_filename, output);
+        // printk_port("tempname :%s\n", temp_filename);
+
+        temp_size = strlen(temp_filename);
+        if (buf && temp_size >= size){
+            // exceeding, = is also valid, as no space for '\0'
+            kfree(filename);
+            kfree(output);
+            kfree(buff);
+            return NULL;
+        }
+    }
+    // arrived root dir
+    if (is_root_dir)
+        strcpy(output, "/");
+
+    strcpy(output, temp_filename);
+    kfree(temp_filename);
+    kfree(filename);
+
+    if (!buf)
+        buf = (uchar*)kmalloc(strlen(output) + 1);
+
+    strcpy(buf, output);
+    return buf;
 }
 
 /* close fd */

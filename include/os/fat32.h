@@ -138,7 +138,10 @@ size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode);
 uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path, uint32_t mode);
 uint8 fat32_close(uint32 fd);
+uint8 fat32_chdir(const char* path_t);
+uchar *fat32_getcwd(uchar *buf, size_t size);
 
+uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_fat(uchar *buf);
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode);
