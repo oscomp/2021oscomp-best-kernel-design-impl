@@ -684,7 +684,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
             printk_port("111\n");
             cnt = 0;
-            p = get_next_dentry(p, buf, &now_clus, *sec);
+            p = get_next_dentry(p, buf, &now_clus, sec);
             ret_p = p; ret_sec = *sec;
         }
         else{
@@ -693,7 +693,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
             else{
                 printk_port("222\n");
-                p = get_next_dentry(p, buf, &now_clus, *sec);
+                p = get_next_dentry(p, buf, &now_clus, sec);
             }
         }
     }
