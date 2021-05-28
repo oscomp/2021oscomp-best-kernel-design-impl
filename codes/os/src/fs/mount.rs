@@ -5,6 +5,8 @@ use lazy_static::*;
 use spin::Mutex;
 use alloc::sync::Arc;
 
+const MNT_MAXLEN:usize = 16;
+
 pub struct MountTable {
     mnt_list:Vec<(String, String, String)>//special,dir,fstype
 }
@@ -13,6 +15,12 @@ impl MountTable {
 
     pub fn mount(&mut self, special:String,dir:String,fstype:String, flag:u32)->isize{
         //println!("[mount] mnt {} to {}", special, dir);
+        if self.mnt_list.len() == MNT_MAXLEN {
+            return -1
+        }
+        if self.mnt_list.iter().find( |&(_,d, _)|{*d == dir}).is_some() {
+            return 0
+        }
         self.mnt_list.push((special, dir, fstype));
         return 0
     }
