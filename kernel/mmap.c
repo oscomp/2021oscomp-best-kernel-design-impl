@@ -47,7 +47,8 @@ add_map(struct mapped **phead, int off, int share)
 }
 
 // return the **pprev field in the pre-node, whether ever it's in an inode or what
-static struct mapped **get_prevmap(struct mapped **phead, int off)
+static struct mapped **
+get_prevmap(struct mapped **phead, int off)
 {
 	struct mapped *p = *phead;
 	while(p && p->offset <= off){
@@ -75,21 +76,6 @@ del_map(struct mapped *p, int off, int npages)
 		}
 		off += PGSIZE;
 	}
-	// struct mapped *pre = p;
-	// while(p){
-	// 	if(p->offset == off){
-	// 		p->n_ref--;
-	// 		if(!p->n_ref){
-	// 			if(p == pre)
-	// 				ind->maphead = p->next;
-	// 			else
-	// 				pre->next = p->next;
-	// 			kfree(p);
-	// 		}
-	// 	}
-	// 	pre = p;
-	// 	p = p->next;
-	// }
 }
 
 uint64
@@ -124,17 +110,7 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 
 	struct seg* s = getseg(p->segment, STACK);
 	uint64 base = VUMMAP;
-	// if(!(s->next)){
-	//   if(s->next->addr < VU_MMAP + sz){
-	//     s = s->next;
-	//     while(s->next){
-	//       base = s->addr + s->sz;
-	//       if(s->next->addr - base >= sz)
-	//       break;
-	//       s = s->next;
-	//     }
-	//   }
-	// }
+	
 
 	for (struct seg *ss = s->next; ss != NULL; ss = ss->next) {
 		if (ss->addr >= base + sz) {
@@ -165,9 +141,6 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 	}
 
 	int n = sz / PGSIZE;
-	// int n = len / PGSIZE;
-	// if(len % PGSIZE)
-	//   n += 1;
 	
 	int i;
 	struct mapped **pmap = &(ip->maphead);
@@ -203,8 +176,7 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 			} else {
 				map = *pmap;
 			}
-			// if(map->ph_addr)    // not the first one to share
-			//   mappages(p->pagetable, base + i * PGSIZE, PGSIZE, map->ph_addr, new_seg->flag|PTE_U);
+
 			if(mappages(p->pagetable, base + i * PGSIZE, PGSIZE, map->ph_addr, new_seg->flag|PTE_U))
 			{
 				__debug_warn("mmap", "allocpage failed!\n");
