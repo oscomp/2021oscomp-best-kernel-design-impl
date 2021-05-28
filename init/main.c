@@ -125,6 +125,7 @@ static void init_syscall(void)
     syscall[SYS_close] = &fat32_close;
     syscall[SYS_chdir] = &fat32_chdir;
     syscall[SYS_getcwd] = &fat32_getcwd;
+    syscall[SYS_read] = &fat32_read;
     // syscall[SYS_mmap] = &do_mmap;
 }
 

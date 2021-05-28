@@ -23,7 +23,7 @@ int main()
         // sys_move_cursor(1,1);
         ;
     }
-    // // printf("Success1\n");
+    printf("Success1\n");
     // while (1);
 
     #else

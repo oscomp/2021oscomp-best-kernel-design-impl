@@ -4,6 +4,7 @@
 #include <type.h>
 #include <pgtable.h>
 #include <../../drivers/sdcard/include/sdcard.h>
+#include <os/sched.h>
 
 typedef struct fat{
     uint32_t  first_data_sec;
@@ -88,21 +89,7 @@ enum{
     FD_USED,
 };
 
-/* file discriptor */
-#define O_RDONLY 1 /* read only open */
-#define O_WRONLY 2 /* write only open */
-#define O_RDWR 3 /* read/write open */
-typedef struct fd{
-    uint8 dev;
-    uint32 first_clus_num;
-    uint8 flags;
-    uint64 pos;
-    uint8 used;
-}fd_t;
-
 typedef uint16_t unicode_t;
-
-#define NUM_FD 16
 
 #define SECTOR_SIZE (fat.bpb.byts_per_sec)
 #define CLUSTER_SIZE (fat.byts_per_clus)
@@ -134,6 +121,7 @@ extern fat_t fat;
 
 uint16 fat32_open(uint32 fd, const uchar *path, uint32 flags, uint32 mode);
 int8 fat32_read_test(const char *filename);
+size_t fat32_read(uint32 fd, uchar *buf, size_t count);
 size_t fat32_write(uint32 fd, uchar *buff, uint64_t count);
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode);
 uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path, uint32_t mode);
@@ -145,6 +133,7 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_fat(uchar *buf);
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode);
+uint8 set_fd_from_dentry(void *pcb, uint i,dentry_t *p, uint32_t flags);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -162,6 +151,11 @@ static inline uint32 fat_sec_of_clus(uint32 cluster)
 static inline uint32 get_cluster_from_dentry(dentry_t *p)
 {
     return ((uint32_t)p->HI_clusnum << 16) + p->LO_clusnum;
+}
+
+static inline uint32 get_length_from_dentry(dentry_t *p)
+{
+    return ((uint32_t)(p->length));
 }
 
 static inline uint32 fat_offset_of_clus(uint32 cluster)

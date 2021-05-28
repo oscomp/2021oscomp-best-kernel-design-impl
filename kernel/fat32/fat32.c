@@ -18,14 +18,14 @@ fat_t fat;
 uchar buf[NORMAL_PAGE_SIZE];
 uchar filebuf[NORMAL_PAGE_SIZE];
 ientry_t cwd_first_clus;
-ientry_t cwd_clus, root_clus;
+ientry_t cwd_clus, root_clus, root_first_clus;
 isec_t cwd_sec, root_sec;
 
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 #define ACCEPT_NUM  1
-uchar accept_table[15][10] = {{"CHDIR"}, {"MKDIR"}, {"OPEN"},  {"CLONE"}, {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
+uchar accept_table[15][10] = {{"READ"} ,{"CHDIR"}, {"MKDIR"}, {"OPEN"},  {"CLONE"}, {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
     {"WAIT"}, {"WAITPID"}, {"EXIT"},{"YIELD"}, {"TIMES"}, {"SLEEP"}};
 
 /* read as many sectors as we can */
@@ -96,6 +96,7 @@ uint8_t fat32_init()
     cwd_first_clus = fat.bpb.root_clus;
     cwd_clus = fat.bpb.root_clus;
     cwd_sec = first_sec_of_clus(fat.bpb.root_clus);
+    root_first_clus = cwd_first_clus;
     root_clus = cwd_clus;
     root_sec = cwd_sec;
     /* from root sector read buffsize */
@@ -204,6 +205,7 @@ int8 fat32_read_test(const char *filename)
     /* set elf_binary and length */
     _elf_binary = file;
     length = p->length;
+    cwd_first_clus = root_first_clus;
 
 #else
 
@@ -244,7 +246,32 @@ int8 fat32_read_test(const char *filename)
     assert(0);
 }
 
+/* success : read count */
+size_t fat32_read(uint32 fd, uchar *buf, size_t count)
+{
 
+    if (!current_running->fd[fd].used)
+        return -1;
+
+    size_t mycount = 0;
+    size_t realcount = max(count, current_running->fd[fd].length);
+    uchar *buff = kalloc();
+    ientry_t now_clus = current_running->fd[fd].first_clus_num;
+
+    while (mycount < realcount){
+        size_t readsize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
+        sd_read(buff,first_sec_of_clus(now_clus));
+        memcpy(buf, buff, readsize);
+        buf += readsize;
+        mycount += readsize;
+        if (mycount % CLUSTER_SIZE == 0)
+            now_clus = get_next_cluster(now_clus);
+    }
+
+    kfree(buff);
+
+    return realcount;
+}
 
 /* write count bytes from buff to file in fd */
 /* return count: success
@@ -258,8 +285,33 @@ size_t fat32_write(uint32 fd, uchar *buff, uint64_t count)
         stdout_buf[count] = 0;
         return printk_port(stdout_buf);
     }
-    else
-        ;
+    else{
+        size_t mycount = 0;
+        size_t realcount = max(count, current_running->fd[fd].length);
+        uchar *tempbuff = kalloc();
+        ientry_t now_clus = current_running->fd[fd].first_clus_num;
+        ientry_t old_clus = now_clus;
+
+        while (mycount < realcount){
+            size_t writesize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
+            sd_read(tempbuff,first_sec_of_clus(now_clus));
+            memcpy(tempbuff, buff, writesize);
+            sd_write(tempbuff,first_sec_of_clus(now_clus));
+            buff += writesize;
+            mycount += writesize;
+            if (mycount % CLUSTER_SIZE == 0){
+                old_clus = now_clus;
+                now_clus = get_next_cluster(now_clus);
+                if (now_clus == 0x0fffffffu){
+                    // new clus should be assigned
+                    write_fat_table(old_clus, now_clus, tempbuff);
+                }
+            }
+        }
+
+        kfree(tempbuff);
+        return realcount;
+    }
 }
 
 uchar unicode2char(uint16_t unich)
@@ -483,6 +535,13 @@ uint8 fat32_chdir(const char* path_t)
 
     uchar path[strlen(path_t) + 1];
     strcpy(path, path_t);
+
+    if (!strcmp("/", path))
+    {
+        cwd_first_clus = root_first_clus;
+        return 0;
+    }
+
     char *temp1, *temp2;
 
     uint isend = 0;
@@ -872,6 +931,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
     }
     
+    // if (mode == SEARCH_DIR && )
     return NULL;
 }
 
@@ -922,12 +982,7 @@ uint16 fat32_open(uint32 fd, const uchar *path_const, uint32 flags, uint32 mode)
 
                 for (uint8 i = 0; i < NUM_FD; ++i)
                 {
-                    if (!current_running->fd[i].used){
-                        current_running->fd[i].dev = 0;
-                        current_running->fd[i].first_clus_num = get_cluster_from_dentry(p);
-                        current_running->fd[i].flags = flags;
-                        current_running->fd[i].pos = 0;
-                        current_running->fd[i].used = 1;
+                    if (!set_fd_from_dentry(current_running, i, p, flags)){                        
                         kfree(buf);
                         return i;
                     }
@@ -946,12 +1001,7 @@ uint16 fat32_open(uint32 fd, const uchar *path_const, uint32 flags, uint32 mode)
                     ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
                     for (uint8 i = 0; i < NUM_FD; ++i)
                     {
-                        if (!current_running->fd[i].used){
-                            current_running->fd[i].dev = 0;
-                            current_running->fd[i].first_clus_num = new_clus;
-                            current_running->fd[i].flags = flags;
-                            current_running->fd[i].pos = 0;
-                            current_running->fd[i].used = 1;
+                        if (!set_fd_from_dentry(current_running, i, p, flags)){
                             kfree(buf);
                             return i;
                         }
@@ -1086,7 +1136,20 @@ uint8_t filenamecmp(const char *name1, const char *name2)
     return strcmp(name1_t, name2_t);
 }
 
-
+/* set fd */
+/* success 0, fail -1 */
+uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags)
+{
+    pcb_t *pcb_under = (pcb_t *)pcb_underinit;
+    if (pcb_under->fd[i].used) return -1;
+    pcb_under->fd[i].dev = 0;
+    pcb_under->fd[i].first_clus_num = get_cluster_from_dentry(p);
+    pcb_under->fd[i].flags = flags;
+    pcb_under->fd[i].pos = 0;
+    pcb_under->fd[i].length = get_length_from_dentry(p);
+    pcb_under->fd[i].used = 1;
+    return 0;
+}
 
 /* go to child directory */
 

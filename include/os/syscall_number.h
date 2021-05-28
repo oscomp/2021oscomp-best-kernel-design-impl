@@ -42,6 +42,7 @@
 #define SYSCALL_TESTDISK 58
 #define SYSCALL_TEST 59
 
+#define SYS_read 63
 #define SYS_write 64
 
 #define SYS_exit 93

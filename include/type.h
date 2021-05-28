@@ -82,4 +82,19 @@ typedef uint64_t size_t;
 # define UINT32_MAX             (4294967295U)
 # define UINT64_MAX             (18446744073709551615lu)
 
+/* file discriptor */
+#define O_RDONLY 1 /* read only open */
+#define O_WRONLY 2 /* write only open */
+#define O_RDWR 3 /* read/write open */
+typedef struct fd{
+    uint8 dev;
+    uint32 first_clus_num;
+    uint8 flags;
+    uint64 pos;
+    uint32 length;
+    uint8 mapped;
+    uint32 fd_num;
+    uint8 used;
+}fd_t;
+
 #endif

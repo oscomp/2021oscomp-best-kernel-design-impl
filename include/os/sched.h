@@ -38,7 +38,6 @@
 #include <os/time.h>
 #include <os/fat32.h>
 
-
 #define NUM_MAX_TASK 16
 
 /* used to save register infomation */
@@ -83,6 +82,8 @@ typedef enum {
     USER_PROCESS,
     USER_THREAD,
 } task_type_t;
+
+#define NUM_FD 16
 
 /* Process Control Block */
 typedef struct pcb
@@ -235,8 +236,10 @@ static inline void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     /* file descriptors */
     pcb_underinit->fd[0].dev = 0; pcb_underinit->fd[0].used = 1; pcb_underinit->fd[0].flags = O_RDONLY; 
     pcb_underinit->fd[1].dev = 0; pcb_underinit->fd[1].used = 1; pcb_underinit->fd[1].flags = O_WRONLY; 
-    for (int i = 2; i < NUM_FD; ++i)
+    for (int i = 2; i < NUM_FD; ++i){
         pcb_underinit->fd[i].used = 0; // remember to set up other props when use it
+        pcb_underinit->fd[i].mapped = 0;
+    }
 
     // systime
     pcb_underinit->stime = 0;
