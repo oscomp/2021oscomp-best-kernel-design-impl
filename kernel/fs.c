@@ -139,6 +139,7 @@ static struct dentry *de_root_generate(struct dentry *parent,
 	ip->fop = &rootfs_file_op;
 	ip->state = I_STATE_VALID;	// not necessary
 	ip->mode = mode;
+	ip->nlink = 1;
 	
 	initsleeplock(&ip->lock, "inode");
 	safestrcpy(de->filename, name, MAXNAME);
@@ -168,6 +169,7 @@ static int rootfs_getattr(struct inode *ip, struct kstat *st) {
 	st->rdev = ip->dev;
     st->ino = ip->inum;
     st->mode = ip->mode;
+	st->nlink = ip->nlink;
 	return 0;
 }
 

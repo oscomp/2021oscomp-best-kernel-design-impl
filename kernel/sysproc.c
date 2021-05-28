@@ -13,6 +13,7 @@
 #include "include/syscall.h"
 #include "include/timer.h"
 #include "include/pm.h"
+#include "include/vm.h"
 #include "include/usrmm.h"
 #include "include/string.h"
 #include "include/printf.h"

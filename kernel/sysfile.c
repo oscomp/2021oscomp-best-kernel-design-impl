@@ -600,14 +600,12 @@ sys_mmap(void)
   if(argaddr(0, &start) < 0 || argint(1, &len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &off) < 0)
     return -1;
   
-  if(off % PGSIZE)
+  if(off % PGSIZE || len <= 0)
     return -1;
 
   struct file * f = fd2file(fd, 0);
   if(!f)
     return -1;
 
-  /*return _mmap(start, len, prot, flags, f, off);*/
-  // not implemented well!
-  return -1;
+  return do_mmap(start, len, prot, flags, f, off);
 }
