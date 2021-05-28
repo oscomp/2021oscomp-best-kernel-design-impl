@@ -4939,7 +4939,7 @@ void fpioa_pin_init() {
     fpioa_set_function(28, FUNC_SPI0_D0);
     fpioa_set_function(26, FUNC_SPI0_D1);
 	fpioa_set_function(32, FUNC_GPIOHS7);
-    fpioa_set_function(29, FUNC_SPI0_SS0);
+    fpioa_set_function(29, FUNC_SPI0_SS3);
     #ifdef DEBUG
     printf("fpioa_pin_init\n");
     #endif
