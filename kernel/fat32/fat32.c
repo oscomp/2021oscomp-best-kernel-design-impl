@@ -114,14 +114,14 @@ int8 fat32_read_test(const char *filename)
 {
     static uint32 cnt = 0;
 
-    fat32_mkdir(AT_FDCWD, "test_mkdir", 1);
-    printk_port("cwd: %d\n", cwd_first_clus);
-    fat32_chdir("test_mkdir");
-    uchar *test;
-    test = fat32_getcwd(NULL, 10);
-    printk_port("getcwd:%s\n", test);
+    // fat32_mkdir(AT_FDCWD, "test_mkdir", 1);
+    // printk_port("cwd: %d\n", cwd_first_clus);
+    // fat32_chdir("test_mkdir");
+    // uchar *test;
+    // test = fat32_getcwd(NULL, 10);
+    // printk_port("getcwd:%s\n", test);
 
-    while(1);
+    // while(1);
 
     /* busy */
     for (int i = 1; i < NUM_MAX_TASK; ++i)
@@ -541,6 +541,7 @@ uint8 fat32_chdir(const char* path_t)
 /* success 0, fail -1 */
 uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path_const, uint32_t mode)
 {
+    printk_port("dirfd %x\n", dirfd);
     uchar *tempbuf = kalloc(); // for search
 
     uchar path[strlen(path_const)+1]; strcpy(path, path_const);
