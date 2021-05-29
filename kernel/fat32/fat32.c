@@ -175,7 +175,7 @@ int8 fat32_read_test(const char *filename)
         !memcmp(p->filename, "MMAP", 4) || !memcmp(p->filename,"MOUNT",5) ||
         !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename,"PIPE", 4) ||
         !memcmp(p->filename, "UMOUNT", 6) || !memcmp(p->filename, "UNLINK", 6) ||
-        !memcmp(p->filename, "RUN", 3) || !memcmp(p->filename, "UNAME", 5)){
+        !memcmp(p->filename, "RUN", 3)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }

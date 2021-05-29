@@ -148,8 +148,6 @@ static void init_syscall(void)
 int main()
 {
     // // init Process Control Block (-_-!)
-    init_recyc();
-    printk("> [INIT] Memory initialization succeeded.\n\r");
     init_pcb();
     printk("> [INIT] PCB initialization succeeded.\n\r");
     // // read CPU frequency
@@ -160,6 +158,8 @@ int main()
     // init system call table (0_0)
     init_syscall();
     printk("> [INIT] System call initialized successfully.\n\r");
+    init_recyc();
+    printk("> [INIT] Memory initialization succeeded.\n\r");
 
 #ifdef K210
     // init sdcard (@—.—@)
