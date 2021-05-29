@@ -234,7 +234,9 @@ int8 fat32_read_test(const char *filename)
         {
             // init pcb
             pcb_t *pcb_underinit = &pcb[i];
+            printk_port("1\n");
             ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
+            printk_port("2\n");
             ptr_t user_stack = USER_STACK_ADDR;
 
             init_pcb_default(pcb_underinit, USER_PROCESS);
@@ -243,18 +245,22 @@ int8 fat32_read_test(const char *filename)
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
 
+            printk_port("3\n");
             uint64_t user_stack_page_kva = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            
+            printk_port("4\n");
             uint64_t edata;
             uint64_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper,&edata);
-            
+            printk_port("5\n");
             pcb_underinit->edata = edata;
             
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
+            printk_port("6\n");
             // prepare stack
             init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, 0, user_stack - NORMAL_PAGE_SIZE, pcb_underinit);
             // add to ready_queue
+            printk_port("7\n");
             list_del(&pcb_underinit->list);
+            printk_port("8\n");
             list_add_tail(&pcb_underinit->list,&ready_queue);
 
             #ifdef K210
