@@ -604,7 +604,7 @@ sys_mmap(void)
     return -1;
 
   struct file * f = fd2file(fd, 0);
-  if(!f)
+  if(!f || f->type != FD_INODE)
     return -1;
 
   return do_mmap(start, len, prot, flags, f, off);

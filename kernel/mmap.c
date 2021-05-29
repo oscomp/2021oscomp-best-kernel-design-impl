@@ -75,12 +75,27 @@ del_map(struct mapped *p, int off, int npages)
 			if (p->next != NULL) {
 				p->next->pprev = p->pprev;
 			}
+			__debug_info("del_map", "freeing %p\n", p);
 			kfree(p);
 		}
 		p = next;
 		off += PGSIZE;
 	}
 }
+
+void del_segmap(struct seg *seg)
+{
+	__debug_assert("del_segmap", seg->type == MMAP, "funny type %d\n", seg->type);
+	// if (!seg->mmap)
+	// 	return;
+	struct inode *ip = seg->mmap->ip;
+	ilock(ip);
+	struct mapped *map = *get_prevmap(&ip->maphead, seg->f_off);
+	del_map(map, map->offset, seg->sz / PGSIZE);
+	iunlock(ip);
+	fileclose(seg->mmap);
+}
+
 
 uint64
 do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
@@ -231,8 +246,12 @@ do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off)
 	iunlock(ip);
 	new_seg->next = s->next;
 	s->next = new_seg;
-	new_seg->mmap = filedup(f);
 	new_seg->f_off = off;
+	if (flags & MAP_SHARED) {
+		new_seg->mmap = filedup(f);
+	} else {
+		new_seg->mmap = NULL;
+	}
 
 	// sfence_vma();
 
@@ -278,24 +297,27 @@ int do_munmap(uint64 start, uint64 len)
 	// cal the off of file corresponding to start
 	uint64 off = s->f_off + (start - s->addr);
 
-	struct inode *ip = s->mmap->ip;
-	ilock(ip);
-	struct mapped *map = *get_prevmap(&ip->maphead, off);
+	struct file *fp = s->mmap;
+	if (fp && (s->flag & PTE_W)) { // A shared map, carry through to the file.
+		struct inode *ip = s->mmap->ip;
+		ilock(ip);
+		struct mapped *map = *get_prevmap(&ip->maphead, off);
 
-	__debug_assert("do_munmap", off == map->offset,
-					"funny mmap: s->off=%d map->off=%d\n", off, map->offset);
+		__debug_assert("do_munmap", off == map->offset,
+						"funny mmap: s->off=%d map->off=%d\n", off, map->offset);
 
-	uint64 sz2 = sz;
-	for (struct mapped *m = map; sz2 > 0 && m; sz2 -= PGSIZE, off += PGSIZE, m = m->next) {
-		
-		__debug_assert("do_munmap", off == m->offset,
-						"funny mmap: s->off=%d map->off=%d\n", off, m->offset);
-		
-		// This op may fail, but what can we do about it?
-		ip->fop->write(ip, 0, m->ph_addr, off, m->len);
+		uint64 sz2 = sz;
+		for (struct mapped *m = map; sz2 > 0 && m; sz2 -= PGSIZE, off += PGSIZE, m = m->next) {
+			
+			__debug_assert("do_munmap", off == m->offset,
+							"funny mmap: s->off=%d map->off=%d\n", off, m->offset);
+			
+			// This op may fail, but what can we do about it?
+			ip->fop->write(ip, 0, m->ph_addr, off, m->len);
+		}
+		del_map(map, map->offset, sz / PGSIZE);
+		iunlock(ip);
 	}
-	del_map(map, map->offset, sz / PGSIZE);
-	iunlock(ip);
 
 	// Now handle segment
 	uvmdealloc(p->pagetable, start, end, s->type);
@@ -307,10 +329,11 @@ int do_munmap(uint64 start, uint64 len)
 		s2->sz = s->sz - (end - s->addr);
 		s2->flag = s->flag;
 		s2->type = s->type;
-		s2->mmap = filedup(s->mmap);
 		s2->f_off = off;
 		s2->next = s->next;
-		
+		s2->mmap = fp;
+		if (fp)
+			filedup(fp);
 		s->sz = start - s->addr;
 		s->next = s2;
 	} else {
@@ -319,7 +342,8 @@ int do_munmap(uint64 start, uint64 len)
 				stack = stack->next;
 			}
 			stack->next = s->next;
-			fileclose(s->mmap);
+			if (fp)
+				fileclose(fp);
 			kfree(s);
 		} else if (start == s->addr) {
 			s->addr = end;

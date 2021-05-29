@@ -8,6 +8,7 @@
 #include "include/kmalloc.h"
 #include "include/proc.h"
 #include "include/vm.h"
+#include "include/string.h"
 #include "include/debug.h"
 
 struct seg*
@@ -79,25 +80,6 @@ newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset
 enum segtype
 typeofseg(struct seg *head, uint64 addr)
 {
-  // enum segtype type = NONE;
-  // while(head){
-  //   uint64 start, end;
-  //   start = head->type == STACK ? head->addr - head->sz : head->addr;
-  //   end = head->type == STACK ? head->addr : head->addr + head->sz;
-  //   if(addr >= start && addr < end)
-  //   {
-  //     type = head->type;
-  //     break;
-  //   }
-  //   else if(addr >= end)
-  //     head = head->next;
-  //   else{
-  //     __debug_error("typeofseg", "in no segment\n");
-	//   return NONE;
-  //   }
-  // }
-
-  // __debug_info("typeofseg", "addr=%p\n", addr);
   head = locateseg(head, addr);
 
   return head == NULL ? NONE : head->type;
@@ -162,6 +144,9 @@ delseg(pagetable_t pagetable, struct seg *s)
   struct seg *next = s->next;
   __debug_info("delseg", "s = %p\n", s);
   __debug_info("delseg", "s->type: %d\n", s->type);
+  if (s->type == MMAP && s->mmap) {
+    del_segmap(s);
+  }
   uvmdealloc(pagetable, s->addr, s->addr + s->sz, s->type);
   kfree(s);
   return next;
@@ -172,4 +157,47 @@ delsegs(pagetable_t pagetable, struct seg *head){
   while(head){
     head = delseg(pagetable, head);
   }
+}
+
+struct seg*
+copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2)
+{
+  struct seg *head = NULL, *tail = NULL;
+	for (; seg != NULL; seg = seg->next) {
+		struct seg *s = kmalloc(sizeof(struct seg));
+		if (s == NULL) {
+			__debug_warn("copysegs", "seg kmalloc fail\n");
+			goto bad;
+		}
+
+    // This means that the mmap segment is shared, shouldn't do COW.
+    // If seg->mmap is NULL, it means the mmap is private.
+    int cow = (seg->type == MMAP && seg->mmap) ? 0 : 1;
+		// Copy user memory from parent to child.
+    if (uvmcopy(pt, pt2, seg->addr, seg->addr + seg->sz, seg->type, cow) < 0) 
+		{
+			__debug_warn("copysegs", "uvmcopy_cow fails\n");
+			__debug_warn("copysegs", "%p, %p, %d\n", 
+          seg->addr, seg->addr + seg->sz, seg->type);
+			kfree(s);
+			__debug_warn("copysegs", "exit kfree\n");
+			goto bad;
+		}
+    if (!cow) {
+      filedup(seg->mmap);
+    }
+		memmove(s, seg, sizeof(struct seg));
+		s->next = NULL;
+    if (tail == NULL) {
+      head = tail = s;
+    } else {
+      tail->next = s;
+      tail = s;
+    }
+	}
+  return head;
+
+bad:
+  delsegs(pt2, head);
+  return NULL;
 }

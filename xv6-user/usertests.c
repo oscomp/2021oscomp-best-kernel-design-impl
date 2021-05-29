@@ -179,12 +179,12 @@ copyinstr2(char *s)
       printf("exec(echo, BIG) returned %d, not -1\n", fd);
       exit(1);
     }
-    exit(747); // OK
+    exit(47); // OK
   }
 
   int st = 0;
   wait(&st);
-  if(st != 747){
+  if(WEXITSTATUS(st) != 47){
     printf("exec(echo, BIG) succeeded, should have failed\n");
     exit(1);
   }
@@ -365,7 +365,7 @@ truncate3(char *s)
 
   wait(&xstatus);
   remove("truncfile");
-  exit(xstatus);
+  exit(WEXITSTATUS(xstatus));
 }
   
 
@@ -418,7 +418,7 @@ exitiputtest(char *s)
     exit(0);
   }
   wait(&xstatus);
-  exit(xstatus);
+  exit(WEXITSTATUS(xstatus));
 }
 
 // does the error path in open() for attempt to write a
@@ -460,7 +460,7 @@ openiputtest(char *s)
     exit(1);
   }
   wait(&xstatus);
-  exit(xstatus);
+  exit(WEXITSTATUS(xstatus));
 }
 
 // simple file system tests
@@ -659,8 +659,8 @@ exectest(char *s)
   if (wait(&xstatus) != pid) {
     printf("%s: wait failed!\n", s);
   }
-  if(xstatus != 0)
-    exit(xstatus);
+  if(WEXITSTATUS(xstatus) != 0)
+    exit(WEXITSTATUS(xstatus));
 
   fd = open("echo-ok", O_RDONLY);
   if(fd < 0) {
@@ -729,7 +729,7 @@ pipe1(char *s)
     }
     close(fds[0]);
     wait(&xstatus);
-    exit(xstatus);
+    exit(WEXITSTATUS(xstatus));
   } else {
     printf("%s: fork() failed\n", s);
     exit(1);
@@ -810,7 +810,7 @@ exitwait(char *s)
         printf("%s: wait wrong pid\n", s);
         exit(1);
       }
-      if(i != xstate) {
+      if(i != WEXITSTATUS(xstate)) {
         printf("%s: wait wrong exit status\n", s);
         exit(1);
       }
@@ -908,7 +908,7 @@ forkfork(char *s)
   int xstatus;
   for(int i = 0; i < N; i++){
     wait(&xstatus);
-    if(xstatus != 0) {
+    if(WEXITSTATUS(xstatus) != 0) {
       printf("%s: fork in child failed", s);
       exit(1);
     }
@@ -999,12 +999,12 @@ mem(char *s)
   } else {
     int xstatus;
     wait(&xstatus);
-    if(xstatus == -1){
+    if(WEXITSTATUS(xstatus) == (char)-1){
       // probably page fault, so might be lazy lab,
       // so OK.
       exit(0);
     }
-    exit(xstatus);
+    exit(WEXITSTATUS(xstatus));
   }
 }
 
@@ -1038,8 +1038,8 @@ sharedfd(char *s)
   } else {
     int xstatus;
     wait(&xstatus);
-    if(xstatus != 0)
-      exit(xstatus);
+    if(WEXITSTATUS(xstatus) != 0)
+      exit(WEXITSTATUS(xstatus));
   }
   
   close(fd);
@@ -1108,8 +1108,8 @@ fourfiles(char *s)
   int xstatus;
   for(pi = 0; pi < NCHILD; pi++){
     wait(&xstatus);
-    if(xstatus != 0)
-      exit(xstatus);
+    if(WEXITSTATUS(xstatus) != 0)
+      exit(WEXITSTATUS(xstatus));
   }
 
   for(i = 0; i < NCHILD; i++){
@@ -1179,7 +1179,7 @@ createdelete(char *s)
   int xstatus;
   for(pi = 0; pi < NCHILD; pi++){
     wait(&xstatus);
-    if(xstatus != 0)
+    if(WEXITSTATUS(xstatus) != 0)
       exit(1);
   }
 
@@ -1997,7 +1997,7 @@ sbrkbasic(char *s)
   xstatus = pid;
 
   wait(&xstatus);
-  if(xstatus == 1){
+  if(WEXITSTATUS(xstatus) == 1){
     printf("%s: too much memory allocated!\n", s);
     exit(1);
   }
@@ -2027,7 +2027,7 @@ sbrkbasic(char *s)
   if(pid == 0)
     exit(0);
   wait(&xstatus);
-  exit(xstatus);
+  exit(WEXITSTATUS(xstatus));
 }
 
 void
@@ -2109,7 +2109,7 @@ kernmem(char *s)
     }
     int xstatus;
     wait(&xstatus);
-    if(xstatus != -1)  // did kernel kill child?
+    if(WEXITSTATUS(xstatus) != (char)-1)  // did kernel kill child?
       exit(1);
   }
 }
@@ -2180,7 +2180,7 @@ sbrkfail(char *s)
     exit(1);
   }
   wait(&xstatus);
-  if(xstatus != -1 && xstatus != 2)
+  if(WEXITSTATUS(xstatus) != (char)-1 && WEXITSTATUS(xstatus) != 2)
     exit(1);
 }
 
@@ -2271,8 +2271,8 @@ bigargtest(char *s)
   }
   
   wait(&xstatus);
-  if(xstatus != 0)
-    exit(xstatus);
+  if(WEXITSTATUS(xstatus) != 0)
+    exit(WEXITSTATUS(xstatus));
   fd = open("bigarg-ok", 0);
   if(fd < 0){
     printf("%s: bigarg test failed!\n", s);
@@ -2375,10 +2375,10 @@ stacktest(char *s)
     exit(1);
   }
   wait(&xstatus);
-  if(xstatus == -1)  // kernel killed child?
+  if(WEXITSTATUS(xstatus) == (char)-1)  // kernel killed child?
     exit(0);
   else
-    exit(xstatus);
+    exit(WEXITSTATUS(xstatus));
 }
 
 // regression test. copyin(), copyout(), and copyinstr() used to cast
@@ -2626,11 +2626,11 @@ run(void f(char *), char *s) {
     exit(0);
   } else {
     wait(&xstatus);
-    if(xstatus != 0) 
+    if(WEXITSTATUS(xstatus) != 0) 
       printf("FAILED\n");
     else
       printf("OK\n");
-    return xstatus == 0;
+    return WEXITSTATUS(xstatus) == 0;
   }
 }
 

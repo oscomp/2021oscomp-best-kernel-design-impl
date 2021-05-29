@@ -98,4 +98,14 @@ struct seg *delseg(pagetable_t pagetable, struct seg *pre);
  */
 void delsegs(pagetable_t pagetable, struct seg *head);
 
+/**
+ * @brief copy segments and pagetable to another and generate an identical segments list
+ *        called by fork and clone
+ * @param[in] pt        the pagetable to copy
+ * @param[in] seg       the head node of the segments list to copy
+ * 
+ * @return the head of the new segments list, NULL if fail to copy
+ */
+struct seg *copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2);
+
 #endif
