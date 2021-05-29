@@ -278,7 +278,7 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
     uint64_t status_ker = NULL;
     if (status) status_ker = get_kva_of(status,current_running->pgdir);
     pid_t ret = -1;
-    for (int i = 1; i < NUM_MAX_TASK; ++i)
+    for (uint i = 1; i < NUM_MAX_TASK; ++i)
     {
         if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
             // confirm pid

@@ -676,8 +676,8 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         return printk_port(stdout_buf);
     }
     else{
-        // if (current_running->fd[fd_index].piped == FD_PIPED)
-        //     return pipe_write(buff, current_running->fd[fd_index].pip_num,count);
+        if (current_running->fd[fd_index].piped == FD_PIPED)
+            return pipe_write(buff, current_running->fd[fd_index].pip_num,count);
 
         size_t mycount = 0;
         size_t realcount = min(count, current_running->fd[fd_index].length);
