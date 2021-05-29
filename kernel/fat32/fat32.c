@@ -375,31 +375,29 @@ int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 /* success return 0, fail return -1; */
 int16 fat32_pipe2(fd_num_t fd[], int32 mode)
 {
-    for (int i = 0; i < NUM_PIPE; ++i)
+    uint64_t pip_num;
+    for (pip_num = 0; pip_num < NUM_PIPE; ++pip_num)
     {
-        if (pipes[i].valid == PIPE_INVALID){
-            pipes[i].fd[0] = fd[0];
-            pipes[i].fd[1] = fd[1];
-            pipes[i].top = 0;
-            pipes[i].pid = current_running->pid;
-            pipes[i].valid = PIPE_VALID;
+        if (pipes[pip_num].valid == PIPE_INVALID){
+            pipes[pip_num].fd[0] = fd[0];
+            pipes[pip_num].fd[1] = fd[1];
+            pipes[pip_num].top = 0;
+            pipes[pip_num].pid = current_running->pid;
+            pipes[pip_num].valid = PIPE_VALID;
+            break;
         }
     }
+    if (pip_num == NUM_PIPE) return -1;
+
     int16 fd_index[0] = {-1};
     printk_port("init: %d, %d\n",fd_index[0], fd_index[1]);
     for (int i = 0; i < NUM_FD; ++i)
         if (current_running->fd[i].used == FD_UNUSED)
             if (fd_index[0] == -1){
                 fd_index[0] = i;
-                current_running->fd[i].used = FD_USED;
-                current_running->fd[i].fd_num = fd[0];
-                current_running->fd[i].piped = FD_PIPED;
             }
             else if (fd_index[1] == -1){
                 fd_index[1] = i;
-                current_running->fd[i].used = FD_USED;
-                current_running->fd[i].fd_num = fd[1];
-                current_running->fd[i].piped = FD_PIPED;
                 break ;
             }
 
@@ -410,6 +408,7 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode)
         current_running->fd[fd_index[i]].used = FD_USED;
         current_running->fd[fd_index[i]].fd_num = fd[i];
         current_running->fd[fd_index[i]].piped = FD_PIPED;
+        current_running->fd[fd_index[i]].pip_num = pip_num;
     }
 }
 
@@ -617,6 +616,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
 
+    // if (current_running->fd[fd_index].piped == FD_PIPED)
     // printk_port("fd: %d, length: %d\n", fd_index, current_running->fd[fd_index].length);
     size_t mycount = 0;
     size_t realcount = min(count, current_running->fd[fd_index].length);

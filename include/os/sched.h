@@ -104,6 +104,7 @@ typedef struct fd{
 
     /* piped */
     uint8 piped;
+    uint32_t pip_num;
 
     uint8 nlink;
 
