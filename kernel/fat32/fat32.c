@@ -25,15 +25,15 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  1
-uchar accept_table[25][10] = {{"PIPE"}, {"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
-    {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
-    {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
-
-// #define ACCEPT_NUM  24
-// uchar accept_table[25][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+// #define ACCEPT_NUM  1
+// uchar accept_table[25][10] = {{"PIPE"}, {"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
 //     {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
 //     {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
+
+#define ACCEPT_NUM  24
+uchar accept_table[25][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+    {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
+    {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
 
 
 uint8_t fat32_init()
@@ -611,6 +611,7 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
 /* return read count */
 int64 pipe_read(uchar *buf, pipe_num_t pip_num)
 {
+    printk_port("readnum:%d\n",pip_num);
     while (pipes[pip_num].top == 0)
         do_scheduler();
     uint32_t count = pipes[pip_num].top;
@@ -661,6 +662,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
 /* return read count */
 int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
 {
+    printk_port("writenum:%d, count: %d\n", pip_num, count);
     memcpy(pipes[pip_num].buff, buf, count);
     pipes[pip_num].top = count;
     return count;

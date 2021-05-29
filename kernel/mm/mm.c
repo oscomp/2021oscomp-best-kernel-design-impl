@@ -24,20 +24,20 @@ static uint64_t find_swap_page_kva(uint64_t pgdir);
 ptr_t allocPage()
 {
     ptr_t ret;
-    memCurr += NORMAL_PAGE_SIZE;
-    ret = memCurr - NORMAL_PAGE_SIZE;
-    // if (!list_empty(&freePageList)){
-    //     ptr_t tmp = freePageList.next->ptr;
-    //     // prints("666:%x\n",tmp);
-    //     list_del(freePageList.next);
-    //     ret = tmp;
-    // }
-    // else if (memCurr < memalloc){
-    //     memCurr += NORMAL_PAGE_SIZE;
-    //     ret = memCurr - NORMAL_PAGE_SIZE;
-    // }
-    // else
-    //     assert(0);
+    // memCurr += NORMAL_PAGE_SIZE;
+    // ret = memCurr - NORMAL_PAGE_SIZE;
+    if (!list_empty(&freePageList)){
+        ptr_t tmp = freePageList.next->ptr;
+        // prints("666:%x\n",tmp);
+        list_del(freePageList.next);
+        ret = tmp;
+    }
+    else if (memCurr < memalloc){
+        memCurr += NORMAL_PAGE_SIZE;
+        ret = memCurr - NORMAL_PAGE_SIZE;
+    }
+    else
+        assert(0);
     return ret;
 }
 
