@@ -135,7 +135,13 @@ static void init_syscall(void)
     syscall[SYS_fstat] = &fat32_fstat;
     syscall[SYS_getdents64] = &fat32_getdent;
     syscall[SYS_pipe2] = &fat32_pipe2;
-    // syscall[SYS_mmap] = &do_mmap;
+
+    syscall[SYS_linkat] = &fat32_link;
+    syscall[SYS_unlinkat] = &fat32_unlink;
+    syscall[SYS_mount] = &fat32_mount;
+    syscall[SYS_umount2] = &fat32_umount;
+    syscall[SYS_mmap] = &fat32_mmap;
+    syscall[SYS_munmap] = &fat32_munmap;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~

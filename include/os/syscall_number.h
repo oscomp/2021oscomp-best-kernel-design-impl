@@ -38,6 +38,13 @@
 #define SYS_dup3 24
 
 #define SYS_mkdirat 34
+
+#define SYS_unlinkat 35
+#define SYS_linkat 37
+
+#define SYS_umount2 39
+#define SYS_mount 40
+
 #define SYS_chdir 49
 #define SYS_openat 56
 #define SYS_close 57
@@ -62,6 +69,7 @@
 #define SYS_getppid 173
 
 #define SYS_brk 214
+#define SYS_munmap 215
 #define SYS_clone 220
 #define SYS_execve 221
 

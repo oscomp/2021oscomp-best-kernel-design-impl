@@ -187,6 +187,13 @@ int16 fat32_fstat(fd_num_t fd, struct kstat *kst);
 int64 fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
 int16 fat32_pipe2(fd_num_t fd[], int32 mode);
 
+int16 fat32_link();
+int16 fat32_unlink();
+int16 fat32_mount();
+int16 fat32_umount();
+int64 fat32_mmap();
+int64 fat32_munmap();
+
 void init_inode();
 void init_pipe();
 

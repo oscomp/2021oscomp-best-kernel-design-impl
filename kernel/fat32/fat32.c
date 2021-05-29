@@ -26,9 +26,6 @@ uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 #define ACCEPT_NUM  26
-// uchar accept_table[23][10] = {{"SLEEP"}, {"WAITPID"}, {"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
-//     {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
-//      {"EXIT"},{"TIMES"}, {"GETCWD"}};
 uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
     {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
     {"gettimeofday"}, {"mkdir_"}, {"open"}, 
@@ -36,6 +33,13 @@ uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"},
     {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
             
     };
+// uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
+//     {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
+//     {"gettimeofday"}, {"mkdir_"}, {"open"}, 
+//     {"openat"}, {"read"}, {"sleep"}, {"times"}, 
+//     {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
+            
+//     };
 
 
 uint8_t fat32_init()
@@ -128,31 +132,32 @@ int8 fat32_read_test(const char *filename)
 
 #ifdef K210
 
-    // static dentry_t *p = (dentry_t *)root_buf;
-    // // 0x0f: long dentry
-    // while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
-    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-    // }
-    // /* now we are at a real dentry */
+    static dentry_t *p = (dentry_t *)root_buf;
+    // 0x0f: long dentry
+    while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
+    }
+    /* now we are at a real dentry */
 
-    // // 0x00: time to end
-    // uint8_t index;
-    // if (is_zero_dentry(p)){
-    //     printk_port("<return success>");
-    //     return 0;
-    // }
-    // // no length or deleted
-    // if (p->length == 0) {
-    //     printk_port("<cause 1>\n");
-    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec); 
-    //     return 1;
-    // }
-    // // not rw-able
-    // if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
-    //     // printk_port("<cause 2>\n");
-    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec); return 1;
-    // }
-    // /* debug return */
+    // 0x00: time to end
+    uint8_t index;
+    if (is_zero_dentry(p)){
+        printk_port("<return success>");
+        return 0;
+    }
+    // no length or deleted
+    if (p->length == 0) {
+        // printk_port("<cause 1>\n");
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec); 
+        return 1;
+    }
+    // not rw-able
+    if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
+        // printk_port("<cause 2>\n");
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
+        return 1;
+    }
+    /* debug return */
     // uint8 i;
     // for (i = 0; i < ACCEPT_NUM; ++i)
     // {
@@ -166,47 +171,56 @@ int8 fat32_read_test(const char *filename)
     //     return 1;
     // }
 
-    // printk_port("filename: %s\n", p->filename);
-    // /* Now we must read file */
-    // // readfile
-    // uint32_t cluster = get_cluster_from_dentry(p);
-    // uint32_t sec = first_sec_of_clus(cluster); // make sure you know the start addr
-    // uchar *file = allocproc(); // make sure space is enough
-    // uchar *temp = file; // for future use
-    // for (uint32_t i = 0; i < p->length; )
-    // {
-    //     // 1. read 1 cluster
-    //     sd_read(temp, sec);
-    //     i += BUFSIZE;
-    //     temp += BUFSIZE;
-    //     // 2. compute sec number of next buf-size datablock
-    //     if (i % CLUSTER_SIZE == 0){
-    //         cluster = get_next_cluster(cluster);
-    //         sec = first_sec_of_clus(cluster);
-    //     }
-    //     else
-    //         sec += READ_BUF_CNT;
-    // }
+    printk_port("filename: %s\n", p->filename);
+    if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
+        !memcmp(p->filename, "MMAP", 4) || !memcmp(p->filename,"MOUNT",5) ||
+        !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename,"PIPE", 4) ||
+        !memcmp(p->filename, "UMOUNT", 6) || !memcmp(p->filename, "UNLINK", 6)){
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
+        return 1;
+    }
+    /* Now we must read file */
+    // readfile
+    uint32_t cluster = get_cluster_from_dentry(p);
+    uint32_t sec = first_sec_of_clus(cluster); // make sure you know the start addr
+    uchar *file = allocproc(); // make sure space is enough
+    uchar *temp = file; // for future use
+    for (uint32_t i = 0; i < p->length; )
+    {
+        // 1. read 1 cluster
+        sd_read(temp, sec);
+        i += BUFSIZE;
+        temp += BUFSIZE;
+        // 2. compute sec number of next buf-size datablock
+        if (i % CLUSTER_SIZE == 0){
+            cluster = get_next_cluster(cluster);
+            sec = first_sec_of_clus(cluster);
+        }
+        else
+            sec += READ_BUF_CNT;
+    }
 
-    // /* set elf_binary and length */
+    /* set elf_binary and length */
+    _elf_binary = file;
+    length = p->length;
 
     cwd_first_clus = root_first_clus;
     cwd_clus = first_sec_of_clus(cwd_first_clus);
-    static uint cnt = 0;
-    uchar *file = allocproc();
+    // static uint cnt = 0;
+    // uchar *file = allocproc();
 
-    fd_num_t fd = fat32_open(AT_FDCWD ,&accept_table[cnt][0], O_RDWR, 0);
+    // fd_num_t fd = fat32_open(AT_FDCWD ,&accept_table[cnt][0], O_RDWR, 0);
     
-    cnt++;
+    // cnt++;
 
-    length = fat32_read(fd, file, 1000000);
+    // length = fat32_read(fd, file, 1000000);
 
-    printk_port("filename: %s\n", &accept_table[cnt-1][0]);
-    printk_port("length: %d\n", length);
+    // printk_port("filename: %s\n", &accept_table[cnt-1][0]);
+    // printk_port("length: %d\n", length);
 
-    fat32_close(fd);
+    // fat32_close(fd);
 
-    _elf_binary = file;
+    // _elf_binary = file;
 
 #else
 
@@ -245,14 +259,16 @@ int8 fat32_read_test(const char *filename)
             #ifdef K210
             // free resource
             allocfree();
+            p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
             #endif
 
-            if (cnt == ACCEPT_NUM)
-                return 0;
-            else{
-                printk_port("<finish>\n");
-                return -1;
-            }
+            // if (cnt == ACCEPT_NUM)
+            //     return 0;
+            // else{
+            //     printk_port("<finish>\n");
+            //     return -1;
+            // }
+            return -1;
         }
     assert(0);
 }
@@ -1259,8 +1275,10 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
             filename[name_cnt++] = 0;
         }
 
-        if (get_cluster_from_dentry(p) == cluster)
+        if (get_cluster_from_dentry(p) == cluster){
+            kfree(filename);
             return filename;
+        }
         else
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
     }
@@ -1443,6 +1461,37 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
     strcpy(buf, output);
     kfree(output);
     return buf;
+}
+
+int16 fat32_link()
+{
+    return -1;
+}
+
+int16 fat32_unlink()
+{
+    return -1;
+}
+
+
+int16 fat32_mount()
+{
+    return -1;
+}
+
+int16 fat32_umount()
+{
+    return -1;
+}
+
+int64 fat32_mmap()
+{
+    return -1;
+}
+
+int64 fat32_munmap()
+{
+    return -1;
 }
 
 /* close fd */
