@@ -171,7 +171,6 @@ int8 fat32_read_test(const char *filename)
     //     return 1;
     // }
 
-    printk_port("filename: %s\n", p->filename);
     if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
         !memcmp(p->filename, "MMAP", 4) || !memcmp(p->filename,"MOUNT",5) ||
         !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename,"PIPE", 4) ||
@@ -186,7 +185,6 @@ int8 fat32_read_test(const char *filename)
     uint32_t sec = first_sec_of_clus(cluster); // make sure you know the start addr
     uchar *file = allocproc(); // make sure space is enough
     uchar *temp = file; // for future use
-    printk_port("1\n");
     for (uint32_t i = 0; i < p->length; )
     {
         // 1. read 1 cluster
@@ -195,15 +193,12 @@ int8 fat32_read_test(const char *filename)
         temp += BUFSIZE;
         // 2. compute sec number of next buf-size datablock
         if (i % CLUSTER_SIZE == 0){
-            printk_port("3\n");
             cluster = get_next_cluster(cluster);
-            printk_port("cluster is %x\n", cluster);
             sec = first_sec_of_clus(cluster);
         }
         else
             sec += READ_BUF_CNT;
     }
-    printk_port("2\n");
 
     /* set elf_binary and length */
     _elf_binary = file;

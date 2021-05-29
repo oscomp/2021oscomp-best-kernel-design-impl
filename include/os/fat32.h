@@ -254,8 +254,6 @@ static inline uint32 fat_offset_of_clus(uint32 cluster)
 static inline uint32_t get_next_cluster(uint32_t cluster)
 {
     uchar *buf2 = kalloc();
-    printk("cluster is %x, fatsec is %d\n",cluster, fat_sec_of_clus(cluster));
-    printk_port("buf2 is :%lx\n", buf2);
     sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
     // printk("offset: %x\n", fat_offset_of_clus(cluster));
     uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));

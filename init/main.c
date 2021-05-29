@@ -148,6 +148,8 @@ static void init_syscall(void)
 int main()
 {
     // // init Process Control Block (-_-!)
+    init_recyc();
+    printk("> [INIT] Memory initialization succeeded.\n\r");
     init_pcb();
     printk("> [INIT] PCB initialization succeeded.\n\r");
     // // read CPU frequency
@@ -188,8 +190,6 @@ int main()
 #endif
 
     printk("> [INIT] IOREMAP initialized successfully.\n\r");
-
-    init_recyc();
 
     share_pgtable(shell_pgdir,pa2kva(PGDIR_PA));
     printk("> [INIT] SHARE PGTABLE initialized successfully.\n\r");

@@ -39,7 +39,6 @@ ptr_t allocPage()
     if (!list_empty(&freePageList)){
         list_node_t *tmp = freePageList.next;
         // prints("666 %lx\n",freePageList.next);
-        printk_port("dest: %lx\n", freePageList.next);
         list_del(tmp);
         list_add_tail(tmp, &freePagebackupList);
         // printk_port("777\n");
