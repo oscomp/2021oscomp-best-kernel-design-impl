@@ -30,7 +30,7 @@ ptr_t allocPage()
         ptr_t tmp = freePageList.next->ptr;
         // prints("666 %lx\n",freePageList.next);
         list_del(freePageList.next);
-        // printk_port("777\n")
+        // printk_port("777\n");
         ret = tmp;
     }
     else if (memCurr < memalloc){
