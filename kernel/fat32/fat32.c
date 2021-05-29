@@ -234,9 +234,7 @@ int8 fat32_read_test(const char *filename)
         {
             // init pcb
             pcb_t *pcb_underinit = &pcb[i];
-            printk_port("1\n");
             ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
-            printk_port("2\n");
             ptr_t user_stack = USER_STACK_ADDR;
 
             init_pcb_default(pcb_underinit, USER_PROCESS);
@@ -245,22 +243,16 @@ int8 fat32_read_test(const char *filename)
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
 
-            printk_port("3\n");
             uint64_t user_stack_page_kva = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            printk_port("4\n");
             uint64_t edata;
             uint64_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper,&edata);
-            printk_port("5\n");
             pcb_underinit->edata = edata;
             
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
-            printk_port("6\n");
             // prepare stack
             init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, 0, user_stack - NORMAL_PAGE_SIZE, pcb_underinit);
             // add to ready_queue
-            printk_port("7\n");
             list_del(&pcb_underinit->list);
-            printk_port("8\n");
             list_add_tail(&pcb_underinit->list,&ready_queue);
 
             #ifdef K210
@@ -1475,9 +1467,133 @@ int16 fat32_link()
     return -1;
 }
 
-int16 fat32_unlink()
+int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
 {
-    return -1;
+    return 1;
+
+    // uchar path[strlen(path_t) + 1];
+    // strcpy(path, path_t);
+
+    // uchar *buf = kalloc(); // for search
+
+    // int fd_index = get_fd_index(fd);
+    // if (fd != AT_FDCWD && fd_index < 0) return -1;
+
+    // /* for const */
+    // uchar path[strlen(path_const)+1];
+    // strcpy(path, path_const);
+
+    // uint8 isend = 0;
+
+    // uchar *temp1, *temp2; // for path parse
+    // uint32_t now_clus; // now cluster num
+
+    // dentry_t *p = (dentry_t *)buf; // for loop
+
+    // if (path[0] == '/'){
+    //     now_clus = fat.bpb.root_clus;
+    //     temp2 = &path[1], temp1 = &path[1];
+    // }
+    // else{
+    //     if (fd == AT_FDCWD)
+    //         now_clus = cwd_first_clus;
+    //     else
+    //     {
+    //         if (current_running->fd[fd_index].used)
+    //             now_clus = current_running->fd[fd_index].first_clus_num;
+    //         else
+    //             return -1;
+    //     }
+    //     temp2 = path, temp1 = path;
+    // }
+
+    // while (1)
+    // {
+    //     while (*temp2 != '/' && *temp2 != '\0') temp2++;
+    //     if (*temp2 == '\0' || *(temp2+1) == '\0' ) isend = 1;
+    //     *temp2 = '\0';
+
+    //     uint8 ignore;
+
+    //     if (isend){
+    //         // success
+    //         // printk_port("filename: %s\n", temp1);
+    //         search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
+    //                                     ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
+    //                                     SEARCH_DIR;
+    //         // 1. found
+    //         if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
+    //             // printk_port("p:%lx\n",p);
+    //             // printk_port("length: %d\n", p->length);
+    //             // printk_port("clus: %d, ignore :%d\n", get_cluster_from_dentry(p), ignore);
+    //             if (ignore){
+    //                 // use buf to non-null
+    //                 p = buf;
+    //                 set_dentry_cluster(p, now_clus);
+    //                 p->length = 0;
+    //                 p->create_time_ms = 0;
+    //                 p->create_time = 0x53D4; //10:30:40
+    //                 p->create_date = 0x52BB; // 2021/5/27
+    //                 p->last_visited = 0x52BB;
+    //                 p->last_modified_time = 0x53D3;   //23:22
+    //                 p->last_modified_date = 0x52BB;     //25:24
+    //             }
+
+    //             for (uint8 i = 0; i < NUM_FD; ++i)
+    //             {
+    //                 if (!set_fd_from_dentry(current_running, i, p, flags)){                        
+    //                     kfree(buf);
+    //                     return current_running->fd[i].fd_num; // use i as index
+    //                 }
+    //             }
+    //             // no available dx
+    //             kfree(buf);
+    //             return -1;
+    //         }
+    //         // 2.create
+    //         else{
+    //             if (search_mode == SEARCH_DIR || (flags & O_CREATE) == 0){
+    //                 kfree(buf);
+    //                 return -1;
+    //             }// you cant mkdir here! BUT you can create a file
+    //             else{
+    //                 ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
+    //                 p = buf;
+    //                 set_dentry_cluster(p, new_clus);
+    //                 p->length = 0;
+    //                 p->create_time_ms = 0;
+    //                 p->create_time = 0x53D4; //10:30:40
+    //                 p->create_date = 0x52BB; // 2021/5/27
+    //                 p->last_visited = 0x52BB;
+    //                 p->last_modified_time = 0x53D3;   //23:22
+    //                 p->last_modified_date = 0x52BB;     //25:24
+
+    //                 for (uint8 i = 0; i < NUM_FD; ++i)
+    //                 {
+    //                     if (!set_fd_from_dentry(current_running, i, p, flags)){ //new file length = 0
+    //                         kfree(buf);
+    //                         return current_running->fd[i].fd_num; // use i as index
+    //                     }
+    //                 }
+    //                 // no available dx
+    //                 kfree(buf);
+    //                 return -1;
+    //             }
+    //         }
+    //     }
+    //     else{
+    //         // printk_port("dirname: %s\n", temp1);
+    //         // search dir until fail or goto search file
+    //         if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+    //             now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
+    //             ++temp2;
+    //             temp1 = temp2;
+    //             continue ;
+    //         }
+    //         kfree(buf);
+    //         return -1;
+    //     }
+    // }
 }
 
 

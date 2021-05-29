@@ -188,7 +188,7 @@ int64 fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
 int16 fat32_pipe2(fd_num_t fd[], int32 mode);
 
 int16 fat32_link();
-int16 fat32_unlink();
+int16 fat32_unlink(fd_num_t dirfd, const char* path, uint32_t flags);
 int16 fat32_mount();
 int16 fat32_umount();
 int64 fat32_mmap();
@@ -245,11 +245,12 @@ static inline uint32 fat_offset_of_clus(uint32 cluster)
 
 static inline uint32_t get_next_cluster(uint32_t cluster)
 {
-    uchar buf2[SECTOR_SIZE];
+    uchar *buf2 = kalloc();
     // printk("cluster is %d, fatsec is %d\n",cluster, fat_sec_of_clus(cluster));
     sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
     // printk("offset: %x\n", fat_offset_of_clus(cluster));
     uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
+    kfree(buf2);
     return ret;
 }
 
