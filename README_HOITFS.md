@@ -8,7 +8,15 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 
 ## Log
 
-> 这里记录了所有输出文档
+> 这里记录了所有输出文档：
+>
+> `Week0 ~ Week8`均为调研阶段，这个阶段主要用于学习以及熟悉SylixOS；
+>
+> `Week9 ~ Week10`为开发准备阶段，这一阶段搭建好了自底向上的开发环境，HoitFS进入**第一个里程碑**；
+>
+> `Week11 ~ Week17`为开发阶段，这一阶段完成了大量编码工作，并在Week17时交付初稿，HoitFS进入**第二个里程碑**；
+>
+> 待续……
 
 ### Week0
 
