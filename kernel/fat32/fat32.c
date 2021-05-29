@@ -196,10 +196,13 @@ int8 fat32_read_test(const char *filename)
     uchar *file = allocproc();
 
     fd_num_t fd = fat32_open(AT_FDCWD ,&accept_table[cnt][0], O_RDWR, 0);
-    printk_port("filename: %s\n", &accept_table[cnt][0]);
+    
     cnt++;
 
     length = fat32_read(fd, file, 1000000);
+
+    printk_port("filename: %s\n", &accept_table[cnt-1][0]);
+    printk_port("length: %d\n", length);
 
     fat32_close(fd);
 
@@ -1418,24 +1421,27 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
         temp_size = strlen(temp_filename);
         if (buf && temp_size >= size){
             // exceeding, = is also valid, as no space for '\0'
-            kfree(filename);
+            kfree(temp_filename);
             kfree(output);
             kfree(buff);
             return NULL;
         }
     }
+
     // arrived root dir
     if (is_root_dir)
         strcpy(output, "/");
 
-    strcpy(output, temp_filename);
+    strcat(output, temp_filename);
+
     kfree(temp_filename);
-    kfree(filename);
+    kfree(buff);
 
     if (!buf)
         buf = (uchar*)kmalloc(strlen(output) + 1);
 
     strcpy(buf, output);
+    kfree(output);
     return buf;
 }
 
