@@ -4,9 +4,11 @@ use crate::{console::print, mm::{
     KERNEL_SPACE, 
     VirtAddr,
     translated_refmut,
+    MmapArea,
+    MapPermission,
 }};
 use crate::trap::{TrapContext, trap_handler};
-use crate::config::{TRAP_CONTEXT, USER_HEAP_SIZE};
+use crate::config::{TRAP_CONTEXT, USER_HEAP_SIZE, MMAP_BASE};
 use super::TaskContext;
 use super::{PidHandle, pid_alloc, KernelStack};
 use alloc::sync::{Weak, Arc};
@@ -37,6 +39,7 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
     pub fd_table: Vec<Option<FileClass>>,
     pub current_path: String,
+    pub mmap_area: MmapArea,
 }
 
 impl TaskControlBlockInner {
@@ -104,6 +107,7 @@ impl TaskControlBlock {
                 task_cx_ptr: task_cx_ptr as usize,
                 task_status: TaskStatus::Ready,
                 memory_set,
+                mmap_area: MmapArea::new(VirtAddr::from(MMAP_BASE), VirtAddr::from(MMAP_BASE)),
                 parent: None,
                 children: Vec::new(),
                 exit_code: 0,
@@ -235,7 +239,7 @@ impl TaskControlBlock {
                 task_cx_ptr: task_cx_ptr as usize,
                 task_status: TaskStatus::Ready,
                 memory_set,
-                //mmap_area: MmapArea,
+                mmap_area: MmapArea::new(VirtAddr::from(MMAP_BASE), VirtAddr::from(MMAP_BASE)),
                 parent: Some(Arc::downgrade(self)),
                 children: Vec::new(),
                 exit_code: 0,
@@ -256,6 +260,23 @@ impl TaskControlBlock {
     }
     pub fn getpid(&self) -> usize {
         self.pid.0
+    }
+
+    pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> usize {
+        let mut inner = self.acquire_inner_lock();
+        let fd_table = inner.fd_table.clone();
+        let token = inner.get_user_token();
+        let va_top = inner.mmap_area.get_mmap_top();
+        let end_va = VirtAddr::from(va_top.0 + len);
+
+        inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::U | MapPermission::W | MapPermission::R);
+        inner.mmap_area.push(start, len, prot, flags, fd, off, fd_table, token)
+    }
+
+    pub fn munmap(&self, start: usize, len: usize) -> isize {
+        let mut inner = self.acquire_inner_lock();
+        inner.memory_set.remove_area_with_start_vpn(VirtAddr::from(start).into());
+        inner.mmap_area.remove(start, len)
     }
 
     pub fn grow_proc(&self, grow_size: isize) -> usize {

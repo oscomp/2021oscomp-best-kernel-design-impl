@@ -402,9 +402,9 @@ impl ArgMachine{
         testsuits.push("getpid\0");
         testsuits.push("getppid\0");
         testsuits.push("mkdir_\0");
-        // testsuits.push("mmap\0");
+        testsuits.push("mmap\0");
         testsuits.push("mount\0");
-        // testsuits.push("munmap\0");
+        testsuits.push("munmap\0");
         testsuits.push("openat\0");
         testsuits.push("open\0");
         testsuits.push("pipe\0");

@@ -71,6 +71,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 
 // TODO:文件所有权
 pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isize {
+    println!("sys_open");
     let task = current_task().unwrap();
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
@@ -87,8 +88,10 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
         ) {
             let fd = inner.alloc_fd();
             inner.fd_table[fd] = Some(FileClass::File(inode));
+            println!("open succ");
             fd as isize
         } else {
+            println!("open error");
             -1
         }
     } else {    
@@ -106,8 +109,10 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                         if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
                             let fd = inner.alloc_fd();
                             inner.fd_table[fd] = Some(FileClass::File(tar_f));
+                            println!("open succ");
                             return fd as isize
                         }else{
+                            println!("open error");
                             return -1;
                         }
                     }
@@ -346,6 +351,7 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
 }
 
 pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
+    println!("sys_fstat");
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();

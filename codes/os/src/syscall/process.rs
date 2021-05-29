@@ -282,3 +282,13 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     }
     // ---- release current PCB lock automatically
 }
+
+pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> isize {
+    let task = current_task().unwrap();
+    task.mmap(start, len, prot, flags, fd, off) as isize
+}
+
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    let task = current_task().unwrap();
+    task.munmap(start, len)
+}

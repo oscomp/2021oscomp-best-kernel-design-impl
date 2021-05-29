@@ -1,5 +1,5 @@
 use super::{PageTable, PageTableEntry, PTEFlags};
-use super::{VirtPageNum, VirtAddr, PhysPageNum, PhysAddr};
+use super::{VirtPageNum, VirtAddr, PhysPageNum, PhysAddr};          
 use super::{FrameTracker, frame_alloc};
 use super::{VPNRange, StepByOne};
 use alloc::collections::BTreeMap;
@@ -64,6 +64,18 @@ impl MemorySet {
             MapType::Framed,
             permission,
         ), None);
+    }
+    pub fn insert_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) {
+        self.push_mmap(MapArea::new(
+            start_va,
+            end_va,
+            MapType::Framed,
+            permission,
+        ), None);
+    }
+    fn push_mmap(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+        map_area.map(&mut self.page_table);
+        self.areas.push(map_area);
     }
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self.areas.iter_mut().enumerate()
