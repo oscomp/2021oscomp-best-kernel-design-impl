@@ -104,15 +104,6 @@ int8 fat32_read_test(const char *filename)
 {
     static uint32 cnt = 0;
 
-    // fat32_mkdir(AT_FDCWD, "test_mkdir", 1);
-    // printk_port("cwd: %d\n", cwd_first_clus);
-    // fat32_chdir("test_mkdir");
-    // uchar *test;
-    // test = fat32_getcwd(NULL, 10);
-    // printk_port("getcwd:%s\n", test);
-
-    // while(1);
-
     /* busy */
     for (int i = 1; i < NUM_MAX_TASK; ++i)
     {
@@ -142,12 +133,12 @@ int8 fat32_read_test(const char *filename)
             break;
     }
     if (index == 32){
-        // printk_port("<return>");
+        printk_port("<return>");
         return 0;
     }
     // no length or deleted
     if (p->length == 0) {
-        // printk_port("<cause 1>\n");
+        printk_port("<cause 1>\n");
         p = get_next_dentry(p, buf, &root_clus, &root_sec); 
         return 1;
     }
@@ -156,6 +147,7 @@ int8 fat32_read_test(const char *filename)
         // printk_port("<cause 2>\n");
         p = get_next_dentry(p, buf, &root_clus, &root_sec); return 1;
     }
+    printk_port("filename: %s\n", p->filename);
     /* debug return */
     uint8 i;
     for (i = 0; i < ACCEPT_NUM; ++i)
