@@ -161,6 +161,7 @@ int8 fat32_read_test(const char *filename)
         return 1;
     }
 
+    printk_port("filename: %s\n", p->filename);
     /* Now we must read file */
     // readfile
     uint32_t cluster = get_cluster_from_dentry(p);

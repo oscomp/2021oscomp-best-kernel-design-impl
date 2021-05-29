@@ -233,7 +233,6 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
         if (pcb[i].status == TASK_EXITED)
         {
-            printk_port("There\n");
             pcb_t *pcb_underinit = &pcb[i];
             init_pcb_default(pcb_underinit, USER_THREAD);
             /* set current_running pcb */
@@ -287,7 +286,6 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
                 current_running->status = TASK_BLOCKED;
                 list_add_tail(&current_running->list, &pcb[i].wait_list);
                 ret = pcb[i].pid;
-                printk_port("here!\n");
                 do_scheduler();
                 if (status_ker) WEXITSTATUS(status_ker,pcb[i].exit_status);
                 i = 1; // start from beginning when wake up
