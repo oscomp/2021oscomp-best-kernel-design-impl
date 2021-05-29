@@ -175,8 +175,8 @@ int8 fat32_read_test(const char *filename)
     if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
         !memcmp(p->filename, "MMAP", 4) || !memcmp(p->filename,"MOUNT",5) ||
         !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename, "UMOUNT", 6) || 
-        !memcmp(p->filename, "UNLINK", 6) || !memcmp(p->filename, "RUN", 3)){
-    // if (memcmp(p->filename, "PIPE", 4)){
+        !memcmp(p->filename, "RUN", 3)){
+    // if (memcmp(p->filename, "UNLINK", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -1402,9 +1402,9 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 
 /* search if name.file exists in dir now_clus */
 /* make sure buf size is BUFSIZE */
-/* return 0 if success, -1 if fail */
+/* return p if success, NULL if fail */
 /* ignore if search "." or ".." in root dir */
-int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos)
+dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos)
 {
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
     uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
@@ -1498,14 +1498,14 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
             pos->sec = top_sec;
             pos->len = top_len;
             kfree(filename);
-            return 0;
+            return p;
         }
         else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
             pos->offset = (void*)top_pt - (void*)buf;
             pos->sec = top_sec;
             pos->len = top_len;
             kfree(filename);
-            return 0;
+            return p;
         }
         else
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
@@ -1516,7 +1516,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
     }
 
     kfree(filename);
-    return -1;
+    return NULL;
 }
 
 /* get current working dir name */
@@ -1646,12 +1646,12 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
                                         ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
                                         SEARCH_DIR;
             // 1. found
-            if (!search2(temp1, now_clus, buf, search_mode, &ignore, &top)){ // can't be ignored, because you cant delete rootdir
+            if ((p = search2(temp1, now_clus, buf, search_mode, &ignore, &top)) != NULL){ // can't be ignored, because you cant delete rootdir
                 // (1) read in
-                isec_t now_sec = top.sec - top.offset / SECTOR_SIZE; // not real now_sec, but fisrt sec of this buf
+                isec_t now_sec = top.sec; // not real now_sec, but fisrt sec of this buf
                 now_clus = clus_of_sec(now_sec);
-                sd_read(buf, now_sec);
                 p = buf + top.offset;
+                sd_read(buf, now_sec);
                 // (2) write
                 while (top.len--){
                     p->filename[0] = 0xE5;
@@ -1659,11 +1659,13 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
                         sd_write(buf, now_sec);
                     p = get_next_dentry(p, buf, &now_clus, &now_sec); // you can find next buff location
                 }
+                sd_write(buf, now_sec);
                 kfree(buf);
-                return -1;
+                return 0;
             }
             // 2. not found
             else{
+                // printk_port("fail\n");
                     kfree(buf);
                     return -1;
             }
