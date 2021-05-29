@@ -104,6 +104,13 @@ int8 fat32_read_test(const char *filename)
 {
     static uint32 cnt = 0;
 
+    dentry_t *pp;
+    while (!is_zero_dentry(pp)){
+        printk_port("ffname: %s\n", pp->filename);
+        pp = get_next_dentry(pp, buf, &root_clus, &root_sec);
+    }
+    while(1);
+
     /* busy */
     for (int i = 1; i < NUM_MAX_TASK; ++i)
     {
@@ -367,7 +374,7 @@ int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 /* success return 0, fail return -1; */
 int16 fat32_pipe2(fd_num_t fd[], int32 mode)
 {
-    uint64_t pip_num;
+    pipe_num_t pip_num;
     for (pip_num = 0; pip_num < NUM_PIPE; ++pip_num)
     {
         if (pipes[pip_num].valid == PIPE_INVALID){
@@ -601,6 +608,17 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
     return -1;
 }
 
+/* read from pipe */
+/* spinlock */
+/* return read count */
+int64 pipe_read(uchar *buf, pipe_num_t pip_num)
+{
+    while (pipes[pip_num].top == 0)
+        do_scheduler();
+    memcpy(buf, pipes[pip_num].buff ,pipes[pip_num].top);
+    return pipes[pip_num].top;
+}
+
 /* success : read count */
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
 {
@@ -608,7 +626,8 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
 
-    // if (current_running->fd[fd_index].piped == FD_PIPED)
+    if (current_running->fd[fd_index].piped == FD_PIPED)
+        return pipe_read(buf, current_running->fd[fd_index].pip_num);
     // printk_port("fd: %d, length: %d\n", fd_index, current_running->fd[fd_index].length);
     size_t mycount = 0;
     size_t realcount = min(count, current_running->fd[fd_index].length);
