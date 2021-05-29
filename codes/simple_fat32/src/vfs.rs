@@ -21,7 +21,7 @@ pub struct VFile {
     long_pos_vec: Vec<(usize, usize)>, // 长目录项的位置<sector, offset>
     //first_cluster: u32,
     attribute:u8,
-    size:u32,
+    //size:u32,
     fs: Arc<RwLock<FAT32Manager>>,
     block_device: Arc<dyn BlockDevice>,
 }
@@ -51,7 +51,7 @@ impl VFile{
             long_pos_vec,
             //first_cluster,
             attribute,
-            size,
+            //size,
             fs,
             block_device
         }
@@ -341,15 +341,14 @@ impl VFile{
         //println!("file: {}, newsz = {}", self.get_name(), new_size);
         //println!("try lock");
         let first_cluster = self.first_cluster();
-        let old_sz = self.get_size();
+        let old_size = self.get_size();
         let manager_writer = self.fs.write();
         //println!("get lock");
-        let old_size = self.size;
         if new_size <= old_size {
             //println!("oldsz > newsz");
             return;
         }
-        let needed = manager_writer.cluster_num_needed(old_sz, new_size, self.is_dir(), first_cluster);
+        let needed = manager_writer.cluster_num_needed(old_size, new_size, self.is_dir(), first_cluster);
         //println!("needed = {}", needed);
         if needed == 0{
             if !self.is_dir() {
