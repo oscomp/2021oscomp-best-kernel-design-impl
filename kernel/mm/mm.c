@@ -28,8 +28,9 @@ ptr_t allocPage()
     // ret = memCurr - NORMAL_PAGE_SIZE;
     if (!list_empty(&freePageList)){
         ptr_t tmp = freePageList.next->ptr;
-        // prints("666:%x\n",tmp);
+        // prints("666 %lx\n",freePageList.next);
         list_del(freePageList.next);
+        // printk_port("777\n")
         ret = tmp;
     }
     else if (memCurr < memalloc){
@@ -38,7 +39,7 @@ ptr_t allocPage()
     }
     else
         assert(0);
-    printk_port("ret: %lx\n",ret);
+    // printk_port("ret: %lx\n",ret);
     return ret;
 }
 
