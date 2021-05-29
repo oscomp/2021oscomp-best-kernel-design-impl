@@ -123,6 +123,11 @@ typedef struct long_dentry{
 }long_dentry_t;
 #pragma pack()
 
+struct dir_pos{
+    dentry_t *dir;
+    isec_t sec;
+};
+
 typedef enum{
     SEARCH_FILE,
     SEARCH_DIR,
@@ -176,7 +181,6 @@ int16 fat32_open(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
 int8 fat32_read_test(const char *filename);
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count);
-dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore);
 int16 fat32_mkdir(fd_num_t dirfd, const uchar *path, uint32_t mode);
 int16 fat32_close(fd_num_t fd);
 int16 fat32_chdir(const char* path_t);
@@ -198,11 +202,15 @@ void init_inode();
 void init_pipe();
 
 
-dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
+dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore);
+int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore);
 uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_clus(uchar *buf);
+
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_t mode);
+
+dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
 uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags);
 int16 get_fd_index(fd_num_t fd);
 

@@ -186,6 +186,7 @@ int8 fat32_read_test(const char *filename)
     uint32_t sec = first_sec_of_clus(cluster); // make sure you know the start addr
     uchar *file = allocproc(); // make sure space is enough
     uchar *temp = file; // for future use
+    printk_port("1\n");
     for (uint32_t i = 0; i < p->length; )
     {
         // 1. read 1 cluster
@@ -200,6 +201,7 @@ int8 fat32_read_test(const char *filename)
         else
             sec += READ_BUF_CNT;
     }
+    printk_port("2\n");
 
     /* set elf_binary and length */
     _elf_binary = file;
@@ -1289,7 +1291,7 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
 
 /* search if name.file exists in dir now_clus */
 /* make sure buf size is BUFSIZE */
-/* return dentry point if success, NULL if fail */
+/* return BOTTOM dentry point if success, NULL if fail */
 /* ignore if search "." or ".." in root dir */
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore)
 {
@@ -1392,6 +1394,117 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
     return NULL;
 }
 
+/* search if name.file exists in dir now_clus */
+/* make sure buf size is BUFSIZE */
+/* return 0 if success, -1 if fail */
+/* ignore if search "." or ".." in root dir */
+int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore)
+{
+    // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
+    uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
+    sd_read(buf, now_sec);
+    // printk_port("5\n");
+    dentry_t *p = (dentry_t *)buf;
+    uchar *filename = kalloc();
+
+    *ignore = 0;
+
+    dentry_t *top; /* ret */
+    isec_t top_sec;
+
+    // dont care deleted dir
+    while (!is_zero_dentry(p)){
+
+        while (0xE5 == p->filename[0]){
+            p = get_next_dentry(p, buf, &now_clus, &now_sec);
+        }
+
+        top = p;
+        top_sec = now_sec;
+
+        long_dentry_t *q = (long_dentry_t *)p;
+        // if long dentry
+        if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
+            uint8 item_num = q->sequence & 0x0f; // entry num
+
+            /* get filename */
+            uint8 isbreak = 0;
+            uint16_t unich; // unicode
+
+            while (item_num--){
+                uint8 name_cnt = 0;
+                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
+                    // name1
+                    unich = q->name1[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
+                    name_cnt++;           
+                }
+                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
+                    // name1
+                    unich = q->name2[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
+                    name_cnt++;            
+                }
+                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
+                    // name1
+                    unich = q->name3[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);  
+                    name_cnt++;             
+                }
+                p = get_next_dentry(p, buf, &now_clus, &now_sec);
+                q = (long_dentry_t *)p;
+            }
+        }
+        // short dentry
+        else{
+            /* filename */
+            uint8 name_cnt = 0;
+            for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
+            {
+                if (p->filename[i] == ' ') break;
+                else filename[name_cnt++] = p->filename[i];
+            }
+            if (p->extname[0] != ' ') filename[name_cnt++] = '.';
+            for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
+            {
+                if (p->extname[i] == ' ') break;
+                else filename[name_cnt++] = p->extname[i];
+            }
+            filename[name_cnt++] = 0;
+        }
+
+        if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
+            kfree(filename);
+            return top;
+        }
+        else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
+            kfree(filename);
+            return top;
+        }
+        else
+            p = get_next_dentry(p, buf, &now_clus, &now_sec);
+    }
+    
+    if (mode == FILE_DIR && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus){
+        *ignore = 1;
+    }
+
+    kfree(filename);
+    return NULL;
+}
+
 /* get current working dir name */
 /* success: return pt to filename*/
 /* fail: NULL */
@@ -1476,13 +1589,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
 
     // uchar *buf = kalloc(); // for search
 
-    // int fd_index = get_fd_index(fd);
-    // if (fd != AT_FDCWD && fd_index < 0) return -1;
-
-    // /* for const */
-    // uchar path[strlen(path_const)+1];
-    // strcpy(path, path_const);
-
+    /* parse path */
     // uint8 isend = 0;
 
     // uchar *temp1, *temp2; // for path parse
@@ -1582,7 +1689,6 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
     //         }
     //     }
     //     else{
-    //         // printk_port("dirname: %s\n", temp1);
     //         // search dir until fail or goto search file
     //         if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
     //             now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
