@@ -195,7 +195,9 @@ int8 fat32_read_test(const char *filename)
         temp += BUFSIZE;
         // 2. compute sec number of next buf-size datablock
         if (i % CLUSTER_SIZE == 0){
+            printk_port("3\n");
             cluster = get_next_cluster(cluster);
+            printk_port("cluster is %d\n");
             sec = first_sec_of_clus(cluster);
         }
         else
@@ -1398,7 +1400,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 /* make sure buf size is BUFSIZE */
 /* return 0 if success, -1 if fail */
 /* ignore if search "." or ".." in root dir */
-int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore)
+int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos)
 {
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
     uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
@@ -1487,11 +1489,11 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
 
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
             kfree(filename);
-            return top;
+            return 0;
         }
         else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
             kfree(filename);
-            return top;
+            return 0;
         }
         else
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
@@ -1502,7 +1504,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
     }
 
     kfree(filename);
-    return NULL;
+    return -1;
 }
 
 /* get current working dir name */
