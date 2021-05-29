@@ -716,7 +716,6 @@ impl VFile{
                 long_ent.clear();
             });
         }
-        
         self.modify_short_dirent(|short_ent:&mut ShortDirEntry|{
             short_ent.clear();
         });
