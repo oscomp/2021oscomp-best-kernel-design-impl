@@ -104,7 +104,7 @@ int8 fat32_read_test(const char *filename)
 {
     static uint32 cnt = 0;
 
-    dentry_t *pp;
+    dentry_t *pp = buf;
     while (!is_zero_dentry(pp)){
         printk_port("ffname: %s\n", pp->filename);
         pp = get_next_dentry(pp, buf, &root_clus, &root_sec);
@@ -615,8 +615,10 @@ int64 pipe_read(uchar *buf, pipe_num_t pip_num)
 {
     while (pipes[pip_num].top == 0)
         do_scheduler();
-    memcpy(buf, pipes[pip_num].buff ,pipes[pip_num].top);
-    return pipes[pip_num].top;
+    uint32_t count = pipes[pip_num].top;
+    memcpy(buf, pipes[pip_num].buff, count);
+    pipes[pip_num].top = 0;
+    return count;
 }
 
 /* success : read count */
@@ -656,6 +658,16 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     return realcount;
 }
 
+/* read from pipe */
+/* spinlock */
+/* return read count */
+int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
+{
+    memcpy(pipes[pip_num].buff, buf, count);
+    pipes[pip_num].top = count;
+    return count;
+}
+
 /* write count bytes from buff to file in fd */
 /* return count: success
           -1: fail
@@ -672,6 +684,9 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         return printk_port(stdout_buf);
     }
     else{
+        if (current_running->fd[fd_index].piped == FD_PIPED)
+            return pipe_write(buff, current_running->fd[fd_index].pip_num,count);
+
         size_t mycount = 0;
         size_t realcount = min(count, current_running->fd[fd_index].length);
         uchar *tempbuff = kalloc();
