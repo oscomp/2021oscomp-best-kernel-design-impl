@@ -25,9 +25,9 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  24
-uchar accept_table[24][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
-    {"READ"}, {"WRITE"} ,{"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
+#define ACCEPT_NUM  23
+uchar accept_table[23][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+    {"READ"}, {"WRITE"} , {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
     {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
 
 
@@ -104,12 +104,12 @@ int8 fat32_read_test(const char *filename)
 {
     static uint32 cnt = 0;
 
-    dentry_t *pp = buf;
-    while (!is_zero_dentry(pp)){
-        printk_port("ffname: %s\n", pp->filename);
-        pp = get_next_dentry(pp, buf, &root_clus, &root_sec);
-    }
-    while(1);
+    // dentry_t *pp = buf;
+    // while (!is_zero_dentry(pp)){
+    //     printk_port("ffname: %s\n", pp->filename);
+    //     pp = get_next_dentry(pp, buf, &root_clus, &root_sec);
+    // }
+    // while(1);
 
     /* busy */
     for (int i = 1; i < NUM_MAX_TASK; ++i)
@@ -131,15 +131,8 @@ int8 fat32_read_test(const char *filename)
     /* now we are at a real dentry */
 
     // 0x00: time to end
-    uchar *n = (uchar *)p;
     uint8_t index;
-    for (index = 0; index < 32; ++index)
-    {
-        // prints("<n: %d>\n", *n);
-        if (*n++ != 0)
-            break;
-    }
-    if (index == 32){
+    if (is_zero_dentry(p)){
         printk_port("<return>");
         return 0;
     }
