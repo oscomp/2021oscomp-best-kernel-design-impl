@@ -83,4 +83,6 @@ void kfree(void *p);
 void *allocproc();
 void allocfree();
 
+void init_recyc();
+
 #endif /* MM_H */

@@ -15,11 +15,21 @@ static ptr_t memalloc = 0xffffffff80600000lu;
 
 static LIST_HEAD(freePageList);
 static LIST_HEAD(shmPageList);
+static LIST_HEAD(freePagebackupList);
 LIST_HEAD(swapPageList);
 LIST_HEAD(availableSwapSpace);
 
 static uint64_t swap_page();
 static uint64_t find_swap_page_kva(uint64_t pgdir);
+
+#define NUM_REC 1024
+list_node_t pageRecyc[NUM_REC];
+
+void init_recyc()
+{
+    for (uint32 i = 0; i < NUM_REC; ++i)
+        list_add_tail(&pageRecyc[i], &freePagebackupList);
+}
 
 ptr_t allocPage()
 {
@@ -27,12 +37,13 @@ ptr_t allocPage()
     // memCurr += NORMAL_PAGE_SIZE;
     // ret = memCurr - NORMAL_PAGE_SIZE;
     if (!list_empty(&freePageList)){
-        ptr_t tmp = freePageList.next->ptr;
+        list_node_t *tmp = freePageList.next;
         // prints("666 %lx\n",freePageList.next);
         printk_port("dest: %lx\n", freePageList.next);
-        list_del(freePageList.next);
+        list_del(tmp);
+        list_add_tail(tmp, &freePagebackupList);
         // printk_port("777\n");
-        ret = tmp;
+        ret = tmp->ptr;
     }
     else if (memCurr < memalloc){
         memCurr += NORMAL_PAGE_SIZE;
@@ -190,9 +201,10 @@ void freePage(ptr_t baseAddr)
     }
     if (clear){
         // printk_port("sizeof : %d\n", sizeof(list_node_t));
-        list_node_t* tmp = (list_node_t *)kmalloc(sizeof(list_node_t));
+        list_node_t *tmp = freePagebackupList.next;
         // printk_port("addr: %lx\n", tmp);
-        tmp->next=tmp;tmp->prev=tmp;tmp->ptr=baseAddr;
+        tmp->ptr = baseAddr;
+        list_del(tmp);
         list_add_tail(tmp,&freePageList);
     }
     // vt100_move_cursor(1,10);

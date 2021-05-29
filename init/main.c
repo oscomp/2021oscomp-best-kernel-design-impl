@@ -189,6 +189,8 @@ int main()
 
     printk("> [INIT] IOREMAP initialized successfully.\n\r");
 
+    init_recyc();
+
     share_pgtable(shell_pgdir,pa2kva(PGDIR_PA));
     printk("> [INIT] SHARE PGTABLE initialized successfully.\n\r");
 
