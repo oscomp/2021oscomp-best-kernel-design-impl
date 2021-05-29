@@ -275,8 +275,8 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
 
 pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
-    uint64_t status_ker = NULL;
-    if (status) status_ker = get_kva_of(status,current_running->pgdir);
+    uint64_t status_ker_va = NULL;
+    if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
     pid_t ret = -1;
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
     {
@@ -287,7 +287,7 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
                 list_add_tail(&current_running->list, &pcb[i].wait_list);
                 ret = pcb[i].pid;
                 do_scheduler();
-                if (status_ker) WEXITSTATUS(status_ker,pcb[i].exit_status);
+                if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
                 i = 1; // start from beginning when wake up
             }
             else

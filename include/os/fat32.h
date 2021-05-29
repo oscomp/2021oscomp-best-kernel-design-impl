@@ -90,6 +90,7 @@ struct linux_dirent64 {
 #define PIPE_BUF_SIZE 512
 #define PIPE_INVALID 0
 #define PIPE_VALID 1
+#define PIPE_ERROR 2
 
 #define FD_UNPIPED 0
 #define FD_PIPED 1
@@ -98,8 +99,11 @@ typedef struct pipe{
     fd_num_t fd[2]; // 0 out, 1 in
     char buff[PIPE_BUF_SIZE];
     uint32 top; // buff top
+    uint32 bottom; // buff bottom
     pid_t pid; // parent id
-    uint8 valid;
+    list_head wait_list;
+    uint8 r_valid;
+    uint8 w_valid;
 }pipe_t;
 
 #define LONG_DENTRY_NAME1_LEN 5
@@ -124,7 +128,8 @@ typedef struct long_dentry{
 #pragma pack()
 
 struct dir_pos{
-    uint64_t dir;
+    uint64_t offset;
+    size_t len;
     isec_t sec;
 };
 
@@ -212,7 +217,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
 
 dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
 uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags);
-int16 get_fd_index(fd_num_t fd);
+int16 get_fd_index(fd_num_t fd, void *pcb);
 
 uchar unicode2char(uint16_t unich);
 unicode_t char2unicode(char ch);

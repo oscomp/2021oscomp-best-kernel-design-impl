@@ -88,7 +88,8 @@ uint8_t fat32_init()
 void init_pipe()
 {
     for (int i = 0; i < NUM_PIPE; ++i){
-        pipes[i].valid = PIPE_INVALID;
+        pipes[i].r_valid = PIPE_INVALID;
+        pipes[i].w_valid = PIPE_INVALID;
     }
 }
 
@@ -173,9 +174,9 @@ int8 fat32_read_test(const char *filename)
 
     if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
         !memcmp(p->filename, "MMAP", 4) || !memcmp(p->filename,"MOUNT",5) ||
-        !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename,"PIPE", 4) ||
-        !memcmp(p->filename, "UMOUNT", 6) || !memcmp(p->filename, "UNLINK", 6) ||
-        !memcmp(p->filename, "RUN", 3)){
+        !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename, "UMOUNT", 6) || 
+        !memcmp(p->filename, "UNLINK", 6) || !memcmp(p->filename, "RUN", 3)){
+    // if (memcmp(p->filename, "PIPE", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -278,7 +279,7 @@ int8 fat32_read_test(const char *filename)
 int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 {
     uint8 fd_index;
-    if ((fd_index = get_fd_index(fd)) == -1)
+    if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
 
     ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
@@ -405,9 +406,9 @@ int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 /* success return 0, fail return -1; */
 int16 fat32_pipe2(fd_num_t fd[], int32 mode)
 {
-    int16 fd_index[2] = {-1};
+    int16 fd_index[2] = {-1,-1};
     for (int i = 0; i < NUM_FD; ++i)
-        if (current_running->fd[i].used == FD_UNUSED)
+        if (current_running->fd[i].used == FD_UNUSED){
             if (fd_index[0] == -1){
                 fd[0] = current_running->fd[i].fd_num;
                 fd_index[0] = i;
@@ -417,16 +418,20 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode)
                 fd_index[1] = i;
                 break;
             }
+        }
 
     pipe_num_t pip_num;
     for (pip_num = 0; pip_num < NUM_PIPE; ++pip_num)
     {
-        if (pipes[pip_num].valid == PIPE_INVALID){
+        if (pipes[pip_num].r_valid == PIPE_INVALID && pipes[pip_num].w_valid == PIPE_INVALID){
             pipes[pip_num].fd[0] = fd[0];
             pipes[pip_num].fd[1] = fd[1];
             pipes[pip_num].top = 0;
+            pipes[pip_num].bottom = 0;
             pipes[pip_num].pid = current_running->pid;
-            pipes[pip_num].valid = PIPE_VALID;
+            init_list_head(&pipes[pip_num].wait_list);
+            pipes[pip_num].r_valid = PIPE_ERROR; // cannot be used when error
+            pipes[pip_num].w_valid = PIPE_ERROR;
             break;
         }
     }
@@ -439,7 +444,6 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode)
         current_running->fd[fd_index[i]].piped = FD_PIPED;
         current_running->fd[fd_index[i]].pip_num = pip_num;
     }
-    printk_port("num: %d, 1:%d, 2:%d\n", pip_num, fd[0], fd[1]);
 }
 
 /* write count bytes from buff to file in fd */
@@ -448,7 +452,7 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode)
         */
 int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
-    int fd_index = get_fd_index(fd);
+    int fd_index = get_fd_index(fd, current_running);
     if (fd != AT_FDCWD && fd_index < 0) return -1;
 
     /* for const */
@@ -574,7 +578,7 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
 int16 fat32_fstat(fd_num_t fd, struct kstat *kst)
 {
     uint8 fd_index;
-    if ((fd_index = get_fd_index(fd)) == -1)
+    if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
     /* exists, now read fd info */
     kst->st_dev = current_running->fd[fd_index].dev;
@@ -601,7 +605,7 @@ int16 fat32_fstat(fd_num_t fd, struct kstat *kst)
 fd_num_t fat32_dup(fd_num_t fd)
 {
     uint8_t fd_index;
-    if ((fd_index = get_fd_index(fd)) == -1) // old doesn't exists, cannot dup
+    if ((fd_index = get_fd_index(fd, current_running)) == -1) // old doesn't exists, cannot dup
         return -1;
     for (int i = 0; i < NUM_FD; ++i)
         // find an available one, i is index
@@ -621,9 +625,9 @@ fd_num_t fat32_dup(fd_num_t fd)
 fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
 {
     uint8_t fd_index;
-    if ((fd_index = get_fd_index(old)) == -1) // old not exist
+    if ((fd_index = get_fd_index(old, current_running)) == -1) // old not exist
         return -1;
-    if (get_fd_index(new) != -1)// new exists
+    if (get_fd_index(new, current_running) != -1)// new exists
         return -1;
 
     /* Now new doesn't exists, which means we can use it */
@@ -640,28 +644,29 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
 }
 
 /* read from pipe */
-/* spinlock */
 /* return read count */
-int64 pipe_read(uchar *buf, pipe_num_t pip_num)
+int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
 {
-    printk_port("readnum:%d\n",pip_num);
-    while (pipes[pip_num].top == 0)
+    while (pipes[pip_num].r_valid != PIPE_INVALID && pipes[pip_num].top == pipes[pip_num].bottom){
+        do_block(&current_running->list, &pipes[pip_num].wait_list);
         do_scheduler();
-    uint32_t count = pipes[pip_num].top;
-    memcpy(buf, pipes[pip_num].buff, count);
-    pipes[pip_num].top = 0;
-    return count;
+    }
+
+    uint32_t readsize = min(pipes[pip_num].top - pipes[pip_num].bottom, count); // neq count
+    memcpy(buf, pipes[pip_num].buff + pipes[pip_num].bottom, readsize); // maybe exceed?
+    pipes[pip_num].bottom += readsize;
+    return readsize;
 }
 
 /* success : read count */
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
 {
-    uint8_t fd_index = get_fd_index(fd);
+    uint8_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
 
     if (current_running->fd[fd_index].piped == FD_PIPED)
-        return pipe_read(buf, current_running->fd[fd_index].pip_num);
+        return pipe_read(buf, current_running->fd[fd_index].pip_num, count);
     // printk_port("fd: %d, length: %d\n", fd_index, current_running->fd[fd_index].length);
     size_t mycount = 0;
     size_t realcount = min(count, current_running->fd[fd_index].length);
@@ -690,15 +695,19 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     return realcount;
 }
 
-/* read from pipe */
-/* spinlock */
-/* return read count */
+/* write pipe */
+/* return write count */
 int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
 {
-    printk_port("writenum:%d, count: %d\n", pip_num, count);
-    memcpy(pipes[pip_num].buff, buf, count);
-    pipes[pip_num].top = count;
-    return count;
+    if (pipes[pip_num].w_valid != PIPE_VALID)
+        return -1;
+    if (pipes[pip_num].top + count > PIPE_BUF_SIZE)
+        return -1;
+    memcpy(pipes[pip_num].buff + pipes[pip_num].top, buf, count);
+    pipes[pip_num].top += count;
+    if (!list_empty(&pipes[pip_num].wait_list))
+        do_unblock(pipes[pip_num].wait_list.next);
+    return count; // write count
 }
 
 /* write count bytes from buff to file in fd */
@@ -707,7 +716,7 @@ int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
         */
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
 {
-    uint8 fd_index = get_fd_index(fd);
+    uint8 fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0) return -1;
 
     if (count == 0) return 0;
@@ -718,7 +727,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
     }
     else{
         if (current_running->fd[fd_index].piped == FD_PIPED)
-            return pipe_write(buff, current_running->fd[fd_index].pip_num,count);
+            return pipe_write(buff, current_running->fd[fd_index].pip_num, count);
 
         size_t mycount = 0;
         size_t realcount = min(count, current_running->fd[fd_index].length);
@@ -825,7 +834,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
             new_dentry.filename[i] = (*(temp1+i) <= 'z' && *(temp1+i) >= 'a')? *(temp1+i) - 'a' + 'A' : *(temp1+i);
         new_dentry.filename[6] = '~'; new_dentry.filename[7] = '1'; // dont think about 2 or more
     }
-    // printk_port("name : %s\n",new_dentry.filename);
+
     // extname:
     if (mode == FILE_DIR || noextname)
         for (uint i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
@@ -1064,7 +1073,7 @@ int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
         if (dirfd == AT_FDCWD)
             now_clus = cwd_first_clus;
         else{
-            int16 dirfd_index = get_fd_index(dirfd);
+            int16 dirfd_index = get_fd_index(dirfd, current_running);
             if (current_running->fd[dirfd_index].used)
                 now_clus = current_running->fd[dirfd_index].first_clus_num;
             else{
@@ -1408,6 +1417,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
 
     dentry_t *top_pt; /* ret */
     isec_t top_sec;
+    size_t top_len;
 
     // dont care deleted dir
     while (!is_zero_dentry(p)){
@@ -1423,7 +1433,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
         // if long dentry
         if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
             uint8 item_num = q->sequence & 0x0f; // entry num
-
+            top_len = item_num + 1;
             /* get filename */
             uint8 isbreak = 0;
             uint16_t unich; // unicode
@@ -1466,6 +1476,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
         }
         // short dentry
         else{
+            top_len = 1;
             /* filename */
             uint8 name_cnt = 0;
             for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
@@ -1483,14 +1494,16 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
         }
 
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
-            pos->dir = (void*)top_pt - (void*)buf;
+            pos->offset = (void*)top_pt - (void*)buf;
             pos->sec = top_sec;
+            pos->len = top_len;
             kfree(filename);
             return 0;
         }
         else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
-            pos->dir = (void*)top_pt - (void*)buf;
+            pos->offset = (void*)top_pt - (void*)buf;
             pos->sec = top_sec;
+            pos->len = top_len;
             kfree(filename);
             return 0;
         }
@@ -1581,127 +1594,92 @@ int16 fat32_link()
     return -1;
 }
 
+/* remove file */
+/* success return 0, fail return -1 */
 int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
 {
-    return 1;
+    int fd_index = get_fd_index(dirfd, current_running);
+    if (dirfd != AT_FDCWD && fd_index < 0) return -1;
 
-    // uchar path[strlen(path_t) + 1];
-    // strcpy(path, path_t);
+    uchar path[strlen(path_t) + 1];
+    strcpy(path, path_t);
 
-    // uchar *buf = kalloc(); // for search
+    uchar *buf = kalloc(); // for search
 
     /* parse path */
-    // uint8 isend = 0;
+    uint8 isend = 0;
 
-    // uchar *temp1, *temp2; // for path parse
-    // uint32_t now_clus; // now cluster num
+    uchar *temp1, *temp2; // for path parse
+    uint32_t now_clus; // now cluster num
 
-    // dentry_t *p = (dentry_t *)buf; // for loop
+    dentry_t *p = (dentry_t *)buf; // for loop
 
-    // if (path[0] == '/'){
-    //     now_clus = fat.bpb.root_clus;
-    //     temp2 = &path[1], temp1 = &path[1];
-    // }
-    // else{
-    //     if (fd == AT_FDCWD)
-    //         now_clus = cwd_first_clus;
-    //     else
-    //     {
-    //         if (current_running->fd[fd_index].used)
-    //             now_clus = current_running->fd[fd_index].first_clus_num;
-    //         else
-    //             return -1;
-    //     }
-    //     temp2 = path, temp1 = path;
-    // }
+    if (path[0] == '/'){
+        now_clus = fat.bpb.root_clus;
+        temp2 = &path[1], temp1 = &path[1];
+    }
+    else{
+        if (dirfd == AT_FDCWD)
+            now_clus = cwd_first_clus;
+        else
+        {
+            if (current_running->fd[fd_index].used)
+                now_clus = current_running->fd[fd_index].first_clus_num;
+            else
+                return -1;
+        }
+        temp2 = path, temp1 = path;
+    }
 
-    // while (1)
-    // {
-    //     while (*temp2 != '/' && *temp2 != '\0') temp2++;
-    //     if (*temp2 == '\0' || *(temp2+1) == '\0' ) isend = 1;
-    //     *temp2 = '\0';
+    while (1)
+    {
+        while (*temp2 != '/' && *temp2 != '\0') temp2++;
+        if (*temp2 == '\0' || *(temp2+1) == '\0' ) isend = 1;
+        *temp2 = '\0';
 
-    //     uint8 ignore;
-        // struct dir_pos top;
+        uint8 ignore;
+        struct dir_pos top;
 
-    //     if (isend){
-    //         // success
-    //         // printk_port("filename: %s\n", temp1);
-    //         search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
-    //                                     ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
-    //                                     SEARCH_DIR;
-    //         // 1. found
-    //         if ((p = search(temp1, now_clus, buf, search_mode, &ignore, &top)) != NULL || ignore == 1){
-    //             // printk_port("p:%lx\n",p);
-    //             // printk_port("length: %d\n", p->length);
-    //             // printk_port("clus: %d, ignore :%d\n", get_cluster_from_dentry(p), ignore);
-    //             if (ignore){
-    //                 // use buf to non-null
-    //                 p = buf;
-    //                 set_dentry_cluster(p, now_clus);
-    //                 p->length = 0;
-    //                 p->create_time_ms = 0;
-    //                 p->create_time = 0x53D4; //10:30:40
-    //                 p->create_date = 0x52BB; // 2021/5/27
-    //                 p->last_visited = 0x52BB;
-    //                 p->last_modified_time = 0x53D3;   //23:22
-    //                 p->last_modified_date = 0x52BB;     //25:24
-    //             }
-
-    //             for (uint8 i = 0; i < NUM_FD; ++i)
-    //             {
-    //                 if (!set_fd_from_dentry(current_running, i, p, flags)){                        
-    //                     kfree(buf);
-    //                     return current_running->fd[i].fd_num; // use i as index
-    //                 }
-    //             }
-    //             // no available dx
-    //             kfree(buf);
-    //             return -1;
-    //         }
-    //         // 2.create
-    //         else{
-    //             if (search_mode == SEARCH_DIR || (flags & O_CREATE) == 0){
-    //                 kfree(buf);
-    //                 return -1;
-    //             }// you cant mkdir here! BUT you can create a file
-    //             else{
-    //                 ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
-    //                 p = buf;
-    //                 set_dentry_cluster(p, new_clus);
-    //                 p->length = 0;
-    //                 p->create_time_ms = 0;
-    //                 p->create_time = 0x53D4; //10:30:40
-    //                 p->create_date = 0x52BB; // 2021/5/27
-    //                 p->last_visited = 0x52BB;
-    //                 p->last_modified_time = 0x53D3;   //23:22
-    //                 p->last_modified_date = 0x52BB;     //25:24
-
-    //                 for (uint8 i = 0; i < NUM_FD; ++i)
-    //                 {
-    //                     if (!set_fd_from_dentry(current_running, i, p, flags)){ //new file length = 0
-    //                         kfree(buf);
-    //                         return current_running->fd[i].fd_num; // use i as index
-    //                     }
-    //                 }
-    //                 // no available dx
-    //                 kfree(buf);
-    //                 return -1;
-    //             }
-    //         }
-    //     }
-    //     else{
-    //         // search dir until fail or goto search file
-    //         if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore, &top)) != NULL || ignore == 1){
-    //             now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
-    //             ++temp2;
-    //             temp1 = temp2;
-    //             continue ;
-    //         }
-    //         kfree(buf);
-    //         return -1;
-    //     }
-    // }
+        if (isend){
+            // success
+            search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
+                                        ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
+                                        SEARCH_DIR;
+            // 1. found
+            if (!search2(temp1, now_clus, buf, search_mode, &ignore, &top)){ // can't be ignored, because you cant delete rootdir
+                // (1) read in
+                isec_t now_sec = top.sec - top.offset / SECTOR_SIZE; // not real now_sec, but fisrt sec of this buf
+                now_clus = clus_of_sec(now_sec);
+                sd_read(buf, now_sec);
+                p = buf + top.offset;
+                // (2) write
+                while (top.len--){
+                    p->filename[0] = 0xE5;
+                    if (p + 1 == buf + BUFSIZE)
+                        sd_write(buf, now_sec);
+                    p = get_next_dentry(p, buf, &now_clus, &now_sec); // you can find next buff location
+                }
+                kfree(buf);
+                return -1;
+            }
+            // 2. not found
+            else{
+                    kfree(buf);
+                    return -1;
+            }
+        }
+        else{
+            // search dir until fail or goto search file
+            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+                now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
+                ++temp2;
+                temp1 = temp2;
+                continue ;
+            }
+            kfree(buf);
+            return -1;
+        }
+    }
 }
 
 
@@ -1729,10 +1707,19 @@ int64 fat32_munmap()
 /* success return 0, fail return 1*/
 int16 fat32_close(fd_num_t fd)
 {
-    uint8 fd_index = get_fd_index(fd);
+    uint8 fd_index = get_fd_index(fd, current_running);
+    if (fd_index == -1) return 1;
     if (current_running->fd[fd_index].used)
     {
         current_running->fd[fd_index].used = FD_UNUSED;
+        if (current_running->fd[fd_index].piped == FD_PIPED)
+            /* not that fd[0] != fd[1] , and if this fd is piped, its fd_num must equal to fd[0] or fd[1]*/
+            if (pipes[current_running->fd[fd_index].pip_num].fd[0] == fd){
+                pipes[current_running->fd[fd_index].pip_num].w_valid--; // ERROR to VALID, VALID to INVALID
+            }
+            else{
+                pipes[current_running->fd[fd_index].pip_num].r_valid--;// ERROR to VALID, VALID to INVALID
+            }
         return 0;
     }
     else
@@ -1792,6 +1779,8 @@ uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flag
 
     pcb_under->fd[i].used = 1;
 
+    pcb_under->fd[i].piped = FD_UNPIPED;
+
     pcb_under->fd[i].nlink = 1;
 
     pcb_under->fd[i].uid = 0;
@@ -1813,11 +1802,12 @@ uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flag
 
 /* return file descriptor index whose fd_num = fd*/
 /* Not found return -1 */
-int16 get_fd_index(fd_num_t fd)
+int16 get_fd_index(fd_num_t fd, void *arg)
 {
+    pcb_t *pcb = (pcb_t *)arg;
     for (int i = 0; i < NUM_FD; ++i)
     {
-        if (current_running->fd[i].used && current_running->fd[i].fd_num == fd){
+        if (pcb->fd[i].used && pcb->fd[i].fd_num == fd){
             return i;
         }
     }
