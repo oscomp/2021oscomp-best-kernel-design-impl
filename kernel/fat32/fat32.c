@@ -15,7 +15,7 @@
 #define READ_BUF_CNT (BUFSIZE/SECTOR_SIZE)
 
 fat_t fat;
-uchar buf[NORMAL_PAGE_SIZE];
+uchar root_buf[NORMAL_PAGE_SIZE];
 uchar filebuf[NORMAL_PAGE_SIZE];
 ientry_t cwd_first_clus;
 ientry_t cwd_clus, root_clus, root_first_clus;
@@ -25,9 +25,9 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  23
-uchar accept_table[23][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
-    {"READ"}, {"WRITE"} , {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
+#define ACCEPT_NUM  24
+uchar accept_table[24][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+    {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
     {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
 
 
@@ -92,7 +92,7 @@ void init_inode()
     root_clus = cwd_clus;
     root_sec = cwd_sec;
     /* from root sector read buffsize */
-    sd_read(buf, cwd_sec);    
+    sd_read(root_buf, cwd_sec);    
 }
 
 /* read file from sd card and put it into readyqueue*/
@@ -123,31 +123,30 @@ int8 fat32_read_test(const char *filename)
 
 #ifdef K210
 
-    static dentry_t *p = (dentry_t *)buf;
+    static dentry_t *p = (dentry_t *)root_buf;
     // 0x0f: long dentry
     while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
-        p = get_next_dentry(p, buf, &root_clus, &root_sec);
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
     }
     /* now we are at a real dentry */
 
     // 0x00: time to end
     uint8_t index;
     if (is_zero_dentry(p)){
-        printk_port("<return>");
+        printk_port("<return success>");
         return 0;
     }
     // no length or deleted
     if (p->length == 0) {
         printk_port("<cause 1>\n");
-        p = get_next_dentry(p, buf, &root_clus, &root_sec); 
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec); 
         return 1;
     }
     // not rw-able
     if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
         // printk_port("<cause 2>\n");
-        p = get_next_dentry(p, buf, &root_clus, &root_sec); return 1;
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec); return 1;
     }
-    printk_port("filename: %s\n", p->filename);
     /* debug return */
     uint8 i;
     for (i = 0; i < ACCEPT_NUM; ++i)
@@ -158,7 +157,7 @@ int8 fat32_read_test(const char *filename)
         }
     }
     if (i == ACCEPT_NUM){
-        p = get_next_dentry(p, buf, &root_clus, &root_sec);
+        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
 
@@ -225,7 +224,7 @@ int8 fat32_read_test(const char *filename)
             #ifdef K210
             // free resource
             allocfree();
-            p = get_next_dentry(p, buf, &root_clus, &root_sec);
+            p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
             #endif
 
             return -1;
@@ -621,8 +620,8 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
 
-    if (current_running->fd[fd_index].piped == FD_PIPED)
-        return pipe_read(buf, current_running->fd[fd_index].pip_num);
+    // if (current_running->fd[fd_index].piped == FD_PIPED)
+    //     return pipe_read(buf, current_running->fd[fd_index].pip_num);
     // printk_port("fd: %d, length: %d\n", fd_index, current_running->fd[fd_index].length);
     size_t mycount = 0;
     size_t realcount = min(count, current_running->fd[fd_index].length);
@@ -677,8 +676,8 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         return printk_port(stdout_buf);
     }
     else{
-        if (current_running->fd[fd_index].piped == FD_PIPED)
-            return pipe_write(buff, current_running->fd[fd_index].pip_num,count);
+        // if (current_running->fd[fd_index].piped == FD_PIPED)
+        //     return pipe_write(buff, current_running->fd[fd_index].pip_num,count);
 
         size_t mycount = 0;
         size_t realcount = min(count, current_running->fd[fd_index].length);
@@ -969,7 +968,7 @@ int16 fat32_chdir(const char* path_t)
 
         if (isend){
             // 1. not found
-            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) == NULL && ignore == 0){
+            if ((p = search(temp1, now_clus, buff, SEARCH_DIR, &ignore)) == NULL && ignore == 0){
                 // no available dx
                 kfree(buff);
                 return -1;
@@ -987,7 +986,7 @@ int16 fat32_chdir(const char* path_t)
         }
         else{
             // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, buff, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
                 ++temp2;
                 temp1 = temp2;
