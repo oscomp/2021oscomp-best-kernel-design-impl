@@ -3,6 +3,7 @@ mod address;
 mod frame_allocator;
 mod page_table;
 mod memory_set;
+mod vma;
 
 use page_table::PTEFlags;
 use address::VPNRange;
@@ -18,6 +19,7 @@ pub use page_table::{
     UserBuffer,
     UserBufferIterator,
 };
+pub use vma::{MmapArea, MmapSpace};
 pub use memory_set::{MemorySet, KERNEL_SPACE, MapPermission, kernel_token};
 pub use memory_set::remap_test;
 

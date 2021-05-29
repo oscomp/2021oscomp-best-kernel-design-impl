@@ -166,6 +166,12 @@ impl OSInode {
             }
         }
     }
+
+    pub fn set_offset(& self, off:usize){
+        let mut inner = self.inner.lock();
+        inner.offset = off;
+    }
+
     // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
     //     let inner = self.inner.lock();
     //     if whence == SeekWhence::SEEK_END {
@@ -302,6 +308,7 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
     if flags.contains(OpenFlags::CREATE) {
         if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // clear size
+            println!("clear size");
             inode.clear();
             Some(Arc::new(OSInode::new(
                 readable,
@@ -422,6 +429,7 @@ impl File for OSInode {
         total_read_size
     }
     fn write(&self, buf: UserBuffer) -> usize {
+        println!("ino_write");
         let mut inner = self.inner.lock();
         let mut total_write_size = 0usize;
         for slice in buf.buffers.iter() {
