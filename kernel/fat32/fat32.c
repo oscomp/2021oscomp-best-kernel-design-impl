@@ -25,8 +25,8 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  24
-uchar accept_table[24][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+#define ACCEPT_NUM  23
+uchar accept_table[23][10] = {{"WAITPID"}, {"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
     {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
      {"EXIT"},{"TIMES"}, {"SLEEP"}};
 
