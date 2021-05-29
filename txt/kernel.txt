@@ -15778,7 +15778,7 @@ ffffffff8040b32c:	47bd                	li	a5,15
 ffffffff8040b32e:	e8e7f9e3          	bgeu	a5,a4,ffffffff8040b1c0 <fat32_read_test+0x42e>
 ffffffff8040b332:	00005617          	auipc	a2,0x5
 ffffffff8040b336:	33660613          	addi	a2,a2,822 # ffffffff80410668 <__FUNCTION__.2073>
-ffffffff8040b33a:	0ee00593          	li	a1,238
+ffffffff8040b33a:	0e900593          	li	a1,233
 ffffffff8040b33e:	00005517          	auipc	a0,0x5
 ffffffff8040b342:	2ba50513          	addi	a0,a0,698 # ffffffff804105f8 <__FUNCTION__.2126+0x188>
 ffffffff8040b346:	868ff0ef          	jal	ra,ffffffff8040a3ae <_panic>
@@ -18107,7 +18107,7 @@ ffffffff8040cf3a:	f9843783          	ld	a5,-104(s0)
 ffffffff8040cf3e:	ef89                	bnez	a5,ffffffff8040cf58 <_create_new+0x128>
 ffffffff8040cf40:	00003617          	auipc	a2,0x3
 ffffffff8040cf44:	73860613          	addi	a2,a2,1848 # ffffffff80410678 <__FUNCTION__.2276>
-ffffffff8040cf48:	30800593          	li	a1,776
+ffffffff8040cf48:	30300593          	li	a1,771
 ffffffff8040cf4c:	00003517          	auipc	a0,0x3
 ffffffff8040cf50:	6ac50513          	addi	a0,a0,1708 # ffffffff804105f8 <__FUNCTION__.2126+0x188>
 ffffffff8040cf54:	c5afd0ef          	jal	ra,ffffffff8040a3ae <_panic>
@@ -20697,7 +20697,7 @@ ffffffff8040eeee:	fe843783          	ld	a5,-24(s0)
 ffffffff8040eef2:	ef89                	bnez	a5,ffffffff8040ef0c <fat32_getcwd+0xa8>
 ffffffff8040eef4:	00001617          	auipc	a2,0x1
 ffffffff8040eef8:	79460613          	addi	a2,a2,1940 # ffffffff80410688 <__FUNCTION__.2535>
-ffffffff8040eefc:	56f00593          	li	a1,1391
+ffffffff8040eefc:	56a00593          	li	a1,1386
 ffffffff8040ef00:	00001517          	auipc	a0,0x1
 ffffffff8040ef04:	6f850513          	addi	a0,a0,1784 # ffffffff804105f8 <__FUNCTION__.2126+0x188>
 ffffffff8040ef08:	ca6fb0ef          	jal	ra,ffffffff8040a3ae <_panic>

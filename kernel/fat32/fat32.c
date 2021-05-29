@@ -25,15 +25,10 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-// #define ACCEPT_NUM  1
-// uchar accept_table[25][10] = {{"PIPE"}, {"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
-//     {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
-//     {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
-
-#define ACCEPT_NUM  24
-uchar accept_table[25][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+#define ACCEPT_NUM  1
+uchar accept_table[25][10] = {{"WAITPID"},{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
     {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
-    {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
+     {"EXIT"},{"TIMES"}, {"SLEEP"}};
 
 
 uint8_t fat32_init()
