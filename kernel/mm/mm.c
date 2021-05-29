@@ -29,6 +29,7 @@ ptr_t allocPage()
     if (!list_empty(&freePageList)){
         ptr_t tmp = freePageList.next->ptr;
         // prints("666 %lx\n",freePageList.next);
+        printk_port("dest: %lx\n", freePageList.next);
         list_del(freePageList.next);
         // printk_port("777\n");
         ret = tmp;

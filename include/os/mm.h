@@ -39,7 +39,7 @@
 #define FREEMEM (INIT_KERNEL_STACK+4*PAGE_SIZE)
 #define USER_STACK_ADDR 0xf00010000lu
 #define FREEMEM_TOP KERNEL_END
-#define MEM_FOR_PROC 0xffffffff80180000lu
+#define MEM_FOR_PROC 0xffffffff80200000lu
 
 /* Rounding; only works for n = power of two */
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))

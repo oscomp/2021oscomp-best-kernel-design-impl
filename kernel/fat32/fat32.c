@@ -1627,6 +1627,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
     //     *temp2 = '\0';
 
     //     uint8 ignore;
+        // struct dir_pos top;
 
     //     if (isend){
     //         // success
@@ -1635,7 +1636,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
     //                                     ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
     //                                     SEARCH_DIR;
     //         // 1. found
-    //         if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
+    //         if ((p = search(temp1, now_clus, buf, search_mode, &ignore, &top)) != NULL || ignore == 1){
     //             // printk_port("p:%lx\n",p);
     //             // printk_port("length: %d\n", p->length);
     //             // printk_port("clus: %d, ignore :%d\n", get_cluster_from_dentry(p), ignore);
@@ -1696,7 +1697,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
     //     }
     //     else{
     //         // search dir until fail or goto search file
-    //         if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+    //         if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore, &top)) != NULL || ignore == 1){
     //             now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
     //             ++temp2;
     //             temp1 = temp2;
