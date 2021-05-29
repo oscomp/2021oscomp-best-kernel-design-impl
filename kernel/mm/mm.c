@@ -38,6 +38,7 @@ ptr_t allocPage()
     }
     else
         assert(0);
+    printk_port("ret: %lx\n",ret);
     return ret;
 }
 
