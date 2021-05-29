@@ -723,7 +723,10 @@ impl VFile{
         let all_clusters = self.fs.read()
             .get_fat().read()
             .get_all_cluster_of(first_cluster, self.block_device.clone());
-        self.fs.write().dealloc_cluster(all_clusters);
+        //self.fs.write().dealloc_cluster(all_clusters);
+        let fs_reader = self.fs.read();
+        fs_reader.dealloc_cluster(all_clusters);
+        fs_reader.cache_write_back();
     }
 
     /* 查找可用目录项，返回offset，簇不够也会返回相应的offset，caller需要及时分配 */
