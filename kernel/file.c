@@ -429,3 +429,35 @@ int fdalloc3(struct file *f, int fd, int flag)
 
   return fd;
 }
+
+void fdcloexec(struct fdtable *fdt)
+{
+	struct fdtable *prev = NULL;
+
+	while (fdt) {
+		if (fdt->exec_close) { // quick peek
+			for (int i = 0; i < NOFILE; i++) {
+				if (fdt->exec_close & (1 << i)) {
+					fileclose(fdt->arr[i]);
+					if (--fdt->used == 0) { // no need to loop
+						break;
+					}
+					fdt->arr[i] = NULL;
+					if (i < fdt->nextfd) {
+						fdt->nextfd = i;
+					}
+				}
+			}
+
+		}
+		// we don't free the first table because it's in a proc
+		if (fdt->used == 0 && prev) {
+			prev->next = fdt->next;
+			kfree(fdt);
+			fdt = prev->next;
+		} else {
+			prev = fdt;
+			fdt = fdt->next;
+		}
+	}
+}

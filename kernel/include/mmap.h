@@ -32,6 +32,7 @@ struct mapped* add_map(struct mapped **phead, int off, int share);
 // void del_map(struct inode* ind, int off);
 void del_map(struct mapped *p, int off, int npages);
 void del_segmap(struct seg *seg);
+void dup_segmap(struct seg *seg);
 uint64 do_mmap(uint64 start, int len, int prot, int flags, struct file *f, int off);
 int do_munmap(uint64 start, uint64 len);
 

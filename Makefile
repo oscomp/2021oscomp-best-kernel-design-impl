@@ -238,7 +238,7 @@ UPROGS=\
 	$U/_mount\
 	$U/_umount\
 	$U/_dup3\
-	$U/_mmap_test
+	$U/_mmaptests
 
 userprogs: $(UPROGS)
 

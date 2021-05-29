@@ -10,5 +10,6 @@
 #define O_DIRECTORY 0x0200000
 
 #define AT_FDCWD  -100
+#define FD_CLOEXEC 1
 
 #endif

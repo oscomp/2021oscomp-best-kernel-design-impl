@@ -184,7 +184,7 @@ copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2)
 			goto bad;
 		}
     if (!cow) {
-      filedup(seg->mmap);
+      dup_segmap(seg);
     }
 		memmove(s, seg, sizeof(struct seg));
 		s->next = NULL;

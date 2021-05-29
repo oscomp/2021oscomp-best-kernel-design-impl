@@ -238,6 +238,7 @@ int execve(char *path, char **argv, char **envp)
   p->trapframe->sp = sp; // initial stack pointer
 
   __debug_info("execve", "sp=%p, stackbase=%p\n", sp, stackbase);
+  fdcloexec(&p->fds);
   w_satp(MAKE_SATP(p->pagetable));
   sfence_vma();
 

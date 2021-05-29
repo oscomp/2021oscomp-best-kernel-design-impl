@@ -90,10 +90,30 @@ void del_segmap(struct seg *seg)
 	// 	return;
 	struct inode *ip = seg->mmap->ip;
 	ilock(ip);
+	// acquire(&ip->lock.lk);
 	struct mapped *map = *get_prevmap(&ip->maphead, seg->f_off);
 	del_map(map, map->offset, seg->sz / PGSIZE);
+	// release(&ip->lock.lk);
 	iunlock(ip);
 	fileclose(seg->mmap);
+}
+
+void dup_segmap(struct seg *seg)
+{
+	__debug_assert("del_segmap", seg->type == MMAP && seg->mmap, "funny seg\n");
+	struct file *fp = seg->mmap;
+	struct inode *ip = fp->ip;
+	// acquire(&ip->lock.lk);
+	ilock(ip);
+	struct mapped *map = *get_prevmap(&ip->maphead, seg->f_off);
+	int npages = PGROUNDUP(seg->sz) / PGSIZE;
+	while (npages--) {
+		map->n_ref++;
+		map = map->next;
+	}
+	iunlock(ip);
+	// release(&ip->lock.lk);
+	filedup(fp);
 }
 
 
