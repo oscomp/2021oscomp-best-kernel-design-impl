@@ -26,9 +26,9 @@ uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 #define ACCEPT_NUM  24
-uchar accept_table[24][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+uchar accept_table[25][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
     {"READ"}, {"WRITE"} , {"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
-    {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
+    {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}, {"PIPE"}};
 
 
 uint8_t fat32_init()

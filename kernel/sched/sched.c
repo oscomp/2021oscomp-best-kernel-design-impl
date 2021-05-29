@@ -275,6 +275,7 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
 
 pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
+    printk_port("111\n");
     uint64_t status_ker = NULL;
     if (status) status_ker = get_kva_of(status,current_running->pgdir);
     pid_t ret = -1;
@@ -286,6 +287,7 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
                 current_running->status = TASK_BLOCKED;
                 list_add_tail(&current_running->list, &pcb[i].wait_list);
                 ret = pcb[i].pid;
+                printk_port("222\n");
                 do_scheduler();
                 if (status_ker) WEXITSTATUS(status_ker,pcb[i].exit_status);
                 i = 1; // start from beginning when wake up
