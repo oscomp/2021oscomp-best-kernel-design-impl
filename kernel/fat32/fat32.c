@@ -197,7 +197,7 @@ int8 fat32_read_test(const char *filename)
         if (i % CLUSTER_SIZE == 0){
             printk_port("3\n");
             cluster = get_next_cluster(cluster);
-            printk_port("cluster is %d\n");
+            printk_port("cluster is %x\n", cluster);
             sec = first_sec_of_clus(cluster);
         }
         else
@@ -1411,7 +1411,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
 
     *ignore = 0;
 
-    dentry_t *top; /* ret */
+    dentry_t *top_pt; /* ret */
     isec_t top_sec;
 
     // dont care deleted dir
@@ -1421,7 +1421,7 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
         }
 
-        top = p;
+        top_pt = p;
         top_sec = now_sec;
 
         long_dentry_t *q = (long_dentry_t *)p;
@@ -1488,10 +1488,14 @@ int16 search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mod
         }
 
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
+            pos->dir = (void*)top_pt - (void*)buf;
+            pos->sec = top_sec;
             kfree(filename);
             return 0;
         }
         else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
+            pos->dir = (void*)top_pt - (void*)buf;
+            pos->sec = top_sec;
             kfree(filename);
             return 0;
         }
