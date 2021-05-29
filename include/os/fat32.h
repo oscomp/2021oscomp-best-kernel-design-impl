@@ -82,7 +82,7 @@ struct linux_dirent64 {
     int64         d_off;
     unsigned short  d_reclen;
     unsigned char   d_type;
-    char            d_name[];
+    char           *d_name;
 };
 
 #define LONG_DENTRY_NAME1_LEN 5
@@ -114,7 +114,7 @@ typedef enum{
 typedef enum{
     FILE_FILE,
     FILE_DIR,
-}file_mode_t;
+}file_type_t;
 
 enum{
     NO_EXT_NAME,
@@ -139,11 +139,6 @@ enum{
 #define FILE_ATTRIBUTE_CHDIR 0x10
 #define FILE_ATTRIBUTE_GDIR 0x20
 #define FILE_ATTRIBUTE_LONG 0x0f
-
-#define O_RDONLY 0x00
-#define O_WRONLY 0x01
-#define O_RDWR 0x02
-#define O_DIRECTORY 0x200000
 
 #define AT_FDCWD 0xffffff9c
 
@@ -175,10 +170,12 @@ dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_
 uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_clus(uchar *buf);
-ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode);
+ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_t mode);
 uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags);
 int16 get_fd_index(fd_num_t fd);
 
+uchar unicode2char(uint16_t unich);
+unicode_t char2unicode(char ch);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)

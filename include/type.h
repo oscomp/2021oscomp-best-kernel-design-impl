@@ -44,7 +44,7 @@ typedef unsigned __attribute__((__mode__(SI))) uint32_t;
 typedef int      __attribute__((__mode__(DI))) int64_t;
 typedef unsigned __attribute__((__mode__(DI))) uint64_t;
 
-typedef unsigned __attribute__((__mode__(QI))) int8;
+typedef char int8;
 typedef unsigned __attribute__((__mode__(QI))) uint8;
 typedef int      __attribute__((__mode__(HI))) int16;
 typedef unsigned __attribute__((__mode__(HI))) uint16;
@@ -99,5 +99,7 @@ typedef uint64_t blkcnt_t;
 #define O_RDONLY 1 /* read only open */
 #define O_WRONLY 2 /* write only open */
 #define O_RDWR 3 /* read/write open */
+#define O_CREATE 0x40 /* create new */
+#define O_DIRECTORY 0x200000 /* open directory */
 
 #endif

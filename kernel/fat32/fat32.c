@@ -25,7 +25,7 @@ uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 #define ACCEPT_NUM  1
-uchar accept_table[21][10] = {{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"}, {"OPEN"}, {"CLONE"}, {"EXECVE"}, {"READ"}, {"WRITE"} ,{"CHDIR"}, {"MKDIR"},  {"GETPID"}, 
+uchar accept_table[21][10] = {{"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"}, {"OPEN"}, {"CLONE"}, {"EXECVE"}, {"READ"}, {"WRITE"} ,{"CHDIR"}, {"MKDIR"},  {"GETPID"}, 
     {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
     {"WAIT"}, {"WAITPID"}, {"EXIT"},{"YIELD"}, {"TIMES"}, {"SLEEP"}};
 
@@ -222,9 +222,135 @@ int8 fat32_read_test(const char *filename)
     assert(0);
 }
 
-size_t fat32_getdent(fd_num_t fd, char *buf, uint32_t len)
+/* get directory entry */
+/* return readsize if success, -1 fail */
+/* make sure buf is enough */
+size_t fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 {
-    
+    uint8 fd_index;
+    if ((fd_index = get_fd_index(fd)) == -1)
+        return -1;
+
+    ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
+    isec_t now_sec = first_sec_of_clus(now_clus);
+    printk_port("clus: %d, sec: %d\n",now_clus,now_sec);
+    uchar *buf = kalloc();
+    sd_read(buf, now_sec); /* read full buff*/
+
+    dentry_t *p = buf;
+    uint32_t readsize = 0;
+
+    // uint32_t basic_size = sizeof(uint64) + sizeof(int64) + sizeof(unsigned short) + sizeof(unsigned char);
+    uint32_t basic_size = sizeof(struct linux_dirent64);
+
+    /* for output */
+    uchar *filename = kalloc();// :d_name
+    /* end for output */
+
+    /* similar to search */
+    while (!is_zero_dentry(p) && readsize < len){
+        
+        /* for output */
+        uint8 item_num_copy; // :=d_reclen, d_offset
+        ientry_t now_clus_copy; //:=d_ino
+        /* end for output */
+
+        while (0xE5 == p->filename[0]){
+            p = get_next_dentry(p, buf, &now_clus, &now_sec);
+        }
+
+        /* now we are at a real dirent */
+        now_clus_copy = now_clus; // record first clus, not last
+
+        long_dentry_t *q = (long_dentry_t *)p;
+        // if long dentry
+        if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
+
+            uint8 item_num = q->sequence & 0x0f; // entry num
+            item_num_copy = item_num + 1;
+
+            /* get filename */
+            uint8 isbreak = 0;
+            uint16_t unich; // unicode
+
+            while (item_num--){
+                uint8 name_cnt = 0;
+                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
+                    // name1
+                    unich = q->name1[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
+                    name_cnt++;           
+                }
+                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
+                    // name1
+                    unich = q->name2[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
+                    name_cnt++;            
+                }
+                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
+                    // name1
+                    unich = q->name3[i];
+                    if (unich == 0x0000 || unich == 0xffffu){
+                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                        break;
+                    }
+                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);  
+                    name_cnt++;             
+                }
+                p = get_next_dentry(p, buf, &now_clus, &now_sec);
+                q = (long_dentry_t *)p;
+            }
+        }
+        // short dentry
+        else{
+            item_num_copy + 1;
+            /* filename */
+            uint8 name_cnt = 0;
+            for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
+            {
+                if (p->filename[i] == ' ') break;
+                else filename[name_cnt++] = p->filename[i];
+            }
+            if (p->extname[0] != ' ') filename[name_cnt++] = '.';
+            for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
+            {
+                if (p->extname[i] == ' ') break;
+                else filename[name_cnt++] = p->extname[i];
+            }
+            filename[name_cnt++] = 0;
+        }
+        printk_port("filename: %s\n");
+        printk_port("readsize: %d\n", readsize + basic_size + strlen(filename) + 1);
+
+        if (readsize + basic_size + strlen(filename) + 1 > len)
+            break;
+
+        /* output */
+        struct linux_dirent64 *now = (struct linux_dirent64 *)(outbuf + readsize);
+
+        uint32_t oldsize = readsize;
+        readsize += basic_size + strlen(filename) + 1;
+        readsize += 64 - (readsize % 64);
+
+        now->d_ino = now_clus_copy;
+        now->d_off = readsize - oldsize;
+        // now->d_reclen = item_num_copy*sizeof(dentry_t);
+        now->d_reclen = readsize - oldsize;
+        now->d_type = p->attribute & 0x10;
+        memcpy(now->d_name, filename, strlen(filename) + 1); 
+
+    }
+    kfree(filename);
+    kfree(buf);
+    return readsize;
 }
 
 /* show file status */
@@ -404,7 +530,7 @@ unicode_t char2unicode(char ch)
 /* create new file */
 /* temp1: filename */
 /* now_clus : now dir cluster */
-ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_mode_t mode)
+ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_t mode)
 {
     int noextname = 1;
     uchar *temp3 = temp1;
@@ -913,7 +1039,7 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
         */
 uint16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
-
+    printk_port("flags: %d\n", flags);
     uint8 fd_index = get_fd_index(fd);
     if (fd_index < 0) return -1;
 
@@ -959,7 +1085,6 @@ uint16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mod
             search_mode_t search_mode = ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : SEARCH_DIR;
             // 1. found
             if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
-
                 if (ignore){
                     // use buf to non-null
                     now_clus = root_first_clus;
@@ -987,7 +1112,7 @@ uint16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mod
             }
             // 2.create
             else{
-                if (search_mode == SEARCH_DIR){
+                if (search_mode == SEARCH_DIR || (flags & O_CREATE == 0)){
                     kfree(buf);
                     return -1;
                 }// you cant mkdir here! BUT you can create a file
@@ -1041,6 +1166,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
     sd_read(buf, now_sec);
     // printk_port("5\n");
     dentry_t *p = (dentry_t *)buf;
+    uchar *filename = kalloc();
 
     // dont care deleted dir
     while (!is_zero_dentry(p)){
@@ -1049,12 +1175,10 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
         }
 
-        uchar *filename;
         long_dentry_t *q = (long_dentry_t *)p;
         // if long dentry
         if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
             uint8 item_num = q->sequence & 0x0f; // entry num
-            filename = kmalloc((LONG_DENTRY_NAME1_LEN + LONG_DENTRY_NAME2_LEN + LONG_DENTRY_NAME3_LEN)*item_num); // filename
 
             /* get filename */
             uint8 isbreak = 0;
@@ -1100,7 +1224,6 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
         else{
             /* filename */
             uint8 name_cnt = 0;
-            filename = kmalloc(SHORT_DENTRY_FILENAME_LEN + SHORT_DENTRY_EXTNAME_LEN + 2); //'.' and addition 0 in the end
             for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
             {
                 if (p->filename[i] == ' ') break;
@@ -1116,9 +1239,11 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
         }
 
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
+            kfree(filename);
             return p;
         }
         else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
+            kfree(filename);
             return p;
         }
         else
@@ -1131,6 +1256,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
     else
         *ignore = 0;
 
+    kfree(filename);
     return NULL;
 }
 
