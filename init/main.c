@@ -134,6 +134,7 @@ static void init_syscall(void)
     syscall[SYS_dup3] = &fat32_dup3;
     syscall[SYS_fstat] = &fat32_fstat;
     syscall[SYS_getdents64] = &fat32_getdent;
+    syscall[SYS_pipe2] = &fat32_pipe2;
     // syscall[SYS_mmap] = &do_mmap;
 }
 

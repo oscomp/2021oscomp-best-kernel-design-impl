@@ -82,8 +82,25 @@ struct linux_dirent64 {
     int64         d_off;
     unsigned short  d_reclen;
     unsigned char   d_type;
-    char           *d_name;
+    char           d_name[];
 };
+
+/* pipe */
+#define NUM_PIPE 16
+#define PIPE_BUF_SIZE 512
+#define PIPE_INVALID 0
+#define PIPE_VALID 1
+
+#define FD_UNPIPED 0
+#define FD_PIPED 1
+
+typedef struct pipe{
+    fd_num_t fd[2]; // 0 out, 1 in
+    char buff[PIPE_BUF_SIZE];
+    uint32 top; // buff top
+    pid_t pid; // parent id
+    uint8 valid;
+}pipe_t;
 
 #define LONG_DENTRY_NAME1_LEN 5
 #define LONG_DENTRY_NAME2_LEN 6
@@ -147,23 +164,31 @@ enum{
 #define STDERR 2
 #define DEFAULT_DEV 3
 
-#define MAX_PATHLEN 60
+/* file map */
+#define MAP_FILE 0
+#define MAP_SHARED 0x01
+#define MAP_PRIVATE 0X02
+#define MAP_FAILED ((void *) -1)
 
 extern fat_t fat;
 
-uint16 fat32_open(uint32 fd, const uchar *path, uint32 flags, uint32 mode);
+int16 fat32_open(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
 int8 fat32_read_test(const char *filename);
-int64 fat32_read(uint32 fd, uchar *buf, size_t count);
-int64 fat32_write(uint32 fd, uchar *buff, uint64_t count);
+int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
+int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count);
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore);
-uint8_t fat32_mkdir(uint32_t dirfd, const uchar *path, uint32_t mode);
-uint8 fat32_close(uint32 fd);
-uint8 fat32_chdir(const char* path_t);
+int16 fat32_mkdir(fd_num_t dirfd, const uchar *path, uint32_t mode);
+int16 fat32_close(fd_num_t fd);
+int16 fat32_chdir(const char* path_t);
 uchar *fat32_getcwd(uchar *buf, size_t size);
 fd_num_t fat32_dup(fd_num_t fd);
 fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use);
 int16 fat32_fstat(fd_num_t fd, struct kstat *kst);
-size_t fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
+int64 fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
+int16 fat32_pipe2(fd_num_t fd[], int32 mode);
+
+void init_inode();
+void init_pipe();
 
 
 dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);

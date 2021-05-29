@@ -20,14 +20,15 @@ uchar filebuf[NORMAL_PAGE_SIZE];
 ientry_t cwd_first_clus;
 ientry_t cwd_clus, root_clus, root_first_clus;
 isec_t cwd_sec, root_sec;
+pipe_t pipes[NUM_PIPE];
 
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  1
-uchar accept_table[21][10] = {{"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"}, {"OPEN"}, {"CLONE"}, {"EXECVE"}, {"READ"}, {"WRITE"} ,{"CHDIR"}, {"MKDIR"},  {"GETPID"}, 
-    {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, 
-    {"WAIT"}, {"WAITPID"}, {"EXIT"},{"YIELD"}, {"TIMES"}, {"SLEEP"}};
+#define ACCEPT_NUM  24
+uchar accept_table[24][10] = {{"OPEN"},{"YIELD"}, {"GETDENTS"} ,{"FSTAT"}, {"OPENAT"},{"DUP"},{"DUP2"}, {"BRK"},  {"CLONE"}, {"EXECVE"}, 
+    {"READ"}, {"WRITE"} ,{"CHDIR"}, {"MKDIR"},  {"GETPID"}, {"UNAME"},  {"FORK"}, {"GETPPID"}, {"GETTIMEOFDAY"}, {"WAIT"}, 
+    {"WAITPID"}, {"EXIT"},{"TIMES"}, {"SLEEP"}};
 
 
 uint8_t fat32_init()
@@ -61,6 +62,28 @@ uint8_t fat32_init()
     printk("> [FAT32 init] fat_rsvd: %d\n", fat.bpb.rsvd_sec_cnt);
     printk("> [FAT32 init] fat_hid: %d\n", fat.bpb.hidd_sec);
 
+    /* init metadata */
+    init_inode();
+
+    /* init pipe */
+    init_pipe();
+
+    kfree(b);
+
+    return 0;
+}
+
+/* init pipe */
+void init_pipe()
+{
+    for (int i = 0; i < NUM_PIPE; ++i){
+        pipes[i].valid = PIPE_INVALID;
+    }
+}
+
+/* init metadata */
+void init_inode()
+{
     /* read root dir and store it for now*/
     cwd_first_clus = fat.bpb.root_clus;
     cwd_clus = fat.bpb.root_clus;
@@ -69,11 +92,7 @@ uint8_t fat32_init()
     root_clus = cwd_clus;
     root_sec = cwd_sec;
     /* from root sector read buffsize */
-    sd_read(buf, cwd_sec);
-
-    kfree(b);
-
-    return 0;
+    sd_read(buf, cwd_sec);    
 }
 
 /* read file from sd card and put it into readyqueue*/
@@ -222,10 +241,11 @@ int8 fat32_read_test(const char *filename)
     assert(0);
 }
 
+
 /* get directory entry */
 /* return readsize if success, -1 fail */
 /* make sure buf is enough */
-size_t fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
+int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 {
     uint8 fd_index;
     if ((fd_index = get_fd_index(fd)) == -1)
@@ -233,7 +253,6 @@ size_t fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 
     ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
     isec_t now_sec = first_sec_of_clus(now_clus);
-    printk_port("clus: %d, sec: %d\n",now_clus,now_sec);
     uchar *buf = kalloc();
     sd_read(buf, now_sec); /* read full buff*/
 
@@ -327,8 +346,6 @@ size_t fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
             }
             filename[name_cnt++] = 0;
         }
-        printk_port("filename: %s\n");
-        printk_port("readsize: %d\n", readsize + basic_size + strlen(filename) + 1);
 
         if (readsize + basic_size + strlen(filename) + 1 > len)
             break;
@@ -347,10 +364,180 @@ size_t fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
         now->d_type = p->attribute & 0x10;
         memcpy(now->d_name, filename, strlen(filename) + 1); 
 
+        p = get_next_dentry(p, buf, &now_clus, &now_sec);
     }
     kfree(filename);
     kfree(buf);
     return readsize;
+}
+
+/* create pipe */
+/* success return 0, fail return -1; */
+int16 fat32_pipe2(fd_num_t fd[], int32 mode)
+{
+    for (int i = 0; i < NUM_PIPE; ++i)
+    {
+        if (pipes[i].valid == PIPE_INVALID){
+            pipes[i].fd[0] = fd[0];
+            pipes[i].fd[1] = fd[1];
+            pipes[i].top = 0;
+            pipes[i].pid = current_running->pid;
+            pipes[i].valid = PIPE_VALID;
+        }
+    }
+    int16 fd_index[0] = {-1};
+    printk_port("init: %d, %d\n",fd_index[0], fd_index[1]);
+    for (int i = 0; i < NUM_FD; ++i)
+        if (current_running->fd[i].used == FD_UNUSED)
+            if (fd_index[0] == -1){
+                fd_index[0] = i;
+                current_running->fd[i].used = FD_USED;
+                current_running->fd[i].fd_num = fd[0];
+                current_running->fd[i].piped = FD_PIPED;
+            }
+            else if (fd_index[1] == -1){
+                fd_index[1] = i;
+                current_running->fd[i].used = FD_USED;
+                current_running->fd[i].fd_num = fd[1];
+                current_running->fd[i].piped = FD_PIPED;
+                break ;
+            }
+
+    if (fd_index[0] == -1 || fd_index[1] == -1) return -1;
+    printk_port("now: %d, %d\n",fd_index[0], fd_index[1]);
+    for (int i = 0; i < 2; ++i)
+    {
+        current_running->fd[fd_index[i]].used = FD_USED;
+        current_running->fd[fd_index[i]].fd_num = fd[i];
+        current_running->fd[fd_index[i]].piped = FD_PIPED;
+    }
+}
+
+/* write count bytes from buff to file in fd */
+/* return fd_num: success
+          -1: fail
+        */
+int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
+{
+    int fd_index = get_fd_index(fd);
+    if (fd != AT_FDCWD && fd_index < 0) return -1;
+
+    /* for const */
+    uchar path[strlen(path_const)+1];
+    strcpy(path, path_const);
+
+    uint8 isend = 0;
+
+    uchar *temp1, *temp2; // for path parse
+    uint32_t now_clus; // now cluster num
+    uchar *buf = kalloc(); // for search
+
+    dentry_t *p = (dentry_t *)buf; // for loop
+
+    if (path[0] == '/'){
+        now_clus = fat.bpb.root_clus;
+        temp2 = &path[1], temp1 = &path[1];
+    }
+    else{
+        if (fd == AT_FDCWD)
+            now_clus = cwd_first_clus;
+        else
+        {
+            if (current_running->fd[fd_index].used)
+                now_clus = current_running->fd[fd_index].first_clus_num;
+            else
+                return -1;
+        }
+        temp2 = path, temp1 = path;
+    }
+
+    while (1)
+    {
+        while (*temp2 != '/' && *temp2 != '\0') temp2++;
+        if (*temp2 == '\0' || *(temp2+1) == '\0' ) isend = 1;
+        *temp2 = '\0';
+
+        uint8 ignore;
+
+        if (isend){
+            // success
+            // printk_port("filename: %s\n", temp1);
+            search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
+                                        ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
+                                        SEARCH_DIR;
+            // 1. found
+            if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
+                // printk_port("p:%lx\n",p);
+                // printk_port("length: %d\n", p->length);
+                // printk_port("clus: %d, ignore :%d\n", get_cluster_from_dentry(p), ignore);
+                if (ignore){
+                    // use buf to non-null
+                    p = buf;
+                    set_dentry_cluster(p, now_clus);
+                    p->length = 0;
+                    p->create_time_ms = 0;
+                    p->create_time = 0x53D4; //10:30:40
+                    p->create_date = 0x52BB; // 2021/5/27
+                    p->last_visited = 0x52BB;
+                    p->last_modified_time = 0x53D3;   //23:22
+                    p->last_modified_date = 0x52BB;     //25:24
+                }
+
+                for (uint8 i = 0; i < NUM_FD; ++i)
+                {
+                    if (!set_fd_from_dentry(current_running, i, p, flags)){                        
+                        kfree(buf);
+                        return current_running->fd[i].fd_num; // use i as index
+                    }
+                }
+                // no available dx
+                kfree(buf);
+                return -1;
+            }
+            // 2.create
+            else{
+                if (search_mode == SEARCH_DIR || (flags & O_CREATE) == 0){
+                    kfree(buf);
+                    return -1;
+                }// you cant mkdir here! BUT you can create a file
+                else{
+                    ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
+                    p = buf;
+                    set_dentry_cluster(p, new_clus);
+                    p->length = 0;
+                    p->create_time_ms = 0;
+                    p->create_time = 0x53D4; //10:30:40
+                    p->create_date = 0x52BB; // 2021/5/27
+                    p->last_visited = 0x52BB;
+                    p->last_modified_time = 0x53D3;   //23:22
+                    p->last_modified_date = 0x52BB;     //25:24
+
+                    for (uint8 i = 0; i < NUM_FD; ++i)
+                    {
+                        if (!set_fd_from_dentry(current_running, i, p, flags)){ //new file length = 0
+                            kfree(buf);
+                            return current_running->fd[i].fd_num; // use i as index
+                        }
+                    }
+                    // no available dx
+                    kfree(buf);
+                    return -1;
+                }
+            }
+        }
+        else{
+            // printk_port("dirname: %s\n", temp1);
+            // search dir until fail or goto search file
+            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+                now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
+                ++temp2;
+                temp1 = temp2;
+                continue ;
+            }
+            kfree(buf);
+            return -1;
+        }
+    }
 }
 
 /* show file status */
@@ -430,8 +617,10 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
 
+    // printk_port("fd: %d, length: %d\n", fd_index, current_running->fd[fd_index].length);
     size_t mycount = 0;
-    size_t realcount = max(count, current_running->fd[fd_index].length);
+    size_t realcount = min(count, current_running->fd[fd_index].length);
+    // printk_port("realcount: %d\n", realcount);
     uchar *buff = kalloc();
     ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
     isec_t now_sec = first_sec_of_clus(now_clus);
@@ -439,6 +628,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     while (mycount < realcount){
         size_t readsize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
         sd_read(buff, now_sec);
+        // printk_port("buff: %s\n");
         memcpy(buf, buff, readsize);
         buf += readsize;
         mycount += readsize;
@@ -472,7 +662,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
     }
     else{
         size_t mycount = 0;
-        size_t realcount = max(count, current_running->fd[fd_index].length);
+        size_t realcount = min(count, current_running->fd[fd_index].length);
         uchar *tempbuff = kalloc();
         ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
         ientry_t old_clus = now_clus;
@@ -510,6 +700,7 @@ uchar unicode2char(uint16_t unich)
         (unich >= 97 && unich <= 122)? unich - 97 + 'a' :
         (unich == 95)? '_' : 
         (unich == 46)? '.':
+        (unich == 0x20)? ' ':
         0;  
 }
 
@@ -519,6 +710,7 @@ unicode_t char2unicode(char ch)
             (ch >= 'a' && ch <= 'z')? 97 + ch - 'a':
             (ch == '_')? 95 :
             (ch == '.')? 46 :
+            (ch == ' ')? 0x20:
             0;
 }
 
@@ -719,7 +911,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
 
 /* go to child dir */
 /* success 0, fail -1 */
-uint8 fat32_chdir(const char* path_t)
+int16 fat32_chdir(const char* path_t)
 {
     uchar *buff = kalloc();
 
@@ -791,7 +983,7 @@ uint8 fat32_chdir(const char* path_t)
 
 /* make a directory */
 /* success 0, fail -1 */
-uint8_t fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
+int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
 {
     uchar *tempbuf = kalloc(); // for search
 
@@ -813,7 +1005,7 @@ uint8_t fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
         if (dirfd == AT_FDCWD)
             now_clus = cwd_first_clus;
         else{
-            uint8 dirfd_index = get_fd_index(dirfd);
+            int16 dirfd_index = get_fd_index(dirfd);
             if (current_running->fd[dirfd_index].used)
                 now_clus = current_running->fd[dirfd_index].first_clus_num;
             else{
@@ -1033,128 +1225,6 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
     return NULL;
 }
 
-/* write count bytes from buff to file in fd */
-/* return fd_num: success
-          -1: fail
-        */
-uint16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
-{
-    printk_port("flags: %d\n", flags);
-    uint8 fd_index = get_fd_index(fd);
-    if (fd_index < 0) return -1;
-
-    /* for const */
-    uchar path[strlen(path_const)+1];
-    strcpy(path, path_const);
-
-    uint8 isend = 0;
-
-    uchar *temp1, *temp2; // for path parse
-    uint32_t now_clus; // now cluster num
-    uchar *buf = kalloc(); // for search
-
-    dentry_t *p = (dentry_t *)buf; // for loop
-
-    if (path[0] == '/'){
-        now_clus = fat.bpb.root_clus;
-        temp2 = &path[1], temp1 = &path[1];
-    }
-    else{
-        if (fd == AT_FDCWD)
-            now_clus = cwd_first_clus;
-        else
-        {
-            if (current_running->fd[fd_index].used)
-                now_clus = current_running->fd[fd_index].first_clus_num;
-            else
-                return -1;
-        }
-        temp2 = path, temp1 = path;
-    }
-
-    while (1)
-    {
-        while (*temp2 != '/' && *temp2 != '\0') temp2++;
-        if (*temp2 == '\0' || *(temp2+1) == '\0' ) isend = 1;
-        *temp2 = '\0';
-
-        uint8 ignore;
-
-        if (isend){
-            // success
-            search_mode_t search_mode = ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : SEARCH_DIR;
-            // 1. found
-            if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
-                if (ignore){
-                    // use buf to non-null
-                    now_clus = root_first_clus;
-                    p = buf;
-                    set_dentry_cluster(p, now_clus);
-                    p->length = 0;
-                    p->create_time_ms = 0;
-                    p->create_time = 0x53D4; //10:30:40
-                    p->create_date = 0x52BB; // 2021/5/27
-                    p->last_visited = 0x52BB;
-                    p->last_modified_time = 0x53D3;   //23:22
-                    p->last_modified_date = 0x52BB;     //25:24
-                }
-
-                for (uint8 i = 0; i < NUM_FD; ++i)
-                {
-                    if (!set_fd_from_dentry(current_running, i, p, flags)){                        
-                        kfree(buf);
-                        return current_running->fd[i].fd_num; // use i as index
-                    }
-                }
-                // no available dx
-                kfree(buf);
-                return -1;
-            }
-            // 2.create
-            else{
-                if (search_mode == SEARCH_DIR || (flags & O_CREATE == 0)){
-                    kfree(buf);
-                    return -1;
-                }// you cant mkdir here! BUT you can create a file
-                else{
-                    ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
-                    p = buf;
-                    set_dentry_cluster(p, new_clus);
-                    p->length = 0;
-                    p->create_time_ms = 0;
-                    p->create_time = 0x53D4; //10:30:40
-                    p->create_date = 0x52BB; // 2021/5/27
-                    p->last_visited = 0x52BB;
-                    p->last_modified_time = 0x53D3;   //23:22
-                    p->last_modified_date = 0x52BB;     //25:24
-
-                    for (uint8 i = 0; i < NUM_FD; ++i)
-                    {
-                        if (!set_fd_from_dentry(current_running, i, p, flags)){ //new file length = 0
-                            kfree(buf);
-                            return current_running->fd[i].fd_num; // use i as index
-                        }
-                    }
-                    // no available dx
-                    kfree(buf);
-                    return -1;
-                }
-            }
-        }
-        else{
-            // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
-                now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
-                ++temp2;
-                temp1 = temp2;
-                continue ;
-            }
-            kfree(buf);
-            return -1;
-        }
-    }
-}
-
 /* search if name.file exists in dir now_clus */
 /* make sure buf size is BUFSIZE */
 /* return dentry point if success, NULL if fail */
@@ -1167,6 +1237,8 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
     // printk_port("5\n");
     dentry_t *p = (dentry_t *)buf;
     uchar *filename = kalloc();
+
+    *ignore = 0;
 
     // dont care deleted dir
     while (!is_zero_dentry(p)){
@@ -1253,8 +1325,6 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
     if (mode == FILE_DIR && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus){
         *ignore = 1;
     }
-    else
-        *ignore = 0;
 
     kfree(filename);
     return NULL;
@@ -1329,7 +1399,7 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
 
 /* close fd */
 /* success return 0, fail return 1*/
-uint8 fat32_close(fd_num_t fd)
+int16 fat32_close(fd_num_t fd)
 {
     uint8 fd_index = get_fd_index(fd);
     if (current_running->fd[fd_index].used)

@@ -41,8 +41,8 @@
 #define SYS_chdir 49
 #define SYS_openat 56
 #define SYS_close 57
-#define SYSCALL_TESTDISK 58
-#define SYSCALL_TEST 59
+
+#define SYS_pipe2 59
 
 #define SYS_getdents64 61
 #define SYS_read 63
@@ -68,5 +68,8 @@
 #define SYS_mmap 222
 
 #define SYS_wait4 260
+
+#define SYSCALL_TESTDISK 500
+#define SYSCALL_TEST 501
 
 #endif

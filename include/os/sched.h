@@ -99,7 +99,11 @@ typedef struct fd{
     /* default: index in fd array*/
     fd_num_t fd_num;
 
+    /* used */
     uint8 used;
+
+    /* piped */
+    uint8 piped;
 
     uint8 nlink;
 

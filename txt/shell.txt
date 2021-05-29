@@ -954,7 +954,7 @@ Disassembly of section .text:
    10ab2:	4681                	li	a3,0
    10ab4:	4601                	li	a2,0
    10ab6:	4581                	li	a1,0
-   10ab8:	03a00513          	li	a0,58
+   10ab8:	1f400513          	li	a0,500
    10abc:	0c0000ef          	jal	ra,10b7c <invoke_syscall>
    10ac0:	0001                	nop
    10ac2:	60a2                	ld	ra,8(sp)
@@ -1033,7 +1033,7 @@ Disassembly of section .text:
    10b5c:	4701                	li	a4,0
    10b5e:	4681                	li	a3,0
    10b60:	4601                	li	a2,0
-   10b62:	03b00513          	li	a0,59
+   10b62:	1f500513          	li	a0,501
    10b66:	016000ef          	jal	ra,10b7c <invoke_syscall>
    10b6a:	87aa                	mv	a5,a0
    10b6c:	0ff7f793          	andi	a5,a5,255

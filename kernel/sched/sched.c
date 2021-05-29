@@ -150,9 +150,11 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     pcb_underinit->parent.parent = NULL;
 
     /* file descriptors */
-    // number default
-    for (int i = 0; i < NUM_FD; ++i)
+    // number, piped
+    for (int i = 0; i < NUM_FD; ++i){
         pcb_underinit->fd[i].fd_num = i;
+        pcb_underinit->fd[i].piped = FD_UNPIPED;
+    }
     // open stdin , stdout and stderr
     pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
     pcb_underinit->fd[1].dev = STDOUT; pcb_underinit->fd[1].used = FD_USED; pcb_underinit->fd[1].flags = O_WRONLY;
@@ -216,6 +218,10 @@ static void copy_to(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t us
     pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size;
     pcb_underinit->user_sp = user_stack;
     copy_stack(pcb_underinit, ker_stack_size, user_stack_size);
+
+    // copy fd
+    for (int i = 0; i < NUM_FD; ++i)
+        memcpy(&pcb_underinit->fd[i], &current_running->fd[i], sizeof(fd_t));
 }
 
 /* clone a child thread for current thread */
@@ -257,8 +263,8 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             switchto_context_t *switch_to_reg = 
                 (switchto_context_t *)(pcb_underinit->kernel_sp);
             // kernel stack should be different
-
             switch_to_reg->regs[0] = &ret_from_exception;
+
             // add to ready queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);

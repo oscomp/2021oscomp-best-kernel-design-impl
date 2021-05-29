@@ -65,7 +65,7 @@ typedef uint64_t uintptr_t;
 typedef int64_t intptr_t;
 typedef uint64_t size_t;
 
-typedef uint32_t fd_num_t;
+typedef int32_t fd_num_t;
 typedef uint16_t unicode_t;
 
 typedef uint64_t dev_t;
