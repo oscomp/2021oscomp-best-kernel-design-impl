@@ -298,7 +298,7 @@ int do_munmap(uint64 start, uint64 len)
 	uint64 off = s->f_off + (start - s->addr);
 
 	struct file *fp = s->mmap;
-	if (fp) { // A shared map, carry through to the file.
+	if (fp && (s->flag & PTE_W)) { // A shared map, carry through to the file.
 		struct inode *ip = s->mmap->ip;
 		ilock(ip);
 		struct mapped *map = *get_prevmap(&ip->maphead, off);
