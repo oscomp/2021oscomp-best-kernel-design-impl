@@ -926,7 +926,6 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     }
 
     // 3. write entry
-    printk_port("p:%lx, tempbuf: %lx, sec, %d\n", p, tempbuf, sec);
     sd_read(tempbuf, sec); // if no sec then p is meaningless
     for (uint i = 0; i < demand - 1; ++i)
     {
@@ -936,8 +935,6 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         if (p + 1 == tempbuf + BUFSIZE) // boundary
         {
             sd_write(tempbuf, sec);
-            printk_port("clus:%d, clus1:%d\n",clus_of_sec(sec),clus_of_sec(sec+1 ));
-            printk_port("clus22:%d\n", get_next_cluster(clus_of_sec(sec)));
             if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
                 uint32_t dir_new_clus = search_empty_clus(tempbuf);
                 write_fat_table(now_clus, dir_new_clus, tempbuf);
@@ -947,7 +944,6 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         p = get_next_dentry(p, tempbuf, &now_clus, &sec);
     }
     memcpy(p, &new_dentry, sizeof(new_dentry));
-    printk_port("p:%lx, tempbuf: %lx, sec, %d\n", p, tempbuf, sec);
     sd_write(tempbuf, sec);
 
     //4. write dir itself
@@ -1202,6 +1198,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
 {
     uint32_t now_clus = dir_first_clus;
     *sec = first_sec_of_clus(dir_first_clus);
+    printk_port("secin: %d\n",*sec);
     sd_read(buf, *sec);
     dentry_t *p = (dentry_t *)buf;
     uint32_t cnt = 0;
@@ -1213,6 +1210,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
             cnt = 0;
             p = get_next_dentry(p, buf, &now_clus, sec);
             ret_p = p; ret_sec = *sec;
+            printk_port("ret_p:%lx, ret_sec:%d\n", ret_p, ret_sec);
         }
         else{
 
