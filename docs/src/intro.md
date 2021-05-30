@@ -15,6 +15,16 @@
 - 启动器与 SBI：在 FPGA 平台上使用基于 RustSBI 开发的 [lrv-rust-bl](https://github.com/Gallium70/lrv-rust-bl) ，在 QEMU 上 uCore-SMP 系统使用 OpenSBI ，rCore 系统使用 RustSBI
 - 操作系统：选择 [uCore-SMP](https://github.com/TianhuaTao/uCore-SMP) 和 [rCore](https://github.com/rcore-os/rCore)
 
+### 文件结构
+
+```
+.
+├── README.md
+├── docs            docs in mdbook structure
+├── qemu            qemu modified by Campbell He
+└── qemu-build      Where we recommend building qemu here
+```
+
 ## 开发进展
 
 ### QEMU 与 FPGA

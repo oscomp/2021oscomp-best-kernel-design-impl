@@ -1,0 +1,4 @@
+[submodule "qemu"]
+	path = qemu
+	url = https://github.com/duskmoon314/qemu.git
+	branch = riscv-N-stable-5.0
