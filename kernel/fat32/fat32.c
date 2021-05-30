@@ -1211,6 +1211,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
     uint32_t ret_sec = *sec;
 
     while(1){
+        old_clus = now_clus; 
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
             // printk_port("restart cnt\n");
             cnt = 0; 
@@ -1222,9 +1223,8 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
             cnt++;
             p = get_next_dentry(p, buf, &now_clus, sec);
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
-        }
-        old_clus = now_clus;        
-        printk_port("nowclus:%x\n", now_clus);
+        }               
+        // printk_port("nowclus:%x\n", now_clus);
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
 
