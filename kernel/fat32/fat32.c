@@ -1680,6 +1680,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
                                         SEARCH_DIR;
             // 1. found
             if ((p = search2(temp1, now_clus, buf, search_mode, &ignore, &top)) != NULL){ // can't be ignored, because you cant delete rootdir
+                printk_port("success\n");
                 // (1) read in
                 isec_t now_sec = top.sec; // not real now_sec, but fisrt sec of this buf
                 now_clus = clus_of_sec(now_sec);
@@ -1698,13 +1699,12 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
             }
             // 2. not found
             else{
-                // printk_port("fail\n");
-                    kfree(buf);
-                    return -1;
+                printk_port("fail\n");
+                kfree(buf);
+                return -1;
             }
         }
         else{
-            printk_port("dirname :%s\n", temp1);
             // search dir until fail or goto search file
             if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
