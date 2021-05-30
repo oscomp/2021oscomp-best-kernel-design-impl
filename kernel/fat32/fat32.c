@@ -175,7 +175,7 @@ int8 fat32_read_test(const char *filename)
     // if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
     //     !memcmp(p->filename,"MOUNT",5) || !memcmp(p->filename, "UMOUNT", 6) || 
     //     !memcmp(p->filename, "RUN", 3)){
-    if (memcmp(p->filename, "UNLINK", 6)){
+    if (memcmp(p->filename, "UNLINK", 6) && memcmp(p->filename, "PIPE", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -725,11 +725,12 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
     uint8 fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0) return -1;
 
-    if (count == 0) return 0;
-    if (current_running->fd[fd_index].dev == STDOUT){
-        memcpy(stdout_buf, buff, count);
-        stdout_buf[count] = 0;
-        return printk_port(stdout_buf);
+    // if (count == 0) return 0;
+    if (current_running->fd[fd_index].dev == STDOUT){        
+        for (uint i = 0; i < count; ++i){
+            sbi_console_putchar(*(buff + i));
+        }
+        return count;
     }
     else{
         if (current_running->fd[fd_index].piped == FD_PIPED)
