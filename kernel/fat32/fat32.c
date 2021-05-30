@@ -935,7 +935,6 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         {
             sd_write(tempbuf, sec);
             if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
-                printk_port("bad\n");
                 uint32_t dir_new_clus = search_empty_clus(tempbuf);
                 write_fat_table(now_clus, dir_new_clus, tempbuf);
                 now_clus = dir_new_clus;
@@ -1305,8 +1304,9 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
         }
 
         if (get_cluster_from_dentry(p) == cluster){
+            strcpy(buf, filename);
             kfree(filename);
-            return filename;
+            return buf;
         }
         else
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
@@ -1520,7 +1520,6 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
             }
             filename[name_cnt++] = 0;
         }
-        printk_port("name :%s, filename :%s\n", name, filename);
 
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
             pos->offset = (void*)top_pt - (void*)buf;
@@ -1604,8 +1603,8 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
     // arrived root dir
     if (is_root_dir)
         strcpy(output, "/");
-
-    strcat(output, temp_filename);
+    else
+        strcpy(output, temp_filename);
 
     kfree(temp_filename);
     kfree(buff);
