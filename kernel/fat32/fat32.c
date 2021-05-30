@@ -525,12 +525,10 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
             // 2.create
             else{
                 if (search_mode == SEARCH_DIR || (flags & O_CREATE) == 0){
-                    printk_port("no\n");
                     kfree(buf);
                     return -1;
                 }// you cant mkdir here! BUT you can create a file
                 else{
-                    printk_port("yes\n");
                     ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
                     p = buf;
                     set_dentry_cluster(p, new_clus);
@@ -806,6 +804,7 @@ unicode_t char2unicode(char ch)
 /* now_clus : now dir cluster */
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_t mode)
 {
+    printk_port("create filename: %s\n", temp1);
     int noextname = 1;
     uchar *temp3 = temp1;
     while (*temp3 != '.' && *temp3 != '\0') temp3++;
@@ -936,6 +935,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         {
             sd_write(tempbuf, sec);
             if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
+                printk_port("bad\n");
                 uint32_t dir_new_clus = search_empty_clus(tempbuf);
                 write_fat_table(now_clus, dir_new_clus, tempbuf);
                 now_clus = dir_new_clus;
@@ -1583,11 +1583,11 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
         assert(filename != NULL);
 
         strcpy(output, "/");
-        // printk_port("output :%s\n", output);
+        printk_port("output1 :%s\n", output);
         strcat(output, filename);
-        // printk_port("output :%s\n", output);
+        printk_port("output2 :%s\n", output);
         strcat(output, temp_filename);
-        // printk_port("output :%s\n", output);
+        printk_port("output3 :%s\n", output);
         strcpy(temp_filename, output);
         // printk_port("tempname :%s\n", temp_filename);
 
