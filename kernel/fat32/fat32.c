@@ -1209,7 +1209,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
     dentry_t *ret_p = p;
     uint32_t ret_sec = *sec;
 
-    for (uint i = 0; i < 255; i++){
+    while(1){
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
             printk_port("restart cnt\n");
             cnt = 0; 
@@ -1226,17 +1226,21 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         printk_port("nowclus:%x\n", now_clus);
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
+
             printk_port("new clus:%d\n", now_clus);
-            *sec = first_sec_of_clus(now_clus);
-            // printk_port("new sec:%d\n", *sec);
-            write_fat_table(old_clus, now_clus, buf);
-            sd_read(buf, *sec);
+
+            printk_port("new sec:%d, ret_sec:%d\n", first_sec_of_clus(now_clus), ret_sec);
+
+            write_fat_table(old_clus, now_clus, buf); // make sure old can find new
+
             printk_port("here, p:%lx, ret_p:%lx\n", p, ret_p);
-            if (!cnt) ret_sec = *sec;
+
+            // need to return beginning sec, so change sec only if not start cnt
+            if (!cnt) *sec = first_sec_of_clus(now_clus); 
+            return ret_p;
             // p = buf; (must be)
         }    
     }
-    return NULL;
 }
 
 /* search if cluster exists in dir now_clus */
