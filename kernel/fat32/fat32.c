@@ -172,9 +172,9 @@ int8 fat32_read_test(const char *filename)
     //     return 1;
     // }
 
-    if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-        !memcmp(p->filename, "RUN", 3)){
-    // if (memcmp(p->filename, "PIPE", 4)){
+    // if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
+    //     !memcmp(p->filename, "RUN", 3)){
+    if (memcmp(p->filename, "PIPE", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -653,15 +653,30 @@ size_t fat32_seek(fd_num_t fd, size_t off)
 /* return read count */
 int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
 {
+    uint64_t buf_kva = get_kva_of(buf, current_running->pgdir);
     while (pipes[pip_num].r_valid != PIPE_INVALID && pipes[pip_num].top == pipes[pip_num].bottom){
         do_block(&current_running->list, &pipes[pip_num].wait_list);
         do_scheduler();
     }
-
     uint32_t readsize = min(pipes[pip_num].top - pipes[pip_num].bottom, count); // neq count
-    memcpy(buf, pipes[pip_num].buff + pipes[pip_num].bottom, readsize); // maybe exceed?
+    memcpy(buf_kva, pipes[pip_num].buff + pipes[pip_num].bottom, readsize); // maybe exceed?
     pipes[pip_num].bottom += readsize;
     return readsize;
+}
+
+/* write pipe */
+/* return write count */
+int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
+{
+    if (pipes[pip_num].w_valid != PIPE_VALID)
+        return -1;
+    if (pipes[pip_num].top + count > PIPE_BUF_SIZE)
+        return -1;
+    memcpy(pipes[pip_num].buff + pipes[pip_num].top, buf, count);
+    pipes[pip_num].top += count;
+    if (!list_empty(&pipes[pip_num].wait_list))
+        do_unblock(pipes[pip_num].wait_list.next);
+    return count; // write count
 }
 
 /* success : read count */
@@ -687,6 +702,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
         memcpy(buf, buff, readsize);
         buf += readsize;
         mycount += readsize;
+        current_running->fd[fd_index].pos += readsize;
         if (mycount % CLUSTER_SIZE == 0){
             now_clus = get_next_cluster(now_clus);
             now_sec = first_sec_of_clus(now_clus);
@@ -698,21 +714,6 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     kfree(buff);
 
     return realcount;
-}
-
-/* write pipe */
-/* return write count */
-int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
-{
-    if (pipes[pip_num].w_valid != PIPE_VALID)
-        return -1;
-    if (pipes[pip_num].top + count > PIPE_BUF_SIZE)
-        return -1;
-    memcpy(pipes[pip_num].buff + pipes[pip_num].top, buf, count);
-    pipes[pip_num].top += count;
-    if (!list_empty(&pipes[pip_num].wait_list))
-        do_unblock(pipes[pip_num].wait_list.next);
-    return count; // write count
 }
 
 /* write count bytes from buff to file in fd */
