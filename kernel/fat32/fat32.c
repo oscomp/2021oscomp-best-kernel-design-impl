@@ -832,6 +832,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
     // find empty entry
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
+    printk_port("sec here: %d\n",sec);
     now_clus = clus_of_sec(sec);
     ientry_t new_clus = search_empty_clus(tempbuf);
 
@@ -931,9 +932,12 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     {
         memcpy(p, &long_entries[demand - 2 - i], sizeof(dentry_t));
 
+        printk_port("p+1: %lx, te:%lx\n", p+1, tempbuf+BUFSIZE);
         if (p + 1 == tempbuf + BUFSIZE) // boundary
         {
             sd_write(tempbuf, sec);
+            printk_port("clus:%d, clus1:%d\n",clus_of_sec(sec),clus_of_sec(sec+1 ));
+            printk_port("clus22:%d\n", get_next_cluster(clus_of_sec(sec)));
             if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
                 uint32_t dir_new_clus = search_empty_clus(tempbuf);
                 write_fat_table(now_clus, dir_new_clus, tempbuf);
@@ -1674,7 +1678,6 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
         struct dir_pos top;
 
         if (isend){
-            printk_port("filename :%s\n", temp1);
             // success
             search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
                                         ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
