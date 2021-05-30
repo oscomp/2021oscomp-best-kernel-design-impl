@@ -25,14 +25,7 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-#define ACCEPT_NUM  26
-uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
-    {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
-    {"gettimeofday"}, {"mkdir_"}, {"open"}, 
-    {"openat"}, {"read"}, {"sleep"}, {"times"}, 
-    {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
-            
-    };
+// #define ACCEPT_NUM  26
 // uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
 //     {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
 //     {"gettimeofday"}, {"mkdir_"}, {"open"}, 
@@ -40,6 +33,13 @@ uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"},
 //     {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
             
 //     };
+// // uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
+// //     {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
+// //     {"gettimeofday"}, {"mkdir_"}, {"open"}, 
+// //     {"openat"}, {"read"}, {"sleep"}, {"times"}, 
+// //     {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
+            
+// //     };
 
 
 uint8_t fat32_init()
@@ -173,10 +173,9 @@ int8 fat32_read_test(const char *filename)
     // }
 
     if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-        !memcmp(p->filename, "MMAP", 4) || !memcmp(p->filename,"MOUNT",5) ||
-        !memcmp(p->filename, "MUNMAP", 6) || !memcmp(p->filename, "UMOUNT", 6) || 
+        !memcmp(p->filename,"MOUNT",5) || !memcmp(p->filename, "UMOUNT", 6) || 
         !memcmp(p->filename, "RUN", 3)){
-    // if (memcmp(p->filename, "UNLINK", 4)){
+    // if (memcmp(p->filename, "MMAP", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -500,9 +499,6 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
                                         SEARCH_DIR;
             // 1. found
             if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
-                // printk_port("p:%lx\n",p);
-                // printk_port("length: %d\n", p->length);
-                // printk_port("clus: %d, ignore :%d\n", get_cluster_from_dentry(p), ignore);
                 if (ignore){
                     // use buf to non-null
                     p = buf;
@@ -643,6 +639,17 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
     return -1;
 }
 
+/* seek pos */
+/* return pos if success, fail return -1 */
+size_t fat32_seek(fd_num_t fd, size_t off)
+{
+    uint8_t fd_index = get_fd_index(fd, current_running);
+    if (fd_index < 0 || !current_running->fd[fd_index].used)
+        return -1;
+    current_running->fd[fd_index].pos = off;
+    return off;
+}
+
 /* read from pipe */
 /* return read count */
 int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
@@ -678,7 +685,6 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     while (mycount < realcount){
         size_t readsize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
         sd_read(buff, now_sec);
-        // printk_port("buff: %s\n");
         memcpy(buf, buff, readsize);
         buf += readsize;
         mycount += readsize;
@@ -730,7 +736,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
             return pipe_write(buff, current_running->fd[fd_index].pip_num, count);
 
         size_t mycount = 0;
-        size_t realcount = min(count, current_running->fd[fd_index].length);
+        size_t realcount = count; // write as many as possible
         uchar *tempbuff = kalloc();
         ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
         ientry_t old_clus = now_clus;
@@ -739,7 +745,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         while (mycount < realcount){
             size_t writesize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
             sd_read(tempbuff,now_sec);
-            memcpy(tempbuff, buff, writesize);
+            memcpy(tempbuff + current_running->fd[fd_index].pos, buff, writesize);
             sd_write(tempbuff,now_sec);
             buff += writesize;
             mycount += writesize;
@@ -756,8 +762,11 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
             else
                 now_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
         }
+        current_running->fd[fd_index].pos += realcount;
+        current_running->fd[fd_index].length = max(current_running->fd[fd_index].pos, current_running->fd[fd_index].length);
 
         kfree(tempbuff);
+
         return realcount;
     }
 }
@@ -795,18 +804,26 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     int noextname = 1;
     uchar *temp3 = temp1;
     while (*temp3 != '.' && *temp3 != '\0') temp3++;
-    if (*temp3 == '.'){
+    if (*temp3 == '.' && mode == FILE_FILE){
         noextname = 0; *temp3 = '\0';temp3++;
     }
 
+    /* filename length, ext name length and total length */
+
+    uint32_t filename_length = strlen(temp1);
+    uint32_t extname_length = strlen(temp3);
+
+    if (!noextname)
+        *(temp3 - 1) = '.';
     uint32_t length = strlen(temp1);
+    
     uint32_t parent_first_clus = now_clus;
     dentry_t *p;
 
     /* never move temp1 */
 
     uint32_t demand, sec;
-    if (length <= 8)
+    if (filename_length <= 8)
         demand = 1;
     else
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
@@ -824,9 +841,9 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     // filename:
     if (demand == 1){
         // only short
-        for (uint i = 0; i < length; ++i)
+        for (uint i = 0; i < filename_length; ++i)
             new_dentry.filename[i] = *(temp1+i);
-        for (uint i = length; i < 8; ++i)
+        for (uint i = filename_length; i < 8; ++i)
             new_dentry.filename[i] = ' ';
     }
     else{
@@ -836,16 +853,16 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     }
 
     // extname:
-    if (mode == FILE_DIR || noextname)
+    if (noextname)
         for (uint i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
             new_dentry.extname[i] = ' ';
     else{
-        uint i = 0;
-        while (*temp3 != 0)
-            new_dentry.extname[i++] = *temp3++;
-        for (uint j = i; j < 3; ++j)
-            new_dentry.extname[j] = ' ';
+        for (uint i = 0; i < extname_length; ++i)
+            new_dentry.extname[i] = (*(temp3+i) <= 'z' && *(temp3+i) >= 'a')? *(temp3+i) - 'a' + 'A' : *(temp3+i);
+        for (uint i = extname_length; i < 3; ++i)
+            new_dentry.extname[i] = ' ';
     }
+
     // attribute
     if (mode == FILE_DIR)
         new_dentry.attribute = FILE_ATTRIBUTE_CHDIR;
@@ -892,7 +909,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
                                             (now_len == length)? 0x0000 :
                                             0xffffu;
             }
-            long_entries[j].sequence = (0x40 | (j + 1)) & 0x4f;   
+            long_entries[j].sequence = (j == demand - 2)? (0x40 | (j + 1)) & 0x4f : (j + 1) & 0x0f;   
             long_entries[j].attribute = FILE_ATTRIBUTE_LONG;
             long_entries[j].reserved = 0;
             // checksum
@@ -1581,8 +1598,13 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
     kfree(temp_filename);
     kfree(buff);
 
-    if (!buf)
-        buf = (uchar*)kmalloc(strlen(output) + 1);
+    if (!buf){
+        buf = do_brk(0);
+        buf = do_brk(buf + strlen(output) + 1);
+    }
+
+    // if (!buf)
+    //     buf = (uchar*)kmalloc(strlen(output) + 1);
 
     strcpy(buf, output);
     kfree(output);
@@ -1684,26 +1706,6 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
     }
 }
 
-
-int16 fat32_mount()
-{
-    return -1;
-}
-
-int16 fat32_umount()
-{
-    return -1;
-}
-
-int64 fat32_mmap()
-{
-    return -1;
-}
-
-int64 fat32_munmap()
-{
-    return -1;
-}
 
 /* close fd */
 /* success return 0, fail return 1*/

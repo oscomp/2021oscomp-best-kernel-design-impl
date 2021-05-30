@@ -38,7 +38,7 @@ SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c
 SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
-SRC_FAT32	= ./kernel/fat32/fat32.c
+SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c
 SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
@@ -64,7 +64,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker-k210.ld
 
-K210_SERIALPORT	= /dev/ttyUSB1
+K210_SERIALPORT	= /dev/ttyUSB2
 
 .PHONY:all
 

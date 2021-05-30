@@ -95,8 +95,8 @@ typedef struct fd{
     uint64 pos;
     /* length */
     uint32 length;
-    /* remapped number */
-    /* default: index in fd array*/
+    /* fd number */
+    /* default: its index in fd-array*/
     fd_num_t fd_num;
 
     /* used */
@@ -106,8 +106,18 @@ typedef struct fd{
     uint8 piped;
     pipe_num_t pip_num;
 
+    /* mmap */
+    struct {
+        void *start;
+        size_t len;
+        int prot;
+        int flags;
+        off_t off;
+    }mmap;
+    /* links */
     uint8 nlink;
 
+    /* status */
     uid_t uid;
     gid_t gid;
 

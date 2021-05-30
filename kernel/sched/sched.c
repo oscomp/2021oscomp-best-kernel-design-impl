@@ -399,7 +399,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp)
                 return -1;
             }
             length = current_running->fd[fd].length;
-            _elf_binary = (char *)kmalloc(length);
+            _elf_binary = (char *)allocproc();
             fat32_read(fd, _elf_binary, length);
 
             uintptr_t pgdir = allocPage();

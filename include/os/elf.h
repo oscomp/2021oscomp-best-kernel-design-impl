@@ -250,6 +250,7 @@ static inline uintptr_t load_elf(
         ptr_sh_table += sh_entry_size;
         shdr = (Elf64_Shdr *)ptr_sh_table;
     }
+    /* for brk */
     shdr = ptr_sh_table - sh_entry_size; // last data
     *edata = shdr->sh_addr + shdr->sh_size;
     return ehdr->e_entry;

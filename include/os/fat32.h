@@ -182,26 +182,38 @@ enum{
 
 extern fat_t fat;
 
-int16 fat32_open(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
 int8 fat32_read_test(const char *filename);
+
+int16 fat32_open(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
+int16 fat32_close(fd_num_t fd);
+
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count);
+
 int16 fat32_mkdir(fd_num_t dirfd, const uchar *path, uint32_t mode);
-int16 fat32_close(fd_num_t fd);
 int16 fat32_chdir(const char* path_t);
+
 uchar *fat32_getcwd(uchar *buf, size_t size);
+
 fd_num_t fat32_dup(fd_num_t fd);
 fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use);
+
 int16 fat32_fstat(fd_num_t fd, struct kstat *kst);
+
 int64 fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
+
 int16 fat32_pipe2(fd_num_t fd[], int32 mode);
+
+size_t fat32_seek(fd_num_t fd, size_t off);
 
 int16 fat32_link();
 int16 fat32_unlink(fd_num_t dirfd, const char* path, uint32_t flags);
+
 int16 fat32_mount();
 int16 fat32_umount();
-int64 fat32_mmap();
-int64 fat32_munmap();
+
+int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off);
+int64 fat32_munmap(void *start, size_t len);
 
 void init_inode();
 void init_pipe();
