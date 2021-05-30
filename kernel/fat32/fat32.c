@@ -1219,6 +1219,7 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         }
         old_clus = now_clus;
         p = get_next_dentry(p, buf, &now_clus, sec);
+        printk_port("noeclus:%x\n");
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
             printk_port("old sec:%d\n", *sec);
