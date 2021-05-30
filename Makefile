@@ -62,7 +62,7 @@ SRC_ELF2CHAR = ./tools/elf2char.c
 
 SRC_BURNER	= ./tools/kflash.py
 
-SRC_LINKER = ./linker-k210.ld
+SRC_LINKER = ./riscv.lds
 
 K210_SERIALPORT	= /dev/ttyUSB0
 
@@ -94,13 +94,11 @@ createimage: ${SRC_IMAGE}
 
 image: createimage head main 
 	./createimage --extended head head.bin
-	cp rustsbi-k210.bin k210.bin
-# 	cp sbi-k210 k210.bin
+	cp ./bootloader/rustsbi-k210.bin k210.bin
 	dd if=head.bin of=k210.bin bs=128K seek=1
 
 run:
-	sudo python3 kflash.py -p ${K210_SERIALPORT} -b 1500000 k210.bin
-# 	sudo minicom
+	sudo python3 ./tools/kflash.py -p ${K210_SERIALPORT} -b 1500000 k210.bin
 	sudo python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct ${K210_SERIALPORT} 115200
 
 clean:

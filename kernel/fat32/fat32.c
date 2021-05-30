@@ -25,23 +25,6 @@ pipe_t pipes[NUM_PIPE];
 uchar stdout_buf[NORMAL_PAGE_SIZE];
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
-// #define ACCEPT_NUM  26
-// uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
-//     {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
-//     {"gettimeofday"}, {"mkdir_"}, {"open"}, 
-//     {"openat"}, {"read"}, {"sleep"}, {"times"}, 
-//     {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
-            
-//     };
-// // uchar accept_table[26][20] = {{"brk"}, {"chdir"}, {"clone"}, {"close"}, {"dup"}, {"dup2"}, {"execve"},
-// //     {"exit"}, {"fork"}, {"fstat"}, {"getcwd"}, {"getdents"}, {"getpid"}, {"getppid"},
-// //     {"gettimeofday"}, {"mkdir_"}, {"open"}, 
-// //     {"openat"}, {"read"}, {"sleep"}, {"times"}, 
-// //     {"uname"},{"wait"}, {"waitpid"}, {"write"} ,{"yield"} 
-            
-// //     };
-
-
 uint8_t fat32_init()
 {
     /* read FAT32 info */
@@ -158,23 +141,9 @@ int8 fat32_read_test(const char *filename)
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
-    /* debug return */
-    // uint8 i;
-    // for (i = 0; i < ACCEPT_NUM; ++i)
-    // {
-    //     uint8 num = (strlen(accept_table[i]) > 6)? 6 : strlen(accept_table[i]);
-    //     if (!memcmp(p->filename, accept_table[i], num)){
-    //         break;
-    //     }
-    // }
-    // if (i == ACCEPT_NUM){
-    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-    //     return 1;
-    // }
 
-    // if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-    //     !memcmp(p->filename, "RUN", 3)){
-    if (memcmp(p->filename, "PIPE", 4)){
+    if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
+        !memcmp(p->filename, "RUN", 3)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -205,21 +174,6 @@ int8 fat32_read_test(const char *filename)
 
     cwd_first_clus = root_first_clus;
     cwd_clus = first_sec_of_clus(cwd_first_clus);
-    // static uint cnt = 0;
-    // uchar *file = allocproc();
-
-    // fd_num_t fd = fat32_open(AT_FDCWD ,&accept_table[cnt][0], O_RDWR, 0);
-    
-    // cnt++;
-
-    // length = fat32_read(fd, file, 1000000);
-
-    // printk_port("filename: %s\n", &accept_table[cnt-1][0]);
-    // printk_port("length: %d\n", length);
-
-    // fat32_close(fd);
-
-    // _elf_binary = file;
 
 #else
 
@@ -260,12 +214,6 @@ int8 fat32_read_test(const char *filename)
             p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
             #endif
 
-            // if (cnt == ACCEPT_NUM)
-            //     return 0;
-            // else{
-            //     printk_port("<finish>\n");
-            //     return -1;
-            // }
             return -1;
         }
     assert(0);
