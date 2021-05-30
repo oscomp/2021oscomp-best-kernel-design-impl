@@ -831,12 +831,14 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         demand = 1;
     else
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
+    printk_port("demand %d\n",demand);
+    printk_port("nnn:%s\n",temp1);
     // find empty entry
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
     now_clus = clus_of_sec(sec);
     ientry_t new_clus = search_empty_clus(tempbuf);
 
-    if (!p) assert(0);
+    assert(p != NULL);
 
     // 1. prepare short entry
     dentry_t new_dentry;
@@ -1582,11 +1584,11 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
         assert(filename != NULL);
 
         strcpy(output, "/");
-        printk_port("output1 :%s\n", output);
+        // printk_port("output1 :%s\n", output);
         strcat(output, filename);
-        printk_port("output2 :%s\n", output);
+        // printk_port("output2 :%s\n", output);
         strcat(output, temp_filename);
-        printk_port("output3 :%s\n", output);
+        // printk_port("output3 :%s\n", output);
         strcpy(temp_filename, output);
         // printk_port("tempname :%s\n", temp_filename);
 
