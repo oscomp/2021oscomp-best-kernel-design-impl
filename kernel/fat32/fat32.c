@@ -1212,13 +1212,13 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
 
     while(1){
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
-            printk_port("restart cnt\n");
+            // printk_port("restart cnt\n");
             cnt = 0; 
             p = get_next_dentry(p, buf, &now_clus, sec);          
             ret_p = p; ret_sec = *sec;
         }
         else{
-            printk_port("cnt is %d\n", cnt + 1);
+            // printk_port("cnt is %d\n", cnt + 1);
             cnt++;
             p = get_next_dentry(p, buf, &now_clus, sec);
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
@@ -1228,13 +1228,15 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
 
+            printk_port("old clus:%d\n", old_clus);
             printk_port("new clus:%d\n", now_clus);
 
-            printk_port("new sec:%d, ret_sec:%d\n", first_sec_of_clus(now_clus), ret_sec);
+            // printk_port("new sec:%d, ret_sec:%d\n", first_sec_of_clus(now_clus), ret_sec);
 
             write_fat_table(old_clus, now_clus, buf); // make sure old can find new
 
-            printk_port("here, p:%lx, ret_p:%lx\n", p, ret_p);
+            // printk_port("here, p:%lx, ret_p:%lx\n", p, ret_p);
+            printk_port("get_next_cluster: %d\n", get_next_cluster(old_clus));
 
             // need to return beginning sec, so change sec only if not start cnt
             // already start cnt: ret_sec is real
