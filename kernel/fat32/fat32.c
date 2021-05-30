@@ -172,10 +172,10 @@ int8 fat32_read_test(const char *filename)
     //     return 1;
     // }
 
-    // if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-    //     !memcmp(p->filename,"MOUNT",5) || !memcmp(p->filename, "UMOUNT", 6) || 
-    //     !memcmp(p->filename, "RUN", 3)){
-    if (memcmp(p->filename, "UNLINK", 6) && memcmp(p->filename, "PIPE", 4)){
+    if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
+        !memcmp(p->filename,"MOUNT",5) || !memcmp(p->filename, "UMOUNT", 6) || 
+        !memcmp(p->filename, "RUN", 3)){
+    // if (memcmp(p->filename, "UNLINK", 6) && memcmp(p->filename, "PIPE", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
