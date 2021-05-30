@@ -942,6 +942,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
             // }
         }
         p = get_next_dentry(p, tempbuf, &now_clus, &sec);
+        printk_port("sec: %d\n", sec);
     }
     memcpy(p, &new_dentry, sizeof(new_dentry));
     sd_write(tempbuf, sec);
