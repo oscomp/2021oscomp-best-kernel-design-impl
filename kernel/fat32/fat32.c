@@ -1174,19 +1174,21 @@ void write_fat_table(uint32_t old_clus, uint32_t new_clus, uchar *buff)
 uint32_t search_empty_clus(uchar *buf)
 {
     uint32_t now_sec = fat.first_data_sec - fat.bpb.fat_sz;
-    uint32_t now_clus = clus_of_sec(now_sec);
     sd_read(buf, now_sec);
-    uchar *temp = buf;
     uint j = 0;
     while (1){
         uint i;
         for (i = 0; i < 4; ++i)
         {
-            if (*(temp + i + j))
+            if (*(buf + i + (j % BUFSIZE)))
                 break;
         }
         if (i == 4) break;
         else j += 4;
+        if (j % BUFSIZE == 0){
+            now_sec += READ_BUF_CNT;
+            sd_read(buf, now_sec);
+        }
     }
     write_fat_table(0, j/4, buf);
     return j/4;
