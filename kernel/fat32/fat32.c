@@ -1210,10 +1210,11 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
             cnt = 0;
             p = get_next_dentry(p, buf, &now_clus, sec);
             ret_p = p; ret_sec = *sec;
+            printk_port("now_clus:%lx\n",now_clus);
             printk_port("ret_p:%lx, ret_sec:%d\n", ret_p, ret_sec);
         }
         else{
-
+            printk_port("start cnt\n");
             cnt++;
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
             else{
