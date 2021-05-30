@@ -1673,6 +1673,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
         struct dir_pos top;
 
         if (isend){
+            printk_port("filename :%s\n", temp1);
             // success
             search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
                                         ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
@@ -1703,6 +1704,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
             }
         }
         else{
+            printk_port("dirname :%s\n", temp1);
             // search dir until fail or goto search file
             if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
