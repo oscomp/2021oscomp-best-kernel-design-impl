@@ -1221,9 +1221,12 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         p = get_next_dentry(p, buf, &now_clus, sec);
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
+            printk_port("old sec:%d\n", *sec);
             *sec = first_sec_of_clus(now_clus);
+            printk_port("new sec:%d\n", *sec);
             write_fat_table(old_clus, now_clus, buf);
             sd_read(buf, *sec);
+            printk_port("here, p:%lx, buf:%lx\n", p, buf);
             // p = buf; (must be)
         }    
     }
