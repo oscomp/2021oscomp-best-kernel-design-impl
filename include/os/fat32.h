@@ -234,6 +234,8 @@ dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_
 uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags);
 int16 get_fd_index(fd_num_t fd, void *pcb);
 
+void write_fat_table(uint32_t old_clus, uint32_t new_clus, uchar *buff);
+
 uchar unicode2char(uint16_t unich);
 unicode_t char2unicode(char ch);
 

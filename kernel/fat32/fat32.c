@@ -832,7 +832,6 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
     // find empty entry
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
-    printk_port("sec here: %d\n",sec);
     now_clus = clus_of_sec(sec);
     ientry_t new_clus = search_empty_clus(tempbuf);
 
@@ -926,6 +925,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     }
 
     // 3. write entry
+    printk_port("sec now:%d\n", sec);
     sd_read(tempbuf, sec); // if no sec then p is meaningless
     for (uint i = 0; i < demand - 1; ++i)
     {
@@ -935,11 +935,11 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         if (p + 1 == tempbuf + BUFSIZE) // boundary
         {
             sd_write(tempbuf, sec);
-            if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
-                uint32_t dir_new_clus = search_empty_clus(tempbuf);
-                write_fat_table(now_clus, dir_new_clus, tempbuf);
-                now_clus = dir_new_clus;
-            }
+            // if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
+            //     uint32_t dir_new_clus = search_empty_clus(tempbuf);
+            //     write_fat_table(now_clus, dir_new_clus, tempbuf);
+            //     now_clus = dir_new_clus;
+            // }
         }
         p = get_next_dentry(p, tempbuf, &now_clus, &sec);
     }
@@ -1197,8 +1197,8 @@ uint32_t search_empty_clus(uchar *buf)
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec)
 {
     uint32_t now_clus = dir_first_clus;
+    uint32_t old_clus;
     *sec = first_sec_of_clus(dir_first_clus);
-    printk_port("secin: %d\n",*sec);
     sd_read(buf, *sec);
     dentry_t *p = (dentry_t *)buf;
     uint32_t cnt = 0;
@@ -1207,20 +1207,22 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
 
     for (uint i = 0; i < 255; i++){
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
-            cnt = 0;
-            p = get_next_dentry(p, buf, &now_clus, sec);
+            cnt = 0;            
             ret_p = p; ret_sec = *sec;
-            printk_port("now_clus:%lx\n",now_clus);
-            printk_port("ret_p:%lx, ret_sec:%d\n", ret_p, ret_sec);
         }
         else{
-            printk_port("start cnt\n");
             cnt++;
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
-            else{
-                p = get_next_dentry(p, buf, &now_clus, sec);
-            }
         }
+        old_clus = now_clus;
+        p = get_next_dentry(p, buf, &now_clus, sec);
+        if (now_clus == 0x0fffffff){
+            now_clus = search_empty_clus(buf);
+            *sec = first_sec_of_clus(now_clus);
+            write_fat_table(old_clus, now_clus, buf);
+            sd_read(buf, *sec);
+            // p = buf; (must be)
+        }    
     }
     return NULL;
 }
