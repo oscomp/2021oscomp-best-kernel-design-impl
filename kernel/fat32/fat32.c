@@ -493,13 +493,11 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
 
         if (isend){
             // success
-            printk_port("open filename: %s\n", temp1);
             search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
                                         ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
                                         SEARCH_DIR;
             // 1. found
             if ((p = search(temp1, now_clus, buf, search_mode, &ignore, NULL)) != NULL || ignore == 1){
-                printk_port("found\n");
                 if (ignore){
                     // use buf to non-null
                     p = buf;
@@ -526,12 +524,13 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
             }
             // 2.create
             else{
-                printk_port("create\n");
                 if (search_mode == SEARCH_DIR || (flags & O_CREATE) == 0){
+                    printk_port("no\n");
                     kfree(buf);
                     return -1;
                 }// you cant mkdir here! BUT you can create a file
                 else{
+                    printk_port("yes\n");
                     ientry_t new_clus = _create_new(temp1, now_clus, buf, FILE_FILE);
                     p = buf;
                     set_dentry_cluster(p, new_clus);
