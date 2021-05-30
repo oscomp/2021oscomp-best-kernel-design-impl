@@ -804,7 +804,6 @@ unicode_t char2unicode(char ch)
 /* now_clus : now dir cluster */
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_t mode)
 {
-    printk_port("create filename: %s\n", temp1);
     int noextname = 1;
     uchar *temp3 = temp1;
     while (*temp3 != '.' && *temp3 != '\0') temp3++;
@@ -831,8 +830,6 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         demand = 1;
     else
         demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for /, 1 for short entry
-    printk_port("demand %d\n",demand);
-    printk_port("nnn:%s\n",temp1);
     // find empty entry
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
     now_clus = clus_of_sec(sec);
@@ -928,6 +925,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     }
 
     // 3. write entry
+    printk_port("p:%lx, tempbuf: %lx, sec, %d\n", p, tempbuf, sec);
     sd_read(tempbuf, sec); // if no sec then p is meaningless
     for (uint i = 0; i < demand - 1; ++i)
     {
@@ -945,7 +943,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
         p = get_next_dentry(p, tempbuf, &now_clus, &sec);
     }
     memcpy(p, &new_dentry, sizeof(new_dentry));
-
+    printk_port("p:%lx, tempbuf: %lx, sec, %d\n", p, tempbuf, sec);
     sd_write(tempbuf, sec);
 
     //4. write dir itself
