@@ -1198,6 +1198,7 @@ uint32_t search_empty_clus(uchar *buf)
 /* make sure demand != 0 */
 /* suggest we can find a result, or endless loop */
 /* return top and modify sec as top*/
+/* make sure a dirent is no longer than 1 clus */
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec)
 {
     uint32_t now_clus = dir_first_clus;
@@ -1236,9 +1237,12 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
             printk_port("here, p:%lx, ret_p:%lx\n", p, ret_p);
 
             // need to return beginning sec, so change sec only if not start cnt
+            // already start cnt: ret_sec is real
+            // not already start: ret_sec is first sec of (0x0fffffff), so we have next 2 lines
             if (!cnt) *sec = first_sec_of_clus(now_clus); 
+            else *sec = ret_sec;
+            // ret_p = p = buf; (must be)
             return ret_p;
-            // p = buf; (must be)
         }    
     }
 }
