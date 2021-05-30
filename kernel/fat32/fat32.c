@@ -926,24 +926,14 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_
     }
 
     // 3. write entry
-    printk_port("sec now:%d\n", sec);
     sd_read(tempbuf, sec); // if no sec then p is meaningless
     for (uint i = 0; i < demand - 1; ++i)
     {
         memcpy(p, &long_entries[demand - 2 - i], sizeof(dentry_t));
 
-        printk_port("p+1: %lx, te:%lx\n", p+1, tempbuf+BUFSIZE);
         if (p + 1 == tempbuf + BUFSIZE) // boundary
-        {
             sd_write(tempbuf, sec);
-            // if (clus_of_sec(sec + 1) != clus_of_sec(sec) && get_next_cluster(clus_of_sec(sec)) == 0x0fffffff){
-            //     uint32_t dir_new_clus = search_empty_clus(tempbuf);
-            //     write_fat_table(now_clus, dir_new_clus, tempbuf);
-            //     now_clus = dir_new_clus;
-            // }
-        }
         p = get_next_dentry(p, tempbuf, &now_clus, &sec);
-        printk_port("sec: %d\n", sec);
     }
     memcpy(p, &new_dentry, sizeof(new_dentry));
     sd_write(tempbuf, sec);
@@ -1228,15 +1218,15 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
 
-            printk_port("old clus:%d\n", old_clus);
-            printk_port("new clus:%d\n", now_clus);
+            // printk_port("old clus:%d\n", old_clus);
+            // printk_port("new clus:%d\n", now_clus);
 
             // printk_port("new sec:%d, ret_sec:%d\n", first_sec_of_clus(now_clus), ret_sec);
 
             write_fat_table(old_clus, now_clus, buf); // make sure old can find new
 
             // printk_port("here, p:%lx, ret_p:%lx\n", p, ret_p);
-            printk_port("get_next_cluster: %d\n", get_next_cluster(old_clus));
+            // printk_port("get_next_cluster: %d\n", get_next_cluster(old_clus));
 
             // need to return beginning sec, so change sec only if not start cnt
             // already start cnt: ret_sec is real

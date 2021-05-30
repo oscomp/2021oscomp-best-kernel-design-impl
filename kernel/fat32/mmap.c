@@ -15,7 +15,7 @@ int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off
     }
 
     uchar *buf = kalloc();
-    fat32_read(fd, buf, off+len);
+    fat32_read(fd, buf, len);
 
     current_running->fd[fd_index].mmap.start = start;
     current_running->fd[fd_index].mmap.len =len;
@@ -23,7 +23,7 @@ int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off
     current_running->fd[fd_index].mmap.flags = flags;
     current_running->fd[fd_index].mmap.off = off;
 
-    memcpy(start, buf + off - 1, len);
+    memcpy(start, buf + off, len);
 
     return start;
 }
@@ -34,7 +34,7 @@ int64 fat32_munmap(void *start, size_t len)
     for (int i = 0; i < NUM_FD; ++i)
     {
         if (current_running->fd[i].used == FD_USED && current_running->fd[i].mmap.start == start){
-            fat32_seek(current_running->fd[i].fd_num, current_running->fd[i].mmap.off - 1);
+            fat32_seek(current_running->fd[i].fd_num, current_running->fd[i].mmap.off);
             fat32_write(current_running->fd[i].fd_num, start, len);
             return 0;
         }
