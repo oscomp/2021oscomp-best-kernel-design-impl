@@ -172,9 +172,9 @@ int8 fat32_read_test(const char *filename)
     //     return 1;
     // }
 
-    if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-        !memcmp(p->filename, "RUN", 3)){
-    // if (memcmp(p->filename, "UMOUNT", 6)){
+    // if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
+    //     !memcmp(p->filename, "RUN", 3)){
+    if (memcmp(p->filename, "PIPE", 4)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -729,6 +729,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         // for (uint i = 0; i < count; ++i){
         //     sbi_console_putchar(*(buff + i));
         // }
+        // printk_port("\npid %d is writing\n", current_running->pid);
         memcpy(stdout_buf, buff, count);
         stdout_buf[count] = 0;
         printk_port(stdout_buf);
@@ -1208,11 +1209,13 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
 
     for (uint i = 0; i < 255; i++){
         if (!is_zero_dentry(p) && 0xE5 != p->filename[0]){
+            printk_port("restart cnt\n");
             cnt = 0; 
             p = get_next_dentry(p, buf, &now_clus, sec);          
             ret_p = p; ret_sec = *sec;
         }
         else{
+            printk_port("cnt is %d\n", cnt + 1);
             cnt++;
             p = get_next_dentry(p, buf, &now_clus, sec);
             if (cnt == demand) {*sec = ret_sec; return ret_p;}
@@ -1221,12 +1224,12 @@ dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t deman
         printk_port("nowclus:%x\n", now_clus);
         if (now_clus == 0x0fffffff){
             now_clus = search_empty_clus(buf);
-            // printk_port("old sec:%d\n", *sec);
+            printk_port("new clus:%d\n", now_clus);
             *sec = first_sec_of_clus(now_clus);
             // printk_port("new sec:%d\n", *sec);
             write_fat_table(old_clus, now_clus, buf);
             sd_read(buf, *sec);
-            printk_port("here, p:%lx, buf:%lx\n", p, buf);
+            printk_port("here, p:%lx, ret_p:%lx\n", p, ret_p);
             if (!cnt) ret_sec = *sec;
             // p = buf; (must be)
         }    
