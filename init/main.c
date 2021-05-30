@@ -68,12 +68,13 @@ static void init_pcb()
     uintptr_t pgdir = allocPage();
     clear_pgdir(pgdir);
     alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+    alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
     uint64_t edata;
     uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper, &edata);
     pcb_underinit->edata = edata;
     shell_pgdir = pgdir;
 
-    init_pcb_stack(pgdir, kernel_stack, user_stack, test_shell, 0, NULL, pcb_underinit);
+    init_pcb_stack(pgdir, kernel_stack, user_stack, test_shell, NULL, pcb_underinit);
     list_add_tail(&pcb_underinit->list,&ready_queue);
 
     /* init pcb */

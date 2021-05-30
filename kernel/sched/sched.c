@@ -168,8 +168,9 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
 }
 
 /* prepare pcb stack for ready process */
+/* prepare USER content, SWITCH content and ARGC&ARGV */
 void init_pcb_stack(
-    ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, int argc ,void *arg,
+    ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, unsigned char* argv[],
     pcb_t *pcb)
 {
     regs_context_t *pt_regs =
@@ -188,8 +189,8 @@ void init_pcb_stack(
     reg_t *regs = pt_regs->regs;    
     regs[3] = gp;  //gp
     regs[4] = pcb; //tp
-    regs[10] = argc; //a0=argc
-    regs[11]= (ptr_t)arg; //a1=argv
+    // regs[10] = argc; //a0=argc
+    // regs[11]= (ptr_t)argv; //a1=argv
     pt_regs->sstatus = SR_SUM; //enable supervisor-mode userpage access
 
 #ifdef K210
@@ -203,6 +204,27 @@ void init_pcb_stack(
     switchto_context_t *switch_to_reg = 
         (switchto_context_t *)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     switch_to_reg->regs[0] = &ret_from_exception;
+
+    uint64_t argc = 0;
+    uint64_t user_stack_kva = get_kva_of(user_stack, pgdir);
+
+    if (argv)
+        while (argv[argc]) argc++;
+
+    memcpy(user_stack_kva, &argc, 8);
+
+    if (argc){
+        unsigned char **pointers = user_stack_kva + 8; // point to argv[i] in i-th iteration
+        unsigned char *strings = user_stack_kva + 8 + argc*sizeof(unsigned char *) + 1; // + 1 for NULL
+        uint64_t write_to_stack = user_stack - NORMAL_PAGE_SIZE + 8 + argc*sizeof(unsigned char*) + 1; // virtual addr for user
+        for (int i = 0; i < argc; ++i)
+        {
+            memcpy(strings,argv[i],strlen(argv[i])+1);
+            pointers[i] = write_to_stack;
+            strings += (strlen(argv[i])+1); write_to_stack += (strlen(argv[i])+1);
+        }
+        pointers[argc] = 0;
+    }
 }
 
 /* copy context */
@@ -404,30 +426,15 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp)
 
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
-            uint64_t user_stack_page_kva = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+            alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+            alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
             uint64_t edata;
             uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper, &edata);
             pcb_underinit->edata = edata;
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
 
-            // copy argc & argv
-            uint argc = 0;
-            while (argv[argc] != NULL) argc++;
-            if (argc){
-                unsigned char **pointers = user_stack_page_kva; // point to argv[i] in i-th iteration
-                unsigned char *strings = user_stack_page_kva + argc*sizeof(unsigned char *) + 1; // + 1 for NULL
-                uint64_t write_to_stack = user_stack - NORMAL_PAGE_SIZE + argc*sizeof(unsigned char*) + 1; // virtual addr for user
-                for (int i = 0; i < argc; ++i)
-                {
-                    memcpy(strings,argv[i],strlen(argv[i])+1);
-                    pointers[i] = write_to_stack;
-                    strings += (strlen(argv[i])+1); write_to_stack += (strlen(argv[i])+1);
-                }
-                pointers[argc] = 0;
-            }
-
             // prepare stack(give argc and argv)(argv = user_stack - NORMAL_PAGE_SIZE)
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argc, user_stack - NORMAL_PAGE_SIZE, pcb_underinit);
+            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, pcb_underinit);
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);

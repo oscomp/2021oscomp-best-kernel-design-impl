@@ -181,6 +181,9 @@ enum{
 #define MAP_FAILED ((void *) -1)
 
 extern fat_t fat;
+extern ientry_t cwd_first_clus;
+extern ientry_t cwd_clus, root_clus, root_first_clus;
+extern isec_t cwd_sec, root_sec;
 
 int8 fat32_read_test(const char *filename);
 
@@ -219,7 +222,7 @@ void init_inode();
 void init_pipe();
 
 
-dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore);
+dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos);
 dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos);
 uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);

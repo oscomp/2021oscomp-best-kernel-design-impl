@@ -173,9 +173,8 @@ int8 fat32_read_test(const char *filename)
     // }
 
     if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-        !memcmp(p->filename,"MOUNT",5) || !memcmp(p->filename, "UMOUNT", 6) || 
         !memcmp(p->filename, "RUN", 3)){
-    // if (memcmp(p->filename, "UNLINK", 6) && memcmp(p->filename, "PIPE", 4)){
+    // if (memcmp(p->filename, "UMOUNT", 6)){
         p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
         return 1;
     }
@@ -242,14 +241,15 @@ int8 fat32_read_test(const char *filename)
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
 
-            uint64_t user_stack_page_kva = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+            alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+            alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
             uint64_t edata;
             uint64_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper,&edata);
-            pcb_underinit->edata = edata;
-            
+            pcb_underinit->edata = edata;            
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
+
             // prepare stack
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, 0, user_stack - NORMAL_PAGE_SIZE, pcb_underinit);
+            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, NULL, pcb_underinit);
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
@@ -498,7 +498,7 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
                                         ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
                                         SEARCH_DIR;
             // 1. found
-            if ((p = search(temp1, now_clus, buf, search_mode, &ignore)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, buf, search_mode, &ignore, NULL)) != NULL || ignore == 1){
                 if (ignore){
                     // use buf to non-null
                     p = buf;
@@ -557,7 +557,7 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
         else{
             // printk_port("dirname: %s\n", temp1);
             // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
                 ++temp2;
                 temp1 = temp2;
@@ -727,9 +727,12 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
 
     // if (count == 0) return 0;
     if (current_running->fd[fd_index].dev == STDOUT){        
-        for (uint i = 0; i < count; ++i){
-            sbi_console_putchar(*(buff + i));
-        }
+        // for (uint i = 0; i < count; ++i){
+        //     sbi_console_putchar(*(buff + i));
+        // }
+        memcpy(stdout_buf, buff, count);
+        stdout_buf[count] = 0;
+        printk_port(stdout_buf);
         return count;
     }
     else{
@@ -1036,7 +1039,7 @@ int16 fat32_chdir(const char* path_t)
 
         if (isend){
             // 1. not found
-            if ((p = search(temp1, now_clus, buff, SEARCH_DIR, &ignore)) == NULL && ignore == 0){
+            if ((p = search(temp1, now_clus, buff, SEARCH_DIR, &ignore, NULL)) == NULL && ignore == 0){
                 // no available dx
                 kfree(buff);
                 return -1;
@@ -1054,7 +1057,7 @@ int16 fat32_chdir(const char* path_t)
         }
         else{
             // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, buff, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, buff, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
                 ++temp2;
                 temp1 = temp2;
@@ -1112,7 +1115,7 @@ int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
 
         if (isend){
             // already exists
-            if (search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore)){
+            if (search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL)){
                 kfree(tempbuf);
                 return 0;
             }
@@ -1123,7 +1126,7 @@ int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
         }
         else{
             // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
                 ++temp2;
                 temp1 = temp2;
@@ -1317,7 +1320,7 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf)
 /* make sure buf size is BUFSIZE */
 /* return BOTTOM dentry point if success, NULL if fail */
 /* ignore if search "." or ".." in root dir */
-dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore)
+dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos)
 {
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
     uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
@@ -1399,10 +1402,16 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
         }
 
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
+            if (pos){
+                pos->sec = now_sec;
+            }
             kfree(filename);
             return p;
         }
         else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
+            if (pos){
+                pos->sec = now_sec;
+            }
             kfree(filename);
             return p;
         }
@@ -1560,7 +1569,7 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
     uint8 is_root_dir = 1;
     uint8 ignore;
 
-    while ((p = search("..", now_clus, buff, SEARCH_DIR, &ignore)) != NULL){
+    while ((p = search("..", now_clus, buff, SEARCH_DIR, &ignore, NULL)) != NULL){
 
         is_root_dir = 0;
 
@@ -1695,7 +1704,7 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
         }
         else{
             // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, buf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
                 ++temp2;
                 temp1 = temp2;

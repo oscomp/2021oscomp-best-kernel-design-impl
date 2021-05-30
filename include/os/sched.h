@@ -233,7 +233,7 @@ extern const ptr_t pid0_stack2;
 extern void __global_pointer$();
 
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type);
-void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,int argc, void* arg,pcb_t *pcb);
+void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,unsigned char *argv[],pcb_t *pcb);
 extern void ret_from_exception();
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
