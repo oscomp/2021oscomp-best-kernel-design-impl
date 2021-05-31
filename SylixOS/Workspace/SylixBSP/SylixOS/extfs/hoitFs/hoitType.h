@@ -50,6 +50,7 @@
 *********************************************************************************************************/
 //#define DEBUG_LOG
 #define  LOG_TEST
+#define  LOG_ENABLE
 
 /*********************************************************************************************************
   HoitFs Error Type
@@ -68,10 +69,11 @@
 #define HOIT_FLAG_TYPE_DIRENT               0x40000000     //raw_dirent类型  0100
 #define HOIT_FLAG_TYPE_LOG                  0x80000000     //raw_log类型 1000
 
-#define HOIT_FLAG_OBSOLETE                  0x00000001     //Flag的最后一位用来表示是否过期，1是没过期，0是过期
+#define HOIT_FLAG_NOT_OBSOLETE              0x00000001     //Flag的最后一位用来表示是否过期，1是没过期，0是过期
+#define HOIT_FLAG_OBSOLETE                  0x00000000
 #define HOIT_ERROR                          100
 #define HOIT_ROOT_DIR_INO                   2   /* HoitFs的根目录的ino为1 */
-#define __HOIT_IS_OBSOLETE(pRawHeader)      ((pRawHeader->flag & HOIT_FLAG_OBSOLETE)    == 0)
+#define __HOIT_IS_OBSOLETE(pRawHeader)      ((pRawHeader->flag & HOIT_FLAG_NOT_OBSOLETE)    == 0)
 #define __HOIT_IS_TYPE_INODE(pRawHeader)    ((pRawHeader->flag & HOIT_FLAG_TYPE_INODE)  != 0)
 #define __HOIT_IS_TYPE_DIRENT(pRawHeader)   ((pRawHeader->flag & HOIT_FLAG_TYPE_DIRENT) != 0)
 #define __HOIT_IS_TYPE_LOG(pRawHeader)      ((pRawHeader->flag & HOIT_FLAG_TYPE_LOG)    != 0)      

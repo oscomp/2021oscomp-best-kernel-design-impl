@@ -97,7 +97,7 @@ INT fs_cmd_wrapper(INT  iArgC, PCHAR  ppcArgV[]) {
     else if (EQU_ARG("-t", pcFSOption))
     {
         pcFSOption = GET_ARG(2);
-        if(EQU_ARG("ftt", pcFSOption)){                                 /* hoit -t ftt -t 2 3 2 */
+        if(EQU_ARG("ftt", pcFSOption)){                                 /* hoit -t ftt 2 3 2 */
             hoitTestFileTree(iArgC - 2, ppcArgV + 2);
         }
         else if (EQU_ARG("fot", pcFSOption))                            /* hoit -t fot */

@@ -45,7 +45,7 @@ BOOL __hoit_delete_full_dnode(PHOIT_VOLUME pfs, PHOIT_FULL_DNODE pFullDnode, INT
 		}
 		__hoit_del_raw_data(pfs, pFullDnode->HOITFD_raw_info);
 		__hoit_del_raw_info(pInodeCache, pFullDnode->HOITFD_raw_info);
-        pFullDnode->HOITFD_raw_info->is_obsolete = 1;
+        pFullDnode->HOITFD_raw_info->is_obsolete = HOIT_FLAG_NOT_OBSOLETE;
 		pFullDnode->HOITFD_raw_info = LW_NULL;
 		__SHEAP_FREE(pFullDnode);
 		return LW_TRUE;
@@ -126,7 +126,7 @@ PHOIT_FULL_DNODE __hoit_truncate_full_dnode(PHOIT_VOLUME pfs, PHOIT_FULL_DNODE p
     pNewRawInfo->totlen = sizeof(struct HOIT_RAW_INODE) + length;
     pNewRawInfo->next_logic = LW_NULL;
     pNewRawInfo->next_phys = LW_NULL;
-    pNewRawInfo->is_obsolete = 0;
+    pNewRawInfo->is_obsolete = HOIT_FLAG_NOT_OBSOLETE;
 
     PHOIT_INODE_CACHE pInodeCache = __hoit_get_inode_cache(pfs, pRawInode->ino);
     __hoit_add_to_inode_cache(pInodeCache, pNewRawInfo);
@@ -169,7 +169,7 @@ PHOIT_FULL_DNODE __hoit_write_full_dnode(PHOIT_INODE_INFO pInodeInfo, UINT offse
     }
 
     pRawInode->file_type = pInodeInfo->HOITN_mode;
-    pRawInode->flag = HOIT_FLAG_OBSOLETE | HOIT_FLAG_TYPE_INODE;
+    pRawInode->flag = HOIT_FLAG_NOT_OBSOLETE | HOIT_FLAG_TYPE_INODE;
     pRawInode->ino = pInodeInfo->HOITN_ino;
     pRawInode->magic_num = HOIT_MAGIC_NUM;
     pRawInode->totlen = sizeof(HOIT_RAW_INODE) + size;
@@ -188,7 +188,7 @@ PHOIT_FULL_DNODE __hoit_write_full_dnode(PHOIT_INODE_INFO pInodeInfo, UINT offse
     pRawInfo->totlen = sizeof(HOIT_RAW_INODE) + size;
     pRawInfo->next_phys = LW_NULL;
     pRawInfo->next_logic = LW_NULL;
-    pRawInfo->is_obsolete = 0;
+    pRawInfo->is_obsolete = HOIT_FLAG_NOT_OBSOLETE;
 
     __hoit_add_to_inode_cache(pInodeInfo->HOITN_inode_cache, pRawInfo);
     __hoit_add_raw_info_to_sector(pfs->HOITFS_now_sector, pRawInfo);
@@ -240,8 +240,10 @@ PHOIT_FULL_DIRENT __hoit_bulid_full_dirent(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRaw
 
     PHOIT_FULL_DIRENT pFullDirent = (PHOIT_FULL_DIRENT)__SHEAP_ALLOC(sizeof(HOIT_FULL_DIRENT));
     PCHAR pFileName = read_buf + sizeof(HOIT_RAW_DIRENT);
-    PCHAR pNewFileName = (PCHAR)__SHEAP_ALLOC(pRawInfo->totlen - sizeof(HOIT_RAW_INFO));
-    lib_strncpy(pNewFileName, pFileName, pRawInfo->totlen - sizeof(HOIT_RAW_INFO));
+    PCHAR pNewFileName = (PCHAR)__SHEAP_ALLOC((pRawInfo->totlen - sizeof(HOIT_RAW_DIRENT))+1);
+    lib_memcpy(pNewFileName, pFileName, pRawInfo->totlen - sizeof(HOIT_RAW_DIRENT));
+    pNewFileName[(pRawInfo->totlen - sizeof(HOIT_RAW_DIRENT))] = '\0';
+
     pFullDirent->HOITFD_file_name = pNewFileName;
     pFullDirent->HOITFD_file_type = pRawDirent->file_type;
     pFullDirent->HOITFD_ino = pRawDirent->ino;
