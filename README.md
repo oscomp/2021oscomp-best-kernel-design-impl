@@ -8,7 +8,7 @@
 
 ## 文档
 
-本项目文档的 Markdown 版本位于 docs/src 文件夹中。
+本项目文档的 Markdown 版本位于 docs/src 文件夹中，推荐优先选择下列版本，阅读效果更佳。
 
 - [mdBook on GitHub Pages](https://gallium70.github.io/rv-n-ext-impl/)
 - [PDF](docs/Risc-V%20Extension%20N%20Implementation.pdf)
