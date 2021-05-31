@@ -11,6 +11,7 @@
 本项目文档的 Markdown 版本位于 docs/src 文件夹中。
 
 - [mdBook on GitHub Pages](https://gallium70.github.io/rv-n-ext-impl/)
+- [PDF](docs/Risc-V%20Extension%20N%20Implementation.pdf)
 
 ## 代码仓库
 
