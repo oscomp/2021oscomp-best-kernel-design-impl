@@ -306,13 +306,13 @@ static uint8 sd_get_cidregister(SD_CID *SD_cid)
 		sd_send_cmd(SD_CMD10, 0, 0);
 		/*!< Wait for response in the R1 format (0x00 is no errors) */
 		if (sd_get_response() != 0x00) {
-			printk("here\n"); while(1);
+			// printk("here\n"); while(1);
 			sd_end_cmd();
 			return 0xFF;
 		}
 		if ((result = sd_get_response()) != SD_START_DATA_SINGLE_BLOCK_READ) {
-			printk("there\n");
-			printk("result is %d\n", result);
+			// printk("there\n");
+			// printk("result is %d\n", result);
 			sd_end_cmd();
 		}
 		else
