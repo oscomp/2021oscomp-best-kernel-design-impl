@@ -1690,6 +1690,9 @@ ssize_t  __hoit_read(PHOIT_INODE_INFO  pInodeInfo, PVOID  pvBuffer, size_t  stSi
 *********************************************************************************************************/
 ssize_t  __hoit_write(PHOIT_INODE_INFO  pInodeInfo, CPVOID  pvBuffer, size_t  stNBytes, size_t  stOft, UINT needLog) {
     if (pInodeInfo->HOITN_rbtree != LW_NULL) {
+        if(stNBytes == 0){
+            return stNBytes;
+        }
         PHOIT_FULL_DNODE pFullDnode = __hoit_write_full_dnode(pInodeInfo, stOft, stNBytes, pvBuffer, needLog);
         PHOIT_FRAG_TREE_NODE pTreeNode = newHoitFragTreeNode(pFullDnode, stNBytes, stOft, stOft);
         hoitFragTreeInsertNode(pInodeInfo->HOITN_rbtree, pTreeNode);
@@ -1831,6 +1834,7 @@ VOID  __hoit_redo_log(PHOIT_VOLUME  pfs) {
             PHOIT_INODE_INFO pInodeInfo = __hoit_get_full_file(pfs, pRawInode->ino);
 
             pRawHeader->version = pfs->HOITFS_highest_version++;
+
             __hoit_write(pInodeInfo, pData, pRawInode->totlen - sizeof(HOIT_RAW_INODE), pRawInode->offset, 0);
 
             __hoit_close(pInodeInfo, 0);
