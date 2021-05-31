@@ -7,16 +7,16 @@
   - [异常的产生](#异常的产生)
   - [中断的处理](#中断的处理)
 - [N 扩展的 CSR](#n-扩展的-csr)
-  - [`ustatus`](#ustatus)
-  - [`uip` `uie`](#uip-uie)
-  - [`sedeleg` `sideleg`](#sedeleg-sideleg)
-  - [`uscratch`](#uscratch)
-  - [`uepc`](#uepc)
-  - [`ucause`](#ucause)
-  - [`utvec`](#utvec)
-  - [`utval`](#utval)
+  - [ustatus](#ustatus)
+  - [uip uie](#uip-uie)
+  - [sedeleg sideleg](#sedeleg-sideleg)
+  - [uscratch](#uscratch)
+  - [uepc](#uepc)
+  - [ucause](#ucause)
+  - [utvec](#utvec)
+  - [utval](#utval)
 - [N 扩展的指令](#n-扩展的指令)
-  - [`URET`](#uret)
+  - [URET](#uret)
 
 ## 用户态中断与异常的执行流程
 
@@ -74,7 +74,7 @@
 
 > WPRI: 该段数值保留为以后使用，欲读取该位时得到合法的值，即 0
 
-### `ustatus`
+### ustatus
 
 ```
 UXLEN-1 5   4    3  1    0
@@ -94,7 +94,7 @@ UIE 和 UPIE 是 `mstatus` 和 `sstatus` 中对应位的镜像。在硬件实现
 
 用户态中断只能在用户态触发，所以不需要 UPP 位。
 
-### `uip` `uie`
+### uip uie
 
 `uip` 和 `uie` 均为 UXLEN 位的读写寄存器，其中 `uip` 存储等待处理的中断信息， `uie` 存储相应的中断使能位。
 
@@ -116,7 +116,7 @@ ABI 应当提供一种向其他 hart 发送处理器间中断的机制，这最�
 
 `uip` 和 `uie` 寄存器是 `mip` 和 `mie` 寄存器的子集。读取 `uip`/`uie` 的任何字段，或者写入任何可写字段，都会对 `mip`/`mie` 的相应字段进行读取或写入。如果系统实现了 S 模式，`uip` 和 `uie` 寄存器也是 `sip` 和 `sie` 寄存器的子集。
 
-### `sedeleg` `sideleg`
+### sedeleg sideleg
 
 为提升中断和异常的处理性能，可以实现独立的读写寄存器 `sedeleg` 和 `sideleg`，设置其中的位将特定的中断和异常交由用户态陷入处理程序处理。
 
@@ -128,11 +128,11 @@ ABI 应当提供一种向其他 hart 发送处理器间中断的机制，这最�
 
 不会在用户态发生的应硬件恒零，如 ECall from S/H/M-mode
 
-### `uscratch`
+### uscratch
 
 `uscratch` 寄存器是一个 UXLEN 位读/写寄存器。
 
-### `uepc`
+### uepc
 
 `uepc` 是 UXLEN 位读写寄存器。最低位（`uepc[0]`）恒零。次低位 `uepc[1]` 视实现的对齐需求而定。
 
@@ -140,7 +140,7 @@ ABI 应当提供一种向其他 hart 发送处理器间中断的机制，这最�
 
 但陷入在用户态处理时，`uepc` 被写入中断或触发异常的指令的虚拟地址。此外，除了软件显式地写，否则 `uepc` 应永不被写。
 
-### `ucause`
+### ucause
 
 ```
 | Interrupt | Exception Code WLRL |
@@ -148,7 +148,7 @@ ABI 应当提供一种向其他 hart 发送处理器间中断的机制，这最�
 
 `ucause` 是 UXLEN 位长读写寄存器。
 
-### `utvec`
+### utvec
 
 ```
 | BASE[UXLEN-1 : 2] | MODE |
@@ -164,12 +164,12 @@ BASE 是 WARL，可以存储任意合法的虚拟地址或物理地址，需要 
 | 1     | vectored | base + 4 \* cause |
 |       |          | reserved          |
 
-### `utval`
+### utval
 
 存储内容仍在讨论中
 
 ## N 扩展的指令
 
-### `URET`
+### URET
 
 `uret` 将 `pc` 设置为 `uepc` ，将 `ustatus.UIE` 设置为 `ustatus.UPIE` ，从而恢复中断前的状态。
