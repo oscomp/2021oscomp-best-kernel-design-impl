@@ -1,6 +1,67 @@
 # HOIT-FS
 We are team "HOIT-23o2" from harbin institute of technology,shenzhen. We are now developing on proj32-NorFlash-Filesystem-on-SylixOS. Keep tuning in.👏
 
+## Docs
+
+- This is the main doc for stage 1 submit: [初赛报告文档](./HoitFS设计开发文档.pdf)
+- This is the link of development doc for stage 1 submit: [README_HOITFS](./README_HOITFS.md)
+- **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the newest repo, this repo is a replica of that, only for submit.
+
+## Goals & Achievement
+
+The goals we must achieve:
+
+1. Basic read, write, seek, mkdir, mv and so on.
+2. Hard and soft link, write balance.
+3. How to make sure the lowest cost of power loss.****
+
+We have achieved that:  
+
+| 目标编号 |   基本完成情况   | 额外说明                                                     |
+| :------: | :--------------: | ------------------------------------------------------------ |
+|    1     | 基本完成（≈90%） | ① **基本 I/O 功能**已通过脚本测试；<br>② 可能潜在未发现的BUG |
+|    2     | 基本完成（≈90%） | ① **软、硬链接**已通过脚本测试；<br/>② JFFS2 自带**磨损均衡**机制，可以引入**更多 WL 算法**； |
+|    3     | 基本完成（≈80%） | ① 引入日志层，**理论上能够保证强掉电安全**。<br/>     但我们还**未实验评估**其带来的优势；<br/>② 将带来更多写开销， 正在研究解决方案； |
+|   总计   | 基本完成（≈90%） | 还有更多优化工作可以完成；                                   |
+
+## Future Works
+
+- **More Stable**
+
+  HoitFS目前可能还不够稳定，我们认为HoitFS部分代码的实现不够Elegant，未来我们会进行统一的Code Review，从而有效提升代码质量；
+
+- **More efficient**
+
+  目前仅用单链表结构来进行块级结构管理，而块选择算法是基于贪心策略完成 的，因此这会带来磨损不平衡问题，在下一步计划中，我们将采用多级链表管理 结构，将对不同的块进行分类，从而缓解磨损不均衡问题；
+
+- **WL & Verify**
+
+  日志系统会带来额外的写开销（我们直接将日志写回Norflash上），这为擦写寿 命本就低的Norflash更添了几分压力。目前的做法是每一次写入都会带来一次日志写开销，这似乎是难以容忍的。我们希望采用一种Sync机制，即我们可以在特定的检查点将日志一并刷入Norflash介质，从而节省写入日志开销，当然，这涉及到对缓存层的修改问题；另外，如何验证及评估日志系统的优势，这还需要进 一步的考量；
+
+- **Multi Tread Implement**
+
+  现在HoitFS的读写I/O均采用单线程机制，我们相信多线程读写将加速读写性能； 事实上，多线程GC也将一并加速垃圾回收效率；
+
+- **Build Boost**
+
+  HoitFS在 Build的时候将扫描整个Norflash，这导致Build速率会较慢，可以通过 设置额外的Summary块来解决这个问题（EBS）；
+
+- **Scalability**
+
+  目前的HoitFS是针对小型Norflash设计，在Scalability上还欠火候。如何解决这一方案呢？介质上索引 + Mountable Tree给了我们很不错的思考。相关工作还未开 始，这将留以后面设计探讨；
+
+- **Efficiency**
+
+  在性能评估方面，HoitFS还未展开很好的工作。目前正准备移植更多的Norflash文件系统至SylixOS，以便进行性能评估；
+
+## Where to see more details?
+
+Here is our [repository](https://github.com/Hoit-23o2/HoitOS.git) in github. If you like it, please give us a star!😄
+
+## Project Detail
+
+To learn more about our project, visit [here](https://github.com/oscomp/proj32-NorFlash-FileSystem-on-SylixOS)! 
+
 ## File Organization
 
 ```
@@ -138,22 +199,4 @@ We are team "HOIT-23o2" from harbin institute of technology,shenzhen. We are now
 |-- tree.exe -- 文件树生成程序
 `-- HoitFS设计开发文档.pdf
 ```
-
-## Docs
-
-- This is the main doc for stage 1 submit: [初赛报告文档](./HoitFS设计开发文档.pdf)
-- This is the link of development doc for stage 1 submit: [README_HOITFS](./README_HOITFS.md)
-- **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the newest repo, this repo is a replica of that, only for submit.
-
-## Where to see more details?
-Here is our [repository](https://github.com/Hoit-23o2/HoitOS.git) in github. If you like it, please give us a star!😄
-
-## Project Detail
-To learn more about our project, visit [here](https://github.com/oscomp/proj32-NorFlash-FileSystem-on-SylixOS)! 
-
-## Goals
-The goals we must achieve:
-1. Basic read, write, seek, mkdir, mv and so on.
-2. Hard and soft link, write balance.
-3. How to make sure the lowest cost of power loss.****
 
