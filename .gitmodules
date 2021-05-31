@@ -8,3 +8,6 @@
 [submodule "lrv-rust-bl"]
 	path = lrv-rust-bl
 	url = https://github.com/Gallium70/lrv-rust-bl
+[submodule "rv-csr-test"]
+	path = rv-csr-test
+	url = https://github.com/duskmoon314/rv-csr-test.git
