@@ -4,7 +4,7 @@
 
 This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](https://vwpp20210125060242436.worktile.com/mission/projects/600e62ffd6e5f843a97f2182)
 
-![worktile](./images/worktile.png)
+![worktile](README_HOITFS.assets/worktile.png)
 
 ## Log
 
@@ -130,6 +130,7 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 对RamFS进行了深入了解，基于FAKE NOR完成LFS FS的基本create、mount操作；
 
 ### Week8
+
 > 本周总结：[第七阶段-NorFlash驱动、基于SylixOS的文件系统设计 - 第二部分(2021-03-16)](./Records/Files/PPT/sylixos-driver-fs-stage2.pptx)
 
 [08-SylixOS&Driver&FS-Continue-Part1](./Records/Docs/08-SylixOS&Driver&FS-Continue-Part1.md)
@@ -144,7 +145,9 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 - GC
 - Adaptive Logging
 - Multi Log
+
 ### Week9 - 里程碑
+
 > 本周总结：[第八阶段-NorFlash驱动、基于SylixOS的文件系统设计 - 第三部分(2021-03-23)](./Records/Files/PPT/sylixos-driver-fs-stage3.pptx)
 
 [09-SylixOS&Driver&FS-Again-Part1](./Records/Docs/09-SylixOS&Driver&FS-Again-Part1.md)
@@ -158,7 +161,9 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 [09-SylixOS&Driver&FS-Again-Part3](./Records/Docs/09-SylixOS&Driver&FS-Again-Part3.md)
 
 基本完成基于Fake Nor的LFS FS，包括了mount、unmount、ls等，**打通SylixOS**构建文件系统的通路；
+
 ### Week10
+
 > 本周总结：[第九阶段-HoitFS正式开发-阶段一(2021-03-29)](./Records/Files/PPT/hoitfs-dev-stage1.pptx)
 
 [10-HoitFsDev-Part1](./Records/Docs/10-HoitFsDev-Part1.md)
@@ -167,7 +172,9 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 [10-HoitFsDev-Part3](./Records/Docs/10-HoitFsDev-Part3.md)
 
 完成LFS的read、write、seek、rename等基本功能，彻底打通文件系统与`SylixOS`的I/O交互流程；
+
 ### Week11~17 - 里程碑
+
 > 本周总结：第11~17周处于开发阶段，文档以及会议工作落了下来，由于学校事情也比较多，因此开发时间不是很够……不过好在交出了初稿
 >
 > HoitFS V1.0：[初赛报告文档.pdf](./HoitFS设计开发文档.pdf)
@@ -188,19 +195,18 @@ This is the repository of 2021 OS comp， 项目进度安排移步至[Worktile](
 
 > 这里记录了会议纪要
 
-1. [2021-01-12](./Records/CCB/2021-01-12.md)
-2. [2021-01-14](./Records/CCB/2021-01-14.md)
-3. [2021-01-24](./Records/CCB/2021-01-24.md)
-4. [2021-01-31](./Records/CCB/2021-01-31.md)
-5. [2021-02-07](./Records/CCB/2021-02-07.md)
-6. [2021-02-23](./Records/CCB/2021-02-23.md)
-7. [2021-03-01](./Records/CCB/2021-03-01.md)
-8. [2021-03-08](./Records/CCB/2021-03-08.md)
-9. [2021-03-15](./Records/CCB/2021-03-15.md)
-
-10. [2021-03-23](./Records/CCB/2021-03-23.md)
-11. [2021-03-29](./Records/CCB/2021-03-29.md)
-12. [2021-05-18](./Records/CCB/2021-05-18.md)
+1. [2021-01-12](./Records/CCB/2021-01-12.md)：分析OS竞赛各赛题内容以及难度评估，并进行投票确定题目。
+2. [2021-01-14](./Records/CCB/2021-01-14.md)：进入第一阶段调研任务，**确定调研方向**（熟悉开发套件、赛题平台SylixOS以及相关文件系统和算法），统一文档范式。
+3. [2021-01-24](./Records/CCB/2021-01-24.md)：展示初步调研成果，包括Norflash各种**常用文件系统**、**MTD**简介和Dummy block原理。确定采用**日志结构**文件系统。
+4. [2021-01-31](./Records/CCB/2021-01-31.md)：在2021-01-24会议的基础上进一步调研，包括**SylixOS开发平台**实验方法，**JFFS2**原理和相关LInux源码分析，以及MTD核心与使用方法。并且完成第一次与赛题组老师的沟通。
+5. [2021-02-07](./Records/CCB/2021-02-07.md)：针对文件系统与操作系统**交互方式**进行进一步调研。一方面调查Linux虚拟文件系统结构以及文件系统挂载方式，另一方面调查SylixOS中Yaffs2和Ramfs的挂载与运作。此外还在Linux上实现简单的日志文件系统。
+6. [2021-02-23](./Records/CCB/2021-02-23.md)：进入第二阶段实践任务，使用赛题组提供的开发工具，尝试进行**BSP开发**。另外，继续进行文件系统调研工作，进一步调研了**Jffs2挂载**流程，以及Yaffs2与MTD的交互方式。
+7. [2021-03-01](./Records/CCB/2021-03-01.md)：完成JFFS2调研工作，理清JFF2的**基本读写**实现以及**垃圾回收**机制。此外，还实现了**norflash模拟驱动**程序以及相应的API文档。开始移植**简易LFS**到SylixOS的工作。
+8. [2021-03-08](./Records/CCB/2021-03-08.md)：打通SylixOS系统**烧录**到mini 2440开发版的流程，完成相应文档。完成JFFS2文件系统基本功能介绍文档。
+9. [2021-03-15](./Records/CCB/2021-03-15.md)：实现对mini 2440 的**nor flash** 的使用，能够通过nor flash启动 SylixOS。初步设计**HoitFs系统框架**。理解文件系统在**SylixOS上的挂载流程**。
+10. [2021-03-23](./Records/CCB/2021-03-23.md)：根据初步设计**HoitFs系统框架**，编写框架代码。完成LFS在SylixOS中的挂载与卸载。
+11. [2021-03-29](./Records/CCB/2021-03-29.md)：完成HoitFs**红黑树**模块代码。完成HoitFs系统框架部分代码。完成**LFS**到SylixOS上的移植。
+12. [2021-05-18](./Records/CCB/2021-05-18.md)：在这次会议开始之前，已经完成了HoitFs基本功能的开发。本次会议主要针对开发中尚未解决的部分Bug以及文件系统功能完善方面，讨论未来**工作目标**和规划未来**工作流程**。
 
 ## Basic Develop Method
 
