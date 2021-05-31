@@ -4,3 +4,6 @@ language = "zh-CN"
 multilingual = false
 src = "src"
 title = "Risc-V Extension N Implementation"
+
+[output.html]
+mathjax-support = true
