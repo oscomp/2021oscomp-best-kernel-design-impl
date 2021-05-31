@@ -254,7 +254,14 @@ void FileTreeTestCheck(PUCHAR pFileName) {
         }        
     }    
 }
-
+/*    
+** 函数名称:    hoitTestFileTree
+** 功能描述:    文件树测试
+** 输　入  :    
+** 输　出  :    测试成功返回ERROR_NONE，失败返回PX_ERROR
+** 全局变量:
+** 调用模块:    
+*/
 INT hoitTestFileTree (INT  iArgC, PCHAR  ppcArgV[])
 {
     UCHAR       filename[512];
@@ -262,7 +269,7 @@ INT hoitTestFileTree (INT  iArgC, PCHAR  ppcArgV[])
     lib_memset(filename, 0 ,sizeof(filename));
     lib_strcpy(filename, "/mnt/hoitfs/\0");
 
-    if (iArgC != 2 && iArgC != 5) {
+    if (iArgC != 2 && iArgC != 4) {
         fprintf(stderr, "arguments error!\n");
         return  (-ERROR_TSHELL_EPARAM);
     }
@@ -278,24 +285,23 @@ INT hoitTestFileTree (INT  iArgC, PCHAR  ppcArgV[])
             fprintf(stderr, "arguments error!\n");
             return  (-ERROR_TSHELL_EPARAM);
         }
-    } else if (iArgC == 5) {
-        if (lib_strcmp("-t",ppcArgV[1]) == 0) {
-            temp = lib_atoi(ppcArgV[2]);
-            if (temp < max_depth)
-                max_depth = temp;
+    } else if (iArgC == 4) {
+        temp = lib_atoi(ppcArgV[1]);
+        if (temp < max_depth)
+            max_depth = temp;
 
-            temp = lib_atoi(ppcArgV[3]);
-            if (temp < max_fileNo)
-                max_fileNo = temp;
+        temp = lib_atoi(ppcArgV[2]);
+        if (temp < max_fileNo)
+            max_fileNo = temp;
 
-            temp = lib_atoi(ppcArgV[4]);
-            if (temp < max_dirNo)
-                max_dirNo = temp;
-        } else {
+        temp = lib_atoi(ppcArgV[3]);
+        if (temp < max_dirNo)
+            max_dirNo = temp;
+     
+    } else {
             fprintf(stderr, "arguments error!\n");
             return  (-ERROR_TSHELL_EPARAM);
-        }        
-    }
+    }  
 
     printf("===========  File Tree Test!         ===========\n");
     printf("===========  Create File And Dir!    ===========\n");
@@ -344,7 +350,7 @@ INT hoitTestFileOverWrite (INT  iArgC, PCHAR  ppcArgV[]) {
         goto __fot_end;       
     }
 
-    /* 关闭文件再打开，追加写256个'2' */
+    /* 关闭文件再打开，追加写36个'2' */
     data ++;
     close(iFd);
     iFd = open(filename, O_WRONLY, DEFAULT_FILE_PERM);
@@ -369,7 +375,7 @@ INT hoitTestFileOverWrite (INT  iArgC, PCHAR  ppcArgV[]) {
         goto __fot_end;       
     }
 
-    /* 覆盖修改前256个字为"3" */
+    /* 覆盖修改前32个字为"3" */
     data ++;
     close(iFd);
     iFd = open(filename, O_WRONLY, DEFAULT_FILE_PERM);
@@ -394,7 +400,7 @@ INT hoitTestFileOverWrite (INT  iArgC, PCHAR  ppcArgV[]) {
         goto __fot_end;       
     }
 
-    /* 从512位开始写512个'4' */
+    /* 从64位开始写64个'4' */
     data ++;
     close(iFd);
     iFd = open(filename, O_WRONLY, DEFAULT_FILE_PERM);

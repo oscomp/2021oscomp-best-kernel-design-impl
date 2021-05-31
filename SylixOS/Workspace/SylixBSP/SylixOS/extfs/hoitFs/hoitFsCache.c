@@ -128,7 +128,9 @@ BOOL hoitFreeCache(PHOIT_CACHE_HDR pcacheHdr) {
     }
     __SHEAP_FREE(pcache->HOITBLK_buf);  /* 释放循环链表头 */
     __SHEAP_FREE(pcacheHdr);
-    API_SemaphoreMDelete(pcacheHdr->HOITCACHE_hLock);
+    if(pcacheHdr->HOITCACHE_hLock){
+        API_SemaphoreMDelete(&pcacheHdr->HOITCACHE_hLock);
+    }
     return ERROR_NONE;
 }
 

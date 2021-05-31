@@ -164,6 +164,7 @@ UINT __hoitScanLogSector(PHOIT_VOLUME pfs, PHOIT_RAW_LOG pRawLogHdr, PHOIT_ERASA
     PCHAR                   pcLogSector;
     UINT                    uiSectorNum;
     UINT                    uiSectorSize;
+    UINT                    uiSectorAddr;
     UINT                    uiOfs;
     PCHAR                   pcCurSectorPos;
     PHOIT_RAW_HEADER        pRawHeader;
@@ -171,6 +172,7 @@ UINT __hoitScanLogSector(PHOIT_VOLUME pfs, PHOIT_RAW_LOG pRawLogHdr, PHOIT_ERASA
 
     uiSectorNum     = hoitGetSectorNo(pRawLogHdr->uiLogFirstAddr);
     uiSectorSize    = hoitGetSectorSize(uiSectorNum);
+    uiSectorAddr    = pRawLogHdr->uiLogFirstAddr;
     uiOfs           = 0;
 
     pcLogSector = (PCHAR)lib_malloc(uiSectorSize);
@@ -184,8 +186,8 @@ UINT __hoitScanLogSector(PHOIT_VOLUME pfs, PHOIT_RAW_LOG pRawLogHdr, PHOIT_ERASA
             
             /* 将初始的pRawLog对应的RawInfo加入到 LOG SECTOR 中 */
             pRawInfo                = (PHOIT_RAW_INFO)lib_malloc(sizeof(HOIT_RAW_INFO));
-            pRawInfo->phys_addr     = pcCurSectorPos;
-            pRawInfo->totlen        = pRawLogHdr->totlen;
+            pRawInfo->phys_addr     = uiSectorAddr + (pcCurSectorPos - pcLogSector);
+            pRawInfo->totlen        = pRawHeader->totlen;
             pRawInfo->is_obsolete   = 0;
             pRawInfo->next_logic    = LW_NULL;
             pRawInfo->next_phys     = LW_NULL;

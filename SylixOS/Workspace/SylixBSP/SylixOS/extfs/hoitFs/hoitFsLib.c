@@ -689,6 +689,11 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
     PCHAR pNow = pReadBuf;
     while (pNow < pReadBuf + uiSectorSize) {
         PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)pNow;
+        if(sector_no == 0 
+        && pRawHeader->ino != -1
+        && pRawHeader->magic_num == HOIT_MAGIC_NUM){
+            printf("offs: %d ino: %d\n", uiSectorOffset + (pNow - pReadBuf), pRawHeader->ino);
+        }
         if (pRawHeader->magic_num == HOIT_MAGIC_NUM && !__HOIT_IS_OBSOLETE(pRawHeader)) {
             /* //TODO:后面这里还需添加CRC校验 */
             PHOIT_RAW_INFO pRawInfo = LW_NULL;
@@ -782,6 +787,7 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
                     /* hoitLogOpen(pfs, pRawLog); */
                     *ppRawLogHdr = (PHOIT_RAW_LOG)lib_malloc(sizeof(HOIT_RAW_LOG));
                     lib_memcpy(*ppRawLogHdr, pRawLog, sizeof(HOIT_RAW_LOG));
+                    uiUsedSize += pRawLog->totlen;
                 }
             }
             
@@ -801,10 +807,9 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
             pNow += 4;   /* 每次移动4字节 */
         }
     }
-    pErasableSector->HOITS_uiFreeSize = uiFreeSize;
     pErasableSector->HOITS_uiUsedSize = uiUsedSize;
-
-    
+    pErasableSector->HOITS_uiFreeSize = uiFreeSize;
+    pErasableSector->HOITS_offset = uiUsedSize;     /*! Modified By PYQ 更新写入偏移 */
 
     __hoit_add_to_sector_list(pfs, pErasableSector);
 
@@ -1707,8 +1712,10 @@ VOID  __hoit_unmount(PHOIT_VOLUME pfs)
         printf("Error in unmount.\n");
         return;
     }
+    hoitFlushCache(pfs->HOITFS_cacheHdr);
     hoitGCClose(pfs);
     __hoit_close(pfs->HOITFS_pRootDir, 0);  /* 先删除根目录 */
+    hoitFreeCache(pfs->HOITFS_cacheHdr);    /* 释放缓存层 */
 
     if (pfs->HOITFS_pTempRootDirent != LW_NULL) {   /* 删除TempDirent链表 */
         PHOIT_FULL_DIRENT pTempDirent = pfs->HOITFS_pTempRootDirent;
@@ -1744,7 +1751,6 @@ VOID  __hoit_unmount(PHOIT_VOLUME pfs)
         }
         pTempSector = pNextSector;
     }
-
 }
 /*********************************************************************************************************
 ** 函数名称: __hoit_mount
@@ -1769,7 +1775,7 @@ VOID  __hoit_mount(PHOIT_VOLUME  pfs)
     }
     pfs->HOITFS_highest_ino++;
     pfs->HOITFS_highest_version++;
-
+    printf("now sector offs: %d \n", pfs->HOITFS_now_sector->HOITS_offset);
     if (!hasLog) {
         hoitLogInit(pfs, hoitGetSectorSize(8), 1);
     }
@@ -1777,8 +1783,9 @@ VOID  __hoit_mount(PHOIT_VOLUME  pfs)
         hoitLogOpen(pfs, pRawLogHdr);
     }
 
-
+#ifdef LOG_TEST
     __hoit_redo_log(pfs);
+#endif // LOG_TEST
 
     if (pfs->HOITFS_highest_ino == HOIT_ROOT_DIR_INO) {    /* 系统第一次运行, 创建根目录文件 */
         mode_t mode = S_IFDIR;
@@ -1787,9 +1794,6 @@ VOID  __hoit_mount(PHOIT_VOLUME  pfs)
     }
     /* 系统不是第一次运行的话会在扫描时就找到pRootDir */
 
-#ifdef LOG_TEST
-    __hoit_redo_log(pfs);
-#endif // LOG_TEST
 
     /* 基本的inode_cache和raw_info构建完毕  */
     /* 接下来要递归统计所有文件的nlink          */
@@ -1811,6 +1815,9 @@ VOID  __hoit_redo_log(PHOIT_VOLUME  pfs) {
     for (i = 0; i < pLogInfo->uiLogEntityCnt; i++) {
         PCHAR p = hoitLogEntityGet(pfs, i);
         PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)p;
+        if(pRawHeader->ino == HOIT_ROOT_DIR_INO){
+            continue;
+        }
         if (__HOIT_IS_TYPE_INODE(pRawHeader)) {
             PHOIT_RAW_INODE pRawInode = (PHOIT_RAW_INODE)pRawHeader;
             PCHAR pData = p + sizeof(HOIT_RAW_INODE);
