@@ -10,7 +10,7 @@
 
 项目架构设计如下：
 
-![arch](docs/assets/arch.svg)
+![arch](docs/src/assets/arch.svg)
 
 - 模拟器：修改 QEMU 5.0，在其中添加 N 扩展支持
 - FPGA：基于中科院计算所的[标签化 RISC-V 架构](https://github.com/LvNA-system/labeled-RISC-V/tree/master/fpga)，添加 N 扩展支持
