@@ -8,6 +8,7 @@ We are team "HOIT-23o2" from harbin institute of technology,shenzhen. We are now
 
 - This is the main doc for stage 1 submit: [初赛报告文档](./HoitFS设计开发文档.pdf)
 - This is the link of development doc for stage 1 submit: [README_HOITFS](./README_HOITFS.md)
+- This is the link of our video description: [HoitFS视频演示](./HoitFS介绍.mp4)
 - **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the newest repo, this repo is a replica of that, only for submit.
 
 ## Goals & Achievement
