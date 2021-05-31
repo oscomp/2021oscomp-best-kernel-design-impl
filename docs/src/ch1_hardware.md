@@ -18,10 +18,6 @@
 
 图中的 `user soft` 为用户态的中断处理程序接收到 `user soft interrupt` 后输出的信息，`user mode` 为用户态程序输出的信息。
 
-### N 扩展实现简述
-
-QEMU 的中断检测方式为每个 block 运行前后调用 `riscv_cpu_local_irq_pending` 函数。其中会查看 `mip` 是否非零，非零位对应的 `mie` 是否非零。同时检查特权级和相应的 `mideleg` `medeleg` 寄存器与 `mstatus.XIE` 的全局中断使能位。
-
 ## Labeled RISC-V CPU
 
 ### 设计目标
