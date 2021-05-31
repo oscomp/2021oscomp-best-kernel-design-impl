@@ -2,5 +2,7 @@
 
 - [简介](./intro.md)
 - [硬件与模拟器](ch1_hardware.md)
+  - [N 扩展](ch1_extN.md)
+  - [用户态中断的使用](ch1_use_of_user_mode_trap.md)
 - [操作系统](ch2_os.md)
 - [应用程序](ch3_app.md)

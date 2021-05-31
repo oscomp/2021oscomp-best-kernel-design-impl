@@ -1,6 +1,8 @@
 # 硬件与模拟器
 
 > 本节介绍硬件与模拟器中实现的主要特性
+>
+> 可以在 [N 扩展](ch1_extN.md) 一节看到完整的 N 扩展及相关寄存器描述。在 [用户态中断的使用](ch1_use_of_user_mode_trap.md) 一节中看到关于用户态中断使用的描述。
 
 ## QEMU with extension N
 
