@@ -1,4 +1,4 @@
-![QQ图片20210531114657](README.assets/logo.png)
+![QQ图片20210531114657](./README.assets/logo.png)
 
 # HOIT-FS
 
