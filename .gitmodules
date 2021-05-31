@@ -2,3 +2,9 @@
 	path = qemu
 	url = https://github.com/duskmoon314/qemu.git
 	branch = riscv-N-stable-5.0
+[submodule "Labeled-uCore-SMP"]
+	path = Labeled-uCore-SMP
+	url = https://github.com/Gallium70/uCore-SMP
+[submodule "lrv-rust-bl"]
+	path = lrv-rust-bl
+	url = https://github.com/Gallium70/lrv-rust-bl
