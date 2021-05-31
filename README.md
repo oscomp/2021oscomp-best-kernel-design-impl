@@ -1,4 +1,7 @@
+![QQ图片20210531114657](README.assets/QQ图片20210531114657.png)
+
 # HOIT-FS
+
 We are team "HOIT-23o2" from harbin institute of technology,shenzhen. We are now developing on proj32-NorFlash-Filesystem-on-SylixOS. Keep tuning in.👏
 
 ## Docs
