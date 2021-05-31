@@ -23,7 +23,6 @@ CFLAGS += -Iarch/$(ARCH)/include
 USER_CFLAGS += -Iarch/$(ARCH)/include
 USER_LDFLAGS = $(ARCH_DIR)/crt0.o
 
-SRC_BOOT 	= $(ARCH_DIR)/boot/bootblock.S
 SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
 SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S $(ARCH_DIR)/sbi/common.c
 SRC_SCREEN	= ./drivers/screen.c
@@ -42,7 +41,7 @@ SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c
 SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
-SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S ./tiny_libc/time.c
+SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S
 SRC_LIBC_ASM	= $(filter %.S %.s,$(SRC_LIBC))
 SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 
@@ -102,7 +101,7 @@ run:
 	sudo python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct ${K210_SERIALPORT} 115200
 
 clean:
-	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu head_qemu.bin
+	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu head_qemu.bin main.bin
 	rm -rf generateMapping disk.img bootblock test/*.elf
 
 asm:
