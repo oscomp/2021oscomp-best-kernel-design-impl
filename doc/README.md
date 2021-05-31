@@ -12,5 +12,6 @@
 - FAT32.md：UltraOS为构建FAT32文件系统所作出的努力和思考以及设计和优化方法。
 - fs_kernel.md：UltraOS文件系统对内核提供的服务以及系统调用支持。
 - MultiCore.md：UltraOS为支持多核运行所作出的努力和思考，以及遇到的问题和解决方案。
-- UltraOS文档.pdf：UltraOS的设计需求、理念、架构、特点、展望等全方位详细文档。
-
+- Shell.md：UltraOS用户程序Shell支持。
+- **UltraOS文档.pdf（重要）**：UltraOS的设计需求、理念、架构、特点、展望等全方位详细文档。
+- UserSupportThinking.md：UltraOS对于用户态支持所作的努力和思考。
