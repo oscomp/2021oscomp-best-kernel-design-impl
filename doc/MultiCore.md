@@ -1,4 +1,4 @@
-## Dual Core
+## MultiCore
 
 ### RustSBI
 
