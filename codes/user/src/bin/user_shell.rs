@@ -187,11 +187,18 @@ impl InputMachine{
             STATE_CSI_2=>{
                 if c == DEL as char{
                     self.state = STATE_IDLE;
-                    self.p -= 1;
                     self.cmd.remove(self.p);
-                    cursor_move_left!(self.p+1);
-                    print!("{} ",self.cmd.as_str());
-                    cursor_move_left!(self.cmd.len() - self.p +1);//assert len>=p
+                    self.p -= 1;
+                    if self.cmd.len() == self.p{
+                        cursor_move_left!(1);
+                        print!("{}",' ');
+                        cursor_move_left!(1);
+                    }
+                    else{
+                        cursor_move_left!(self.p+1);
+                        print!("{} ",self.cmd.as_str());
+                        cursor_move_left!(self.cmd.len() - self.p +1);//assert len>=p
+                    }
                 }
                 else{
                     self.state = STATE_PANIC;
@@ -384,6 +391,12 @@ impl ArgMachine{
         return true;
     }
 
+    pub fn auto_run_busy_box(){
+        unlink("result.txt\0");
+        open("result.txt\0", OpenFlags::CREATE);
+
+    }
+
     pub fn auto_run_testsuites(){
         // ls("\0");
         let mut testsuits :Vec<&str>= Vec::new();
@@ -522,24 +535,9 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    ArgMachine::auto_run_testsuites();
+    // ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
-    // cursor_move_right!(left);
-    // cursor_move_right!(3);
-    // println!("{}","TTTTTTTTTTTTTTTTTTEST  test start");
-    // print!("{}{}{}","hello", " ", "delete");
-    // cursor_move_left!(3);
-    // cursor_move_left!(left);
-    // print!("{}{}K",CSI as char, 2u8 as char);
-    // print!("\r");
-    // println!("{}{}{}","hello", KEY_LEFT, "left");
-    // println!("{}{}{}","hello", KEY_RIGHT, "fuck");
-    // println!("{}{}{}","hello", KEY_DOWN, "down");
-    // println!("{}{}{}","hello", KEY_UP, "up");
-    // println!("sth_in:{}",sth_in);
-    // let mut sth = 3;
-    // println!("{}","TTTTTTTTTTTTTTTTTTEST  test end");
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();
     loop {

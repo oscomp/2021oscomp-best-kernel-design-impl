@@ -113,6 +113,15 @@ gdb:
 	file=$(U_FAT32),if=none,format=raw,id=x0 \
 	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=2 -S -s
 
+runsimple:
+	@qemu-system-riscv64 \
+		-machine virt \
+		-nographic \
+		-bios $(BOOTLOADER) \
+		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+		-drive file=$(U_FAT32),if=none,format=raw,id=x0 \
+        -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0\
+		-smp threads=2
 
 release: build
 	@cp $(BOOTLOADER) $(BOOTLOADER).copy
