@@ -21,7 +21,7 @@ pub const MAP_PRIVATE: usize = 0x02;
 pub const MAP_FAILED: isize = -1;
 
 pub const USER_STACK_SIZE: usize = 4096 * 2;
-pub const USER_HEAP_SIZE: usize = 4096 * 16;
+pub const USER_HEAP_SIZE: usize = 4096 * 8;
 pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
 pub const KERNEL_HEAP_SIZE: usize = 0x20_0000;
 pub const MEMORY_END: usize = 0x80800000;

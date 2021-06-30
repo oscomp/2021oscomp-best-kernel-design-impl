@@ -501,7 +501,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
             // TODO
             match file {
                 FileClass::File(f) => {
-                    print!("\n");
+                    // print!("\n");
                     let oflags = OpenFlags::from_bits(flags).unwrap();
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
                         tar_f.delete();

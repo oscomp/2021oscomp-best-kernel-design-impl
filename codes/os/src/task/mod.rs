@@ -52,6 +52,8 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let task = take_current_task().unwrap();
     // **** hold current PCB lock
     let mut inner = task.acquire_inner_lock();
+    
+    print!("[exit{}]",task.pid.0);
     // Change status to Zombie
     inner.task_status = TaskStatus::Zombie;
     inner.exit_code = exit_code;
@@ -84,7 +86,7 @@ pub fn add_initproc_into_fs() {
     extern "C" { fn _num_app(); }
     extern "C" { fn _app_names(); }
     let mut num_app_ptr = _num_app as usize as *mut usize;
-    let start = _app_names as usize as *const u8;
+    // let start = _app_names as usize as *const u8;
     let mut app_start = unsafe {
         core::slice::from_raw_parts_mut(num_app_ptr.add(1), 3)
     };

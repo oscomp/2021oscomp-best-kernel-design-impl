@@ -145,7 +145,9 @@ pub fn sys_brk(brk_addr: usize) -> isize{
 }
 
 pub fn sys_fork(flags: usize, stack_ptr: usize) -> isize {
+    print!("[fork]");
     if flags != SIGCHILD{
+        println!("sys_fork: FLAG not supported!");
         return -1;
     }
     

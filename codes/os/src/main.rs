@@ -24,6 +24,7 @@ mod sbi;
 mod syscall;
 mod trap;
 mod config;
+mod monitor;
 mod task;
 mod timer;
 mod mm;
