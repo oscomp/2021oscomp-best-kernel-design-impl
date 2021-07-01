@@ -1,23 +1,43 @@
-// const SYSCALL_WAITPID: usize = 7;
-const SYSCALL_DUP: usize = 24;
+const SYSCALL_GETCWD: usize = 17;
+const SYSCALL_DUP: usize = 23;
+const SYSCALL_DUP3:usize = 24;
+const SYSCALL_MKDIRAT: usize = 34;
 const SYSCALL_UNLINKAT: usize = 35;
+const SYSCALL_LINKAT: usize = 37;
+const SYSCALL_UMOUNT2: usize = 39;
+const SYSCALL_MOUNT: usize = 40;
 const SYSCALL_CHDIR: usize = 49;
-const SYSCALL_OPEN: usize = 56;
+const SYSCALL_OPENAT: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
+const SYSCALL_GETDENTS64: usize = 61;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
+const SYSCALL_FSTAT:usize = 80;
 const SYSCALL_EXIT: usize = 93;
+const SYSCALL_NANOSLEEP: usize = 101;
 const SYSCALL_YIELD: usize = 124;
-const SYSCALL_GET_TIME: usize = 169;
+const SYSCALL_TIMES: usize = 153;
+const SYSCALL_UNAME: usize = 160;
+const SYSCALL_GET_TIME_OF_DAY: usize = 169;
 const SYSCALL_GETPID: usize = 172;
+const SYSCALL_GETPPID: usize = 173;
+const SYSCALL_SBRK: usize = 213;
+const SYSCALL_BRK: usize = 214;
+const SYSCALL_MUNMAP: usize = 215;
 const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
+const SYSCALL_MMAP: usize = 222;
 const SYSCALL_WAIT4: usize = 260;
 
 // Not standard POSIX sys_call
 const SYSCALL_LS: usize = 500;
 const SYSCALL_SHUTDOWN: usize = 501;
+const SYSCALL_CLEAR: usize = 502;
+pub struct TimeVal{
+    sec: u64,
+    usec: u64,
+}
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -45,7 +65,7 @@ pub fn sys_unlinkat(fd:i32, path: &str, flags:u32) -> isize {
 }
 
 pub fn sys_open(path: &str, flags: u32) -> isize {
-    syscall(SYSCALL_OPEN, [path.as_ptr() as usize, flags as usize, 0])
+    syscall(SYSCALL_OPENAT, [path.as_ptr() as usize, flags as usize, 0])
 }
 
 pub fn sys_close(fd: usize) -> isize {
@@ -74,7 +94,7 @@ pub fn sys_yield() -> isize {
 }
 
 pub fn sys_get_time() -> isize {
-    syscall(SYSCALL_GET_TIME, [0, 0, 0])
+    syscall(SYSCALL_GET_TIME_OF_DAY, [0, 0, 0])
 }
 
 pub fn sys_getpid() -> isize {
@@ -97,6 +117,11 @@ pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
 
 pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: usize) -> isize {
     syscall(SYSCALL_WAIT4, [pid as usize, wstatus as usize, option])
+}
+
+pub fn sys_sleep(period_ms: usize)  -> isize {
+    let time = TimeVal{sec:0, usec:(period_ms*1000) as u64};
+    syscall(SYSCALL_NANOSLEEP, [&time as *const TimeVal as usize,  &time as *const TimeVal as usize,0])
 }
 
 // Not standard POSIX sys_call
