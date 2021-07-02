@@ -40,12 +40,14 @@ mod process;
 
 pub use fs::*;
 use process::*;
+use crate::gdb_print;
+use crate::monitor::*;
 use crate::sbi::shutdown;
 
 //use crate::fs::Dirent;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
-    // print!("({})",syscall_id);
+    gdb_print!(SYSCALL_ENABLE,"({})",syscall_id);
     match syscall_id {
         SYSCALL_GETCWD=> sys_getcwd(args[0] as *mut u8, args[1] as usize),
         SYSCALL_DUP=> sys_dup(args[0]),

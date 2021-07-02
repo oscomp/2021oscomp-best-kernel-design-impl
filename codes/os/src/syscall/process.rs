@@ -9,6 +9,8 @@ use crate::task::{
     SIGCHILD
 };
 use crate::timer::*;
+use crate::gdb_print;
+use crate::monitor::*;
 use crate::mm::{
     UserBuffer,
     translated_str,
@@ -184,7 +186,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     }
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
-    //println!("try get app {}{}", inner.current_path.as_str(), path);
+    gdb_print!(EXEC_ENABLE, "try get app {}{}", inner.current_path.as_str(), path);
     if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
         drop(inner);
         //let par_inode_id:u32 = find_par_inode_id(path.as_str());

@@ -7,7 +7,8 @@ mod pid;
 mod info;
 
 use crate::fs::{open, OpenFlags, DiskInodeType, File};
-use crate::mm::UserBuffer;
+use crate::mm::{UserBuffer, add_free};
+use crate::config::PAGE_SIZE;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -82,6 +83,8 @@ lazy_static! {
     });
 }
 
+// Write initproc & user_shell into file system to be executed
+// And then release them to fram_allocator
 pub fn add_initproc_into_fs() {
     extern "C" { fn _num_app(); }
     extern "C" { fn _app_names(); }
@@ -99,7 +102,7 @@ pub fn add_initproc_into_fs() {
     );
 
     // find if there already exits 
-    println!("Find if there already exits ");
+    // println!("Find if there already exits ");
     if let Some(inode) = open(
         "/",
         "initproc",
@@ -120,19 +123,19 @@ pub fn add_initproc_into_fs() {
         OpenFlags::CREATE,
         DiskInodeType::File
     ){
-        println!("Create initproc ");
+        // println!("Create initproc ");
         let mut data: Vec<&'static mut [u8]> = Vec::new();
         data.push( unsafe{
         core::slice::from_raw_parts_mut(
             app_start[0] as *mut u8,
             app_start[1] - app_start[0]
         )}) ;
-        println!("Start write initproc ");
+        // println!("Start write initproc ");
         inode.write(UserBuffer::new(data));
-        println!("Init_proc OK");
+        // println!("Init_proc OK");
     }
     else{
-        panic!("initproc create fail!");
+        // panic!("initproc create fail!");
     }
 
     if let Some(inode) = open(
@@ -141,21 +144,31 @@ pub fn add_initproc_into_fs() {
         OpenFlags::CREATE,
         DiskInodeType::File
     ){
-        println!("Create user_shell ");
+        // println!("Create user_shell ");
         let mut data:Vec<&'static mut [u8]> = Vec::new();
         data.push(unsafe{
         core::slice::from_raw_parts_mut(
             app_start[1] as *mut u8,
             app_start[2] - app_start[1]
         )});
-        println!("Start write user_shell ");
+        // println!("Start write user_shell ");
         inode.write(UserBuffer::new(data));
-        println!("User_shell OK");
+        // println!("User_shell OK");
     }
     else{
         panic!("user_shell create fail!");
     }
     println!("Write apps(initproc & user_shell) to disk from mem");
+
+
+    // release
+    let mut start_ppn = app_start[0] / PAGE_SIZE + 1;
+    println!("Recycle memory: {:x}-{:x}", start_ppn* PAGE_SIZE, (app_start[2] / PAGE_SIZE)* PAGE_SIZE);
+    while start_ppn < app_start[2] / PAGE_SIZE {
+        add_free(start_ppn);
+        start_ppn += 1;
+    }
+
 }
 
 pub fn add_initproc() {

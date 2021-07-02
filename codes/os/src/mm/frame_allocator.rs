@@ -50,6 +50,10 @@ impl StackFrameAllocator {
         self.end = r.0;
         println!("last {} Physical Frames.", self.end - self.current);
     }
+
+    pub fn add_free(&mut self, ppn: usize){
+        self.recycled.push(ppn);
+    }
 }
 impl FrameAllocator for StackFrameAllocator {
     fn new() -> Self {
@@ -112,6 +116,10 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
     FRAME_ALLOCATOR
         .lock()
         .dealloc(ppn);
+}
+
+pub fn add_free(ppn: usize){
+    FRAME_ALLOCATOR.lock().recycled.push(ppn);
 }
 
 #[allow(unused)]
