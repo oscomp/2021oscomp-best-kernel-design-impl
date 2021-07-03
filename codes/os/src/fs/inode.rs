@@ -125,6 +125,11 @@ impl OSInode {
 
     }
 
+    pub fn get_size(&self)->usize{
+        let inner = self.inner.lock();
+        let (size, _, mt_me, _) = inner.inode.stat();
+        return size as usize
+    }
 
     pub fn create(&self, path:&str, type_: DiskInodeType)->Option<Arc<OSInode>>{
         let inner = self.inner.lock();

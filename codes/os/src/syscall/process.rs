@@ -9,26 +9,27 @@ use crate::task::{
     SIGCHILD
 };
 use crate::timer::*;
-use crate::gdb_print;
-use crate::monitor::*;
 use crate::mm::{
     UserBuffer,
     translated_str,
     translated_refmut,
     translated_ref,
-    translated_byte_buffer,
+    translated_byte_buffer, 
 };
 use crate::fs::{
     open,
     //find_par_inode_id,
     OpenFlags,
-    DiskInodeType
+    DiskInodeType,
+    FileClass,
 };
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 //use alloc::vec;
 use alloc::string::String;
+//use simple_fat32::println;
 use core::mem::size_of;
+use core::slice;
 //use easy_fs::DiskInodeType;
 
 
@@ -173,6 +174,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize) -> isize {
 }
 
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
+    //println!("[sys_exec]");
     let token = current_user_token();
     let path = translated_str(token, path);
     let mut args_vec: Vec<String> = Vec::new();
@@ -185,16 +187,29 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         unsafe { args = args.add(1); }
     }
     let task = current_task().unwrap();
-    let inner = task.acquire_inner_lock();
-    gdb_print!(EXEC_ENABLE, "try get app {}{}", inner.current_path.as_str(), path);
+    let mut inner = task.acquire_inner_lock();
+    
     if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
+        let len = app_inode.get_size();
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some(FileClass::File(app_inode));
         drop(inner);
-        //let par_inode_id:u32 = find_par_inode_id(path.as_str());
-        let all_data = app_inode.read_all();
-        //let task = current_task().unwrap();
+        let elf_buf = task.kmmap(0, len, 0, 0, fd, 0);
+        
+        //let page_table = PageTable::from_token(KERNEL_TOKEN.token());
+        //println!("ppn2 = 0x{:X}", page_table.translate(VirtAddr::from(elf_buf).floor()).unwrap().bits);
         let argc = args_vec.len();
-        task.exec(all_data.as_slice(), args_vec);
-        // return argc because cx.x[10] will be covered with it later
+        //println!("[sys_exec2]");
+        unsafe{
+
+            let elf_ref = slice::from_raw_parts(elf_buf as *const u8, len);
+            task.exec(elf_ref, args_vec);
+        }
+        task.kmunmap(elf_buf, len);
+        // drop fd
+        let mut inner = task.acquire_inner_lock();
+        inner.fd_table[fd].take();
+        //println!("[sys_exec] finish");
         argc as isize
     } else {
         -1

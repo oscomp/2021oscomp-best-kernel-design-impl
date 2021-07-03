@@ -20,7 +20,7 @@ pub use page_table::{
     UserBufferIterator,
 };
 pub use vma::{MmapArea, MmapSpace};
-pub use memory_set::{MemorySet, KERNEL_SPACE, MapPermission, kernel_token};
+pub use memory_set::{MemorySet, KERNEL_SPACE, KERNEL_MMAP_AREA, KERNEL_TOKEN,  MapPermission, kernel_token};
 pub use memory_set::remap_test;
 
 pub fn init() {

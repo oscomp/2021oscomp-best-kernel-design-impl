@@ -2,10 +2,14 @@ use crate::{console::print, mm::{
     MemorySet,
     PhysPageNum,
     KERNEL_SPACE, 
+    KERNEL_MMAP_AREA, 
+    KERNEL_TOKEN,
+    PageTable,
     VirtAddr,
     translated_refmut,
     MmapArea,
     MapPermission,
+
 }};
 use crate::trap::{TrapContext, trap_handler};
 use crate::config::{TRAP_CONTEXT, USER_HEAP_SIZE, MMAP_BASE};
@@ -72,6 +76,7 @@ impl TaskControlBlockInner {
             println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
         }
     }
+
     pub fn get_work_path(&self)->String{
         self.current_path.clone()
     }
@@ -139,13 +144,16 @@ impl TaskControlBlock {
     }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
         // memory_set with elf program headers/trampoline/trap context/user stack
+        
         let (memory_set, mut user_sp, user_heap, entry_point) = MemorySet::from_elf(elf_data);
+        
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
             .ppn();
         // push arguments on user stack
         // sp减小[参数个数*usize]，用于存放参数地址 
+        println!("[exec] usp = 0x{:X}", user_sp);
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
         let argv_base = user_sp;
         
@@ -189,6 +197,7 @@ impl TaskControlBlock {
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize trap_cx
+        println!("[exec] entry point = 0x{:X}", entry_point);
         let mut trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,
@@ -199,6 +208,7 @@ impl TaskControlBlock {
         trap_cx.x[10] = args.len();
         trap_cx.x[11] = argv_base;
         *inner.get_trap_cx() = trap_cx;
+        println!("[exec] finish");
         // **** release current PCB lock
     }
     pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
@@ -279,6 +289,37 @@ impl TaskControlBlock {
         inner.mmap_area.remove(start, len)
     }
 
+
+    // create mmap in kernel space, used for elf file only
+    pub fn kmmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> usize {
+        let mut ks_lock = KERNEL_SPACE.lock();
+        let mut kma_lock = KERNEL_MMAP_AREA.lock();
+        let mut inner = self.acquire_inner_lock();
+        let fd_table = inner.fd_table.clone();
+        let token = ks_lock.token();
+        let va_top = kma_lock.get_mmap_top();
+        let end_va = VirtAddr::from(va_top.0 + len);
+        //println!("vatop = 0x{:X}, end_va = 0x{:X}", va_top.0, end_va.0);
+        ks_lock.insert_mmap_area(va_top, end_va,  MapPermission::W | MapPermission::R );
+        //let page_table = PageTable::from_token(KERNEL_TOKEN.token());
+        //println!("pte = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().bits);
+        //println!("ppn = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().ppn().0);
+        //point();
+        //ks_lock.activate();
+        //unsafe{
+        //    *(MMAP_BASE as *mut usize) = 5;
+        //}
+    
+        kma_lock.push(start, len, prot, flags, fd, off, fd_table, token)
+    }
+
+    pub fn kmunmap(&self, start: usize, len: usize) -> isize {
+        let mut ks_lock = KERNEL_SPACE.lock();
+        let mut kma_lock = KERNEL_MMAP_AREA.lock();
+        ks_lock.remove_area_with_start_vpn(VirtAddr::from(start).into());
+        kma_lock.remove(start, len)
+    }
+
     pub fn grow_proc(&self, grow_size: isize) -> usize {
         if grow_size > 0 {
             let growed_addr: usize = self.inner.lock().heap_pt + grow_size as usize;
@@ -304,4 +345,11 @@ pub enum TaskStatus {
     Ready,
     Running,
     Zombie,
+}
+
+
+#[inline(never)]
+#[no_mangle]
+pub fn point(){
+    println!("hi");
 }

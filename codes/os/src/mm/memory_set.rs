@@ -15,8 +15,10 @@ use crate::config::{
     TRAP_CONTEXT,
     USER_STACK_SIZE,
     USER_HEAP_SIZE,
+    MMAP_BASE,
     MMIO,
 };
+use crate::mm::MmapArea;
 
 extern "C" {
     fn stext();
@@ -31,11 +33,35 @@ extern "C" {
     fn strampoline();
 }
 
+
+pub struct KernelToken {
+    token:usize
+}
+impl KernelToken {
+    pub fn token(&self)->usize{
+        self.token
+    }
+}
+
 lazy_static! {
     pub static ref KERNEL_SPACE: Arc<Mutex<MemorySet>> = Arc::new(Mutex::new(
         MemorySet::new_kernel()
     ));
+
+    pub static ref KERNEL_TOKEN: Arc<KernelToken> = Arc::new(
+        KernelToken{
+            token:KERNEL_SPACE.lock().token()
+        }
+    );
 }
+
+lazy_static! {
+    pub static ref KERNEL_MMAP_AREA: Arc<Mutex<MmapArea>> = Arc::new(Mutex::new(
+        MmapArea::new(VirtAddr::from(MMAP_BASE), VirtAddr::from(MMAP_BASE))
+    ));
+}
+
+
 
 pub fn kernel_token() -> usize {
     KERNEL_SPACE.lock().token()
