@@ -22,6 +22,10 @@ const SYSCALL_UNAME: usize = 160;
 const SYSCALL_GET_TIME_OF_DAY: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_GETPPID: usize = 173;
+const SYSCALL_GETUID: usize = 174;
+const SYSCALL_GETEUID: usize = 175;
+const SYSCALL_GETGID: usize = 176;
+const SYSCALL_GETEGID: usize = 177;
 const SYSCALL_SBRK: usize = 213;
 const SYSCALL_BRK: usize = 214;
 const SYSCALL_MUNMAP: usize = 215;
@@ -76,6 +80,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_BRK => sys_brk(args[0]),
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETPPID => sys_getppid(),
+        
+        SYSCALL_GETUID => sys_getppid(),
+        SYSCALL_GETEUID => sys_getppid(),
+        SYSCALL_GETGID => sys_getppid(),
+        SYSCALL_GETEGID => sys_getppid(),
+
         SYSCALL_FORK => sys_fork(args[0] as usize, args[1] as  usize),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
@@ -88,7 +98,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => shutdown(),
         SYSCALL_CLEAR => sys_clear(args[0] as *const u8),
-        _ => panic!("Unsupported syscall_id: {}", syscall_id),
+        _ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
+        // _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }
 

@@ -398,40 +398,9 @@ impl ArgMachine{
     }
 
     pub fn auto_run_testsuites(){
-        // ls("\0");
+        println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
-        testsuits.push("brk\0");
-        testsuits.push("chdir\0");
-        testsuits.push("clone\0");
-        testsuits.push("close\0");
-        testsuits.push("dup2\0");
-        testsuits.push("dup\0");
-        testsuits.push("execve\0");
-        testsuits.push("exit\0");
-        testsuits.push("fork\0");
-        testsuits.push("fstat\0");
-        testsuits.push("getcwd\0");
-        testsuits.push("getdents\0");
-        testsuits.push("getpid\0");
-        testsuits.push("getppid\0");
-        testsuits.push("mkdir_\0");
-        testsuits.push("mmap\0");
-        testsuits.push("mount\0");
-        testsuits.push("munmap\0");
-        testsuits.push("openat\0");
-        testsuits.push("open\0");
-        testsuits.push("pipe\0");
-        testsuits.push("read\0");
-        testsuits.push("umount\0");
-        testsuits.push("uname\0");
-        testsuits.push("wait\0");
-        testsuits.push("waitpid\0");
-        testsuits.push("write\0");
-        testsuits.push("yield\0");
-        testsuits.push("sleep\0");
-        testsuits.push("times\0");
-        testsuits.push("gettimeofday\0");
-        testsuits.push("unlink\0");
+        testsuits.push("busybox\0");
         for programname in testsuits.iter(){
             let mut exit_code = 0;
             let mut args_addr: Vec<*const u8> = Vec::new();
@@ -535,7 +504,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    // ArgMachine::auto_run_testsuites();
+    ArgMachine::auto_run_testsuites();
     let mut line: String;
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();

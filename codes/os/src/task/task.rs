@@ -153,7 +153,7 @@ impl TaskControlBlock {
             .ppn();
         // push arguments on user stack
         // sp减小[参数个数*usize]，用于存放参数地址 
-        println!("[exec] usp = 0x{:X}", user_sp);
+        // println!("[exec] usp = 0x{:X}", user_sp);
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
         let argv_base = user_sp;
         
@@ -185,6 +185,13 @@ impl TaskControlBlock {
         // make the user_sp aligned to 8B for k210 platform
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
+        // push *argv (pointers)
+        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * (args.len() + 1)) as *mut usize) = 0;
+        for i in 0..args.len() {
+            *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * i) as *mut usize) = *argv[i] ;
+        }
+
         // **** hold current PCB lock
         let mut inner = self.acquire_inner_lock();
         // substitute memory_set
@@ -197,7 +204,7 @@ impl TaskControlBlock {
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize trap_cx
-        println!("[exec] entry point = 0x{:X}", entry_point);
+        // println!("[exec] entry point = 0x{:X}", entry_point);
         let mut trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,

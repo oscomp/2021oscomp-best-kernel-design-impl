@@ -54,6 +54,11 @@ impl StackFrameAllocator {
     pub fn add_free(&mut self, ppn: usize){
         self.recycled.push(ppn);
     }
+
+    pub fn print_free(&mut self){
+        let size = self.recycled.len() + self.end - self.current;
+        println!("Free memory: {} pages", size);
+    }
 }
 impl FrameAllocator for StackFrameAllocator {
     fn new() -> Self {
@@ -120,6 +125,10 @@ pub fn frame_dealloc(ppn: PhysPageNum) {
 
 pub fn add_free(ppn: usize){
     FRAME_ALLOCATOR.lock().recycled.push(ppn);
+}
+
+pub fn print_free_pages(){
+    FRAME_ALLOCATOR.lock().print_free();
 }
 
 #[allow(unused)]

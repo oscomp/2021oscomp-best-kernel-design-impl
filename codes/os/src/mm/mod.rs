@@ -8,7 +8,7 @@ mod vma;
 use page_table::PTEFlags;
 use address::VPNRange;
 pub use address::{PhysAddr, VirtAddr, PhysPageNum, VirtPageNum, StepByOne};
-pub use frame_allocator::{FrameTracker, frame_alloc, frame_dealloc,add_free};
+pub use frame_allocator::{FrameTracker, frame_alloc, frame_dealloc,add_free, print_free_pages};
 pub use page_table::{
     PageTable,
     PageTableEntry,

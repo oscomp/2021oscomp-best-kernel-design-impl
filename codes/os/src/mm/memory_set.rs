@@ -199,6 +199,7 @@ impl MemorySet {
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
                 let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
                 let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
+                println!("[ELF part {}] {:X}-{:X}",i, start_va.0, end_va.0);
                 let mut map_perm = MapPermission::U;
                 let ph_flags = ph.flags();
                 if ph_flags.is_read() { map_perm |= MapPermission::R; }
@@ -230,6 +231,9 @@ impl MemorySet {
             MapType::Framed,
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
+        println!("[exec] user heap top: 0x{:X}", user_heap_top);
+        println!("[exec] user heap bottom: 0x{:X}", user_heap_bottom);
+
 
         // map TrapContext
         memory_set.push(MapArea::new(

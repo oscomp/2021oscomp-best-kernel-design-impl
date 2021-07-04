@@ -15,6 +15,7 @@ use crate::mm::{
     translated_refmut,
     translated_ref,
     translated_byte_buffer, 
+    print_free_pages
 };
 use crate::fs::{
     open,
@@ -134,6 +135,22 @@ pub fn sys_getppid() -> isize {
     // getppid(child_pid, &search_task) as isize
 }
 
+pub fn sys_getuid() -> isize {
+    0 // root user
+}
+
+pub fn sys_geteuid() -> isize {
+    0 // root user
+}
+
+pub fn sys_getgid() -> isize {
+    0 // root group
+}
+
+pub fn sys_getegid() -> isize {
+    0 // root group
+}
+
 
 pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
     current_task().unwrap().grow_proc(grow_size) as isize
@@ -191,6 +208,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     
     if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
         let len = app_inode.get_size();
+        println!("[exec] File size: {} bytes", len);
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(FileClass::File(app_inode));
         drop(inner);
@@ -205,6 +223,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
             let elf_ref = slice::from_raw_parts(elf_buf as *const u8, len);
             task.exec(elf_ref, args_vec);
         }
+        // print_free_pages();
         task.kmunmap(elf_buf, len);
         // drop fd
         let mut inner = task.acquire_inner_lock();
