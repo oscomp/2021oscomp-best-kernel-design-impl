@@ -401,7 +401,6 @@ impl ArgMachine{
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("busybox\0");
-        testsuits.push("busybox sh\0");
         for programname in testsuits.iter(){
             let mut exit_code = 0;
             let mut args_addr: Vec<*const u8> = Vec::new();

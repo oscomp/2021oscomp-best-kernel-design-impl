@@ -6,7 +6,8 @@ mkfs.vfat -F 32 ${U_FAT32}
 
 if test -e ${U_FAT32_DIR}/fs
 then 
-    echo "already have fs"
+    sudo rm -r ${U_FAT32_DIR}/fs
+    mkdir ${U_FAT32_DIR}/fs
 else
     mkdir ${U_FAT32_DIR}/fs
 fi
