@@ -24,6 +24,7 @@ use crate::fs::{
     DiskInodeType,
     FileClass,
 };
+use crate::config::PAGE_SIZE;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 //use alloc::vec;
@@ -331,4 +332,13 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, 
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     let task = current_task().unwrap();
     task.munmap(start, len)
+}
+
+pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{
+    let task = current_task().unwrap();
+    if (addr % PAGE_SIZE != 0) || (len % PAGE_SIZE != 0){ // Not align
+        return -1
+    }
+    
+    0
 }
