@@ -1,7 +1,7 @@
 use core::usize;
 
 use crate::{
-    fs::{/*OSInode,*/Kstat, FileClass, File, Dirent, MNT_TABLE}, 
+    fs::{/*OSInode,*/Kstat, FileClass, File, Dirent, MNT_TABLE, IoVec, IoVecs}, 
     mm::{
     UserBuffer,
     translated_byte_buffer,
@@ -38,6 +38,38 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         f.write(
             UserBuffer::new(translated_byte_buffer(token, buf, len))
         ) as isize
+    } else {
+        -1
+    }
+}
+
+pub fn sys_writev(fd:usize, iov_ptr: usize, iov_num:usize)->isize{
+    let iov_head = iov_ptr as *mut IoVec;
+    
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        let f: Arc<dyn File + Send + Sync> = match file {
+            FileClass::Abstr(f)=> {f.clone()},
+            FileClass::File(f)=>{f.clone()},
+            _ => return -1,
+        };
+        if !f.writable() {
+            return -1;
+        }
+        drop(inner);
+        unsafe {
+            let buf = UserBuffer::new( IoVecs::new(
+                iov_head,
+                iov_num,
+                token
+            ).0);
+            f.write(buf) as isize
+        }   
     } else {
         -1
     }

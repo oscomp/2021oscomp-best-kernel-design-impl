@@ -16,6 +16,8 @@ pub use page_table::{
     translated_str,
     translated_ref,
     translated_refmut,
+    translated_ref_array,
+    translated_array_copy,
     UserBuffer,
     UserBufferIterator,
 };

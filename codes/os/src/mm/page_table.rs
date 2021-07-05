@@ -203,6 +203,42 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     page_table.translate_va(VirtAddr::from(va)).unwrap().get_mut()
 }
 
+/* 获取用户数组内各元素的引用 */
+/* 目前并不能处理跨页结构体 */
+pub fn translated_ref_array<T>(token: usize, ptr: *mut T, len: usize) -> Vec<&'static T>{
+    let page_table = PageTable::from_token(token);
+    let mut ref_array:Vec<&'static T> = Vec::new();
+    let mut va = ptr as usize;
+    let step = core::mem::size_of::<T>();
+    for i in 0..len {
+        println!("[trans array] va = 0x{:X}", va);
+        ref_array.push( page_table.translate_va(VirtAddr::from(va)).unwrap().get_ref() );
+        va += step;
+    }
+    ref_array
+}
+
+/* 获取用户数组的一份拷贝 */
+pub fn translated_array_copy<T>(token: usize, ptr: *mut T, len: usize) -> Vec< T>
+    where T:Copy {
+    let page_table = PageTable::from_token(token);
+    let mut ref_array:Vec<T> = Vec::new();
+    let mut va = ptr as usize;
+    let step = core::mem::size_of::<T>();
+    //println!("step = {}, len = {}", step, len);
+    for i in 0..len {
+        let u_buf = UserBuffer::new( translated_byte_buffer(token, va as *const u8, step) );
+        let mut bytes_vec:Vec<u8> = Vec::new();
+        u_buf.read_as_vec(&mut bytes_vec, step);
+        //println!("loop, va = 0x{:X}, vec = {:?}", va, bytes_vec);
+        unsafe{
+            ref_array.push(  *(bytes_vec.as_slice() as *const [u8] as *const u8 as usize as *const T) );
+        }
+        va += step;
+    }
+    ref_array
+}
+
 pub struct UserBuffer {
     pub buffers: Vec<&'static mut [u8]>,
 }
@@ -245,6 +281,22 @@ impl UserBuffer {
             let sblen = (*sub_buff).len();
             for j in 0..sblen {
                 buff[current] = (*sub_buff)[j];
+                current += 1;
+                if current == len {
+                    return len;
+                }
+            }
+        }
+        return len;
+    }
+
+    pub fn read_as_vec(&self, vec: &mut Vec<u8>, vlen:usize)->usize{
+        let len = self.len().min(vlen);
+        let mut current = 0;
+        for sub_buff in self.buffers.iter() {
+            let sblen = (*sub_buff).len();
+            for j in 0..sblen {
+                vec.push( (*sub_buff)[j] );
                 current += 1;
                 if current == len {
                     return len;
