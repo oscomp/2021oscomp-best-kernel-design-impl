@@ -404,14 +404,11 @@ impl ArgMachine{
         for programname in testsuits.iter(){
             let mut exit_code = 0;
             let mut args_addr: Vec<*const u8> = Vec::new();
+            args_addr.push(programname.as_ptr());
             args_addr.push(0 as *const u8);
             let pid = fork();
             if pid == 0 {
-                // child process
-                //println!("{}",programname);
-                //if *programname == "mkdir_\0" {
-                //    ls("\0");
-                //}
+                
                 if exec(programname, args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     shutdown();
