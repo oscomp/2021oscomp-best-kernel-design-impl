@@ -10,3 +10,13 @@ run:
 
 runsimple:
 	cd codes/os && make runsimple
+
+gdb:
+	cd codes/os && make gdb
+
+monitor:
+	cd codes/os && make monitor
+
+build:
+	cd codes/os && make build
+

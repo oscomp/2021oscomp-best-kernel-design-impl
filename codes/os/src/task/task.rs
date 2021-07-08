@@ -13,6 +13,8 @@ use crate::{console::print, mm::{
 }};
 use crate::trap::{TrapContext, trap_handler};
 use crate::config::{TRAP_CONTEXT, USER_HEAP_SIZE, MMAP_BASE};
+use crate::gdb_println;
+use crate::monitor::*;
 use super::TaskContext;
 use super::{PidHandle, pid_alloc, KernelStack};
 use alloc::sync::{Weak, Arc};
@@ -22,15 +24,22 @@ use alloc::string::String;
 use spin::{Mutex, MutexGuard};
 use crate::fs::{File, Stdin, Stdout, FileClass};
 
+pub struct ProcAddress {
+    pub set_child_tid: usize,
+    pub clear_child_tid: usize,
+}
+
 pub struct TaskControlBlock {
     // immutable
     pub pid: PidHandle,
+    pub tgid: usize,
     pub kernel_stack: KernelStack,
     // mutable
     inner: Mutex<TaskControlBlockInner>,
 }
 
 pub struct TaskControlBlockInner {
+    pub address: ProcAddress,
     pub trap_cx_ppn: PhysPageNum,
     pub base_size: usize,
     pub heap_start: usize,
@@ -44,6 +53,12 @@ pub struct TaskControlBlockInner {
     pub fd_table: Vec<Option<FileClass>>,
     pub current_path: String,
     pub mmap_area: MmapArea,
+}
+
+impl ProcAddress {
+    pub fn new() -> Self{
+        Self{set_child_tid: 0, clear_child_tid: 0}
+    }
 }
 
 impl TaskControlBlockInner {
@@ -97,14 +112,17 @@ impl TaskControlBlock {
             .ppn();
         // alloc a pid and a kernel stack in kernel space
         let pid_handle = pid_alloc();
+        let tgid = pid_handle.0;
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
         // push a task context which goes to trap_return to the top of kernel stack
         let task_cx_ptr = kernel_stack.push_on_top(TaskContext::goto_trap_return());
         let task_control_block = Self {
             pid: pid_handle,
+            tgid,
             kernel_stack,
             inner: Mutex::new(TaskControlBlockInner {
+                address: ProcAddress::new(),
                 trap_cx_ppn,
                 base_size: user_sp,
                 heap_start: user_heap,
@@ -142,55 +160,95 @@ impl TaskControlBlock {
         let inner = self.inner.lock();
         inner.parent.as_ref().unwrap().upgrade()
     }
+    
+    // exec will push following arguments to user stack:
+    // STACK TOP
+    //      argc
+    //      *argv [] (with NULL as the end) 8 bytes each
+    //      *envp [] (with NULL as the end) 8 bytes each: now only NULL
+    //      auxv[] (with NULL as the end) 16 bytes each: now only NULL
+    //      padding (16 bytes-align)
+    //      rand bytes: Now set 0x00 ~ 0x0f (not support random) 16bytes
+    //      String: platform "RISC-V64"
+    //      Argument string(argv[])
+    //      Environment String (envp[]): now NOTHING
+    // STACK BOTTOM
+    // Due to "push" operations, we will start from the bottom
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
         // memory_set with elf program headers/trampoline/trap context/user stack
         
         let (memory_set, mut user_sp, user_heap, entry_point) = MemorySet::from_elf(elf_data);
         
+        // println!("user_sp {:X}", user_sp);
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
             .ppn();
-        // push arguments on user stack
-        // sp减小[参数个数*usize]，用于存放参数地址 
-        // println!("[exec] usp = 0x{:X}", user_sp);
-        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
-        let argv_base = user_sp;
         
-        let mut argv: Vec<_> = (0..=args.len())
-            .map(|arg| {
-                translated_refmut(
-                    memory_set.token(),
-                    (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize
-                )
-            })
-            .collect();
-
-        // argv的类型实际为 Vec<&'static mut T>
-        // 所以这里直接往对应的地址写数据
-        *argv[args.len()] = 0;
+        let mut argv: Vec<usize> = (0..=args.len()).collect();
+        ////////////// argv[] ///////////////////
+        argv[args.len()] = 0;
         for i in 0..args.len() {
-            // sp继续向下增长，留空间给每个参数
-            // +1是因为需要'\0'
             user_sp -= args[i].len() + 1;
-            *argv[i] = user_sp;
+            // println!("user_sp {:X}", user_sp);
+            argv[i] = user_sp;
             let mut p = user_sp;
-            // 将字符写入栈 [user_sp, user_sp + len]
+            // write chars to [user_sp, user_sp + len]
             for c in args[i].as_bytes() {
                 *translated_refmut(memory_set.token(), p as *mut u8) = *c;
+                // print!("({})",*c as char);
                 p += 1;
             }
             *translated_refmut(memory_set.token(), p as *mut u8) = 0;
         }
         // make the user_sp aligned to 8B for k210 platform
         user_sp -= user_sp % core::mem::size_of::<usize>();
-
-        // push *argv (pointers)
-        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
-        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * (args.len() + 1)) as *mut usize) = 0;
-        for i in 0..args.len() {
-            *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * i) as *mut usize) = *argv[i] ;
+        
+        ////////////// platform String ///////////////////
+        let platform = "RISC-V64";
+        user_sp -= platform.len() + 1;
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+        let mut p = user_sp;
+        for c in platform.as_bytes() {
+            *translated_refmut(memory_set.token(), p as *mut u8) = *c;
+            p += 1;
         }
+        *translated_refmut(memory_set.token(), p as *mut u8) = 0;
+
+        ////////////// rand bytes ///////////////////
+        user_sp -= 16;
+        p = user_sp;
+        for i in 0..0xf {
+            *translated_refmut(memory_set.token(), p as *mut u8) = i as u8;
+            p += 1;
+        }
+        
+        ////////////// padding //////////////////////
+        user_sp -= user_sp % 16;
+        
+        ////////////// auxv[] //////////////////////
+        user_sp -= user_sp % 16;
+        let auxv_base = user_sp;
+        *translated_refmut(memory_set.token(), auxv_base as *mut usize) = 0;
+        *translated_refmut(memory_set.token(), (auxv_base + core::mem::size_of::<usize>()) as *mut usize) = 0;
+
+        ////////////// *envp [] //////////////////////
+        user_sp -= core::mem::size_of::<usize>();
+        let envp_base = user_sp;
+        *translated_refmut(memory_set.token(), envp_base as *mut usize) = 0;
+        
+        ////////////// *argv [] //////////////////////
+        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        let argv_base = user_sp;
+        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * (args.len())) as *mut usize) = 0;
+        for i in 0..args.len() {
+            *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * i) as *mut usize) = argv[i] ;
+        }
+
+        ////////////// argc //////////////////////
+        user_sp -= core::mem::size_of::<usize>();
+        *translated_refmut(memory_set.token(), user_sp as *mut usize) = args.len();
+
 
         // **** hold current PCB lock
         let mut inner = self.acquire_inner_lock();
@@ -205,6 +263,7 @@ impl TaskControlBlock {
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize trap_cx
         // println!("[exec] entry point = 0x{:X}", entry_point);
+        
         let mut trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,
@@ -214,11 +273,13 @@ impl TaskControlBlock {
         );
         trap_cx.x[10] = args.len();
         trap_cx.x[11] = argv_base;
+        trap_cx.x[12] = envp_base;
+        trap_cx.x[13] = auxv_base;
         *inner.get_trap_cx() = trap_cx;
-        println!("[exec] finish");
+        gdb_println!(EXEC_ENABLE,"[exec] finish");
         // **** release current PCB lock
     }
-    pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
+    pub fn fork(self: &Arc<TaskControlBlock>, is_create_thread: bool) -> Arc<TaskControlBlock> {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();
         // copy user space(include trap context)
@@ -231,6 +292,13 @@ impl TaskControlBlock {
             .ppn();
         // alloc a pid and a kernel stack in kernel space
         let pid_handle = pid_alloc();
+        let mut tgid = 0;
+        if is_create_thread{
+            tgid = self.pid.0;
+        }
+        else{
+            tgid = pid_handle.0;
+        }
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
         // push a goto_trap_return task_cx on the top of kernel stack
@@ -247,8 +315,10 @@ impl TaskControlBlock {
         //println!("fork: parent_inner.current_inode = {}",parent_inner.current_inode);
         let task_control_block = Arc::new(TaskControlBlock {
             pid: pid_handle,
+            tgid,
             kernel_stack,
             inner: Mutex::new(TaskControlBlockInner {
+                address: ProcAddress::new(),
                 trap_cx_ppn,
                 base_size: parent_inner.base_size,
                 heap_start: parent_inner.heap_start,
@@ -277,6 +347,10 @@ impl TaskControlBlock {
     }
     pub fn getpid(&self) -> usize {
         self.pid.0
+    }
+
+    pub fn gettgid(&self) -> usize {
+        self.tgid
     }
 
     pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> usize {

@@ -7,8 +7,10 @@ mod pid;
 mod info;
 
 use crate::fs::{open, OpenFlags, DiskInodeType, File};
-use crate::mm::{UserBuffer, add_free};
+use crate::mm::{UserBuffer, add_free, translated_refmut};
 use crate::config::PAGE_SIZE;
+use crate::gdb_print;
+use crate::monitor::*;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
@@ -53,8 +55,11 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let task = take_current_task().unwrap();
     // **** hold current PCB lock
     let mut inner = task.acquire_inner_lock();
-    
-    print!("[exit{}]",task.pid.0);
+    let clear_child_tid = inner.address.clear_child_tid;
+    if clear_child_tid != 0{
+        *translated_refmut(inner.get_user_token(), clear_child_tid as *mut i32) = 0;
+    }
+    gdb_print!(EXIT_ENABLE,"[exit{}]",task.pid.0);
     // Change status to Zombie
     inner.task_status = TaskStatus::Zombie;
     inner.exit_code = exit_code;

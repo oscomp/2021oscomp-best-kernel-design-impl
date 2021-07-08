@@ -16,6 +16,7 @@ const SYSCALL_WRITE: usize = 64;
 const SYSCALL_WRITEV: usize = 66;
 const SYSCALL_FSTAT:usize = 80;
 const SYSCALL_EXIT: usize = 93;
+const SYSCALL_SET_TID_ADDRESS: usize = 96;
 const SYSCALL_NANOSLEEP: usize = 101;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_TIMES: usize = 153;
@@ -27,12 +28,14 @@ const SYSCALL_GETUID: usize = 174;
 const SYSCALL_GETEUID: usize = 175;
 const SYSCALL_GETGID: usize = 176;
 const SYSCALL_GETEGID: usize = 177;
+const SYSCALL_GETTID: usize = 177;
 const SYSCALL_SBRK: usize = 213;
 const SYSCALL_BRK: usize = 214;
 const SYSCALL_MUNMAP: usize = 215;
-const SYSCALL_FORK: usize = 220;
+const SYSCALL_CLONE: usize = 220;
 const SYSCALL_EXEC: usize = 221;
 const SYSCALL_MMAP: usize = 222;
+const SYSCALL_MPROTECT: usize = 226;
 const SYSCALL_WAIT4: usize = 260;
 
 // Not standard POSIX sys_call
@@ -73,7 +76,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITEV => sys_writev(args[0], args[1], args[2]),
         SYSCALL_FSTAT=>sys_fstat(args[0] as isize, args[1] as *mut u8),
-        
+        SYSCALL_SET_TID_ADDRESS => sys_set_tid_address(args[0] as usize),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_NANOSLEEP => sys_sleep(args[0] as *mut u64, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),
@@ -82,15 +85,16 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GET_TIME_OF_DAY => sys_get_time(args[0] as *mut u64),
         SYSCALL_SBRK => sys_sbrk(args[0] as isize, args[1] as usize),
         SYSCALL_BRK => sys_brk(args[0]),
+
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETPPID => sys_getppid(),
-        
-        SYSCALL_GETUID => sys_getppid(),
-        SYSCALL_GETEUID => sys_getppid(),
-        SYSCALL_GETGID => sys_getppid(),
-        SYSCALL_GETEGID => sys_getppid(),
+        SYSCALL_GETUID => sys_getuid(),
+        SYSCALL_GETEUID => sys_geteuid(),
+        SYSCALL_GETGID => sys_getgid(),
+        SYSCALL_GETEGID => sys_getegid(),
+        SYSCALL_GETTID => sys_gettid(),
 
-        SYSCALL_FORK => sys_fork(args[0] as usize, args[1] as  usize),
+        SYSCALL_CLONE => sys_fork(args[0] as usize, args[1] as  usize, args[2] as  usize, args[3] as  usize),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
         // SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
@@ -99,10 +103,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[3] as usize, args[4] as usize, args[5] as usize)
         },
         SYSCALL_MUNMAP => { sys_munmap(args[0] as usize, args[1] as usize) },
+        SYSCALL_MPROTECT => {sys_mprotect(args[0] as usize, args[1] as usize, args[2] as isize)},
         SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => shutdown(),
         SYSCALL_CLEAR => sys_clear(args[0] as *const u8),
-        _ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
+        _ => 0
+        // _ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
         //_ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

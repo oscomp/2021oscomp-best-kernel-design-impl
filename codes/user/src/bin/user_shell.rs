@@ -400,22 +400,43 @@ impl ArgMachine{
     pub fn auto_run_testsuites(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
-        testsuits.push("busybox\0");
-        for programname in testsuits.iter(){
+        testsuits.push("basename\0 /aaa/bbb\0");
+        testsuits.push("clear\0");
+        testsuits.push("dirname\0 /aaa/bbb\0");
+        testsuits.push("du\0");
+        testsuits.push("false\0");
+        testsuits.push("true\0");
+        testsuits.push("uname\0");
+        testsuits.push("printf\0 \"abc\n\"\0");
+        testsuits.push("kill\0 10\0");
+        testsuits.push("touch\0 test.txt\0");
+        for programname_op in testsuits.iter(){
+            let exec_op = String::from("busybox\0 ") + programname_op;
             let mut exit_code = 0;
+            let args: Vec<&str> = exec_op.as_str().split(' ').collect();
+            // for i in 0..args.len() {
+            //     args[i].push('\0');
+            // }
             let mut args_addr: Vec<*const u8> = Vec::new();
-            args_addr.push(programname.as_ptr());
-            args_addr.push(0 as *const u8);
+            for i in 0..args.len() {
+                args_addr.push(args[i].as_ptr() as usize as *const u8);
+            }
+            // print!("shell:{}",args_addr[0] as usize);
             let pid = fork();
             if pid == 0 {
-                
-                if exec(programname, args_addr.as_slice()) == -1 {
+                if exec(args[0], args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     shutdown();
                 }
                 unreachable!();
             } else {
                 waitpid(pid as usize, &mut exit_code);
+                if *programname_op != "false\0" && exit_code != 0{
+                    println!("testcase busybox {} fail", programname_op);
+                }
+                else{
+                    println!("testcase busybox {} success", programname_op);
+                }
             }
         }
         shutdown();
@@ -527,8 +548,9 @@ pub fn main() -> i32 {
             args_addr.push(0 as *const u8);
             let pid = fork();
             if pid == 0 {
-                // input redirection
-                if !input.is_empty() {
+                // input redirection : NOW CLOSED 
+                // if !input.is_empty() {
+                if false {
                     let input_fd = open(input.as_str(), OpenFlags::RDONLY);
                     if input_fd == -1 {
                         println!("Error when opening file {}", input);
@@ -540,7 +562,8 @@ pub fn main() -> i32 {
                     close(input_fd);
                 }
                 // output redirection
-                if !output.is_empty() {
+                // if !output.is_empty() {
+                if false {
                     let output_fd = open(
                         output.as_str(),
                         OpenFlags::CREATE | OpenFlags::WRONLY

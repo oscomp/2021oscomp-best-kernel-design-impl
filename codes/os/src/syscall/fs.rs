@@ -294,9 +294,9 @@ pub fn sys_getcwd(buf: *mut u8, len: usize)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
-    let mut buf_vec = translated_byte_buffer(token, buf, len);
+    let buf_vec = translated_byte_buffer(token, buf, len);
     let mut userbuf = UserBuffer::new(buf_vec);
-    let mut current_offset:usize = 0;
+    let current_offset:usize = 0;
     if buf as usize == 0 {
         return 0
     } else {
@@ -339,7 +339,7 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
-    let mut buf_vec = translated_byte_buffer(token, buf, len);
+    let buf_vec = translated_byte_buffer(token, buf, len);
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut dirent = Dirent::empty();

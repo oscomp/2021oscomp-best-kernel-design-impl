@@ -6,7 +6,9 @@ use crate::task::{
     add_task,
     TaskControlBlock,
     utsname,
-    SIGCHILD
+    SIGCHLD,
+    CLONE_CHILD_CLEARTID,
+    CLONE_CHILD_SETTID,
 };
 use crate::timer::*;
 use crate::mm::{
@@ -15,7 +17,8 @@ use crate::mm::{
     translated_refmut,
     translated_ref,
     translated_byte_buffer, 
-    print_free_pages
+    print_free_pages,
+    PageTable,
 };
 use crate::fs::{
     open,
@@ -25,6 +28,9 @@ use crate::fs::{
     FileClass,
 };
 use crate::config::PAGE_SIZE;
+use crate::gdb_print;
+use crate::gdb_println;
+use crate::monitor::*;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 //use alloc::vec;
@@ -119,15 +125,23 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
     0
 }
 
-pub fn sys_getpid() -> isize {
-    current_task().unwrap().pid.0 as isize
+pub fn sys_set_tid_address(tidptr: usize) -> isize {
+    current_task().unwrap().acquire_inner_lock().address.clear_child_tid = tidptr;
+    // print!("sys_set_tid_address: return {}", sys_gettid());
+    sys_gettid()
 }
 
+// For user, pid is tgid in kernel
+pub fn sys_getpid() -> isize {
+    current_task().unwrap().tgid as isize
+}
+
+// For user, pid is tgid in kernel
 pub fn sys_getppid() -> isize {
     // let mut search_task_pid: usize = current_task().unwrap().pid.0;
     let mut search_task: Arc<TaskControlBlock> = current_task().unwrap();
     search_task = search_task.get_parent().unwrap();
-    search_task.pid.0 as isize
+    search_task.tgid as isize
     // while search_task_pid != 0 {
     //     search_task = search_task.get_parent().unwrap();
     //     search_task_pid = search_task.pid.0;
@@ -152,6 +166,10 @@ pub fn sys_getegid() -> isize {
     0 // root group
 }
 
+// For user, tid is pid in kernel
+pub fn sys_gettid() -> isize {
+    current_task().unwrap().pid.0 as isize
+}
 
 pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
     current_task().unwrap().grow_proc(grow_size) as isize
@@ -167,15 +185,27 @@ pub fn sys_brk(brk_addr: usize) -> isize{
     0
 }
 
-pub fn sys_fork(flags: usize, stack_ptr: usize) -> isize {
-    print!("[fork]");
-    if flags != SIGCHILD{
-        println!("sys_fork: FLAG not supported!");
+//long clone(unsigned long flags, void *child_stack,
+//    int *ptid, int *ctid,
+//    unsigned long newtls);
+pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize) -> isize {
+    gdb_print!(FORK_ENABLE,"[fork]");
+    let current_task = current_task().unwrap();
+    let new_task = current_task.fork(false);
+    let tid = new_task.getpid();
+    if flags == CLONE_CHILD_SETTID{
+        new_task.acquire_inner_lock().address.set_child_tid = ctid; 
+        *translated_refmut(new_task.acquire_inner_lock().get_user_token(), ctid as *mut i32) = tid  as i32;
+    }
+    else if flags == CLONE_CHILD_CLEARTID{
+        new_task.acquire_inner_lock().address.clear_child_tid = ctid;
+    }
+    else if flags != SIGCHLD{
+        panic!("sys_fork: FLAG not supported!");
         return -1;
     }
+
     
-    let current_task = current_task().unwrap();
-    let new_task = current_task.fork();
     if stack_ptr != 0{
         let trap_cx = new_task.acquire_inner_lock().get_trap_cx();
         trap_cx.set_sp(stack_ptr);
@@ -202,6 +232,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
             break;
         }
         args_vec.push(translated_str(token, arg_str_ptr as *const u8));
+        // println!("arg{}: {}",0, args_vec[0]);
         unsafe { args = args.add(1); }
     }
     let task = current_task().unwrap();
@@ -209,7 +240,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     
     if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
         let len = app_inode.get_size();
-        println!("[exec] File size: {} bytes", len);
+        gdb_println!(EXEC_ENABLE,"[exec] File size: {} bytes", len);
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(FileClass::File(app_inode));
         drop(inner);
@@ -218,11 +249,16 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         //let page_table = PageTable::from_token(KERNEL_TOKEN.token());
         //println!("ppn2 = 0x{:X}", page_table.translate(VirtAddr::from(elf_buf).floor()).unwrap().bits);
         let argc = args_vec.len();
+        // println!("argc:{}",argc);
         //println!("[sys_exec2]");
         unsafe{
 
             let elf_ref = slice::from_raw_parts(elf_buf as *const u8, len);
             task.exec(elf_ref, args_vec);
+            let inner = task.acquire_inner_lock();
+            let target = 0xffffffffffffcfe8 as *mut u8;
+            let c = *translated_refmut(inner.memory_set.token(), target);
+            // println!("c {}",c as char);
         }
         // print_free_pages();
         task.kmunmap(elf_buf, len);
@@ -335,10 +371,19 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
 }
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{
-    let task = current_task().unwrap();
     if (addr % PAGE_SIZE != 0) || (len % PAGE_SIZE != 0){ // Not align
         return -1
     }
-    
+    let task = current_task().unwrap();
+    // let token = task.acquire_inner_lock().get_user_token();
+    let memory_set = &mut task.acquire_inner_lock().memory_set;
+    let start_vpn = addr / PAGE_SIZE;
+    for i in 0..(len/PAGE_SIZE){
+        // here (prot << 1) is identical to BitFlags of X/W/R in pte flags
+        if memory_set.set_pte_flags(start_vpn.into(), (prot as usize)<<1) == -1{
+            // if fail
+            panic!("sys_mprotect: No such pte");
+        }
+    }
     0
 }

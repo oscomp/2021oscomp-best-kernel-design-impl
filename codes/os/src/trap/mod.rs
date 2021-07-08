@@ -23,6 +23,8 @@ use crate::task::{
 };
 use crate::timer::set_next_trigger;
 use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
+use crate::gdb_print;
+use crate::monitor::*;
 
 global_asm!(include_str!("trap.S"));
 
@@ -89,7 +91,7 @@ pub fn trap_handler() -> ! {
             exit_current_and_run_next(-3);
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            // print!("[timer]");
+            gdb_print!(TIMER_ENABLE,"[timer]");
             set_next_trigger();
             suspend_current_and_run_next();
         }

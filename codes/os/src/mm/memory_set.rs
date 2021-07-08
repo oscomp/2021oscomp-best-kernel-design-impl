@@ -305,6 +305,9 @@ impl MemorySet {
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
     }
+    pub fn set_pte_flags(&mut self, vpn: VirtPageNum, flags: usize) -> isize{
+        self.page_table.set_pte_flags(vpn, flags)
+    }
     pub fn recycle_data_pages(&mut self) {
         //*self = Self::new_bare();
         self.areas.clear();

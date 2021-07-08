@@ -102,7 +102,7 @@ pub fn sys_getpid() -> isize {
 }
 
 pub fn sys_fork() -> isize {
-    //SIGCHILD=17
+    //SIGCHLD=17
     syscall(SYSCALL_FORK, [17, 0, 0])
 }
 

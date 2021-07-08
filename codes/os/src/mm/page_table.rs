@@ -60,6 +60,10 @@ impl PageTableEntry {
     pub fn executable(&self) -> bool {
         (self.flags() & PTEFlags::X) != PTEFlags::empty()
     }
+    // only X+W+R can be set
+    pub fn set_flags(&mut self, flags: usize) {
+        self.bits = (self.bits & !(0b1110 as usize)) | ( flags & (0b1110 as usize));
+    }
 }
 
 pub struct PageTable {
@@ -119,6 +123,31 @@ impl PageTable {
         }
         result
     }
+    
+    // only X+W+R can be set
+    pub fn set_pte_flags(&mut self, vpn: VirtPageNum, flags: usize) -> isize{
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&PageTableEntry> = None;
+        for i in 0..3 {
+            let pte = &mut ppn.get_pte_array()[idxs[i]];
+            if i == 2 {
+                // if pte == None{
+                //     panic!("set_pte_flags: no such pte");
+                // }
+                // else{
+                    pte.set_flags(flags);
+                // }
+                break;
+            }
+            if !pte.is_valid() {
+                return -1;
+            }
+            ppn = pte.ppn();
+        }
+        0
+    }
+    
     #[allow(unused)]
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).unwrap();
@@ -226,7 +255,7 @@ pub fn translated_array_copy<T>(token: usize, ptr: *mut T, len: usize) -> Vec< T
     let mut va = ptr as usize;
     let step = core::mem::size_of::<T>();
     //println!("step = {}, len = {}", step, len);
-    for i in 0..len {
+    for _i in 0..len {
         let u_buf = UserBuffer::new( translated_byte_buffer(token, va as *const u8, step) );
         let mut bytes_vec:Vec<u8> = Vec::new();
         u_buf.read_as_vec(&mut bytes_vec, step);

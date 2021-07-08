@@ -24,6 +24,7 @@ mod sbi;
 mod syscall;
 mod trap;
 mod config;
+#[macro_use]
 mod monitor;
 mod task;
 mod timer;
