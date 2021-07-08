@@ -421,7 +421,9 @@ impl ArgMachine{
             for i in 0..args.len() {
                 args_addr.push(args[i].as_ptr() as usize as *const u8);
             }
-            // print!("shell:{}",args_addr[0] as usize);
+            args_addr.push(0 as *const u8 );
+            // print!("args_addr.as_slice():{:?}",args_addr.as_slice());
+            // print!("ars:{:?}",args);
             let pid = fork();
             if pid == 0 {
                 if exec(args[0], args_addr.as_slice()) == -1 {
