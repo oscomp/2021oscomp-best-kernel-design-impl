@@ -89,12 +89,12 @@ pub fn trap_handler() -> ! {
             }
             let vpn: VirtPageNum = va.floor();
             // Get the task inner of current
-            let pcb_inner = current_task().unwrap().acquire_inner_lock();
+            // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
             // get the PageTableEntry that faults
-            let pte = pcb_inner.translate_vpn(va.floor());
+            let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
             // if the virtPage is a CoW
             if pte.is_cow() {
-                pcb_inner.cow_alloc(vpn);
+                current_task().unwrap().acquire_inner_lock().cow_alloc(vpn);
             } else {
                 println!(
                     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",

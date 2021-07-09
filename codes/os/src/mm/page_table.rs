@@ -60,16 +60,22 @@ impl PageTableEntry {
     pub fn executable(&self) -> bool {
         (self.flags() & PTEFlags::X) != PTEFlags::empty()
     }
-    pub fn set_flags(&self, flags: &PTEFlags) {
+    pub fn set_flags(&mut self, flags: PTEFlags) {
         let new_flags: u8 = flags.bits().clone();
         self.bits = (self.bits & 0xFFFF_FFFF_FFFF_FF00) | (new_flags as usize);
     }
-    pub fn set_cow(&self) {
-        self.bits = self.bits | 0x200;
+    pub fn set_cow(&mut self) {
+        (*self).bits = self.bits | (1 << 9);
+    }
+    pub fn reset_cow(&mut self) {
+        (*self).bits = self.bits & !(1 << 9);
     }
     pub fn is_cow(&self) -> bool {
         self.bits & (1 << 9) != 0
     }
+    // fn set_bits(self, bits: usize) {
+    //     self.bits = bits;
+    // }
 }
 
 pub struct PageTable {
@@ -136,6 +142,12 @@ impl PageTable {
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
     #[allow(unused)]
+    pub fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum) {
+        let pte = self.find_pte_create(vpn).unwrap();
+        pte.reset_cow();
+        pte.set_flags(pte.flags() | PTEFlags::W);
+    }
+    #[allow(unused)]
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         let pte = self.find_pte_create(vpn).unwrap();
         assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
@@ -153,6 +165,15 @@ impl PageTable {
                 let aligned_pa_usize: usize = aligned_pa.into();
                 (aligned_pa_usize + offset).into()
             })
+    }
+    pub fn set_cow(&mut self, vpn: VirtPageNum) {
+        let pte = self.find_pte_create(vpn).unwrap();
+    }
+    pub fn reset_cow(&mut self, vpn: VirtPageNum) {
+        self.find_pte_create(vpn).unwrap().reset_cow();
+    }
+    pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+        self.find_pte_create(vpn).unwrap().set_flags(flags);
     }
     pub fn token(&self) -> usize {
         8usize << 60 | self.root_ppn.0

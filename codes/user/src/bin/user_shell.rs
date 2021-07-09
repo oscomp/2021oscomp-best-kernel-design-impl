@@ -362,10 +362,10 @@ impl ArgMachine{
             return false;
         }
         // Standard autorun
-        if self.args[0].clone().as_str() == "autorun\0" {
-            ArgMachine::auto_run_testsuites();
-            return false
-        }
+        // if self.args[0].clone().as_str() == "autorun\0" {
+        //     ArgMachine::auto_run_testsuites();
+        //     return false
+        // }
         // ls
         if self.args[0].clone().as_str() == "ls\0" {
             // println!("(into ls)");

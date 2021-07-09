@@ -41,17 +41,30 @@ pub fn kernel_token() -> usize {
     KERNEL_SPACE.lock().token()
 }
 
+// #[derive(Clone)]
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
 }
 
 impl MemorySet {
+    pub fn clone_areas(&self) -> Vec<MapArea> {
+        self.areas.clone()
+    }
     pub fn new_bare() -> Self {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
         }
+    }
+    pub fn set_cow(&mut self, vpn: VirtPageNum) {
+        self.page_table.set_cow(vpn);
+    }
+    pub fn reset_cow(&mut self, vpn: VirtPageNum) {
+        self.page_table.reset_cow(vpn);
+    }
+    pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+        self.page_table.set_flags(vpn, flags);
     }
     pub fn token(&self) -> usize {
         self.page_table.token()
@@ -84,6 +97,9 @@ impl MemorySet {
             self.areas.remove(idx);
         }
     }
+    fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum) {
+        self.page_table.remap_cow(vpn, ppn);
+    }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
@@ -91,7 +107,7 @@ impl MemorySet {
         }
         self.areas.push(map_area);
     }
-    fn push_mapped(&self, mut map_area: MapArea) {
+    fn push_mapped(&mut self, map_area: MapArea) {
         self.areas.push(map_area);
     }
     /// Mention that trampoline is not collected by areas.
@@ -252,36 +268,45 @@ impl MemorySet {
         memory_set
     }
 
-    pub fn from_copy_on_write(&mut self, user_space: &MemorySet) -> MemorySet {
+    pub fn from_copy_on_write(user_space: &mut MemorySet) -> MemorySet {
         // create a new memory_set
+        println!{"pin1-----------------------"};
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
         //copy on write
-        for area in user_space.areas.iter() {
+        let mut parent_areas = user_space.areas.clone();
+        let page_table = &mut user_space.page_table;
+        println!{"pin2-----------------------"};
+        for area in parent_areas.iter_mut() {
             // copy pagetable
+            println!{"pin3-----------------------"};
             let new_area = MapArea::from_another(area);
             // map the former physical address
             for vpn in area.vpn_range {
                 //change the map permission of both pagetable
-                let pte = user_space.translate(vpn).unwrap();
+                // get the former flags and ppn
+                let pte = page_table.translate(vpn).unwrap();
                 let pte_flags = pte.flags() & !PTEFlags::W;
-                pte.set_flags(&pte_flags);
-                pte.set_cow();
-                // map the cow page table to former ppn
                 let src_ppn = pte.ppn();
-                self.page_table.map(vpn, src_ppn, pte_flags);
-                self.translate(vpn).unwrap().set_cow();
+                // change the flags of the src_pte
+                page_table.set_flags(vpn, pte_flags);
+                page_table.set_cow(vpn);
+                // map the cow page table to src_ppn
+                memory_set.page_table.map(vpn, src_ppn, pte_flags);
+                memory_set.set_cow(vpn);
             }
-            memory_set.push(area);
+            memory_set.push_mapped(new_area);
         }
+        println!{"pin4-----------------------"};
         memory_set
     }
 
-    pub fn cow_alloc(&self, vpn: VirtPageNum) -> usize {
-        for area in self.areas.iter() {
-
-        }
+    pub fn cow_alloc(&mut self, vpn: VirtPageNum) -> usize {
+        println!{"pin8-----------------------"};
+        let frame = frame_alloc().unwrap();
+        let ppn = frame.ppn;
+        self.remap_cow(vpn, ppn);
         0
     }
 
@@ -301,6 +326,7 @@ impl MemorySet {
     }
 }
 
+#[derive(Clone)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,

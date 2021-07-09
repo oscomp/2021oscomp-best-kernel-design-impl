@@ -5,6 +5,7 @@ use crate::config::MEMORY_END;
 use lazy_static::*;
 use core::fmt::{self, Debug, Formatter};
 
+#[derive(Clone)]
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
 }
