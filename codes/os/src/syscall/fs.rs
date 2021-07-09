@@ -1,7 +1,7 @@
 use core::usize;
 
 use crate::{
-    fs::{/*OSInode,*/Kstat, FileClass, File, Dirent, MNT_TABLE, IoVec, IoVecs}, 
+    fs::{/*OSInode,*/Kstat, FileClass, File, Dirent, MNT_TABLE, IoVec, IoVecs, TTY}, 
     mm::{
     UserBuffer,
     translated_byte_buffer,
@@ -109,7 +109,16 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     let path = translated_str(token, path);
     //println!("openat: path = {}", path);
     let mut inner = task.acquire_inner_lock();
-    //println!("openat: fd = {}", dirfd);
+    
+    /////////////////////////////// WARNING ////////////////////////////////
+    // 只是测试用的临时处理
+    if path.contains("/dev") {
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some(FileClass::Abstr(TTY.clone()));
+        return fd as isize
+    }
+    ////////////////////////////////////////////////////////////////////////
+
     if dirfd == AT_FDCWD {
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
@@ -547,5 +556,24 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
         } else {
             return -1
         }
+    }
+}
+
+pub fn sys_ioctl(fd:usize, cmd:u32, arg:usize)->isize{
+    let token = current_user_token();
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = &inner.fd_table[fd] {
+        let file: Arc<dyn File + Send + Sync> = match file {
+            FileClass::Abstr(f)=> {f.clone()},
+            FileClass::File(f)=>{f.clone()},
+            _ => return -1,
+        };
+        return file.ioctl(cmd, arg)
+    } else {
+        return -1
     }
 }

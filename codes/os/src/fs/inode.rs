@@ -279,7 +279,8 @@ bitflags! {
         const RDWR = 1 << 1;
         const CREATE = 1 << 6;
         const TRUNC = 1 << 10;
-        const DIRECTROY = 0x0200000;
+        const DIRECTROY = 0200000;
+        const LARGEFILE  = 0100000;
     }
 }
 
