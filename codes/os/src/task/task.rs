@@ -3,6 +3,8 @@ use crate::{console::print, mm::{
     PhysPageNum,
     KERNEL_SPACE, 
     VirtAddr,
+    VirtPageNum,
+    PageTableEntry,
     translated_refmut,
     MmapArea,
     MapPermission,
@@ -74,6 +76,12 @@ impl TaskControlBlockInner {
     }
     pub fn get_work_path(&self)->String{
         self.current_path.clone()
+    }
+    pub fn translate_vpn(&self, vpn: VirtPageNum) -> PageTableEntry {
+        self.memory_set.translate(vpn).unwrap()
+    }
+    pub fn cow_alloc(&self, vpn: VirtPageNum) -> usize {
+        self.memory_set.cow_alloc(vpn)
     }
 }
 
@@ -261,7 +269,6 @@ impl TaskControlBlock {
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
-
     pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> usize {
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();

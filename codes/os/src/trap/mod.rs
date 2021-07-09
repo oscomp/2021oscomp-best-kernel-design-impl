@@ -13,6 +13,10 @@ use riscv::register::{
     stval,
     sie,
 };
+use crate::mm::{
+    VirtAddr,
+    VirtPageNum,
+};
 use crate::syscall::syscall;
 use crate::task::{
     exit_current_and_run_next,
@@ -20,6 +24,7 @@ use crate::task::{
     current_user_token,
     current_trap_cx,
     get_core_id,
+    current_task,
 };
 use crate::timer::set_next_trigger;
 use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
@@ -63,11 +68,9 @@ pub fn trap_handler() -> ! {
             cx.x[10] = result as usize;
         }
         Trap::Exception(Exception::StoreFault) |
-        Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::InstructionFault) |
         Trap::Exception(Exception::InstructionPageFault) |
-        Trap::Exception(Exception::LoadFault) |
-        Trap::Exception(Exception::LoadPageFault) => {
+        Trap::Exception(Exception::LoadFault) => {
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
@@ -76,6 +79,32 @@ pub fn trap_handler() -> ! {
             );
             // page fault exit code
             exit_current_and_run_next(-2);
+        }
+        Trap::Exception(Exception::StorePageFault) |
+        Trap::Exception(Exception::LoadPageFault) => {
+            let va: VirtAddr = (stval as usize).into();
+            // The boundary decision
+            if va > TRAMPOLINE.into() {
+                panic!("VirtAddr out of range!");
+            }
+            let vpn: VirtPageNum = va.floor();
+            // Get the task inner of current
+            let pcb_inner = current_task().unwrap().acquire_inner_lock();
+            // get the PageTableEntry that faults
+            let pte = pcb_inner.translate_vpn(va.floor());
+            // if the virtPage is a CoW
+            if pte.is_cow() {
+                pcb_inner.cow_alloc(vpn);
+            } else {
+                println!(
+                    "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                    scause.cause(),
+                    stval,
+                    current_trap_cx().sepc,
+                );
+                // page fault exit code
+                exit_current_and_run_next(-2);
+            }
         }
         Trap::Exception(Exception::IllegalInstruction) => {
             println!("[kernel] IllegalInstruction in application, core dumped.");

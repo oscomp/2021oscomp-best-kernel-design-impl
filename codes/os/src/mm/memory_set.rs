@@ -91,6 +91,9 @@ impl MemorySet {
         }
         self.areas.push(map_area);
     }
+    fn push_mapped(&self, mut map_area: MapArea) {
+        self.areas.push(map_area);
+    }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
         self.page_table.map(
@@ -198,6 +201,7 @@ impl MemorySet {
         //guard page
         user_heap_bottom += PAGE_SIZE;
         let user_heap_top: usize = user_heap_bottom + USER_HEAP_SIZE;
+        //maparea1: user_heap
         memory_set.push(MapArea::new(
             user_heap_bottom.into(),
             user_heap_top.into(),
@@ -205,7 +209,7 @@ impl MemorySet {
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
 
-        // map TrapContext
+        // maparea2: TrapContext
         memory_set.push(MapArea::new(
             TRAP_CONTEXT.into(),
             TRAMPOLINE.into(),
@@ -214,6 +218,8 @@ impl MemorySet {
         ), None);
 
         // map user stack with U flags
+        //maparea3: user_stack
+        //maparea3: user_stack
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
         user_stack_top -= PAGE_SIZE;
@@ -245,6 +251,40 @@ impl MemorySet {
         }
         memory_set
     }
+
+    pub fn from_copy_on_write(&mut self, user_space: &MemorySet) -> MemorySet {
+        // create a new memory_set
+        let mut memory_set = Self::new_bare();
+        // map trampoline
+        memory_set.map_trampoline();
+        //copy on write
+        for area in user_space.areas.iter() {
+            // copy pagetable
+            let new_area = MapArea::from_another(area);
+            // map the former physical address
+            for vpn in area.vpn_range {
+                //change the map permission of both pagetable
+                let pte = user_space.translate(vpn).unwrap();
+                let pte_flags = pte.flags() & !PTEFlags::W;
+                pte.set_flags(&pte_flags);
+                pte.set_cow();
+                // map the cow page table to former ppn
+                let src_ppn = pte.ppn();
+                self.page_table.map(vpn, src_ppn, pte_flags);
+                self.translate(vpn).unwrap().set_cow();
+            }
+            memory_set.push(area);
+        }
+        memory_set
+    }
+
+    pub fn cow_alloc(&self, vpn: VirtPageNum) -> usize {
+        for area in self.areas.iter() {
+
+        }
+        0
+    }
+
     pub fn activate(&self) {
         let satp = self.page_table.token();
         unsafe {

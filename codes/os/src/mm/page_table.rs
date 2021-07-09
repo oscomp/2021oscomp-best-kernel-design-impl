@@ -60,6 +60,16 @@ impl PageTableEntry {
     pub fn executable(&self) -> bool {
         (self.flags() & PTEFlags::X) != PTEFlags::empty()
     }
+    pub fn set_flags(&self, flags: &PTEFlags) {
+        let new_flags: u8 = flags.bits().clone();
+        self.bits = (self.bits & 0xFFFF_FFFF_FFFF_FF00) | (new_flags as usize);
+    }
+    pub fn set_cow(&self) {
+        self.bits = self.bits | 0x200;
+    }
+    pub fn is_cow(&self) -> bool {
+        self.bits & (1 << 9) != 0
+    }
 }
 
 pub struct PageTable {
