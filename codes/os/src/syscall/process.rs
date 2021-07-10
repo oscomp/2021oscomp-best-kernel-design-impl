@@ -167,6 +167,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize) -> isize {
 }
 
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
+    println!{"exec called!"};
     let token = current_user_token();
     let path = translated_str(token, path);
     let mut args_vec: Vec<String> = Vec::new();

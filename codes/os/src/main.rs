@@ -86,7 +86,7 @@ pub fn rust_main() -> ! {
     //println!("enter kernel");
         // println!("[core 2] Hello, world!");
     let core = id();
-    //println!("get id");
+    // println!("get id = {}", core);
     if core != 0 {
         println!("other core");
         loop{}
@@ -98,6 +98,7 @@ pub fn rust_main() -> ! {
         //panic!("Unreachable in rust_main!");
     }
     //println!("clear bss");
+    println!{"pin8-----------------------"};
     clear_bss();
     //println!("init mm");
     mm::init();

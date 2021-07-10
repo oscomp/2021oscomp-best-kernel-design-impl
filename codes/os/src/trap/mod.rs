@@ -66,6 +66,7 @@ pub fn trap_handler() -> ! {
             // cx is changed during sys_exec, so we have to call it again
             cx = current_trap_cx();
             cx.x[10] = result as usize;
+            // println!{"cx written..."}
         }
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::InstructionFault) |
@@ -92,6 +93,7 @@ pub fn trap_handler() -> ! {
             // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
             // get the PageTableEntry that faults
             let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
+            println!{"PageTableEntry: {}", pte.bits};
             // if the virtPage is a CoW
             if pte.is_cow() {
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn);

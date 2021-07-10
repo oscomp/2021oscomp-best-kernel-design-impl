@@ -78,7 +78,6 @@ impl Processor {
                     drop(current_task_inner);
                     //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
-                    
                     unsafe {
                         __switch(
                             idle_task_cx_ptr2,

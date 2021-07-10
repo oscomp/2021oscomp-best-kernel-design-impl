@@ -212,17 +212,17 @@ impl TaskControlBlock {
     pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();
+        let user_heap_top = parent_inner.heap_start + USER_HEAP_SIZE;
         // copy user space(include trap context)
         let memory_set = MemorySet::from_copy_on_write(
-            &mut parent_inner.memory_set
+            &mut parent_inner.memory_set,
+            user_heap_top,
         );
-        println!{"pin5-----------------------"};
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
             .ppn();
         // alloc a pid and a kernel stack in kernel space
-        println!{"pin6-----------------------"};
         let pid_handle = pid_alloc();
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
@@ -258,7 +258,6 @@ impl TaskControlBlock {
             }),
         });
         // add child
-        println!{"pin7-----------------------"};
         parent_inner.children.push(task_control_block.clone());
         // modify kernel_sp in trap_cx
         // **** acquire child PCB lock

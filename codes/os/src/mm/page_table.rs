@@ -167,7 +167,7 @@ impl PageTable {
             })
     }
     pub fn set_cow(&mut self, vpn: VirtPageNum) {
-        let pte = self.find_pte_create(vpn).unwrap();
+        self.find_pte_create(vpn).unwrap().set_cow();
     }
     pub fn reset_cow(&mut self, vpn: VirtPageNum) {
         self.find_pte_create(vpn).unwrap().reset_cow();

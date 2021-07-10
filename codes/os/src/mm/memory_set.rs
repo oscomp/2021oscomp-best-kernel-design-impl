@@ -235,7 +235,6 @@ impl MemorySet {
 
         // map user stack with U flags
         //maparea3: user_stack
-        //maparea3: user_stack
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
         user_stack_top -= PAGE_SIZE;
@@ -268,25 +267,48 @@ impl MemorySet {
         memory_set
     }
 
-    pub fn from_copy_on_write(user_space: &mut MemorySet) -> MemorySet {
+    pub fn from_copy_on_write(user_space: &mut MemorySet, user_heap_top: usize) -> MemorySet {
         // create a new memory_set
-        println!{"pin1-----------------------"};
         let mut memory_set = Self::new_bare();
-        // map trampoline
+        // This part is not for Copy on Write.
+        // Including:   Trampoline
+        //              Trap_Context
+        //              User_Stack
         memory_set.map_trampoline();
-        //copy on write
+        for area in user_space.areas.iter() {
+            let head_vpn = area.vpn_range.get_start();
+            let user_heap_top_addr: VirtAddr = user_heap_top.into();
+            if head_vpn < user_heap_top_addr.floor() {
+                //skipping the part using CoW
+                continue;
+            }
+            let new_area = MapArea::from_another(area);
+            memory_set.push(new_area, None);
+            for vpn in area.vpn_range {
+                let src_ppn = user_space.translate(vpn).unwrap().ppn();
+                let dst_ppn = memory_set.translate(vpn).unwrap().ppn();
+                dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
+            }
+        }
+        println!{"CoW starting..."};
+        //This part is for copy on write
         let mut parent_areas = user_space.areas.clone();
         let page_table = &mut user_space.page_table;
-        println!{"pin2-----------------------"};
         for area in parent_areas.iter_mut() {
-            // copy pagetable
-            println!{"pin3-----------------------"};
+            let head_vpn = area.vpn_range.get_start();
+            let user_heap_top_addr: VirtAddr = user_heap_top.into();
+            if head_vpn > user_heap_top_addr.floor() {
+                //skipping the part using Coping to new ppn
+                continue;
+            }
             let new_area = MapArea::from_another(area);
             // map the former physical address
             for vpn in area.vpn_range {
+                println!{"mapping {:?}", vpn};
                 //change the map permission of both pagetable
                 // get the former flags and ppn
                 let pte = page_table.translate(vpn).unwrap();
+                // println!{"The content of PTE: {}", pte.bits};
                 let pte_flags = pte.flags() & !PTEFlags::W;
                 let src_ppn = pte.ppn();
                 // change the flags of the src_pte
@@ -298,7 +320,7 @@ impl MemorySet {
             }
             memory_set.push_mapped(new_area);
         }
-        println!{"pin4-----------------------"};
+        println!{"returning..."};
         memory_set
     }
 

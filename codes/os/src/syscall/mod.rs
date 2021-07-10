@@ -74,7 +74,11 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_BRK => sys_brk(args[0]),
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_GETPPID => sys_getppid(),
-        SYSCALL_FORK => sys_fork(args[0] as usize, args[1] as  usize),
+        SYSCALL_FORK => {
+            let res = sys_fork(args[0] as usize, args[1] as  usize);
+            println!{"returning to user..."}
+            res
+        },
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
         // SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
