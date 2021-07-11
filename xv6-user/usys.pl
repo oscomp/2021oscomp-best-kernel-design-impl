@@ -35,7 +35,6 @@ entry("sbrk");
 entry("sleep");
 entry("uptime");
 entry("test_proc");
-entry("dev");
 entry("getdents");
 entry("getcwd");
 entry("unlinkat");

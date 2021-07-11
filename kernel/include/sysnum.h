@@ -4,7 +4,6 @@
 // System call numbers
 #define SYS_fork         1
 #define SYS_wait         3
-#define SYS_dev          4
 #define SYS_kill         6
 #define SYS_exec         7
 #define SYS_sbrk        12
@@ -40,6 +39,10 @@
 #define SYS_gettimeofday 169
 #define SYS_getpid     172
 #define SYS_getppid    173
+// #define SYS_getuid     174
+// #define SYS_geteuid    175
+// #define SYS_getgid     176
+// #define SYS_getegid    177
 #define SYS_brk        214
 #define SYS_munmap     215
 #define SYS_clone      220

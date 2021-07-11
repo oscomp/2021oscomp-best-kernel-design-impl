@@ -1,7 +1,7 @@
-platform	:= k210
-#platform	:= qemu
-#mode := debug
-mode := release
+# platform	:= k210
+platform	:= qemu
+mode := debug
+# mode := release
 K=kernel
 U=xv6-user
 T=target
@@ -108,7 +108,7 @@ linker = ./linker/qemu.ld
 endif
 
 # Compile Kernel
-$T/kernel: $(OBJS) $(linker) $U/initcode $U/ostest 
+$T/kernel: $(OBJS) $(linker) $U/initcode
 	@if [ ! -d "./target" ]; then mkdir target; fi
 	@$(LD) $(LDFLAGS) -T $(linker) -o $T/kernel $(OBJS)
 	@$(OBJDUMP) -S $T/kernel > $T/kernel.asm

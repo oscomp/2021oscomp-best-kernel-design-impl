@@ -195,6 +195,7 @@ sys_brk(void)
     }
     heap->sz += n;
   }
+  return heap->addr + heap->sz;
   return 0;
 }
 
@@ -295,3 +296,9 @@ sys_trace(void)
   myproc()->tmask = mask;
   return 0;
 }
+
+// uint64
+// sys_getuid(void)
+// {
+//   return 0;
+// }

@@ -139,7 +139,6 @@ extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
 extern uint64 sys_test_proc(void);
-extern uint64 sys_dev(void);
 extern uint64 sys_getdents(void);
 extern uint64 sys_getcwd(void);
 extern uint64 sys_unlinkat(void);
@@ -159,6 +158,10 @@ extern uint64 sys_gettimeofday(void);
 extern uint64 sys_nanosleep(void);
 extern uint64 sys_mmap(void);
 extern uint64 sys_munmap(void);
+// extern uint64 sys_getuid(void);
+// extern uint64 sys_geteuid(void);
+// extern uint64 sys_getgid(void);
+// extern uint64 sys_getegid(void);
 
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
@@ -182,7 +185,6 @@ static uint64 (*syscalls[])(void) = {
   [SYS_mkdirat]     sys_mkdirat,
   [SYS_close]       sys_close,
   [SYS_test_proc]   sys_test_proc,
-  [SYS_dev]         sys_dev,
   [SYS_getdents]    sys_getdents,
   [SYS_getcwd]      sys_getcwd,
   [SYS_unlinkat]    sys_unlinkat,
@@ -193,7 +195,6 @@ static uint64 (*syscalls[])(void) = {
   [SYS_mount]       sys_mount,
   [SYS_umount]      sys_umount,
   [SYS_clone]       sys_clone, 
-  [SYS_execve]      sys_execve, 
   [SYS_wait4]       sys_wait4, 
   [SYS_getpid]      sys_getpid, 
   [SYS_getppid]     sys_getppid, 
@@ -204,6 +205,10 @@ static uint64 (*syscalls[])(void) = {
   [SYS_nanosleep]   sys_nanosleep, 
   [SYS_mmap]        sys_mmap,
   [SYS_munmap]      sys_munmap,
+  // [SYS_getuid]      sys_getuid,
+  // [SYS_geteuid]     sys_getuid,
+  // [SYS_getgid]      sys_getuid,
+  // [SYS_getegid]     sys_getuid,
 };
 
 static char *sysnames[] = {
@@ -228,7 +233,6 @@ static char *sysnames[] = {
   [SYS_mkdirat]     "mkdirat",
   [SYS_close]       "close",
   [SYS_test_proc]   "test_proc",
-  [SYS_dev]         "dev",
   [SYS_getdents]    "getdents",
   [SYS_getcwd]      "getcwd",
   [SYS_unlinkat]    "unlinkat",
@@ -239,7 +243,7 @@ static char *sysnames[] = {
   [SYS_mount]       "mount",
   [SYS_umount]      "umount",
   [SYS_clone]       "clone", 
-  [SYS_wait4]       "wait", 
+  [SYS_wait4]       "wait4", 
   [SYS_getpid]      "getpid", 
   [SYS_getppid]     "getppid", 
   [SYS_times]       "times", 
@@ -273,8 +277,8 @@ syscall(void)
     }
     
   } else {
-    printf("pid %d %s: unknown sys call %d\n",
-            p->pid, p->name, num);
+    printf("pid %d %s: unknown syscall %d, epc=0x%x, ra=0x%x\n",
+            p->pid, p->name, num, p->trapframe->epc, p->trapframe->ra);
     p->trapframe->a0 = -1;
   }
 }

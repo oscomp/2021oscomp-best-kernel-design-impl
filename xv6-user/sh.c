@@ -283,21 +283,12 @@ main(void)
   int fd;
 
   // Ensure that three file descriptors are open.
-  // while((fd = dev(O_RDWR, 1, 0)) >= 0){
   while((fd = open("/dev/console", O_RDWR)) >= 0){
     if(fd >= 3){
       close(fd);
       break;
     }
   }
-
-  // for os test
-  // if (fork() == 0) {
-  //   close(0);
-  //   open("test.sh", O_RDONLY);
-  // } else {
-  //   wait(0);
-  // }
 
   // Add an embedded env var(for basic commands in shell)
   fd = open("shrc", O_RDONLY);
