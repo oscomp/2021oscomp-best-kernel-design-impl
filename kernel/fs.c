@@ -162,13 +162,13 @@ static int rootfs_iop1(struct inode *ip) {
 
 static int rootfs_getattr(struct inode *ip, struct kstat *st) {
 	memset(st, 0, sizeof(struct kstat));
-    st->blksize = ip->sb->blocksz;
-    st->size = ip->size;
-    st->blocks = (st->size + st->blksize - 1) / st->blksize;
-    st->dev = ip->sb->devnum;
+	st->blksize = ip->sb->blocksz;
+	st->size = ip->size;
+	st->blocks = (st->size + st->blksize - 1) / st->blksize;
+	st->dev = ip->sb->devnum;
 	st->rdev = ip->dev;
-    st->ino = ip->inum;
-    st->mode = ip->mode;
+	st->ino = ip->inum;
+	st->mode = ip->mode;
 	st->nlink = ip->nlink;
 	return 0;
 }

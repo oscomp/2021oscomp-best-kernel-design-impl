@@ -205,7 +205,7 @@ kerneltrap() {
 	else if (p && is_page_fault(scause) && PGSIZE <= r_stval() && r_stval() < MAXUVA) {
 		// This case may happen when kernel is accessing user's lazy-allocated page.
 		// The handler should allocate a real one, but failed for lack of memory.
-      	//p->killed = 1;
+	  	//p->killed = 1;
 		sepc = kern_pgfault_escape();
 		__debug_error("kerneltrap", "sepc=%p stval=%p escape=%p pid=%d\n", 
 				r_sepc(), r_stval(), sepc, p->pid);
@@ -309,14 +309,14 @@ int handle_excp(uint64 scause) {
 /*static inline int is_page_fault(uint64 scause)*/
 /*{*/
   /*switch (scause) {*/
-    /*#ifndef QEMU*/
-      /*case EXCP_LOAD_ACCESS:*/
-      /*case EXCP_STORE_ACCESS:*/
-    /*#else*/
-      /*case EXCP_LOAD_PAGE:*/
-      /*case EXCP_STORE_PAGE:*/
-    /*#endif*/
-        /*return 1;*/
+	/*#ifndef QEMU*/
+	  /*case EXCP_LOAD_ACCESS:*/
+	  /*case EXCP_STORE_ACCESS:*/
+	/*#else*/
+	  /*case EXCP_LOAD_PAGE:*/
+	  /*case EXCP_STORE_PAGE:*/
+	/*#endif*/
+		/*return 1;*/
   /*}*/
   /*return 0;*/
 /*}*/

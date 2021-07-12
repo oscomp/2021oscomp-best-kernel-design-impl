@@ -13,29 +13,29 @@ struct spinlock tickslock;
 uint64 ticks;
 
 void timerinit() {
-    initlock(&tickslock, "time");
+	initlock(&tickslock, "time");
 	ticks = 0;
 
-    #ifdef DEBUG
-    printf("timerinit\n");
-    #endif
+	#ifdef DEBUG
+	printf("timerinit\n");
+	#endif
 }
 
 void
 set_next_timeout() {
-    // There is a very strange bug,
-    // if comment the `printf` line below
-    // the timer will not work.
+	// There is a very strange bug,
+	// if comment the `printf` line below
+	// the timer will not work.
 
-    // this bug seems to disappear automatically
-    // printf("");
-    sbi_set_timer(r_time() + INTERVAL);
+	// this bug seems to disappear automatically
+	// printf("");
+	sbi_set_timer(r_time() + INTERVAL);
 }
 
 void timer_tick() {
-    if (cpuid() == 0) {
-        ticks++;
-        wakeup(&ticks);
-    }
-    set_next_timeout();
+	if (cpuid() == 0) {
+		ticks++;
+		wakeup(&ticks);
+	}
+	set_next_timeout();
 }

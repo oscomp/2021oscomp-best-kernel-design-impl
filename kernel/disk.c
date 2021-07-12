@@ -21,52 +21,52 @@
 
 void disk_init(void)
 {
-    __debug_info("disk_init", "enter\n");
+	__debug_info("disk_init", "enter\n");
 
-    #ifdef QEMU
-    virtio_disk_init();
+	#ifdef QEMU
+	virtio_disk_init();
 	#else 
 	sdcard_init();
-    #endif
+	#endif
 
-    __debug_info("disk_init", "leave\n");
+	__debug_info("disk_init", "leave\n");
 }
 
 void disk_read(struct buf *b)
 {
-    __debug_info("disk_read", "enter\n");
+	__debug_info("disk_read", "enter\n");
 
-    #ifdef QEMU
+	#ifdef QEMU
 	virtio_disk_rw(b, 0);
-    #else 
+	#else 
 	sdcard_read_sector(b->data, b->sectorno);
 	#endif
 
-    __debug_info("disk_read", "leave\n");
+	__debug_info("disk_read", "leave\n");
 }
 
 void disk_write(struct buf *b)
 {
-    __debug_info("disk_write", "enter\n");
+	__debug_info("disk_write", "enter\n");
 
-    #ifdef QEMU
+	#ifdef QEMU
 	virtio_disk_rw(b, 1);
-    #else 
+	#else 
 	sdcard_write_sector(b->data, b->sectorno);
 	#endif
 
-    __debug_info("disk_write", "leave\n");
+	__debug_info("disk_write", "leave\n");
 }
 
 void disk_intr(void)
 {
-    __debug_info("disk_intr", "enter\n");
+	__debug_info("disk_intr", "enter\n");
 
-    #ifdef QEMU
-    virtio_disk_intr();
-    #else 
-    dmac_intr(DMAC_CHANNEL0);
-    #endif
+	#ifdef QEMU
+	virtio_disk_intr();
+	#else 
+	dmac_intr(DMAC_CHANNEL0);
+	#endif
 
-    __debug_info("disk_intr", "leave\n");
+	__debug_info("disk_intr", "leave\n");
 }

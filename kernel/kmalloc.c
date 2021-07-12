@@ -90,6 +90,12 @@ void kmallocinit(void) {
 // the question comes that whether we should free an allocator? 
 // when should we do this? 
 
+// retrhelo: It's not necessary for the kernel to free an allocator, 
+// 		as the types of allocators that kernel uses are limited, 
+// 		and would reach an end at some time during running. Considering 
+// 		that the kernel is rather small, the total number of types are 
+//		within an acceptable range. 
+
 // current solution doesn't not free an allocator 
 
 #define _malloc_allocator() \
