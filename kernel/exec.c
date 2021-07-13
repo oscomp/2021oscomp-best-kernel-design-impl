@@ -74,7 +74,6 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
       goto bad;
     }
     sp -= arglen;
-    sp -= sp % 16;
     if (sp < stackbase || copyout(pt, sp, buf, arglen) < 0)
       goto bad;
     table[argc] = sp;
@@ -126,6 +125,7 @@ int execve(char *path, char **argv, char **envp)
   __debug_info("execve", "load from elf\n");
   // Load program into memory.
   struct proghdr ph;
+	uint64 elfaddr = 0;
   int flags;
   for (int i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph)) {
     if (ip->fop->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph)) {
@@ -145,15 +145,15 @@ int execve(char *path, char **argv, char **envp)
     flags |= (ph.flags & ELF_PROG_FLAG_EXEC) ? PTE_X : 0;
     flags |= (ph.flags & ELF_PROG_FLAG_WRITE) ? PTE_W : 0;
     flags |= (ph.flags & ELF_PROG_FLAG_READ) ? PTE_R : 0;
-
     seg = newseg(pagetable, seghead, LOAD, PGROUNDDOWN(ph.vaddr), ph.memsz + ph.vaddr % PGSIZE, flags);
-    __debug_info("execve", "newseg: vaddr=%p, memsz=%d\n", PGROUNDDOWN(ph.vaddr), ph.memsz + ph.vaddr % PGSIZE);
     if(seg == NULL) {
       __debug_warn("execve", "newseg fail: vaddr=%p, memsz=%d\n", ph.vaddr, ph.memsz);
       goto bad;
     }
-
     seghead = seg;
+
+		if (ph.off == 0)
+			elfaddr = ph.vaddr;
 
     if (loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0) {
       __debug_warn("execve", "load segment\n");
@@ -179,27 +179,17 @@ int execve(char *path, char **argv, char **envp)
 
     __debug_info("execve", "making stack\n");
   // Stack
-  seg = newseg(pagetable, seghead, STACK, VUSTACK - PGSIZE, PGSIZE, flags);
+  uint64 sp = VUSTACK;
+  uint64 stackbase = VUSTACK - PGSIZE;
+  seg = newseg(pagetable, seghead, STACK, stackbase, sp - stackbase, flags);
   if(seg == NULL) {
     __debug_warn("execve", "new stack fail\n");
     goto bad;
   }
   seghead = seg;
-  // uvmclear(pagetable, sz - 2 * PGSIZE);
-
-  __debug_info("execve", "pushing stack\n");
-  /* If the stack is located, we can assign sp */
-  uint64 sp = VUSTACK;
-  uint64 stackbase = VUSTACK - PGSIZE;
 
   // prepare a NULL on the bottom of stack
-  sp -= 16;        // on risc-v, sp should be 16-byte aligned
-
-  // if (copyout(pagetable, sp, (char *)&ip, sizeof(uint64)) < 0) {  // *ep is 0 now, borrow it
-  //   __debug_warn("execve", "fail to push bottom NULL into user stack\n");
-  //   goto bad;
-  // }
-
+  sp -= sizeof(uint64);
   __debug_info("execve", "pushing argv/envp\n");
   // arguments to user main(argc, argv, envp)
   // argc is returned via the system call return
@@ -211,19 +201,40 @@ int execve(char *path, char **argv, char **envp)
     __debug_warn("execve", "fail to push argv or envp into user stack\n");
     goto bad;
   }
+	uint64 random[2] = { 0xcde142a16cb93072, 0x128a39c127d8bbf2 };
+	sp -= 16;
+	if (sp < stackbase || copyout(pagetable, sp, (char *)random, 16) < 0)
+		goto bad;
+	
+	uint64 auxvec[][2] = {
+		// {AT_HWCAP, 0x112d},
+		{AT_PAGESZ, PGSIZE},
+		{AT_PHDR, elf.phoff + elfaddr},
+		{AT_PHENT, elf.phentsize},
+		{AT_PHNUM, elf.phnum},
+		{AT_UID, 0},
+		{AT_EUID, 0},
+		{AT_GID, 0},
+		{AT_EGID, 0},
+		{AT_SECURE, 0},
+		{AT_RANDOM, sp},
+		{AT_NULL, 0}
+	};
+
+  sp -= 16 + sizeof(auxvec);
   sp -= (envc + 1) * sizeof(uint64);
   uint64 a2 = sp;
   sp -= (argc + 1) * sizeof(uint64);
-  uint64 a1 = sp;       // original
-  // uint64 a1 = sp - sizeof(uint64); // for os test
+  uint64 a1 = sp;
   sp -= sizeof(uint64); // argc
-  if (sp % 16) {        // align to 16
-		sp -= sp % 16;
-		a1 -= sp % 16;
-		a2 -= sp % 16;
-	}
+  flags = sp % 16;      // on risc-v, sp should be 16-byte aligned
+  sp -= flags;
+  a1 -= flags;
+  a2 -= flags;
+  
   __debug_info("execve", "pushing argv/envp table\n");
   if (sp < stackbase || 
+			copyout(pagetable, a2 + (envc + 1) * sizeof(uint64), (char *)auxvec, sizeof(auxvec)) < 0 ||
       copyout(pagetable, a2, (char *)uenvp, (envc + 1) * sizeof(uint64)) < 0 ||
       copyout(pagetable, a1, (char *)uargv, (argc + 1) * sizeof(uint64)) < 0 ||
       copyout(pagetable, sp, (char *)&argc, sizeof(uint64)) < 0)

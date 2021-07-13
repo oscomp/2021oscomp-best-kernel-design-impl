@@ -40,6 +40,11 @@ struct fdtable {
 
 #define CONSOLE 1
 
+struct iovec {
+	void *iov_base; /* Starting address */
+	uint64 iov_len; /* Number of bytes to transfer */
+};
+
 struct file*    filealloc(void);
 void            fileclose(struct file*);
 struct file*    filedup(struct file*);

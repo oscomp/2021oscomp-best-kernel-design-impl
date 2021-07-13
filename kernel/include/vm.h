@@ -46,6 +46,7 @@ uint64          uvmdealloc(pagetable_t, uint64, uint64, enum segtype);
 void            uvmclear(pagetable_t, uint64);
 void            uvmfree(pagetable_t pt);
 
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 uint64          walkaddr(pagetable_t, uint64);
 uint64          kwalkaddr(pagetable_t pagetable, uint64 va);
 uint64          kvmpa(uint64);

@@ -158,10 +158,13 @@ extern uint64 sys_gettimeofday(void);
 extern uint64 sys_nanosleep(void);
 extern uint64 sys_mmap(void);
 extern uint64 sys_munmap(void);
-// extern uint64 sys_getuid(void);
-// extern uint64 sys_geteuid(void);
-// extern uint64 sys_getgid(void);
-// extern uint64 sys_getegid(void);
+extern uint64 sys_getuid(void);
+extern uint64 sys_geteuid(void);
+extern uint64 sys_getgid(void);
+extern uint64 sys_getegid(void);
+extern uint64 sys_writev(void);
+extern uint64 sys_readlinkat(void);
+extern uint64 sys_mprotect(void);
 
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
@@ -205,10 +208,13 @@ static uint64 (*syscalls[])(void) = {
   [SYS_nanosleep]   sys_nanosleep, 
   [SYS_mmap]        sys_mmap,
   [SYS_munmap]      sys_munmap,
-  // [SYS_getuid]      sys_getuid,
-  // [SYS_geteuid]     sys_getuid,
-  // [SYS_getgid]      sys_getuid,
-  // [SYS_getegid]     sys_getuid,
+  [SYS_getuid]      sys_getuid,
+  [SYS_geteuid]     sys_getuid,
+  [SYS_getgid]      sys_getuid,
+  [SYS_getegid]     sys_getuid,
+  [SYS_writev]      sys_writev,
+  [SYS_readlinkat]  sys_readlinkat,
+  [SYS_mprotect]    sys_mprotect,
 };
 
 static char *sysnames[] = {
@@ -253,6 +259,13 @@ static char *sysnames[] = {
   [SYS_nanosleep]   "nanosleep", 
   [SYS_mmap]        "mmap",
   [SYS_munmap]      "munmap",
+  [SYS_getuid]      "getuid",
+  [SYS_geteuid]     "geteuid",
+  [SYS_getgid]      "getgid",
+  [SYS_getegid]     "getegid",
+  [SYS_writev]      "writev",
+  [SYS_readlinkat]  "readlinkat",
+  [SYS_mprotect]    "mprotect",
 };
 
 void

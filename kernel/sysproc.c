@@ -297,8 +297,34 @@ sys_trace(void)
   return 0;
 }
 
-// uint64
-// sys_getuid(void)
-// {
-//   return 0;
-// }
+uint64
+sys_getuid(void)
+{
+  return 0;
+}
+
+uint64
+sys_mprotect(void)
+{
+	uint64 addr, len;
+	int prot;
+
+	argaddr(0, &addr);
+	argaddr(1, &len);
+	argint(2, &prot);
+	if (addr % PGSIZE)
+		return -1;
+
+	struct proc *p = myproc();
+	prot = (prot << 1) | ~0xe; // convert to PTE_attr
+	
+	for (int i = 0; i < len; i += PGSIZE)
+	{
+		pte_t *pte = walk(p->pagetable, addr + i, 0); 
+		if (pte == NULL) return -1;
+		*pte &= prot;
+	}
+	sfence_vma();
+	
+	return 0;
+}
