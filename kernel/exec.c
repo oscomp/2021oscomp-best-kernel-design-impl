@@ -265,16 +265,8 @@ int execve(char *path, char **argv, char **envp)
   uvmfree(oldpagetable);
   freepage(oldpagetable);
 
-	// if (strncmp(p->name, "busybox", sizeof(p->name)) == 0) {
-	// 	uint64 pp = walkaddr(pagetable, sp) + sp % PGSIZE;
-	// 	while (pp % PGSIZE) {
-	// 		printf("%p\n", *(uint64 *)pp);
-	// 		pp += sizeof(uint64);
-	// 	}
-	// 	return 0;
-	// }
-
-  return argc; // this ends up in a0, the first argument to main(argc, argv)
+  return 0;
+  // return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
   __debug_warn("execve", "reach bad: seg=%p, pt=%p, ip=%p\n", seghead, pagetable, ip);

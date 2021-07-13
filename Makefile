@@ -199,12 +199,16 @@ $U/ostest: $U/ostest.c $U/ostest_asm.S
 tags: $(OBJS) _init
 	@etags *.S *.c
 
-ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
+ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o $U/crt.o
 
 _%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $(ulinker) -e main -o $@ $^
+	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
+
+$U/crt.o:
+	$(CC) $(CFLAGS) -c -o $U/crt.o $U/crt.c
+	$(OBJDUMP) -S $U/crt.o > $U/crt.asm
 
 $U/usys.S : $U/usys.pl
 	@perl $U/usys.pl > $U/usys.S
