@@ -23,6 +23,7 @@
 // va must be page-aligned (not necessary)
 // and the pages from va to va+sz must already be mapped.
 // Returns 0 on success, -1 on failure.
+/*
 static int
 loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz)
 {
@@ -49,6 +50,7 @@ loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz
 
   return 0;
 }
+*/
 
 // push arg or env strings into user stack, return strings count
 static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, uint64 *spp)
@@ -104,13 +106,6 @@ int execve(char *path, char **argv, char **envp)
     __debug_warn("execve", "can't open %s\n", path);
     goto bad;
   }
-  __debug_info("execve", "get elf\n");
-  ilock(ip);
-
-  // Check ELF header
-  struct elfhdr elf;
-  if (ip->fop->read(ip, 0, (uint64) &elf, 0, sizeof(elf)) != sizeof(elf) || elf.magic != ELF_MAGIC)
-    goto bad;
 
   // Make a copy of p->pagetable without old user space, 
   // but with the same kstack we are using now, which can't be changed.
@@ -122,6 +117,15 @@ int execve(char *path, char **argv, char **envp)
     pagetable[i] = 0;
   }
 
+  __debug_info("execve", "get elf\n");
+  // Check ELF header
+  ilock(ip);
+  struct elfhdr elf;
+  if (ip->fop->read(ip, 0, (uint64) &elf, 0, sizeof(elf)) != sizeof(elf) || elf.magic != ELF_MAGIC) {
+    iunlock(ip);
+		goto bad;
+	}
+
   __debug_info("execve", "load from elf\n");
   // Load program into memory.
   struct proghdr ph;
@@ -130,6 +134,7 @@ int execve(char *path, char **argv, char **envp)
   for (int i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph)) {
     if (ip->fop->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph)) {
       __debug_warn("execve", "fail to read ELF file\n");
+			iunlock(ip);
       goto bad;
     }
     if (ph.type != ELF_PROG_LOAD)
@@ -137,6 +142,7 @@ int execve(char *path, char **argv, char **envp)
     // if (ph.vaddr % PGSIZE != 0 || ph.memsz < ph.filesz || ph.vaddr + ph.memsz < ph.vaddr) {
     if (ph.memsz < ph.filesz || ph.vaddr + ph.memsz < ph.vaddr) {
       __debug_warn("execve", "funny ELF file: va=%p msz=0x%x fsz=0x%x\n", ph.vaddr, ph.memsz, ph.filesz);
+			iunlock(ip);
       goto bad;
     }
     
@@ -145,9 +151,10 @@ int execve(char *path, char **argv, char **envp)
     flags |= (ph.flags & ELF_PROG_FLAG_EXEC) ? PTE_X : 0;
     flags |= (ph.flags & ELF_PROG_FLAG_WRITE) ? PTE_W : 0;
     flags |= (ph.flags & ELF_PROG_FLAG_READ) ? PTE_R : 0;
-    seg = newseg(pagetable, seghead, LOAD, PGROUNDDOWN(ph.vaddr), ph.memsz + ph.vaddr % PGSIZE, flags);
+    seg = newseg(pagetable, seghead, LOAD, ph.vaddr, ph.memsz, flags);
     if(seg == NULL) {
       __debug_warn("execve", "newseg fail: vaddr=%p, memsz=%d\n", ph.vaddr, ph.memsz);
+			iunlock(ip);
       goto bad;
     }
     seghead = seg;
@@ -155,16 +162,19 @@ int execve(char *path, char **argv, char **envp)
 		if (ph.off == 0)
 			elfaddr = ph.vaddr;
 
-    if (loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0) {
-      __debug_warn("execve", "load segment\n");
-      goto bad;
-    }
+		seg = locateseg(seghead, ph.vaddr);
+		seg->f_off = ph.off;
+		seg->f_sz = ph.filesz;
+		if (ph.vaddr <= elf.entry && elf.entry < ph.vaddr + ph.filesz) {
+			__debug_info("execve", "meet entry segment: entry=0x%x, va=0x%x, sz=0x%x\n", elf.entry, ph.vaddr, ph.filesz);
+			if (loadseg(pagetable, elf.entry, seg, ip) < 0) {
+				__debug_warn("execve", "load segment\n");
+				iunlock(ip);
+				goto bad;
+			}
+		}
   }
-
-  char pname[16];
-  safestrcpy(pname, ip->entry->filename, sizeof(pname));
-  iunlockput(ip);
-  ip = 0;
+  iunlock(ip);
 
   // Heap
   flags = PTE_R | PTE_W;
@@ -182,7 +192,7 @@ int execve(char *path, char **argv, char **envp)
   uint64 sp = VUSTACK;
   uint64 stackbase = VUSTACK - PGSIZE;
   seg = newseg(pagetable, seghead, STACK, stackbase, sp - stackbase, flags);
-  if(seg == NULL) {
+  if(seg == NULL || uvmalloc(pagetable, stackbase, sp, flags) == 0) {
     __debug_warn("execve", "new stack fail\n");
     goto bad;
   }
@@ -246,7 +256,7 @@ int execve(char *path, char **argv, char **envp)
   p->trapframe->a2 = a2;
 
   // Save program name for debugging.
-  memmove(p->name, pname, sizeof(p->name));
+  safestrcpy(p->name, ip->entry->filename, sizeof(p->name));
 
   // Commit to the user image.
   pagetable_t oldpagetable = p->pagetable;
@@ -255,6 +265,9 @@ int execve(char *path, char **argv, char **envp)
   p->segment = seghead;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
+	if (p->elf)
+		iput(p->elf);
+	p->elf = ip;
 
   __debug_info("execve", "sp=%p, stackbase=%p, entry=%p\n", sp, stackbase, elf.entry);
   fdcloexec(&p->fds);
@@ -278,7 +291,7 @@ int execve(char *path, char **argv, char **envp)
     freepage(pagetable);
   }
   if (ip) {
-    iunlockput(ip);
+    iput(ip);
   }
   return -1;
 }

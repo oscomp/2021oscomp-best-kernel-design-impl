@@ -168,7 +168,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 
-.gdbinit: .gdbinit.tmpl-riscv
+.gdbinit: debug/.gdbinit.tmpl-riscv
 	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
 
 qemu-gdb: $T/kernel .gdbinit fs.img

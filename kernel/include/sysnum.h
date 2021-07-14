@@ -34,6 +34,7 @@
 #define SYS_readlinkat  78
 #define SYS_fstat       80
 #define SYS_exit        93
+#define SYS_exit_group  94
 #define SYS_nanosleep  101
 #define SYS_sched_yield 124
 #define SYS_times      153

@@ -23,10 +23,10 @@
 int
 fetchaddr(uint64 addr, uint64 *ip)
 {
-  struct proc *p = myproc();
+  // struct proc *p = myproc();
 
-  if (partofseg(p->segment, addr, addr + sizeof(uint64)) == NONE)
-    return -1;
+  // if (partofseg(p->segment, addr, addr + sizeof(uint64)) == NULL)
+  //   return -1;
   // if(copyin(p->pagetable, (char *)ip, addr, sizeof(*ip)) != 0)
   if(copyin2((char *)ip, addr, sizeof(*ip)) != 0)
     return -1;
@@ -215,6 +215,7 @@ static uint64 (*syscalls[])(void) = {
   [SYS_writev]      sys_writev,
   [SYS_readlinkat]  sys_readlinkat,
   [SYS_mprotect]    sys_mprotect,
+  [SYS_exit_group]  sys_exit,
 };
 
 static char *sysnames[] = {
@@ -266,6 +267,7 @@ static char *sysnames[] = {
   [SYS_writev]      "writev",
   [SYS_readlinkat]  "readlinkat",
   [SYS_mprotect]    "mprotect",
+  [SYS_exit_group]  "exit_group",
 };
 
 void

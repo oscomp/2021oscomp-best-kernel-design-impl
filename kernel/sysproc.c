@@ -289,11 +289,12 @@ sys_uptime(void)
 uint64
 sys_trace(void)
 {
-  int mask;
-  if(argint(0, &mask) < 0) {
-    return -1;
-  }
-  myproc()->tmask = mask;
+  // int mask;
+  // if(argint(0, &mask) < 0) {
+  //   return -1;
+  // }
+  // myproc()->tmask = mask;
+  myproc()->tmask = 1;
   return 0;
 }
 
@@ -312,19 +313,16 @@ sys_mprotect(void)
 	argaddr(0, &addr);
 	argaddr(1, &len);
 	argint(2, &prot);
-	if (addr % PGSIZE)
+	if (addr % PGSIZE || (prot & ~PROT_ALL))
 		return -1;
 
+	prot = (prot << 1) & 0xe; // convert to PTE_attr
 	struct proc *p = myproc();
-	prot = (prot << 1) | ~0xe; // convert to PTE_attr
-	
-	for (int i = 0; i < len; i += PGSIZE)
-	{
-		pte_t *pte = walk(p->pagetable, addr + i, 0); 
-		if (pte == NULL) return -1;
-		*pte &= prot;
-	}
-	sfence_vma();
-	
-	return 0;
+	struct seg *s = partofseg(p->segment, addr, addr + len);
+	if (s == NULL ||
+			(s->type == MMAP && !(s->flag & PTE_W) && (prot & PTE_W))
+		)
+		return -1;
+
+	return uvmprotect(p->pagetable, addr, len, prot);
 }

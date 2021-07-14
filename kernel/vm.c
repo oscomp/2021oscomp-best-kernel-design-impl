@@ -128,8 +128,10 @@ kvminithart()
 
 static int __hash_page_idx(uint64 pa)
 {
-	if (pa % PGSIZE || pa < PGROUNDUP((uint64)kernel_end) || pa >= PHYSTOP)
+	if (pa % PGSIZE || pa < PGROUNDUP((uint64)kernel_end) || pa >= PHYSTOP) {
+		__debug_error("__hash_page_idx", "%p\n", pa);
 		panic("__hash_page");
+  }
 	return (pa - PGROUNDUP((uint64)kernel_end)) >> PGSHIFT;
 }
 
@@ -319,7 +321,8 @@ unmappages(pagetable_t pagetable, uint64 va, uint64 npages, int flag)
 
 	int do_free = flag & VM_FREE;
 	int usr = flag & VM_USER;
-	int allowhole = flag & VM_HOLE;
+	// int allowhole = flag & VM_HOLE;
+	int allowhole = 1;
 
 	uint64 end = va + npages * PGSIZE;
   for (a = va; a < end; a += PGSIZE) {
@@ -426,7 +429,8 @@ uvmdealloc(pagetable_t pagetable, uint64 start, uint64 end, enum segtype segt)
   if(start >= end)
     return end;
 
-	int heapflag = segt == HEAP ? VM_HOLE : 0;
+	// int heapflag = segt == HEAP ? VM_HOLE : 0;
+	int heapflag = VM_HOLE;
   if (PGROUNDUP(start) < PGROUNDUP(end)) {
     int npages = (PGROUNDUP(end) - PGROUNDUP(start)) / PGSIZE;
     unmappages(pagetable, PGROUNDUP(start), npages, VM_FREE|VM_USER|heapflag);
@@ -528,7 +532,8 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum seg
   uint64 pa, i;
   uint flags;
 
-  int heapflag = segt == HEAP ? VM_HOLE : 0;
+  // int heapflag = segt == HEAP ? VM_HOLE : 0;
+  int heapflag = VM_HOLE;
   for (i = start; i < end; i += PGSIZE) {
 	  if((pte = walk(old, i, 0)) == NULL || !(*pte & PTE_V)) {
 			if (heapflag) continue;  // a lazy-allocation page, just ignore it, page-fault handler will handle it
@@ -577,6 +582,50 @@ uvmclear(pagetable_t pagetable, uint64 va)
   if(pte == NULL)
     panic("uvmclear");
   *pte &= ~PTE_U;
+}
+
+/**
+ * Caller must check legality via usrmm module before calling to this.
+ * TODO: If protecting legal but not-valid-at-present pages, how can we maintain the
+ *       protect flags we set in this function? Since mappages may over-write them.
+ */
+int
+uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
+{
+	if (va % PGSIZE)
+		panic("uvmprotect");
+	
+	int flag = 0;
+	uint64 i;
+	for (i = 0; i < len; i += PGSIZE) {
+		pte_t *pte = walk(pagetable, va + i, 1);
+		if (pte == NULL)
+			break;
+
+		if (*pte & PTE_V) {
+			flag = 1;
+			if (!(*pte & (PTE_W|PTE_COW)) && (prot & PTE_W)) { // may lead to conflict
+				uint64 pa = PTE2PA(*pte);
+				if (!monopolizepage(pa)) { // a shared page, must be unwritavle
+					char *copy = (char *)allocpage();
+					if (copy == NULL) {
+						pagecopydone();
+						break;
+					}
+					memmove(copy, (char *)pa, PGSIZE);
+					pagecopydone();
+					pagereg((uint64)copy, 1);
+					*pte = PA2PTE(copy) | PTE_FLAGS(*pte);
+				}
+			}
+		}
+		*pte = (*pte & ~(PTE_X|PTE_W|PTE_R)) | (prot & (PTE_X|PTE_W|PTE_R));
+	}
+
+	if (flag)
+		sfence_vma();
+
+	return i < len ? -1 : 0;
 }
 
 /**
@@ -640,56 +689,76 @@ kvmfree(pagetable_t pagetable, int stack_free)
 
 // back to this point when fail to handle a page fault
 static uint64 save_point = 0;
-static uint8 safe_state[NCPU];
 
 // a page fault failed to handle, kerneltrap() called for help
-uint64 kern_pgfault_escape()
+uint64 kern_pgfault_escape(uint64 badaddr)
 {
-	safe_state[r_tp()] = 0; // set unsafe for tht current hart
+	myproc()->kstack = badaddr; // this field is useless, borrow it, set unsafe for tht current hart
 	return save_point;
 }
 
-static void set_safe_state(void)
+static uint64 get_copy_badaddr(struct proc *p, uint64 old)
 {
-	safe_state[r_tp()] = 1;
+	// struct proc *p = myproc();
+	uint64 ret = old;
+	if (p->kstack != old) {
+		ret = p->kstack;
+		p->kstack = old;
+	}
+	return ret;
 }
 
-static int get_safe_state(void)
+static uint64 do_safememmove(char *dst, char *src, uint len)
 {
-	return safe_state[r_tp()];
-}
-
-static int safememmove(void *dst, const void *src, uint len)
-{
-	char *dst_s = (char *)dst;
-	char *src_s = (char *)src;
-	int ret = 0;
-
-	set_safe_state();
+	struct proc *p = myproc();
+	uint64 old = p->kstack;			// p->kstack might store the stval later
 
 	// kerneltrap() in trap.c can look up for this safe escape.
 	uint64 safe_pc;
 	asm volatile("auipc %0, 0x0" : "=r" (safe_pc));
 	if (!save_point) {
-		__debug_info("safememmove", "save point=%p\n", safe_pc);
+		__debug_info("do_safememmove", "save point=%p\n", safe_pc);
 		save_point = safe_pc;
 	}
 
-	if (get_safe_state() == 1) {
+	uint64 badaddr = get_copy_badaddr(p, old);
+	if (badaddr == old) {
 		permit_usr_mem();
 		while (len--) {         // There is no overlap between user and kernel space
-			*dst_s++ = *src_s++;  // this is possible to raise a page fault
+			*dst++ = *src++;  // this is possible to raise a page fault
 		}
-		ret = 1;
+		badaddr = 0;
 	}
-
-	ret--;
 	protect_usr_mem();
+	
+	__debug_info("do_safememmove", "badaddr=0x%x\n", badaddr);
+	return badaddr;
+}
 
-	if (ret) {
-		__debug_error("safememmove", "fail to move\n");
-	}
-	return ret;
+static int safememmove(uint64 dst, uint64 src, uint64 len, struct seg *s)
+{
+	uint64 badaddr;
+	do {
+		badaddr = do_safememmove((void *)dst, (void *)src, len);
+		if (badaddr && s->type == LOAD) { // meet unloaded elf part, must do it outside the excep-handler
+			struct proc *p = myproc();
+			__debug_info("safememmove", "elf needs to load at badaddr=0x%x\n", badaddr);
+			ilock(p->elf);
+			if (loadseg(p->pagetable, badaddr, s, p->elf) < 0) {
+				iunlock(p->elf);
+				return -1;
+			}
+			iunlock(p->elf);
+			sfence_vma();
+
+			int diff = badaddr - dst;
+			dst += diff;
+			src += diff;
+			len -= diff;
+		}
+		else break;
+	} while (1);
+	return badaddr == 0 ? 0 : -1;
 }
 
 // Copy from kernel to user.
@@ -720,11 +789,13 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 int
 copyout2(uint64 dstva, char *src, uint64 len)
 {
-  if (partofseg(myproc()->segment, dstva, dstva + len) == NONE) {
-	__debug_warn("copyout2", "%p, %p, %d\n", myproc()->segment, dstva, len);
-    return -1;
-  }
-  return safememmove((void *)dstva, src, len);
+	struct proc *p = myproc();
+	struct seg *s = partofseg(p->segment, dstva, dstva + len);
+  if (s == NULL) {
+		// __debug_warn("copyout2", "%p, %p, %d\n", s, dstva, len);
+		return -1;
+	}
+	return safememmove(dstva, (uint64)src, len, s);
 }
 
 // Copy from user to kernel.
@@ -755,10 +826,12 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 int
 copyin2(char *dst, uint64 srcva, uint64 len)
 {
-  if (partofseg(myproc()->segment, srcva, srcva + len) == NONE) {
+	struct proc *p = myproc();
+	struct seg *s = partofseg(p->segment, srcva, srcva + len);
+  if (s == NULL) {
     return -1;
   }
-  return safememmove(dst, (void *)srcva, len);
+  return safememmove((uint64)dst, srcva, len, s);
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -894,13 +967,29 @@ static int handle_page_fault_lazy(uint64 badaddr)
 
 	uint64 pa = PGROUNDDOWN(badaddr);  // in uvmalloc(), oldsz will round up
 	if (uvmalloc(p->pagetable, pa, pa + PGSIZE, PTE_W|PTE_R|PTE_X) == 0) {
-	  __debug_error("handle_page_fault_lazy", "fail\n");
+	  __debug_warn("handle_page_fault_lazy", "fail\n");
   	return -1;
   }
 
 	sfence_vma();
   __debug_info("handle_page_fault_lazy", "success\n");
 	return 0;
+}
+
+static int handle_page_fault_loadelf(uint64 badaddr, struct seg *s)
+{
+	struct proc *p = myproc();
+	__debug_info("handle_page_fault_loadelf", "badaddr=%p, pid=%d, name=%s\n", badaddr, p->pid, p->name);
+	__debug_assert("handle_page_fault_loadelf", (r_sstatus() & SSTATUS_SPP) == 0,  "not from user space\n");
+  ilock(p->elf);
+  if (loadseg(p->pagetable, badaddr, s, p->elf) < 0) {
+		__debug_info("handle_page_fault_loadelf", "fail to load at badaddr=%p\n", badaddr);
+  	iunlock(p->elf);
+		return -1;
+	}
+  iunlock(p->elf);
+  sfence_vma();
+  return 0;
 }
 
 /**
@@ -910,7 +999,6 @@ static int handle_page_fault_lazy(uint64 badaddr)
 int handle_page_fault(int kind, uint64 badaddr)
 {
 	struct proc *p = myproc();
-	// In later implement, we will handle badaddr at heap, mmap zoom and wherever a COW page
 	struct seg *seg = locateseg(p->segment, badaddr);
 	if (seg == NULL) {
 		return -1;
@@ -924,6 +1012,11 @@ int handle_page_fault(int kind, uint64 badaddr)
 	if (kind == 1 && pte && (*pte & PTE_COW)) {
     // mapped and store-type, might be a COW fault
 		return handle_store_page_fault_cow(pte);
+	}
+	if (seg->type == LOAD) {
+		if (pte && PTE2PA(*pte) != NULL)
+			return -1;
+		return handle_page_fault_loadelf(badaddr, seg);
 	}
   if (seg->type == HEAP) {     // a lazy-alloction
 		return handle_page_fault_lazy(badaddr);

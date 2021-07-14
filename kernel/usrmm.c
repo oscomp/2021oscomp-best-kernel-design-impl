@@ -7,6 +7,7 @@
 #include "include/usrmm.h"
 #include "include/kmalloc.h"
 #include "include/proc.h"
+#include "include/pm.h"
 #include "include/vm.h"
 #include "include/string.h"
 #include "include/debug.h"
@@ -15,23 +16,21 @@ struct seg*
 newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset, uint64 sz, long flag)
 {
   uint64 nstart, nend;
-  nstart = offset;
+  nstart = PGROUNDDOWN(offset);
   nend = offset + sz;
+  nend = PGROUNDUP(nend);
 
   __debug_info("newseg", "type=%d nstart=%p nend=%p\n", type, nstart, nend);
   // __debug_info("newseg", "sizeof(struct seg): %d\n", sizeof(struct seg));
   struct seg *seg = NULL;
   for(struct seg *s = head; s != NULL; s = s->next)
   {
-    uint64 start, end;
-    start = s->addr;
-    end = s->addr + s->sz;
     // __debug_info("newseg", "type=%d start=%p end=%p\n", s->type, start, end);
-    if(nend <= start)
+    if(nend <= s->addr)
     {
       break;
     }
-    else if(nstart >= end){
+    else if(nstart >= s->addr + s->sz){
       seg = s;
     }
     else
@@ -48,7 +47,7 @@ newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset
     __debug_error("newseg", "fail to kmalloc\n");
 	  return NULL;
   }
-
+/*
   // __debug_info("newseg", "calling to uvmalloc\n");
   if(uvmalloc(pagetable, nstart, nend, flag) == 0)
   {
@@ -56,7 +55,7 @@ newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset
     __debug_error("newseg", "fail to uvmalloc\n");
 	  return NULL;
   }
-
+*/
   if(seg == NULL)
   {
     p->next = head;
@@ -77,21 +76,13 @@ newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset
   return head;
 }
 
-enum segtype
-typeofseg(struct seg *head, uint64 addr)
-{
-  head = locateseg(head, addr);
-
-  return head == NULL ? NONE : head->type;
-}
-
 struct seg*
 locateseg(struct seg *head, uint64 addr)
 {
     // __debug_info("locateseg", "addr=%p\n", addr);
   while(head){
     uint64 start, end;
-    start = head->addr;
+    start = PGROUNDDOWN(head->addr);
     end = head->addr + head->sz;
     // __debug_info("locateseg", "type=%d start=%p end=%p\n", head->type, start, end);
     if(addr >= start && addr < end)
@@ -120,21 +111,20 @@ getseg(struct seg *head, enum segtype type)
 }
 
 // end is not included
-enum segtype
+struct seg*
 partofseg(struct seg *head, uint64 start, uint64 end)
 {
   __debug_info("partofseg", "start=%p end=%p\n", start, end);
-  enum segtype st = typeofseg(head, start);
-  if (st == NONE)
-    return NONE;
-
-  return st == typeofseg(head, end - 1) ? st : NONE;
+	struct seg *s = locateseg(head, start);
+  if (s == NULL || locateseg(head, end - 1) != s)
+    return NULL;
+  return s;
 }
 
 void 
 freeseg(pagetable_t pagetable, struct seg *p)
 {
-  uvmdealloc(pagetable, p->addr, p->addr+p->sz, p->type);
+  uvmdealloc(pagetable, PGROUNDDOWN(p->addr), p->addr + p->sz, p->type);
   p->sz = 0;
 }
 
@@ -147,7 +137,7 @@ delseg(pagetable_t pagetable, struct seg *s)
   if (s->type == MMAP && s->mmap) {
     del_segmap(s);
   }
-  uvmdealloc(pagetable, s->addr, s->addr + s->sz, s->type);
+  uvmdealloc(pagetable, PGROUNDDOWN(s->addr), s->addr + s->sz, s->type);
   kfree(s);
   return next;
 }
@@ -174,7 +164,7 @@ copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2)
     // If seg->mmap is NULL, it means the mmap is private.
     int cow = (seg->type == MMAP && seg->mmap) ? 0 : 1;
 		// Copy user memory from parent to child.
-    if (uvmcopy(pt, pt2, seg->addr, seg->addr + seg->sz, seg->type, cow) < 0) 
+    if (uvmcopy(pt, pt2, PGROUNDDOWN(seg->addr), seg->addr + seg->sz, seg->type, cow) < 0) 
 		{
 			__debug_warn("copysegs", "uvmcopy_cow fails\n");
 			__debug_warn("copysegs", "%p, %p, %d\n", 
@@ -200,4 +190,52 @@ copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2)
 bad:
   delsegs(pt2, head);
   return NULL;
+}
+
+// caller must hold ip->lock
+int
+loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip)
+{
+	va = PGROUNDDOWN(va) >= s->addr ? PGROUNDDOWN(va) : s->addr;
+	uint64 off = s->f_off + (va - s->addr);
+	int64 size = s->f_sz - (va - s->addr);
+	uint64 end = va + PGSIZE;
+	end = PGROUNDDOWN(end);
+	if ((int64)(end - va) < size)
+		size = end - va;
+
+	__debug_info("loadseg", "base=0x%x, off=0x%x, size=0x%x, end=0x%x\n", va, off, size, end);
+	__debug_info("loadseg", "saddr=0x%x, sz=0x%x, f_off=0x%x, f_zs=0x%x, flag=0x%x\n", s->addr, s->sz, s->f_off, s->f_sz, s->flag);
+
+	void *pa = allocpage();
+	if (pa == NULL)
+		return -1;
+
+	memset(pa, 0, PGSIZE);
+	__debug_info("loadseg", "pa=%p, base=0x%x, f_off=0x%x, size=%d\n", pa, va, off, size);
+	if (size > 0 && ip->fop->read(ip, 0, (uint64)pa + va % PGSIZE, off, size) != size) {
+		__debug_warn("loadseg", "fail to load! off=0x%x, size=%d\n", off, size);
+		goto bad;
+	}
+	if (mappages(pagetable, va, end - va, (uint64)pa, s->flag|PTE_U) < 0) {
+		__debug_warn("loadseg", "fail to map! va=0x%x, end=0x%x\n", va, end);
+		goto bad;
+	}
+
+	#ifdef QEMU
+	// Temporarily solution for illegal float point instructions in busybox on QEMU
+  if (strncmp(ip->entry->filename, "busybox", MAXNAME) == 0 &&
+			va <= 0x10614 && 0x10614 < end)
+	{
+		__debug_warn("loadseg", "meet strange region\n");
+		uint16 *ins = (uint16 *)((uint64)pa + 0x10614 % PGSIZE);
+		*ins = 0xa035;
+	}
+	#endif
+
+	return 0;
+
+bad:
+	freepage(pa);
+	return -1;
 }

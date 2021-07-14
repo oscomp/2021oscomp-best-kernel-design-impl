@@ -26,18 +26,18 @@ main(int argc, char *argv[], char *envp[])
   int i;
   char *nargv[MAXARG];
 
-  if(argc < 3){
-    fprintf(2, "usage: %s MASK COMMAND\n", argv[0]);
+  if(argc < 2){
+    fprintf(2, "usage: %s COMMAND\n", argv[0]);
     exit(1);
   }
 
-  if (trace(atoi(argv[1])) < 0) {
+  if (trace() < 0) {
     fprintf(2, "%s: strace failed\n", argv[0]);
     exit(1);
   }
   
-  for(i = 2; i < argc && i < MAXARG; i++){
-    nargv[i-2] = argv[i];
+  for(i = 1; i < argc && i < MAXARG; i++){
+    nargv[i-1] = argv[i];
   }
   execve(nargv[0], nargv, envp);
   char buf[128];
@@ -52,7 +52,7 @@ main(int argc, char *argv[], char *envp[])
           break;
         }
       }
-      char *argp = argv[2];
+      char *argp = argv[1];
       for (i++; i < 128; i++) {
         if ((buf[i] = *argp++) == '\0') {
           break;

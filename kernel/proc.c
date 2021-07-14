@@ -275,6 +275,7 @@ int fork_cow(void) {
 		return -1;
 	}
 	np->cwd = idup(p->cwd);
+	np->elf = idup(p->elf);
 
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);
@@ -374,16 +375,10 @@ int clone(uint64 flag, uint64 stack) {
 		freeproc(np);
 		return -1;
 	}
-	np->cwd = idup(p->cwd);
-	
-	// these parts may be improved later 
-	// filesystem 
-	if (copyfdtable(&p->fds, &np->fds) < 0) {
-		freeproc(np);
-		return -1;
-	}
 
 	np->cwd = idup(p->cwd);
+	np->elf = idup(p->elf);
+
 	// copy parent's trapframe 
 	*(np->trapframe) = *(p->trapframe);
 	np->trapframe->a0 = 0;
@@ -448,6 +443,7 @@ void exit(int xstate) {
 	// close all open files 
 	dropfdtable(&p->fds);
 	iput(p->cwd);
+	iput(p->elf);
 
 	// DO NOT REMOVE ITSELF FROM PARENT'S CHILD LIST!
 	// IN CASE THAT PARENT WAS KILLED BEFORE ABLE TO WAIT 
@@ -867,6 +863,7 @@ void userinit(void) {
 	safestrcpy(p->name, "initcode", sizeof(p->name));
 
 	p->tmask = 0;
+	p->elf = NULL;
 
 	__enter_proc_cs 
 	__insert_runnable(PRIORITY_NORMAL, p);

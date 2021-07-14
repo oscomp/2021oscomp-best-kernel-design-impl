@@ -82,6 +82,7 @@ struct proc {
 	// file system 
 	struct fdtable fds;				// Open files
 	struct inode *cwd;				// Current directory
+	struct inode *elf;				// Executable file
 	// scheduling 
 	struct context context;
 
