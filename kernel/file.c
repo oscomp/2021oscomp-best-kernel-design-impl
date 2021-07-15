@@ -334,6 +334,21 @@ struct file *fd2file(int fd, int free)
 	return f;
 }
 
+static struct fdtable *newfdtable(int basefd, struct fdtable *next)
+{
+	struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
+	if (fdnew == NULL) {
+		return NULL;
+	}
+	fdnew->basefd = basefd;
+	fdnew->exec_close = 0;
+	fdnew->nextfd = 0;
+	fdnew->used = 0;
+	memset(fdnew->arr, 0, sizeof(fdnew->arr));
+	fdnew->next = next;
+	return fdnew;
+}
+
 // Allocate a file descriptor for the given file.
 // Takes over file reference from caller on success.
 int fdalloc(struct file *f)
@@ -346,17 +361,11 @@ int fdalloc(struct file *f)
 		if (!fdt->next ||                               // no next table
 				fdt->basefd + NOFILE != fdt->next->basefd)  // or next table is not continuous
 		{
-			struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
+			struct fdtable *fdnew = newfdtable(fdt->basefd + NOFILE, fdt->next);
 			if (fdnew == NULL) {
 				return -1;
 			}
 			__debug_info("fdalloc", "alloc %p\n", fdnew);
-			fdnew->basefd = fdt->basefd + NOFILE;
-			fdnew->exec_close = 0;
-			fdnew->nextfd = 0;
-			fdnew->used = 0;
-			memset(fdnew->arr, 0, sizeof(fdnew->arr));
-			fdnew->next = fdt->next;
 			fdt->next = fdnew;
 		}
 		fdt = fdt->next;
@@ -390,16 +399,10 @@ int fdalloc3(struct file *f, int fd, int flag)
 		fdt = fdt->next;
 	}
 	if (!fdt || fdt->basefd > fd) {  // no next table, or next table is not continuous
-		struct fdtable *fdnew = kmalloc(sizeof(struct fdtable));
+		struct fdtable *fdnew = newfdtable(fd - fd % NOFILE, fdt);
 		if (fdnew == NULL) {
 			return -1;
 		}
-		fdnew->basefd = fd - fd % NOFILE;
-		fdnew->used = 0;
-		fdnew->nextfd = 0;
-		fdnew->exec_close = 0;
-		memset(fdnew->arr, 0, sizeof(fdnew->arr));
-		fdnew->next = fdt;
 		prev->next = fdnew;
 		fdt = fdnew;
 		__debug_info("fdalloc3", "alloc %p base=%d\n",
@@ -460,4 +463,60 @@ void fdcloexec(struct fdtable *fdt)
 			fdt = fdt->next;
 		}
 	}
+}
+
+// allocate one greater or equal to fd
+int fcntldup(struct file *f, int fd, int cloexec)
+{
+	if (fd < 0)
+		panic("fcntldup");
+
+	struct proc *p = myproc();
+	struct fdtable *fdt = &p->fds, *prev = NULL;
+
+	while (fdt && fdt->basefd + NOFILE <= fd) {
+		prev = fdt;
+		fdt = fdt->next;
+	}
+
+	int base = fd - fd % NOFILE;
+	fd %= NOFILE;
+	for (;;) {
+		if (!fdt || fdt->basefd > base) {  // no next table, or next table is not continuous
+			struct fdtable *fdnew = newfdtable(base, fdt);
+			if (fdnew == NULL) {
+				return -1;
+			}
+			prev->next = fdnew;
+			fdt = fdnew;
+		}
+
+		while (fd < NOFILE && fdt->arr[fd] != NULL) {
+			fd++;
+		}
+
+		if (fd == NOFILE) {
+			fd = 0;
+			base += NOFILE;
+			fdt = fdt->next;
+		} else {
+			fdt->arr[fd] = f;
+			fdt->used++;
+			if (fd == fdt->nextfd) { // unfortunately, we need to update nextfd
+				while (++fdt->nextfd < NOFILE) {
+					if (fdt->arr[fdt->nextfd] == NULL) {
+						break;
+					}
+				}
+			}
+			break;
+		}
+	}
+	__debug_info("fcntldup", "table %p base=%d, nextfd=%d, fd2=%d, fd=%d\n",
+								fdt, fdt->basefd, fdt->nextfd, fd2, fd);
+
+	if (cloexec)
+		fdt->exec_close |= (1 << fd);
+
+	return base + fd;
 }

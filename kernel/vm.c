@@ -707,18 +707,18 @@ uint64 kern_pgfault_escape(uint64 badaddr)
 	return save_point;
 }
 
-static uint64 get_copy_badaddr(struct proc *p, uint64 old)
+static uint64 get_copy_badaddr(uint64 old)
 {
-	// struct proc *p = myproc();
-	uint64 ret = old;
+	struct proc *p = myproc();
 	if (p->kstack != old) {
-		ret = p->kstack;
+		uint64 ret = p->kstack;
 		p->kstack = old;
+		return ret;
 	}
-	return ret;
+	return old;
 }
 
-static uint64 do_safememmove(char *dst, char *src, uint len)
+static uint64 safememmove(char *dst, char *src, uint len)
 {
 	struct proc *p = myproc();
 	uint64 old = p->kstack;			// p->kstack might store the stval later
@@ -731,7 +731,7 @@ static uint64 do_safememmove(char *dst, char *src, uint len)
 		save_point = safe_pc;
 	}
 
-	uint64 badaddr = get_copy_badaddr(p, old);
+	uint64 badaddr = get_copy_badaddr(old);
 	if (badaddr == old) {
 		permit_usr_mem();
 		while (len--) {         // There is no overlap between user and kernel space
@@ -745,33 +745,20 @@ static uint64 do_safememmove(char *dst, char *src, uint len)
 	return badaddr;
 }
 
-static int safememmove(uint64 dst, uint64 src, uint64 len, struct seg *s)
+static int handle_copy_elf_miss(pagetable_t pagetable, uint64 badaddr, struct seg *s, struct inode *elf)
 {
-	uint64 badaddr;
-	do {
-		badaddr = do_safememmove((void *)dst, (void *)src, len);
-		if (badaddr && s->type == LOAD) { // maybe meet unloaded elf part, must do it outside the excep-handler
-			struct proc *p = myproc();
-			pte_t *pte = walk(p->pagetable, badaddr, 0);
-			if (pte != NULL && (*pte & PTE_V)) // this part has already been loaded, which indicas a permission problem
-				return -1;
-			__debug_info("safememmove", "elf needs to load at badaddr=0x%x\n", badaddr);
-			ilock(p->elf);
-			if (loadseg(p->pagetable, badaddr, s, p->elf) < 0) {
-				iunlock(p->elf);
-				return -1;
-			}
-			iunlock(p->elf);
-			sfence_vma();
-
-			int diff = badaddr - dst;
-			dst += diff;
-			src += diff;
-			len -= diff;
-		}
-		else break;
-	} while (1);
-	return badaddr == 0 ? 0 : -1;
+	pte_t *pte = walk(pagetable, badaddr, 0);
+	if (pte != NULL && (*pte & PTE_V)) {	// this part has already been loaded
+		return -1;							// which indicas a permission problem
+	}
+	ilock(elf);
+	if (loadseg(pagetable, badaddr, s, elf) < 0) {
+		iunlock(elf);
+		return -1;
+	}
+	iunlock(elf);
+	sfence_vma();
+	return 0;
 }
 
 // Copy from kernel to user.
@@ -808,7 +795,21 @@ copyout2(uint64 dstva, char *src, uint64 len)
 		// __debug_warn("copyout2", "%p, %p, %d\n", s, dstva, len);
 		return -1;
 	}
-	return safememmove(dstva, (uint64)src, len, s);
+	uint64 badaddr;
+	do {
+		badaddr = safememmove((char *)dstva, src, len);
+		if (badaddr && s->type == LOAD) { // maybe meet unloaded elf part, must do it outside the excep-handler
+			if (handle_copy_elf_miss(p->pagetable, badaddr, s, p->elf) < 0)
+				return -1;
+
+			int diff = badaddr - dstva;
+			dstva += diff;
+			src += diff;
+			len -= diff;
+		}
+		else break;
+	} while (1);
+	return badaddr == 0 ? 0 : -1;
 }
 
 // Copy from user to kernel.
@@ -844,7 +845,22 @@ copyin2(char *dst, uint64 srcva, uint64 len)
 	if (s == NULL) {
 		return -1;
 	}
-	return safememmove((uint64)dst, srcva, len, s);
+	uint64 badaddr;
+	do {
+		badaddr = safememmove(dst, (char *)srcva, len);
+		if (badaddr && s->type == LOAD) { // maybe meet unloaded elf part, must do it outside the excep-handler
+			__debug_info("copyin2", "elf needs to load at badaddr=0x%x\n", badaddr);
+			if (handle_copy_elf_miss(p->pagetable, badaddr, s, p->elf) < 0)
+				return -1;
+
+			int diff = badaddr - srcva;
+			dst += diff;
+			srcva += diff;
+			len -= diff;
+		}
+		else break;
+	} while (1);
+	return badaddr == 0 ? 0 : -1;
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -991,13 +1007,15 @@ static int handle_page_fault_lazy(uint64 badaddr)
 
 static int handle_page_fault_loadelf(uint64 badaddr, struct seg *s)
 {
-	if ((r_sstatus() & SSTATUS_SPP) != 0) // don't handle this in S-mode exception: need to read disk and sleep
+	if ((r_sstatus() & SSTATUS_SPP) != 0) {// don't handle this in S-mode exception: need to read disk and sleep
+		__debug_warn("handle_page_fault_loadelf", "kernel triggered! badaddr=%p\n", badaddr);
 		return -1;
+	}
 	struct proc *p = myproc();
 	__debug_info("handle_page_fault_loadelf", "badaddr=%p, pid=%d, name=%s\n", badaddr, p->pid, p->name);
 	ilock(p->elf);
 	if (loadseg(p->pagetable, badaddr, s, p->elf) < 0) {
-		__debug_info("handle_page_fault_loadelf", "fail to load at badaddr=%p\n", badaddr);
+		__debug_warn("handle_page_fault_loadelf", "fail to load at badaddr=%p\n", badaddr);
 		iunlock(p->elf);
 		return -1;
 	}
@@ -1027,12 +1045,12 @@ int handle_page_fault(int kind, uint64 badaddr)
 		// mapped and store-type, might be a COW fault
 		return handle_store_page_fault_cow(pte);
 	}
-	if (pte && PTE2PA(*pte) != NULL) // the page has been mapped, so it's not an elf-load/lazy-alloc problem
+	if (pte && (*pte & PTE_V)) // the page has been mapped, so it's not an elf-load/lazy-alloc problem
 		return -1;
 	if (seg->type == LOAD) {
 		return handle_page_fault_loadelf(badaddr, seg);
 	}
-	if (seg->type == HEAP) {     // a lazy-alloction
+	if (seg->type == HEAP || seg->type == STACK) {     // a lazy-alloction
 		return handle_page_fault_lazy(badaddr);
 	}
 

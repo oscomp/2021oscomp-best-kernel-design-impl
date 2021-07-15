@@ -60,5 +60,6 @@ struct file*    fd2file(int fd, int free);
 int             fdalloc(struct file *f);
 int             fdalloc3(struct file *f, int fd, int flag);
 void            fdcloexec(struct fdtable *fdt);
+int             fcntldup(struct file *f, int minfd, int cloexec);
 
 #endif

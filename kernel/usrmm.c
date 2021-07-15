@@ -20,7 +20,7 @@ newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset
 	nend = offset + sz;
 	nend = PGROUNDUP(nend);
 
-	__debug_info("newseg", "type=%d nstart=%p nend=%p\n", type, nstart, nend);
+	// __debug_info("newseg", "type=%d nstart=%p nend=%p\n", type, nstart, nend);
 	// __debug_info("newseg", "sizeof(struct seg): %d\n", sizeof(struct seg));
 	struct seg *seg = NULL;
 	for(struct seg *s = head; s != NULL; s = s->next)
@@ -114,7 +114,7 @@ getseg(struct seg *head, enum segtype type)
 struct seg*
 partofseg(struct seg *head, uint64 start, uint64 end)
 {
-	__debug_info("partofseg", "start=%p end=%p\n", start, end);
+	// __debug_info("partofseg", "start=%p end=%p\n", start, end);
 	struct seg *s = locateseg(head, start);
 	if (s == NULL || locateseg(head, end - 1) != s)
 		return NULL;
@@ -132,8 +132,8 @@ struct seg*
 delseg(pagetable_t pagetable, struct seg *s)
 {
 	struct seg *next = s->next;
-	__debug_info("delseg", "s = %p\n", s);
-	__debug_info("delseg", "s->type: %d\n", s->type);
+	// __debug_info("delseg", "s = %p\n", s);
+	// __debug_info("delseg", "s->type: %d\n", s->type);
 	if (s->type == MMAP && s->mmap) {
 		del_segmap(s);
 	}
@@ -229,6 +229,8 @@ loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip)
 	{
 		__debug_warn("loadseg", "meet strange region\n");
 		uint16 *ins = (uint16 *)((uint64)pa + 0x10614 % PGSIZE);
+		*ins = 0xa035;
+		ins = (uint16 *)((uint64)pa + 0x10678 % PGSIZE);
 		*ins = 0xa035;
 	}
 	#endif

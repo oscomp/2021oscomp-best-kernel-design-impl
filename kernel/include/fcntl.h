@@ -12,4 +12,7 @@
 #define AT_FDCWD  -100
 #define FD_CLOEXEC 1
 
+#define F_DUPFD         1
+#define F_DUPFD_CLOEXEC 1030
+
 #endif

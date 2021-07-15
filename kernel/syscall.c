@@ -165,6 +165,8 @@ extern uint64 sys_getegid(void);
 extern uint64 sys_writev(void);
 extern uint64 sys_readlinkat(void);
 extern uint64 sys_mprotect(void);
+extern uint64 sys_fstatat(void);
+extern uint64 sys_fcntl(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -219,6 +221,8 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_mprotect]		sys_mprotect,
 	[SYS_exit_group]	sys_exit,
 	[SYS_ioctl]			sys_unimplemented,
+	[SYS_fstatat]		sys_fstatat,
+	[SYS_fcntl]			sys_fcntl,
 };
 
 static char *sysnames[] = {
@@ -272,6 +276,8 @@ static char *sysnames[] = {
 	[SYS_mprotect]		"mprotect",
 	[SYS_exit_group]	"exit_group",
 	[SYS_ioctl]			"ioctl",
+	[SYS_fstatat]		"fstatat",
+	[SYS_fcntl]			"fcntl",
 };
 
 void
