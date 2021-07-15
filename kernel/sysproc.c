@@ -316,7 +316,7 @@ sys_mprotect(void)
 	if (addr % PGSIZE || (prot & ~PROT_ALL))
 		return -1;
 
-	prot = (prot << 1) & 0xe; // convert to PTE_attr
+	prot = (prot << 1) & (PTE_X|PTE_W|PTE_R); // convert to PTE_attr
 	struct proc *p = myproc();
 	struct seg *s = partofseg(p->segment, addr, addr + len);
 	if (s == NULL ||

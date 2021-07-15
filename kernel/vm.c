@@ -129,7 +129,8 @@ kvminithart()
 static int __hash_page_idx(uint64 pa)
 {
 	if (pa % PGSIZE || pa < PGROUNDUP((uint64)kernel_end) || pa >= PHYSTOP) {
-		__debug_error("__hash_page_idx", "%p\n", pa);
+		__debug_error("__hash_page_idx", "%p not in [%p, %p]\n",
+					pa, PGROUNDUP((uint64)kernel_end), PHYSTOP);
 		panic("__hash_page");
   }
 	return (pa - PGROUNDUP((uint64)kernel_end)) >> PGSHIFT;
@@ -293,7 +294,12 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
       return -1;
     if(*pte & PTE_V)
       panic("remap");
-    *pte = PA2PTE(pa) | perm | PTE_V;
+		if (*pte & PTE_U) { // mprotect might take care of perm ahead
+			__debug_assert("mappages", PTE2PA(*pte) == NULL, "invalid page with ppn\n");
+			*pte |= PA2PTE(pa) | PTE_V;
+		} else {
+			*pte = PA2PTE(pa) | perm | PTE_V;
+		}
 		if (usr)
 			pagedup(PGROUNDDOWN(pa));  // increase ref to parent's page
     if(a == last)
@@ -592,8 +598,10 @@ uvmclear(pagetable_t pagetable, uint64 va)
 int
 uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
 {
-	if (va % PGSIZE)
+	if (va % PGSIZE || prot & ~(PTE_X|PTE_W|PTE_R)) {
+		__debug_error("uvmprotect", "va=%p, prot=0x%0x\n", va, prot);
 		panic("uvmprotect");
+	}
 	
 	int flag = 0;
 	uint64 i;
@@ -618,8 +626,10 @@ uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
 					*pte = PA2PTE(copy) | PTE_FLAGS(*pte);
 				}
 			}
+			*pte = (*pte & ~(PTE_X|PTE_W|PTE_R)) | prot;
+		} else {
+			*pte = prot | PTE_U; // pre-mark a PTE_U here, if mappages meets a pte without PTE_V but PTE_U, it knows how to do.
 		}
-		*pte = (*pte & ~(PTE_X|PTE_W|PTE_R)) | (prot & (PTE_X|PTE_W|PTE_R));
 	}
 
 	if (flag)
@@ -740,8 +750,11 @@ static int safememmove(uint64 dst, uint64 src, uint64 len, struct seg *s)
 	uint64 badaddr;
 	do {
 		badaddr = do_safememmove((void *)dst, (void *)src, len);
-		if (badaddr && s->type == LOAD) { // meet unloaded elf part, must do it outside the excep-handler
+		if (badaddr && s->type == LOAD) { // maybe meet unloaded elf part, must do it outside the excep-handler
 			struct proc *p = myproc();
+      pte_t *pte = walk(p->pagetable, badaddr, 0);
+			if (pte != NULL && (*pte & PTE_V)) // this part has already been loaded, which indicas a permission problem
+				return -1;
 			__debug_info("safememmove", "elf needs to load at badaddr=0x%x\n", badaddr);
 			ilock(p->elf);
 			if (loadseg(p->pagetable, badaddr, s, p->elf) < 0) {
@@ -978,9 +991,10 @@ static int handle_page_fault_lazy(uint64 badaddr)
 
 static int handle_page_fault_loadelf(uint64 badaddr, struct seg *s)
 {
+	if ((r_sstatus() & SSTATUS_SPP) != 0) // don't handle this in S-mode exception: need to read disk and sleep
+		return -1;
 	struct proc *p = myproc();
 	__debug_info("handle_page_fault_loadelf", "badaddr=%p, pid=%d, name=%s\n", badaddr, p->pid, p->name);
-	__debug_assert("handle_page_fault_loadelf", (r_sstatus() & SSTATUS_SPP) == 0,  "not from user space\n");
   ilock(p->elf);
   if (loadseg(p->pagetable, badaddr, s, p->elf) < 0) {
 		__debug_info("handle_page_fault_loadelf", "fail to load at badaddr=%p\n", badaddr);
@@ -1013,9 +1027,9 @@ int handle_page_fault(int kind, uint64 badaddr)
     // mapped and store-type, might be a COW fault
 		return handle_store_page_fault_cow(pte);
 	}
+	if (pte && PTE2PA(*pte) != NULL) // the page has been mapped, so it's not an elf-load/lazy-alloc problem
+		return -1;
 	if (seg->type == LOAD) {
-		if (pte && PTE2PA(*pte) != NULL)
-			return -1;
 		return handle_page_fault_loadelf(badaddr, seg);
 	}
   if (seg->type == HEAP) {     // a lazy-alloction

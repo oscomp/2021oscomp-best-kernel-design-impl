@@ -166,6 +166,8 @@ extern uint64 sys_writev(void);
 extern uint64 sys_readlinkat(void);
 extern uint64 sys_mprotect(void);
 
+extern uint64 sys_unimplemented(void);
+
 static uint64 (*syscalls[])(void) = {
   [SYS_fork]        sys_fork,
   [SYS_exit]        sys_exit,
@@ -213,9 +215,10 @@ static uint64 (*syscalls[])(void) = {
   [SYS_getgid]      sys_getuid,
   [SYS_getegid]     sys_getuid,
   [SYS_writev]      sys_writev,
-  [SYS_readlinkat]  sys_readlinkat,
+  [SYS_readlinkat]  sys_unimplemented,
   [SYS_mprotect]    sys_mprotect,
   [SYS_exit_group]  sys_exit,
+  [SYS_ioctl]       sys_unimplemented,
 };
 
 static char *sysnames[] = {
@@ -268,6 +271,7 @@ static char *sysnames[] = {
   [SYS_readlinkat]  "readlinkat",
   [SYS_mprotect]    "mprotect",
   [SYS_exit_group]  "exit_group",
+  [SYS_ioctl]       "ioctl",
 };
 
 void

@@ -653,7 +653,8 @@ sys_writev(void)
 }
 
 uint64
-sys_readlinkat(void)
+// sys_readlinkat(void)
+sys_unimplemented(void)
 {/*
 	int dirfd;
 	uint64 path, ubuf, size;

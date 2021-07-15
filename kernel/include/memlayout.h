@@ -91,18 +91,18 @@
 #endif
 
 // the physical address of rustsbi
-#define RUSTSBI_BASE            0x80000000
+#define RUSTSBI_BASE            0x80000000UL
 
 // the kernel expects there to be RAM
 // for use by the kernel and user pages
 // from physical address 0x80200000 to PHYSTOP.
 #ifndef QEMU
-#define KERNBASE                0x80020000
+#define KERNBASE                0x80020000UL
 #else
-#define KERNBASE                0x80200000
+#define KERNBASE                0x80200000UL
 #endif
 
-#define PHYSTOP                 0x80600000
+#define PHYSTOP                 0x80600000UL
 
 // map the trampoline page to the highest address,
 // in both user and kernel space.
