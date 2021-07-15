@@ -32,9 +32,11 @@
 #define INTR_EXTERNAL    (0x9 | INTERRUPT_FLAG)
 
 // Supervisor exception number
+#define EXCP_INST_ACCESS  0x1
 #define EXCP_LOAD_ACCESS  0x5
 #define EXCP_STORE_ACCESS 0x7
 #define EXCP_ENV_CALL     0x8
+#define EXCP_INST_PAGE    0xc // 12
 #define EXCP_LOAD_PAGE    0xd // 13
 #define EXCP_STORE_PAGE   0xf // 15
 
@@ -205,9 +207,9 @@ kerneltrap() {
 	else if (p && is_page_fault(scause) && PGSIZE <= r_stval() && r_stval() < MAXUVA) {
 		// This case may happen when kernel is accessing user's lazy-allocated page.
 		// The handler should allocate a real one, but failed for lack of memory.
-	  	//p->killed = 1;
-		sepc = kern_pgfault_escape();
-		__debug_error("kerneltrap", "sepc=%p stval=%p escape=%p pid=%d\n", 
+		//p->killed = 1;
+		sepc = kern_pgfault_escape(r_stval());
+		__debug_warn("kerneltrap", "sepc=%p stval=%p escape=%p pid=%d\n", 
 				r_sepc(), r_stval(), sepc, p->pid);
 	}
 	else {
@@ -301,6 +303,11 @@ int handle_excp(uint64 scause) {
 	case EXCP_LOAD_ACCESS: 
 	#endif 
 		return handle_page_fault(0, r_stval());
+	case EXCP_INST_PAGE:
+	#ifndef QEMU
+	case EXCP_INST_ACCESS:
+	#endif
+		return handle_page_fault(2, r_stval());
 	// unsupported exception 
 	default: return -1;
 	}

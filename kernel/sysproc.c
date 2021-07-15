@@ -289,16 +289,40 @@ sys_uptime(void)
 uint64
 sys_trace(void)
 {
-	int mask;
-	if(argint(0, &mask) < 0) {
-		return -1;
-	}
-	myproc()->tmask = mask;
+	// int mask;
+	// if(argint(0, &mask) < 0) {
+	//   return -1;
+	// }
+	// myproc()->tmask = mask;
+	myproc()->tmask = 1;
 	return 0;
 }
 
-// uint64
-// sys_getuid(void)
-// {
-//   return 0;
-// }
+uint64
+sys_getuid(void)
+{
+	return 0;
+}
+
+uint64
+sys_mprotect(void)
+{
+	uint64 addr, len;
+	int prot;
+
+	argaddr(0, &addr);
+	argaddr(1, &len);
+	argint(2, &prot);
+	if (addr % PGSIZE || (prot & ~PROT_ALL))
+		return -1;
+
+	prot = (prot << 1) & (PTE_X|PTE_W|PTE_R); // convert to PTE_attr
+	struct proc *p = myproc();
+	struct seg *s = partofseg(p->segment, addr, addr + len);
+	if (s == NULL ||
+		(s->type == MMAP && !(s->flag & PTE_W) && (prot & PTE_W))
+	)
+	return -1;
+
+	return uvmprotect(p->pagetable, addr, len, prot);
+}

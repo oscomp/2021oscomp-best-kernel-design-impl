@@ -161,6 +161,20 @@ else
 	$(QEMU) $(QEMUOPTS)
 endif
 
+# try to generate a unique GDB port
+GDBPORT = $(shell expr `id -u` % 5000 + 25000)
+# QEMU's gdb stub command line changed in 0.11
+QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
+	then echo "-gdb tcp::$(GDBPORT)"; \
+	else echo "-s -p $(GDBPORT)"; fi)
+
+.gdbinit: debug/.gdbinit.tmpl-riscv
+	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
+
+qemu-gdb: $T/kernel .gdbinit fs.img
+	@echo "*** Now run 'gdb' in another window." 1>&2
+	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+
 all: build 
 	@$(OBJCOPY) $T/kernel --strip-all -O binary $(image)
 	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $(k210)
@@ -185,12 +199,16 @@ $U/ostest: $U/ostest.c $U/ostest_asm.S
 tags: $(OBJS) _init
 	@etags *.S *.c
 
-ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
+ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o $U/crt.o
 
 _%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $(ulinker) -e main -o $@ $^
+	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
+
+$U/crt.o:
+	$(CC) $(CFLAGS) -c -o $U/crt.o $U/crt.c
+	$(OBJDUMP) -S $U/crt.o > $U/crt.asm
 
 $U/usys.S : $U/usys.pl
 	@perl $U/usys.pl > $U/usys.S

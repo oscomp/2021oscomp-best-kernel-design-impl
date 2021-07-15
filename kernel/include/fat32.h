@@ -32,38 +32,38 @@
 
 /* FAT32 superblock */
 struct fat32_sb {
-    uint32  first_data_sec;
-    uint32  data_sec_cnt;
-    uint32  data_clus_cnt;
-    uint32  byts_per_clus;
-    struct {
-        uint16  byts_per_sec;
-        uint8   sec_per_clus;
-        uint16  rsvd_sec_cnt;
-        uint8   fat_cnt;            /* count of FAT regions */
-        uint32  hidd_sec;           /* count of hidden sectors */
-        uint32  tot_sec;            /* total count of sectors including all regions */
-        uint32  fat_sz;             /* count of sectors for a FAT region */
-        uint32  root_clus;
-    } bpb;
+	uint32  first_data_sec;
+	uint32  data_sec_cnt;
+	uint32  data_clus_cnt;
+	uint32  byts_per_clus;
+	struct {
+		uint16  byts_per_sec;
+		uint8   sec_per_clus;
+		uint16  rsvd_sec_cnt;
+		uint8   fat_cnt;            /* count of FAT regions */
+		uint32  hidd_sec;           /* count of hidden sectors */
+		uint32  tot_sec;            /* total count of sectors including all regions */
+		uint32  fat_sz;             /* count of sectors for a FAT region */
+		uint32  root_clus;
+	} bpb;
 };
 
 /* Inode of FAT32 in-memory format */
 struct fat32_entry {
-    // char  filename[FAT32_MAX_FILENAME + 1];
-    uint8   attribute;
-    uint8   create_time_tenth;
-    uint16  create_time;
-    uint16  create_date;
-    uint16  last_access_date;
-    uint32  first_clus;
-    uint16  last_write_time;
-    uint16  last_write_date;
-    uint32  file_size;
+	// char  filename[FAT32_MAX_FILENAME + 1];
+	uint8   attribute;
+	uint8   create_time_tenth;
+	uint16  create_time;
+	uint16  create_date;
+	uint16  last_access_date;
+	uint32  first_clus;
+	uint16  last_write_time;
+	uint16  last_write_date;
+	uint32  file_size;
 
-    uint    ent_cnt;
-    uint32  cur_clus;
-    uint    clus_cnt;
+	uint    ent_cnt;
+	uint32  cur_clus;
+	uint    clus_cnt;
 };
 
 

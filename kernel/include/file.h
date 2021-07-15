@@ -6,15 +6,15 @@
 
 // struct file中已经添加成员mmap_ph_addr，但是还未考虑初始化其为NULL
 struct file {
-  struct spinlock lock;
-  enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
-  int ref; // reference count
-  char readable;
-  char writable;
-  struct pipe *pipe; // FD_PIPE
-  struct inode *ip;
-  uint off;          // FD_ENTRY
-  short major;       // FD_DEVICE
+	struct spinlock lock;
+	enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
+	int ref; // reference count
+	char readable;
+	char writable;
+	struct pipe *pipe; // FD_PIPE
+	struct inode *ip;
+	uint off;          // FD_ENTRY
+	short major;       // FD_DEVICE
 };
 
 // #define major(dev)  ((dev) >> 16 & 0xFFFF)
@@ -30,15 +30,20 @@ struct file {
 // extern struct devsw devsw[];
 
 struct fdtable {
-  uint16 basefd;
-  uint16 nextfd;
-  uint16 used;
-  uint16 exec_close;
-  struct file *arr[NOFILE];
-  struct fdtable *next;
+	uint16 basefd;
+	uint16 nextfd;
+	uint16 used;
+	uint16 exec_close;
+	struct file *arr[NOFILE];
+	struct fdtable *next;
 };
 
 #define CONSOLE 1
+
+struct iovec {
+	void *iov_base; /* Starting address */
+	uint64 iov_len; /* Number of bytes to transfer */
+};
 
 struct file*    filealloc(void);
 void            fileclose(struct file*);

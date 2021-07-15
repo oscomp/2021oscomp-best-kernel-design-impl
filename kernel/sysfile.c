@@ -8,6 +8,8 @@
 #undef DEBUG
 #endif
 
+#define __module_name__ 	"sysfile"
+
 #include "include/types.h"
 #include "include/riscv.h"
 #include "include/param.h"
@@ -600,7 +602,7 @@ sys_mmap(void)
 	if(argaddr(0, &start) < 0 || argint(1, &len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &off) < 0)
 		return -1;
 	
-	if(off % PGSIZE || len <= 0)
+	if(off % PGSIZE || len <= 0 || fd < 0)
 		return -1;
 
 	struct file * f = fd2file(fd, 0);
@@ -623,4 +625,68 @@ sys_munmap(void)
 	}
 
 	return do_munmap(start, len);
+}
+
+uint64
+sys_writev(void)
+{
+	int fd, count;
+	struct iovec iov;
+	uint64 iovp;
+	struct file *f = NULL;
+	if (argfd(0, &fd, &f) < 0 || argaddr(1, &iovp) < 0 || argint(2, &count) < 0)
+		return -1;
+
+	uint64 n = 0;
+	while (count-- > 0) {
+		if (copyin2((char *)&iov, iovp, sizeof(iov)) < 0)
+			return -1;
+		
+		int64 ret = filewrite(f, (uint64)iov.iov_base, iov.iov_len);
+		if (ret < 0)
+			return -1;
+		
+		n += ret;
+		iovp += sizeof(iov);
+	}
+	return n;
+}
+
+uint64
+// sys_readlinkat(void)
+sys_unimplemented(void)
+{/*
+	int dirfd;
+	uint64 path, ubuf, size;
+	struct file *f;
+	// struct inode *dp;
+
+	if (argfd(0, &dirfd, &f) < 0) {
+		if (dirfd != AT_FDCWD) {
+			return -1;
+		}
+	// 	dp = myproc()->cwd;
+	// } else {
+	// 	dp = f->ip;
+	}
+
+	if (argaddr(1, &path) < 0 || argaddr(2, &ubuf) < 0 || argaddr(3, &size) < 0)
+		return -1;
+
+	char buf[MAXPATH];
+	if (copyinstr2(buf, path, sizeof(buf)) < 0)
+		return -1;
+
+	__debug_info("sys_readlinkat", "path=%s\n", buf);
+	// special handler, since we run on fat, which has no links
+	if (strncmp(buf, "/proc/self/exe", sizeof(buf)) == 0) {
+		char res[] = "/home/busybox";
+		int const len = sizeof(res) - 1;
+		if (len > size || copyout2(ubuf, res, len) < 0) {
+			return -1;
+		}
+		return len;
+	}
+*/
+	return -1;
 }

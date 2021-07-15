@@ -43,9 +43,11 @@ pagetable_t     uvmcreate(void);
 int             uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype, int cow);
 uint64          uvmalloc(pagetable_t, uint64 start, uint64 end, int perm);
 uint64          uvmdealloc(pagetable_t, uint64, uint64, enum segtype);
+int             uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot);
 void            uvmclear(pagetable_t, uint64);
 void            uvmfree(pagetable_t pt);
 
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 uint64          walkaddr(pagetable_t, uint64);
 uint64          kwalkaddr(pagetable_t pagetable, uint64 va);
 uint64          kvmpa(uint64);
@@ -62,6 +64,6 @@ int             copyinstr2(char *dst, uint64 srcva, uint64 max);
 void            vmprint(pagetable_t pagetable);
 
 int             handle_page_fault(int type, uint64 badaddr);
-uint64          kern_pgfault_escape(void);
+uint64          kern_pgfault_escape(uint64 badaddr);
 
 #endif 

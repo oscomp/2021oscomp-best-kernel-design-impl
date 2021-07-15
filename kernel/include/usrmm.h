@@ -15,6 +15,7 @@ struct seg{
   struct seg *next;
   struct file *mmap;
   uint64 f_off;
+  uint64 f_sz;
 };
 
 /**
@@ -39,7 +40,7 @@ struct seg* newseg(pagetable_t pagetable, struct seg *head, enum segtype type, u
  * 
  * @return    the type
  */
-enum segtype typeofseg(struct seg *head, uint64 addr);
+// enum segtype typeofseg(struct seg *head, uint64 addr);
 
 /**
  * @brief for the given range, check which seg it falls in.
@@ -50,7 +51,7 @@ enum segtype typeofseg(struct seg *head, uint64 addr);
  * 
  * @return the segment type the range falls in.
  */
-enum segtype partofseg(struct seg *head, uint64 start, uint64 end);
+struct seg* partofseg(struct seg *head, uint64 start, uint64 end);
 
 /**
  * @brief get the segment in a seglist specified by type
@@ -107,5 +108,7 @@ void delsegs(pagetable_t pagetable, struct seg *head);
  * @return the head of the new segments list, NULL if fail to copy
  */
 struct seg *copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2);
+
+int loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip);
 
 #endif
