@@ -57,7 +57,7 @@ int             filereaddir(struct file *f, uint64 addr, uint64 n);
 int             copyfdtable(struct fdtable *fdt1, struct fdtable *fdt2);
 void            dropfdtable(struct fdtable *fdt);
 struct file*    fd2file(int fd, int free);
-int             fdalloc(struct file *f);
+int             fdalloc(struct file *f, int flag);
 int             fdalloc3(struct file *f, int fd, int flag);
 void            fdcloexec(struct fdtable *fdt);
 int             fcntldup(struct file *f, int minfd, int cloexec);

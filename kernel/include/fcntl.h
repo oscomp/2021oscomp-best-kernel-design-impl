@@ -7,7 +7,8 @@
 #define O_CREATE  0x040
 #define O_TRUNC   0x200
 #define O_APPEND  0x400
-#define O_DIRECTORY 0x0200000
+#define O_DIRECTORY 0x010000
+#define O_CLOEXEC 0x80000
 
 #define AT_FDCWD  -100
 #define FD_CLOEXEC 1

@@ -694,7 +694,7 @@ int namepath(struct inode *ip, char *path, int max)
 	if (de == rootfs.root) {
 		path[0] = '/';
 		path[1] = '\0';
-		return 1;
+		return 2;
 	}
 
 	int len;

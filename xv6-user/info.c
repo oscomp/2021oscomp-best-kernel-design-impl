@@ -9,8 +9,10 @@ int main()
     if (sysinfo(&info) < 0) {
         printf("sysinfo fail!\n");
     } else {
-        printf("memory left: %d KB\n", info.freemem >> 10);
-        printf("process amount: %d\n", info.nproc);
+        printf("total memory: %d KB\n", info.totalram >> 10);
+        printf("free memory: %d KB\n", info.freeram >> 10);
+        printf("process amount: %d\n", info.procs);
+        printf("ticks since boot: %d\n", info.uptime);
     }
     exit(0);
 }

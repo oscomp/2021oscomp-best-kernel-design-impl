@@ -28,6 +28,7 @@
 #include "include/debug.h"
 #include "include/poll.h"
 #include "include/kmalloc.h"
+#include "include/errno.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -75,7 +76,7 @@ sys_dup(void)
 
 	if(argfd(0, 0, &f) < 0)
 		return -1;
-	if((fd=fdalloc(f)) < 0)
+	if((fd=fdalloc(f, 0)) < 0)
 		return -1;
 	filedup(f);
 	return fd;
@@ -160,16 +161,16 @@ sys_fstatat(void)
 
 	if (argfd(0, &fd, &f) < 0) {
 		if (fd != AT_FDCWD)
-			return -1;
+			return -EBADF;
 		dp = myproc()->cwd;
 	} else {
 		dp = f->ip;
 	}
 
 	if (argstr(1, path, MAXPATH) < 0 || argaddr(2, &staddr) < 0 || argint(3, &flag) < 0)
-		return -1;
+		return -ENAMETOOLONG;
 	if ((ip = nameifrom(dp, path)) == NULL)
-		return -1;
+		return -ENOENT;
 
 	struct kstat st;
 	ilock(ip);
@@ -177,7 +178,7 @@ sys_fstatat(void)
 	iunlockput(ip);
 	
 	if (copyout2(staddr, (char *)&st, sizeof(st)) < 0)
-		return -1;
+		return -EFAULT;
 
 	return 0;
 }
@@ -192,14 +193,14 @@ sys_openat(void)
 
 	if (argfd(0, &dirfd, &f) < 0) {
 		if (dirfd != AT_FDCWD) {
-			return -1;
+			return -EBADF;
 		}
 		dp = myproc()->cwd;
 	} else {
 		dp = f->ip;
 	}
 	if (argstr(1, path, MAXPATH) < 0 || argint(2, &omode) < 0 || argint(3, &fmode) < 0)
-		return -1;
+		return -ENAMETOOLONG;
 
 	if(omode & O_CREATE){
 		ip = create(dp, path, fmode & (~I_MODE_DIR));
@@ -207,29 +208,32 @@ sys_openat(void)
 			return -1;
 		}
 	} else {
-		if((ip = nameifrom(dp, path)) == NULL){
-			return -1;
+		if ((ip = nameifrom(dp, path)) == NULL) {
+			__debug_warn("sys_openat", "can find %s\n", path);
+			return -ENOENT;
 		}
 		ilock(ip);
-		if ((ip->mode & I_MODE_DIR) && omode != O_RDONLY && omode != O_DIRECTORY) {
+		if ((ip->mode & I_MODE_DIR) && (omode & (O_WRONLY|O_RDWR))) {
 			iunlockput(ip);
-			return -1;
+			__debug_warn("sys_openat", "illegel mode 0x%x\n", omode);
+			return -EISDIR;
 		}
 		if ((omode & O_DIRECTORY) && !(ip->mode & I_MODE_DIR)) {
 			iunlockput(ip);
-			return -1;
+			__debug_warn("sys_openat", "o_dir\n");
+			return -ENOTDIR;
 		}
 	}
 
-	if((f = filealloc()) == NULL || (fd = fdalloc(f)) < 0){
+	if((f = filealloc()) == NULL || (fd = fdalloc(f, omode & O_CLOEXEC)) < 0){
 		if (f) {
 			fileclose(f);
 		}
 		iunlockput(ip);
-		return -1;
+		return -ENOMEM;
 	}
 
-	if (!(ip->mode & I_MODE_DIR) && (omode & O_TRUNC)) {
+	if (!(ip->mode & I_MODE_DIR) && (omode & O_TRUNC) && (omode & (O_WRONLY|O_RDWR))) {
 		ip->op->truncate(ip);
 	}
 
@@ -259,14 +263,14 @@ sys_mkdirat(void)
 
 	if (argfd(0, &dirfd, &f) < 0) {
 		if (dirfd != AT_FDCWD) {
-			return -1;
+			return -EBADF;
 		}
 		dp = myproc()->cwd;
 	} else {
 		dp = f->ip;
 	}
 	if (argstr(1, path, MAXPATH) < 0 || argint(2, &mode) < 0) {
-		return -1;
+		return -ENAMETOOLONG;
 	}
 	__debug_info("mkdirat", "create dir %s\n", path);
 	if ((ip = create(dp, path, mode | I_MODE_DIR)) == NULL) {
@@ -309,7 +313,7 @@ sys_pipe(void)
 	if(pipealloc(&rf, &wf) < 0)
 		return -1;
 	fd0 = -1;
-	if((fd0 = fdalloc(rf)) < 0 || (fd1 = fdalloc(wf)) < 0){
+	if ((fd0 = fdalloc(rf, 0)) < 0 || (fd1 = fdalloc(wf, 0)) < 0) {
 		if(fd0 >= 0)
 			fd2file(fd0, 1);
 		fileclose(rf);
@@ -378,7 +382,7 @@ isdirempty(struct inode *dp)
 		else if (ret == 0)
 			return 1;
 		else if ((dent.name[0] == '.' && dent.name[1] == '\0') ||     // skip the "." and ".."
-						 (dent.name[0] == '.' && dent.name[1] == '.' && dent.name[2] == '\0'))
+				 (dent.name[0] == '.' && dent.name[1] == '.' && dent.name[2] == '\0'))
 		{
 			off += ret;
 		}
@@ -413,20 +417,24 @@ sys_unlinkat(void)
 		s--;
 	}
 	if (s >= path && *s == '.' && (s == path || *--s == '/')) {
+		__debug_warn("sys_unlinkat", "illegel path %s\n", path);
 		return -1;
 	}
 	
 	if((ip = nameifrom(dp, path)) == NULL){
+		__debug_warn("sys_unlinkat", "can namei %s\n", path);
 		return -1;
 	}
 	if ((ip->mode ^ mode) & I_MODE_DIR) {
 		iput(ip);
+		__debug_warn("sys_unlinkat", "illegel mode 0x%x against 0x%x\n", mode, ip->mode);
 		return -1;
 	}
 	ilock(ip);
 	if ((ip->mode & I_MODE_DIR) && isdirempty(ip) != 1) {
-			iunlockput(ip);
-			return -1;
+		iunlockput(ip);
+		__debug_warn("sys_unlinkat", "dir isn't empty\n");
+		return -1;
 	}
 	int ret = unlink(ip);
 	iunlockput(ip);
@@ -746,4 +754,94 @@ sys_ppoll(void)
 	copyout2(addr, (char *)pfds, sizeof(struct pollfd) * nfds);
 	kfree(pfds);
 	return ret;
+}
+
+#define R_OK	4		/* Test for read permission.  */
+#define W_OK	2		/* Test for write permission.  */
+#define X_OK	1		/* Test for execute permission.  */
+#define F_OK	0		/* Test for existence.  */              
+
+uint64
+sys_faccessat(void)
+{
+	char path[MAXPATH];
+	int dirfd, mode, flags;
+	struct file *f = NULL;
+	struct inode *dp, *ip;
+
+	if (argfd(0, &dirfd, &f) < 0) {
+		if (dirfd != AT_FDCWD) {
+			return -1;
+		}
+		dp = myproc()->cwd;
+	} else {
+		dp = f->ip;
+	}
+	if (argstr(1, path, MAXPATH) < 0 || argint(2, &mode) < 0 || argint(3, &flags) < 0)
+		return -1;
+
+	ip = nameifrom(dp, path);
+	if (ip != NULL) {
+		if (mode == F_OK) {
+			iput(ip);
+			return 0;
+		}
+	} else return -1;
+
+	// assume user as root
+	int imode = (ip->mode >> 6) & 0x7;
+	iput(ip);
+
+	if ((imode & mode) != mode)
+		return -1;
+
+	return 0;
+}
+
+#define SEEK_SET	0	/* Seek from beginning of file.  */                                                                                      
+#define SEEK_CUR	1	/* Seek from current position.  */
+#define SEEK_END	2	/* Seek from end of file.  */
+
+uint64
+sys_lseek(void)
+{
+	int fd;
+	struct file *f;
+	int64 off;
+	int whence;
+
+	if (argfd(0, &fd, &f) < 0)
+		return -EBADF;
+	argaddr(1, (uint64 *)&off);
+	argint(2, &whence);
+
+	if (f->type != FD_INODE)
+		return -ESPIPE;
+
+	uint64 cur = f->off;	
+	uint64 size = f->ip->size;
+	switch (whence)
+	{
+		case SEEK_SET:
+			cur = off;
+			break;
+		case SEEK_CUR:
+			cur += off;
+			break;
+		case SEEK_END:
+			cur = size + off;
+			break;
+		default:
+			return -EINVAL;
+	}
+
+	// Doesn't support offset out of size
+	if (cur > size)
+		return -EPERM;
+
+	acquire(&f->lock);
+	f->off = cur;
+	release(&f->lock);
+
+	return cur;
 }

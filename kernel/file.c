@@ -163,9 +163,13 @@ fileread(struct file *f, uint64 addr, int n)
 				break;
 		case FD_INODE:
 				ilock(ip);
-					if((r = ip->fop->read(ip, 1, addr, f->off, n)) > 0)
-						f->off += r;
+				r = ip->fop->read(ip, 1, addr, f->off, n);
 				iunlock(ip);
+				if (r > 0) {
+					acquire(&f->lock);
+					f->off += r;
+					release(&f->lock);
+				}
 				break;
 		default:
 			panic("fileread");
@@ -194,13 +198,15 @@ filewrite(struct file *f, uint64 addr, int n)
 	} else if(f->type == FD_INODE){
 		struct inode *ip = f->ip;
 		ilock(ip);
-		if (ip->fop->write(ip, 1, addr, f->off, n) == n) {
-			ret = n;
+		ret = ip->fop->write(ip, 1, addr, f->off, n);
+		iunlock(ip);
+		if (ret == n) {
+			acquire(&f->lock);
 			f->off += n;
+			release(&f->lock);
 		} else {
 			ret = -1;
 		}
-		iunlock(ip);
 	} else {
 		panic("filewrite");
 	}
@@ -224,25 +230,32 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 		return -1;
 
 	int ret;
+	uint off = f->off;
 	uint64 old = addr;
 	ilock(ip);
 	for (;;) {
-		ret = ip->fop->readdir(ip, &dent, f->off);
+		ret = ip->fop->readdir(ip, &dent, off);
 		if (ret <= 0 || dent.reclen > n) // 0 is end, -1 is err
 			break;
 
 		if(copyout2(addr, (char *)&dent, dent.reclen) < 0) {
-			iunlock(ip);
-			return -1;
+			ret = -1;
+			break;	
 		}
 
-		f->off += ret;
+		off += ret;
 		addr += dent.reclen;
 		n -= dent.reclen;
 
 	}
 	iunlock(ip);
 
+	acquire(&f->lock);
+	f->off = off;
+	release(&f->lock);
+
+	if (ret < 0)
+		return -1;
 	return addr - old;
 }
 
@@ -352,7 +365,7 @@ static struct fdtable *newfdtable(int basefd, struct fdtable *next)
 
 // Allocate a file descriptor for the given file.
 // Takes over file reference from caller on success.
-int fdalloc(struct file *f)
+int fdalloc(struct file *f, int flag)
 {
 	int fd = 0;
 	struct proc *p = myproc();
@@ -375,6 +388,9 @@ int fdalloc(struct file *f)
 	fd = fdt->nextfd;
 	fdt->arr[fd] = f;
 	fdt->used++;
+	if (flag)
+		fdt->exec_close |= 1 << fd;
+
 	// locate the next smallest free fd
 	// if not found, nextfd will stop at NOFILE, which means this table is full
 	while (++fdt->nextfd < NOFILE) {
@@ -412,6 +428,7 @@ int fdalloc3(struct file *f, int fd, int flag)
 
 	int fd2 = fd % NOFILE;
 	if (fdt->arr[fd2] != NULL) {
+		fdt->exec_close &= ~(1 << fd2);
 		fileclose(fdt->arr[fd2]);
 		fdt->arr[fd2] = f;
 	} else {
@@ -453,7 +470,7 @@ void fdcloexec(struct fdtable *fdt)
 					}
 				}
 			}
-
+			fdt->exec_close = 0;
 		}
 		// we don't free the first table because it's in a proc
 		if (fdt->used == 0 && prev) {
