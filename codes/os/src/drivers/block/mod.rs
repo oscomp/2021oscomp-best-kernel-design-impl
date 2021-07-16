@@ -4,6 +4,7 @@ mod sdcard;
 use lazy_static::*;
 use alloc::sync::Arc;
 use simple_fat32::BlockDevice;
+//use virtio_drivers::*;
 
 #[cfg(feature = "board_qemu")]
 type BlockDeviceImpl = virtio_blk::VirtIOBlock;

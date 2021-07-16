@@ -79,13 +79,13 @@ impl Dirent {
 
 #[repr(C)]
 pub struct Kstat {
-	st_dev  :u64,
-    st_ino  :u64,
-    st_mode :u32,
-    st_nlink:u32,
+	st_dev  :u64,   /* ID of device containing file */
+    st_ino  :u64,   /* Inode number */
+    st_mode :u32,   /* File type and mode */
+    st_nlink:u32,   /* Number of hard links */
     st_uid  :u32,
     st_gid  :u32,
-    st_rdev :u64,
+    st_rdev :u64,   /* Device ID (if special file) */
     __pad   :u64,
     st_size :i64,
     st_blksize   :u32,
@@ -157,6 +157,111 @@ impl Kstat {
             st_blksize   :0,
             __pad2       :0,
             st_blocks    :0,
+            st_atime_sec , 
+            st_atime_nsec:0,  
+            st_mtime_sec ,  
+            st_mtime_nsec:0,   
+            st_ctime_sec ,  
+            st_ctime_nsec:0,  
+        };
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        let size = core::mem::size_of::<Self>();
+        unsafe {
+            core::slice::from_raw_parts(
+                self as *const _ as usize as *const u8,
+                size,
+            )
+        }
+    }
+    
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        let size = core::mem::size_of::<Self>();
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                self as *mut _ as usize as *mut u8,
+                size,
+            )
+        }
+    }
+}
+
+#[repr(C)]
+pub struct NewStat{
+    st_dev  :u64,   /* ID of device containing file */
+    st_ino  :u64,   /* Inode number */
+    st_mode :u32,   /* File type and mode */
+    st_nlink:u64,   /* Number of hard links */
+    st_uid  :u32,
+    st_gid  :u32,
+    st_rdev :u64,   /* Device ID (if special file) */
+    st_size :u64,         /* Total size, in bytes */
+    st_blksize   :u32,    /* Block size for filesystem I/O */
+    st_blocks    :u64,    /* Number of 512B blocks allocated */
+    st_atime_sec :i64,    
+    st_atime_nsec:i64,  
+    st_mtime_sec :i64,  
+    st_mtime_nsec:i64,   
+    st_ctime_sec :i64,  
+    st_ctime_nsec:i64,  
+}
+
+impl NewStat {
+    pub fn empty()->Self{
+        Self{
+            st_dev  :0,
+            st_ino  :0,
+            st_mode :0,
+            st_nlink:0,
+            st_uid  :0,
+            st_gid  :0,
+            st_rdev :0,
+            st_size :0,
+            st_blksize   :512,
+            st_blocks    :0,
+            st_atime_sec :0, 
+            st_atime_nsec:0,  
+            st_mtime_sec :0,  
+            st_mtime_nsec:0,   
+            st_ctime_sec :0,  
+            st_ctime_nsec:0,  
+        }
+    }
+
+    // 目前仅填充用户测试需要的成员
+    pub fn fill_info(&mut self, 
+        st_dev  :u64,
+        st_ino  :u64,
+        st_mode :u32,
+        st_nlink:u64,
+        //st_uid  :u32,
+        //st_gid  :u32,
+        //st_rdev :u64,
+        st_size :i64,
+        //st_blksize   :u32,
+        //st_blocks    :u64,
+        st_atime_sec :i64, 
+        //st_atime_nsec:i64,  
+        st_mtime_sec :i64,  
+        //st_mtime_nsec:i64,   
+        st_ctime_sec :i64,  
+        //st_ctime_nsec:i64,  
+    ) {
+        let st_blocks = ( st_size as u64 + self.st_blksize as u64 - 1)
+                            / self.st_blksize as u64;
+
+        *self = Self {
+            st_dev  ,
+            st_ino  ,
+            st_mode ,
+            st_nlink,
+            st_uid  :0,
+            st_gid  :0,
+            st_rdev :0,
+            st_size : st_size as u64,
+            st_blksize :self.st_blksize, //TODO:real blksize
+            st_blocks ,
             st_atime_sec , 
             st_atime_nsec:0,  
             st_mtime_sec ,  

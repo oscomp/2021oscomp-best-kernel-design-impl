@@ -109,6 +109,7 @@ pub fn rust_main() -> ! {
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
     //println!("init fs");
+    fs::init_rootfs();
     fs::list_apps();
     task::add_initproc();
     let mask:usize = 1 << 1;

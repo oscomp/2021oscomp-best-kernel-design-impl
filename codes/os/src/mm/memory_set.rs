@@ -68,6 +68,7 @@ pub fn kernel_token() -> usize {
     KERNEL_SPACE.lock().token()
 }
 
+
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
@@ -314,6 +315,7 @@ impl MemorySet {
     }
 }
 
+#[derive(Clone)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,

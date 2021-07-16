@@ -6,7 +6,7 @@ use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
 use spin::Mutex;
-use super::{File, Dirent, Kstat, DT_DIR, DT_REG, DT_UNKNOWN};
+use super::{DT_DIR, DT_REG, DT_UNKNOWN, Dirent, File, Kstat, NewStat};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
 
@@ -110,11 +110,11 @@ impl OSInode {
     pub fn get_fstat(&self, kstat:&mut Kstat){
         let inner = self.inner.lock();
         let vfile = inner.inode.clone();
-        let (size, atime, mtime, ctime) = vfile.stat();
+        let (size, atime, mtime, ctime, ino) = vfile.stat();
         //println!("info = {:?}", (size, atime, mtime, ctime));
         kstat.fill_info(
             0, 
-            233, 
+            ino, 
             0, 
             1, 
             size, 
@@ -122,12 +122,28 @@ impl OSInode {
             mtime, 
             ctime
         );
+    }
 
+    pub fn get_newstat(&self, stat:&mut NewStat){
+        let inner = self.inner.lock();
+        let vfile = inner.inode.clone();
+        let (size, atime, mtime, ctime, ino) = vfile.stat();
+        //println!("info = {:?}", (size, atime, mtime, ctime));
+        stat.fill_info(
+            0, 
+            ino, 
+            0, 
+            1, 
+            size, 
+            atime, 
+            mtime, 
+            ctime
+        );
     }
 
     pub fn get_size(&self)->usize{
         let inner = self.inner.lock();
-        let (size, _, mt_me, _) = inner.inode.stat();
+        let (size, _, mt_me, _, _) = inner.inode.stat();
         return size as usize
     }
 
@@ -229,6 +245,20 @@ lazy_static! {
     pub static ref DIR_STACK: Vec<Arc<Inode>> = vec![ROOT_INODE.clone()];
 }
 */
+
+pub fn init_rootfs(){
+    println!("[fs] build rootfs ... start");
+    let dir_etc = open("/","etc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    println!("[fs] build rootfs: creating /etc");
+    let dir_dev = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    println!("[fs] build rootfs: creating /dev");
+    let root_dev = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    println!("[fs] build rootfs: creating userdir");
+    let file_pswd = open("/dev","passwd", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    println!("[fs] build rootfs ... finish");
+}
+
+
 pub fn list_apps() {
     println!("/**** APPS ****");
     for app in ROOT_INODE.ls_lite().unwrap() {
