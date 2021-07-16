@@ -167,6 +167,7 @@ extern uint64 sys_readlinkat(void);
 extern uint64 sys_mprotect(void);
 extern uint64 sys_fstatat(void);
 extern uint64 sys_fcntl(void);
+extern uint64 sys_ppoll(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -223,6 +224,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_ioctl]			sys_unimplemented,
 	[SYS_fstatat]		sys_fstatat,
 	[SYS_fcntl]			sys_fcntl,
+	[SYS_ppoll]			sys_ppoll,
 };
 
 static char *sysnames[] = {
@@ -278,6 +280,7 @@ static char *sysnames[] = {
 	[SYS_ioctl]			"ioctl",
 	[SYS_fstatat]		"fstatat",
 	[SYS_fcntl]			"fcntl",
+	[SYS_ppoll]			"ppoll",
 };
 
 void

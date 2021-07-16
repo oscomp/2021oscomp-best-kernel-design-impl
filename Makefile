@@ -46,7 +46,8 @@ OBJS += \
   $K/systime.o \
   $K/sysuname.o \
   $K/uname.o \
-  $K/mmap.o 
+  $K/mmap.o \
+  $K/poll.o
 
 ifeq ($(platform), k210)
 OBJS += \

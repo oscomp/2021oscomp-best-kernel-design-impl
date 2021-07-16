@@ -53,7 +53,7 @@ filealloc(void)
 		return NULL;
 	}
 	initlock(&f->lock, "f->lock");
-
+	f->type = FD_NONE;
 	f->ref = 1;
 	return f;
 }
@@ -92,11 +92,11 @@ fileclose(struct file *f)
 {
 	// struct file ff;
 
-	 acquire(&f->lock);
+	acquire(&f->lock);
 	if(f->ref < 1)
 		panic("fileclose");
 	if(--f->ref > 0){
-	 release(&f->lock);
+		release(&f->lock);
 		return;
 	}
 	// ff = *f;
@@ -322,6 +322,7 @@ struct file *fd2file(int fd, int free)
 	f = head->arr[fd];
 	if (free) {
 		head->arr[fd] = NULL; // the file should be closed by caller
+		head->exec_close &= ~(1 << fd);
 		if (fd < head->nextfd) {  // make nextfd the smallest
 			head->nextfd = fd;
 		}
@@ -439,6 +440,7 @@ void fdcloexec(struct fdtable *fdt)
 
 	while (fdt) {
 		if (fdt->exec_close) { // quick peek
+			__debug_info("fdcloexec", "cloexec flag: 0x%x\n", fdt->exec_close);
 			for (int i = 0; i < NOFILE; i++) {
 				if (fdt->exec_close & (1 << i)) {
 					fileclose(fdt->arr[i]);
@@ -512,8 +514,8 @@ int fcntldup(struct file *f, int fd, int cloexec)
 			break;
 		}
 	}
-	__debug_info("fcntldup", "table %p base=%d, nextfd=%d, fd2=%d, fd=%d\n",
-								fdt, fdt->basefd, fdt->nextfd, fd2, fd);
+	// __debug_info("fcntldup", "table %p base=%d, nextfd=%d, fd2=%d, fd=%d\n",
+	// 							fdt, fdt->basefd, fdt->nextfd, fd2, fd);
 
 	if (cloexec)
 		fdt->exec_close |= (1 << fd);

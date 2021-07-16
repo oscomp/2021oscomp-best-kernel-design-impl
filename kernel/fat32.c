@@ -1082,7 +1082,7 @@ struct inode *fat_lookup_dir(struct inode *dir, char *filename, uint *poff)
 	ip->fop = dir->fop;
 	ip->real_i = ep;
 	ip->size = ep->file_size;
-	ip->mode = (ep->attribute & ATTR_DIRECTORY) ? I_MODE_DIR : 0;
+	ip->mode = (ep->attribute & ATTR_DIRECTORY) ? S_IFDIR : S_IFREG;
 	ip->mode |= 0x1ff;
 
 	struct fat32_entry *dp = i2fat(dir);

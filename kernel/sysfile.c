@@ -26,6 +26,8 @@
 #include "include/printf.h"
 #include "include/vm.h"
 #include "include/debug.h"
+#include "include/poll.h"
+#include "include/kmalloc.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -104,7 +106,7 @@ sys_read(void)
 	int n;
 	uint64 p;
 
-	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
+	if(argfd(0, 0, &f) < 0 || argaddr(1, &p) < 0 || argint(2, &n) < 0)
 		return -1;
 	return fileread(f, p, n);
 }
@@ -116,7 +118,7 @@ sys_write(void)
 	int n;
 	uint64 p;
 
-	if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argaddr(1, &p) < 0)
+	if(argfd(0, 0, &f) < 0 || argaddr(1, &p) < 0 || argint(2, &n) < 0)
 		return -1;
 
 	return filewrite(f, p, n);
@@ -712,4 +714,36 @@ sys_fcntl(void)
 	__debug_error("sys_fcntl", "unsupported cmd %d\n", cmd);
 
 	return -1;
+}
+
+uint64
+sys_ppoll(void)
+{
+	uint64 addr;
+	uint32 nfds;
+	uint64 timeoutaddr;
+	uint64 sigmaskaddr;
+	if (argaddr(0, &addr) < 0 || argint(1, (int*)&nfds) < 0 || argaddr(2, &timeoutaddr) < 0 || argaddr(3, &sigmaskaddr) < 0)
+		return -1;
+
+	if (timeoutaddr || sigmaskaddr) {
+		__debug_error("sys_ppoll", "not supported yet!\n");
+		return -1;
+	}
+	if (nfds < 0) return -1;
+
+	struct pollfd *pfds = kmalloc(nfds * sizeof(struct pollfd));
+	if (pfds == NULL) return -1;
+
+	for (int i = 0; i < nfds; i++) {
+		if (copyin2((char *)(pfds + i), addr + i * sizeof(struct pollfd), sizeof(struct pollfd)) < 0) {
+			kfree(pfds);
+			return -1;
+		}
+	}
+
+	int ret = do_ppoll(pfds, nfds); // should accept more arguments
+	copyout2(addr, (char *)pfds, sizeof(struct pollfd) * nfds);
+	kfree(pfds);
+	return ret;
 }
