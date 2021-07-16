@@ -27,6 +27,7 @@ pub enum SeekWhence{
 pub struct OSInode {
     readable: bool,
     writable: bool,
+    //fd_cloexec: bool,
     inner: Mutex<OSInodeInner>,
 }
 
@@ -44,6 +45,7 @@ impl OSInode {
         Self {
             readable,
             writable,
+            //fd_cloexec:false,
             inner: Mutex::new(OSInodeInner {
                 offset: 0,
                 inode,

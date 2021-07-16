@@ -1,5 +1,6 @@
 use super::{VirtAddr, UserBuffer, translated_byte_buffer};
 use crate::fs::{File, FileClass};
+use crate::task::FdTable;
 use alloc::sync::{Arc};
 use alloc::vec::Vec;
 
@@ -24,7 +25,7 @@ impl MmapArea {
     pub fn get_mmap_top(&mut self) -> VirtAddr { self.mmap_top }
 
     pub fn push(&mut self, start: usize, len: usize, prot: usize, flags: usize,
-                fd: usize, offset: usize, fd_table: Vec<Option<FileClass>>, token: usize) -> usize {
+                fd: usize, offset: usize, fd_table: FdTable, token: usize) -> usize {
         if start != 0 {
             panic!{"The start arg is not NULL!"};
         }
@@ -76,11 +77,11 @@ impl MmapSpace{
         Self {oaddr, length, prot, flags, valid, fd}
     }
 
-    pub fn map_file(&mut self, va_start: VirtAddr, len: usize, offset: usize, fd_table: Vec<Option<FileClass>>, token: usize) -> isize {
+    pub fn map_file(&mut self, va_start: VirtAddr, len: usize, offset: usize, fd_table: FdTable, token: usize) -> isize {
         if self.fd >= fd_table.len() { return -1; }
 
         if let Some(file) = &fd_table[self.fd] {
-            match file {
+            match &file.fclass {
                 FileClass::File(f)=>{
                     f.set_offset(offset);
                     if !f.readable() { return -1; }

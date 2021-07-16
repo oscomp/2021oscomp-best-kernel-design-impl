@@ -3,8 +3,8 @@ use crate::{console::print, mm::{
     PhysPageNum,
     KERNEL_SPACE, 
     KERNEL_MMAP_AREA, 
-    KERNEL_TOKEN,
-    PageTable,
+    //KERNEL_TOKEN,
+    //PageTable,
     VirtAddr,
     translated_refmut,
     MmapArea,
@@ -22,7 +22,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::{Mutex, MutexGuard};
-use crate::fs::{File, Stdin, Stdout, FileClass};
+use crate::fs::{ FileDiscripter, Stdin, Stdout, FileClass};
 
 pub struct ProcAddress {
     pub set_child_tid: usize,
@@ -38,6 +38,7 @@ pub struct TaskControlBlock {
     inner: Mutex<TaskControlBlockInner>,
 }
 
+pub type FdTable =  Vec<Option<FileDiscripter>>;
 pub struct TaskControlBlockInner {
     pub address: ProcAddress,
     pub trap_cx_ppn: PhysPageNum,
@@ -50,7 +51,7 @@ pub struct TaskControlBlockInner {
     pub parent: Option<Weak<TaskControlBlock>>,
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
-    pub fd_table: Vec<Option<FileClass>>,
+    pub fd_table: FdTable,
     pub current_path: String,
     pub mmap_area: MmapArea,
 }
@@ -136,11 +137,20 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: vec![
                     // 0 -> stdin
-                    Some( FileClass::Abstr(Arc::new(Stdin)) ),
+                    Some( FileDiscripter::new(
+                        false,
+                        FileClass::Abstr(Arc::new(Stdin)) 
+                    )),
                     // 1 -> stdout
-                    Some( FileClass::Abstr(Arc::new(Stdout)) ),
+                    Some( FileDiscripter::new(
+                        false,
+                        FileClass::Abstr(Arc::new(Stdout)) 
+                    )),
                     // 2 -> stderr
-                    Some( FileClass::Abstr(Arc::new(Stdout)) ),
+                    Some( FileDiscripter::new(
+                        false,
+                        FileClass::Abstr(Arc::new(Stdout)) 
+                    )),
                 ],
                 current_path: String::from("/"), // 只有initproc在此建立，其他进程均为fork出
             }),
@@ -176,7 +186,7 @@ impl TaskControlBlock {
     // Due to "push" operations, we will start from the bottom
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
         // memory_set with elf program headers/trampoline/trap context/user stack
-        
+        // TODO: check fd.cloexec and close fd when need!!!!!!!!
         let (memory_set, mut user_sp, user_heap, entry_point) = MemorySet::from_elf(elf_data);
         
         // println!("user_sp {:X}", user_sp);
@@ -304,7 +314,7 @@ impl TaskControlBlock {
         // push a goto_trap_return task_cx on the top of kernel stack
         let task_cx_ptr = kernel_stack.push_on_top(TaskContext::goto_trap_return());
         // copy fd table
-        let mut new_fd_table: Vec<Option<FileClass>> = Vec::new();
+        let mut new_fd_table: FdTable = Vec::new();
         for fd in parent_inner.fd_table.iter() {
             if let Some(file) = fd {
                 new_fd_table.push(Some( file.clone() ));

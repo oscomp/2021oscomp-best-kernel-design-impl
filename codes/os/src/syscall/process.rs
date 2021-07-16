@@ -20,13 +20,7 @@ use crate::mm::{
     print_free_pages,
     PageTable,
 };
-use crate::fs::{
-    open,
-    //find_par_inode_id,
-    OpenFlags,
-    DiskInodeType,
-    FileClass,
-};
+use crate::fs::{DiskInodeType, FileClass, FileDiscripter, OpenFlags, open};
 use crate::config::PAGE_SIZE;
 use crate::gdb_print;
 use crate::gdb_println;
@@ -242,7 +236,12 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         let len = app_inode.get_size();
         gdb_println!(EXEC_ENABLE,"[exec] File size: {} bytes", len);
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(FileClass::File(app_inode));
+        inner.fd_table[fd] = Some( 
+            FileDiscripter::new(
+                false, 
+                FileClass::File(app_inode)
+            )
+        );
         drop(inner);
         let elf_buf = task.kmmap(0, len, 0, 0, fd, 0);
         

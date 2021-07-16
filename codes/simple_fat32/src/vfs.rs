@@ -4,8 +4,8 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
-    println,
-    print
+    //println,
+    //print
 };
 use alloc::sync::Arc;
 use alloc::string::String;
