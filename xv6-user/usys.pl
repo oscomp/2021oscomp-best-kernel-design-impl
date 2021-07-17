@@ -18,7 +18,7 @@ sub entry {
 entry("fork");
 entry("exit");
 entry("wait");
-entry("pipe");
+entry("pipe2");
 entry("read");
 entry("write");
 entry("close");
@@ -40,7 +40,7 @@ entry("getcwd");
 entry("unlinkat");
 entry("trace");
 entry("sysinfo");
-entry("rename");
+entry("renameat2");
 entry("execve");
 entry("mount");
 entry("umount");

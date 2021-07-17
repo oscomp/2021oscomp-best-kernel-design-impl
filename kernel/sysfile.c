@@ -306,29 +306,33 @@ sys_pipe(void)
 	uint64 fdarray; // user pointer to array of two integers
 	struct file *rf, *wf;
 	int fd0, fd1;
+	int flags;
 	// struct proc *p = myproc();
 
 	if(argaddr(0, &fdarray) < 0)
 		return -1;
-	if(pipealloc(&rf, &wf) < 0)
+	if (argint(1, &flags) < 0)
 		return -1;
+	if(pipealloc(&rf, &wf) < 0)
+		return -ENOMEM;
 	fd0 = -1;
 	if ((fd0 = fdalloc(rf, 0)) < 0 || (fd1 = fdalloc(wf, 0)) < 0) {
 		if(fd0 >= 0)
 			fd2file(fd0, 1);
 		fileclose(rf);
 		fileclose(wf);
-		return -1;
+		return -ENOMEM;
 	}
 	// if(copyout(p->pagetable, fdarray, (char*)&fd0, sizeof(fd0)) < 0 ||
 	//    copyout(p->pagetable, fdarray+sizeof(fd0), (char *)&fd1, sizeof(fd1)) < 0){
-	if(copyout2(fdarray, (char*)&fd0, sizeof(fd0)) < 0 ||
-		 copyout2(fdarray+sizeof(fd0), (char *)&fd1, sizeof(fd1)) < 0){
+	if (copyout2(fdarray, (char*)&fd0, sizeof(fd0)) < 0 ||
+		copyout2(fdarray+sizeof(fd0), (char *)&fd1, sizeof(fd1)) < 0)
+	{
 		fd2file(fd0, 1);
 		fd2file(fd1, 1);
 		fileclose(rf);
 		fileclose(wf);
-		return -1;
+		return -EFAULT;
 	}
 	return 0;
 }
@@ -369,28 +373,6 @@ sys_getcwd(void)
 	return size;
 }
 
-// Is the directory dp empty except for "." and ".." ?
-static int
-isdirempty(struct inode *dp)
-{
-	struct dirent dent;
-	int off = 0, ret;
-	while (1) {
-		ret = dp->fop->readdir(dp, &dent, off);
-		if (ret < 0)
-			return -1;
-		else if (ret == 0)
-			return 1;
-		else if ((dent.name[0] == '.' && dent.name[1] == '\0') ||     // skip the "." and ".."
-				 (dent.name[0] == '.' && dent.name[1] == '.' && dent.name[2] == '\0'))
-		{
-			off += ret;
-		}
-		else
-			return 0;
-	}
-}
-
 uint64
 sys_unlinkat(void)
 {
@@ -401,16 +383,19 @@ sys_unlinkat(void)
 
 	if (argfd(0, &dirfd, &f) < 0) {
 		if (dirfd != AT_FDCWD) {
-			return -1;
+			return -EBADF;
 		}
 		dp = myproc()->cwd;
 	} else {
 		dp = f->ip;
+		if (!(dp->mode & I_MODE_DIR)) {
+			return -ENOTDIR;
+		}
 	}
 
 	int len;
 	if((len = argstr(1, path, MAXPATH)) <= 0 || argint(2, &mode) < 0)
-		return -1;
+		return -ENAMETOOLONG;
 
 	char *s = path + len - 1;
 	while (s >= path && *s == '/') {
@@ -425,10 +410,13 @@ sys_unlinkat(void)
 		__debug_warn("sys_unlinkat", "can namei %s\n", path);
 		return -1;
 	}
-	if ((ip->mode ^ mode) & I_MODE_DIR) {
+	if ((ip->mode & I_MODE_DIR) && mode != AT_REMOVEDIR) {
 		iput(ip);
 		__debug_warn("sys_unlinkat", "illegel mode 0x%x against 0x%x\n", mode, ip->mode);
-		return -1;
+		return -EISDIR;
+	} else if (!(ip->mode & I_MODE_DIR) && mode == AT_REMOVEDIR) {
+		iput(ip);
+		return -ENOTDIR;
 	}
 	ilock(ip);
 	if ((ip->mode & I_MODE_DIR) && isdirempty(ip) != 1) {
@@ -445,86 +433,45 @@ sys_unlinkat(void)
 // Must hold too many locks at a time! It's possible to raise a deadlock.
 // Because this op takes some steps, we can't promise
 uint64
-sys_rename(void)
+sys_renameat(void)
 {
-//   char old[MAXPATH], new[MAXPATH];
-//   if (argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0) {
-			return -1;
-//   }
+	int fd1, fd2, flags;
+	struct file *f1, *f2;
+	char name1[MAXPATH], name2[MAXPATH];
+	struct inode *ip1, *ip2;
+	struct proc *p = myproc();
 
-//   struct inode *src = NULL, *dst = NULL, *pdst = NULL;
-//   int srclock = 0;
-//   char *name;
-//   if ((src = ename(old)) == NULL || (pdst = enameparent(new, old)) == NULL
-//       || (name = formatname(old)) == NULL) {
-//     goto fail;          // src doesn't exist || dst parent doesn't exist || illegal new name
-//   }
-//   for (struct inode *ep = pdst; ep != NULL; ep = ep->parent) {
-//     if (ep == src) {    // In what universe can we move a directory into its child?
-//       goto fail;
-//     }
-//   }
+	if (argfd(0, &fd1, &f1) < 0) {
+		if (fd1 != AT_FDCWD) return -EBADF;
+		ip1 = p->cwd;
+	} else
+		ip1 = f1->ip;
+	if (argfd(2, &fd2, &f2) < 0) {
+		if (fd2 != AT_FDCWD) return -EBADF;
+		ip2 = p->cwd;
+	} else
+		ip2 = f2->ip;
 
-//   uint off;
-//   elock(src);     // must hold child's lock before acquiring parent's, because we do so in other similar cases
-//   srclock = 1;
-//   elock(pdst);
-//   dst = dirlookup(pdst, name, &off);
-//   if (dst != NULL) {
-//     eunlock(pdst);
-//     if (src == dst) {
-//       goto fail;
-//     } else if (src->attribute & dst->attribute & ATTR_DIRECTORY) {
-//       elock(dst);
-//       if (!isdirempty(dst)) {    // it's ok to overwrite an empty dir
-//         eunlock(dst);
-//         goto fail;
-//       }
-//       elock(pdst);
-//       eremove(dst);
-//       eunlock(dst);
-//       eput(dst);
-//       dst = NULL;
-//     } else {                    // src is not a dir || dst exists and is not an dir
-//       goto fail;
-//     }
-//   }
+	if (!(ip1->mode & ip2->mode & I_MODE_DIR))
+		return -ENOTDIR;
 
-//   struct inode *psrc = src->parent;  // src must not be root, or it won't pass the for-loop test
-//   memmove(src->filename, name, FAT32_MAX_FILENAME);
-//   if (emake(pdst, src, off) < 0) {
-//     eunlock(pdst);
-//     goto fail;
-//   }
-//   if (psrc != pdst) {
-//     elock(psrc);
-//   }
-//   eremove(src);
-//   ereparent(pdst, src);
-//   src->off = off;
-//   src->valid = 1;
-//   if (psrc != pdst) {
-//     eunlock(psrc);
-//   }
-//   eunlock(pdst);
-//   eunlock(src);
+	if (argstr(1, name1, MAXPATH) < 0 || argstr(3, name2, MAXPATH) < 0 || argint(4, &flags))
+		return -ENAMETOOLONG;
 
-//   eput(psrc);   // because src no longer points to psrc
-//   eput(pdst);
-//   eput(src);
+	int ret = 0;
+	if ((ip1 = nameifrom(ip1, name1)) == NULL ||
+		(ip2 = nameiparentfrom(ip2, name2, name1)) == NULL) // name1 stores the new name
+	{
+		if (ip1)
+			iput(ip1);
+		return -ENOENT;
+	}
+	
+	ret = do_rename(ip1, ip2, name1);
 
-//   return 0;
-
-// fail:
-//   if (srclock)
-//     eunlock(src);
-//   if (dst)
-//     eput(dst);
-//   if (pdst)
-//     eput(pdst);
-//   if (src)
-//     eput(src);
-//  return -1;
+	iput(ip1);
+	iput(ip2);
+	return ret;
 }
 
 uint64
@@ -836,12 +783,62 @@ sys_lseek(void)
 	}
 
 	// Doesn't support offset out of size
-	if (cur > size)
-		return -EPERM;
+	if (cur > 0xffffffff)
+		return -EFBIG;
 
 	acquire(&f->lock);
 	f->off = cur;
 	release(&f->lock);
 
 	return cur;
+}
+
+uint64
+sys_utimensat(void)
+{
+	char path[MAXPATH];
+	int dirfd, flags;
+	uint64 addr;
+	struct file *f = NULL;
+	struct inode *ip;
+	struct timespec times[2];
+
+	if (argfd(0, &dirfd, &f) < 0) {
+		if (dirfd != AT_FDCWD) {
+			return -EBADF;
+		}
+		ip = myproc()->cwd;
+	} else {
+		ip = f->ip;
+	}
+	if (argstr(1, path, MAXPATH) < 0 || argaddr(2, &addr) < 0 || argint(3, &flags) < 0)
+		return -ENAMETOOLONG;
+
+	if (addr != NULL && copyin2((char *)times, addr, sizeof(times)) < 0)
+		return -EFAULT;
+	else if (addr == NULL) {
+		// memset(times, 0, sizeof(times));
+	
+	}
+
+	ip = nameifrom(ip, path);
+	if (ip == NULL)
+		return -ENOENT;
+
+	int ret = 0;
+	struct kstat st;
+	memset(&st, 0, sizeof(st));
+
+	ilock(ip);
+	ip->op->getattr(ip, &st);
+	st.atime_sec = times[0].sec;
+	st.atime_nsec = times[0].nsec;
+	st.mtime_sec = times[1].sec;
+	st.mtime_nsec = times[1].nsec;
+	if (!ip->op->setattr || ip->op->setattr(ip, &st) < 0) {
+		ret = -EACCES;
+	}
+	iunlockput(ip);
+
+	return ret;
 }

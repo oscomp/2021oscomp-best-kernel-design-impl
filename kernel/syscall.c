@@ -144,7 +144,7 @@ extern uint64 sys_getcwd(void);
 extern uint64 sys_unlinkat(void);
 extern uint64 sys_trace(void);
 extern uint64 sys_sysinfo(void);
-extern uint64 sys_rename(void);
+extern uint64 sys_renameat(void);
 extern uint64 sys_execve(void);
 extern uint64 sys_mount(void);
 extern uint64 sys_umount(void);
@@ -170,6 +170,7 @@ extern uint64 sys_fcntl(void);
 extern uint64 sys_ppoll(void);
 extern uint64 sys_faccessat(void);
 extern uint64 sys_lseek(void);
+extern uint64 sys_utimensat(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -177,7 +178,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_fork]			sys_fork,
 	[SYS_exit]			sys_exit,
 	[SYS_wait]			sys_wait,
-	[SYS_pipe]			sys_pipe,
+	[SYS_pipe2]			sys_pipe,
 	[SYS_read]			sys_read,
 	[SYS_kill]			sys_kill,
 	[SYS_exec]			sys_exec,
@@ -200,7 +201,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_unlinkat]		sys_unlinkat,
 	[SYS_trace]			sys_trace,
 	[SYS_sysinfo]		sys_sysinfo,
-	[SYS_rename]		sys_rename,
+	[SYS_renameat2]		sys_renameat,
 	[SYS_execve]		sys_execve,
 	[SYS_mount]			sys_mount,
 	[SYS_umount]		sys_umount,
@@ -229,13 +230,14 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_ppoll]			sys_ppoll,
 	[SYS_faccessat]		sys_faccessat,
 	[SYS_lseek]			sys_lseek,
+	[SYS_utimensat]		sys_utimensat,
 };
 
 static char *sysnames[] = {
 	[SYS_fork]			"fork",
 	[SYS_exit]			"exit",
 	[SYS_wait]			"wait",
-	[SYS_pipe]			"pipe",
+	[SYS_pipe2]			"pipe2",
 	[SYS_read]			"read",
 	[SYS_kill]			"kill",
 	[SYS_exec]			"exec",
@@ -258,7 +260,7 @@ static char *sysnames[] = {
 	[SYS_unlinkat]		"unlinkat",
 	[SYS_trace]			"trace",
 	[SYS_sysinfo]		"sysinfo",
-	[SYS_rename]		"rename",
+	[SYS_renameat2]		"renameat2",
 	[SYS_execve]		"execve",
 	[SYS_mount]			"mount",
 	[SYS_umount]		"umount",
@@ -287,6 +289,7 @@ static char *sysnames[] = {
 	[SYS_ppoll]			"ppoll",
 	[SYS_faccessat]		"faccessat",
 	[SYS_lseek]			"lseek",
+	[SYS_utimensat]		"utimensat",
 };
 
 void
@@ -311,8 +314,7 @@ syscall(void)
 		}
 		
 	} else {
-		printf("pid %d %s: unknown syscall %d, epc=0x%x, ra=0x%x\n",
-						p->pid, p->name, num, p->trapframe->epc, p->trapframe->ra);
+		printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
 		p->trapframe->a0 = -1;
 	}
 }

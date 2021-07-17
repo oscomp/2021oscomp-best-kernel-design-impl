@@ -2,6 +2,7 @@
 #define __POLL_H
 
 #include "types.h"
+#include "time.h"
 
 #define POLLIN      0x0001
 #define POLLPRI     0x0002
@@ -16,12 +17,6 @@ struct pollfd {
 	int16 events;     /* requested events */
 	int16 revents;    /* returned events */
 };
-
-// Temporarily put here
-// struct timespec {
-// 	uint64 sec;			/* seconds */
-// 	uint64 nsec;		/* nanoseconds */
-// };
 
 int do_ppoll(struct pollfd *pfds, int nfds /*, struct timespec *timeout, struct sigset *sigmask*/);
 

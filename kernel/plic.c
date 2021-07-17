@@ -16,9 +16,9 @@ void plicinit(void) {
 	writed(1, PLIC_V + DISK_IRQ * sizeof(uint32));
 	writed(1, PLIC_V + UART_IRQ * sizeof(uint32));
 
-	#ifdef DEBUG 
-	printf("plicinit\n");
-	#endif 
+	// #ifdef DEBUG 
+	// printf("plicinit\n");
+	// #endif 
 }
 
 void
@@ -36,9 +36,9 @@ plicinithart(void)
 	uint32 *hart0_m_int_enable_hi = hart_m_enable + 1;
 	*(hart0_m_int_enable_hi) = readd(hart0_m_int_enable_hi) | (1 << (UART_IRQ % 32));
 	#endif
-	#ifdef DEBUG
-	printf("plicinithart\n");
-	#endif
+	// #ifdef DEBUG
+	// printf("plicinithart\n");
+	// #endif
 }
 
 // ask the PLIC what interrupt we should serve.
