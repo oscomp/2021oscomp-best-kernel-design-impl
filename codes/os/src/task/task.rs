@@ -1,3 +1,5 @@
+use core::ops::Index;
+
 use crate::{console::print, mm::{
     MemorySet,
     PhysPageNum,
@@ -272,6 +274,14 @@ impl TaskControlBlock {
         // println!("The heap start is {}", user_heap);
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
+
+        inner.fd_table.iter_mut()
+            .find(
+                |fd|{
+                    fd.is_some() && fd.as_ref().unwrap().get_cloexec()
+                }
+            ).take();
+
         // initialize trap_cx
         // println!("[exec] entry point = 0x{:X}", entry_point);
         

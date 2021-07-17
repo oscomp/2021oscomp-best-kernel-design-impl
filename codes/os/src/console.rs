@@ -19,7 +19,7 @@ pub fn print(args: fmt::Arguments) {
 
 
 
-#[cfg(feature = "board_qemu")]
+//#[cfg(feature = "board_qemu")]
 #[macro_export]
 macro_rules! print {
     ($fmt: literal $(, $($arg: tt)+)?) => {
@@ -28,7 +28,7 @@ macro_rules! print {
     }
 }
 
-#[cfg(feature = "board_qemu")]
+//#[cfg(feature = "board_qemu")]
 #[macro_export]
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {

@@ -4,6 +4,7 @@ use crate::sbi::console_getchar;
 use crate::task::suspend_current_and_run_next;
 use lazy_static::*;
 use spin::Mutex;
+
 //use crate::task::get_core_id;
 
 // 这个模块的两个宏应该公开
