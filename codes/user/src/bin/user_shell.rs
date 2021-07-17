@@ -240,9 +240,13 @@ impl ArgMachine{
 
     // not clear path
     pub fn clear(&mut self){
+        println!{"<<<<<<<<<<<<<<<<pin1"}
         self.args.clear();
+        println!{"<<<<<<<<<<<<<<<<pin2"}
         self.argc = 0;
+        println!{"<<<<<<<<<<<<<<<<pin3"}
         self.state = STATE_IDLE;
+        println!{"<<<<<<<<<<<<<<<<pin4"}
         self.print_root();
     }
 
@@ -543,6 +547,7 @@ pub fn main() -> i32 {
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();
     loop {
+        println!{"<<<<<<<<<entering the loop of input"}
         let c = getchar();
         let is_exec = shellmachine.operate(c as char);
         if is_exec {
@@ -565,6 +570,7 @@ pub fn main() -> i32 {
             let pid = fork();
             if pid == 0 {
                 // input redirection
+                println!{"<<<<<<<<<entering the child process"}
                 if !input.is_empty() {
                     let input_fd = open(input.as_str(), OpenFlags::RDONLY);
                     if input_fd == -1 {
@@ -599,11 +605,15 @@ pub fn main() -> i32 {
                 unreachable!();
             } else {
                 let mut exit_code: i32 = 0;
+                println!{"<<<<<<<<<waiting pid of exec"}
                 let exit_pid = waitpid(pid as usize, &mut exit_code);
+                println!{"<<<<<<<<<back of the pid exec"}
                 assert_eq!(pid, exit_pid);
                 println!("Shell: Process {} exited with code {}", pid, exit_code);
                 shellmachine.clear();
+                println!{"<<<<<<<<<end of the shell cleaning"}
                 arg_machine.clear();
+                println!{"<<<<<<<<<end of the arg cleaning"}
             }
         }
     }

@@ -58,6 +58,7 @@ pub fn trap_handler() -> ! {
     let stval = stval::read();
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
+            println!{"pinUserEnvCall"}
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
@@ -72,6 +73,7 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::InstructionFault) |
         Trap::Exception(Exception::InstructionPageFault) |
         Trap::Exception(Exception::LoadFault) => {
+            println!{"pinLoadFault"}
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
@@ -83,6 +85,7 @@ pub fn trap_handler() -> ! {
         }
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
+            println!{"pinLoadPageFault"}
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
@@ -123,11 +126,13 @@ pub fn trap_handler() -> ! {
             println!{"Trap solved..."}
         }
         Trap::Exception(Exception::IllegalInstruction) => {
+            println!{"pinIllegalInstruction"}
             println!("[kernel] IllegalInstruction in application, core dumped.");
             // illegal instruction exit code
             exit_current_and_run_next(-3);
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
+            println!{"pinSupervisorTimer"}
             set_next_trigger();
             suspend_current_and_run_next();
         }
@@ -141,6 +146,7 @@ pub fn trap_handler() -> ! {
 
 #[no_mangle]
 pub fn trap_return() -> ! {
+    println!("trap_return");
     set_user_trap_entry();
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
