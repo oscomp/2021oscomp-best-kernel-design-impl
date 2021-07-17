@@ -553,17 +553,28 @@ sys_umount(void)
 uint64
 sys_mmap(void)
 {
-	uint64 start;
-	int len, prot, flags, fd, off;
-	if(argaddr(0, &start) < 0 || argint(1, &len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0 || argint(4, &fd) < 0 || argint(5, &off) < 0)
-		return -1;
-	
-	if(off % PGSIZE || len <= 0 || fd < 0)
-		return -1;
+	uint64 start, len;
+	int prot, flags, fd;
+	int64 off;
+	struct file *f = NULL;
 
-	struct file * f = fd2file(fd, 0);
-	if(!f || f->type != FD_INODE)
-		return -1;
+	argaddr(0, &start);
+	argaddr(1, &len);
+	argint(2, &prot);
+	argint(3, &flags);
+	argfd(4, &fd, &f);
+	argaddr(5, (uint64*)&off);
+	
+	if (off % PGSIZE || len == 0)
+		return -EINVAL;
+	
+	if ((fd < 0 || f == NULL) && !(flags & MAP_ANONYMOUS)) {
+		return -EBADF;
+	} else if (flags & MAP_ANONYMOUS) {
+		f = NULL;
+	} else if (f->type != FD_INODE) {
+		return -EPERM;
+	}
 
 	return do_mmap(start, len, prot, flags, f, off);
 }
@@ -576,8 +587,9 @@ sys_munmap(void)
 		return -1;
 	}
 
-	if (start % PGSIZE) {
+	if (start % PGSIZE || len == 0) {
 		__debug_info("sys_munmap", "start=%p not aligned\n", start);
+		return -EINVAL;
 	}
 
 	return do_munmap(start, len);

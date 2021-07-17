@@ -8,14 +8,14 @@
 enum segtype { NONE, LOAD, TEXT, DATA, BSS, HEAP, MMAP, STACK };
 
 struct seg{
-  enum segtype type;
-  int flag;
-  uint64 addr;
-  uint64 sz;
-  struct seg *next;
-  struct file *mmap;
-  uint64 f_off;
-  uint64 f_sz;
+	enum segtype type;
+	int flag;
+	uint64 addr;
+	uint64 sz;
+	struct seg *next;
+	struct file *mmap;
+	uint64 f_off;
+	uint64 f_sz;
 };
 
 /**

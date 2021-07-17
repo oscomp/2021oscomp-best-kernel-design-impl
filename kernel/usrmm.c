@@ -70,6 +70,7 @@ newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset
 	p->sz = sz;
 	p->type = type;
 	p->flag = flag;
+	p->mmap = NULL;
 
 	// __debug_info("newseg", "done\n");
 	// return p;
@@ -232,7 +233,16 @@ loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip)
 		*ins = 0xa035;
 		ins = (uint16 *)((uint64)pa + 0x10678 % PGSIZE);
 		*ins = 0xa035;
+	} else if (strncmp(ip->entry->filename, "lua", MAXNAME) == 0 &&
+			va <= 0x33176 && 0x33176 < end)
+	{
+		__debug_warn("loadseg", "meet strange region\n");
+		uint16 *ins = (uint16 *)((uint64)pa + 0x33176 % PGSIZE);
+		*ins = 0xa035;
+		// ins = (uint16 *)((uint64)pa + 0x10678 % PGSIZE);
+		// *ins = 0xa035;
 	}
+
 	#endif
 
 	return 0;
