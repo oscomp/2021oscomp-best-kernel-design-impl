@@ -165,6 +165,9 @@ extern uint64 sys_getegid(void);
 extern uint64 sys_writev(void);
 extern uint64 sys_readlinkat(void);
 extern uint64 sys_mprotect(void);
+extern uint64 sys_rt_sigaction(void);
+extern uint64 sys_rt_sigprocmask(void);
+extern uint64 sys_rt_sigreturn(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -206,6 +209,9 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_times]			sys_times,
 	[SYS_uname]			sys_uname,
 	[SYS_sched_yield]	sys_sched_yield,
+	[SYS_rt_sigaction]	sys_rt_sigaction, 
+	[SYS_rt_sigprocmask] sys_rt_sigprocmask, 
+	[SYS_rt_sigreturn]	sys_rt_sigreturn, 
 	[SYS_gettimeofday]	sys_gettimeofday,
 	[SYS_nanosleep]		sys_nanosleep,
 	[SYS_mmap]			sys_mmap,
@@ -259,6 +265,9 @@ static char *sysnames[] = {
 	[SYS_times]			"times",
 	[SYS_uname]			"uname",
 	[SYS_sched_yield]	"sched_yield",
+	[SYS_rt_sigaction]	"rt_sigaction", 
+	[SYS_rt_sigprocmask] 	"rt_sigprocmask", 
+	[SYS_rt_sigreturn]	"rt_sigreturn", 
 	[SYS_gettimeofday]	"gettimeofday",
 	[SYS_nanosleep]		"nanosleep",
 	[SYS_mmap]			"mmap",

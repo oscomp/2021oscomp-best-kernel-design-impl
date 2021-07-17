@@ -11,6 +11,7 @@
 #include "file.h"
 #include "fs.h"
 #include "trap.h"
+#include "signal.h"
 
 // Saved registers for kernel context switches.
 struct context {
@@ -84,7 +85,12 @@ struct proc {
 	struct inode *cwd;				// Current directory
 	struct inode *elf;				// Executable file
 	// scheduling 
-	struct context context;
+	struct context context;			// the "trapframe" for kernel running
+
+	// signal 
+	ksigaction_t *sig_act;
+	__sigset_t sig_set;
+	__sigset_t sig_pending;
 
 	// debug 
 	char name[16];	// process name 

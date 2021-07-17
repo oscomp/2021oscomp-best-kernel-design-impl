@@ -14,6 +14,8 @@ kernel/*.back.c
 kernel/*.example.c
 kernel/*.d
 kernel/*.o
+kernel/utils/*.d
+kernel/utils/*.o
 kernel/include/*.back.h
 kernel/include/*.example.h
 target/*
