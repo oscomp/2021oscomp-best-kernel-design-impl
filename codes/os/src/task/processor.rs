@@ -46,7 +46,6 @@ impl Processor {
             // True: Not first time to fetch a task 
             if let Some(current_task) = take_current_task(){
                 //println!("try lock");
-                println!{"14"}
                 let mut current_task_inner = current_task.acquire_inner_lock();
                 //println!("get lock");
                 let task_cx_ptr2 = current_task_inner.get_task_cx_ptr2();
@@ -54,7 +53,6 @@ impl Processor {
                 // True: switch
                 // False: return to current task, don't switch
                 if let Some(task) = fetch_task() {
-                    println!{"15"}
                     let mut task_inner = task.acquire_inner_lock();
                     let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
                     task_inner.task_status = TaskStatus::Running;
@@ -94,7 +92,6 @@ impl Processor {
                     // acquire
                     let idle_task_cx_ptr2 = self.get_idle_task_cx_ptr2();
                     // println!("*1");
-                    println!{"16"}
                     let mut task_inner = task.acquire_inner_lock();
                     // println!("*2");
                     let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
@@ -142,14 +139,11 @@ pub fn current_task() -> Option<Arc<TaskControlBlock>> {
 pub fn current_user_token() -> usize {
     let core_id: usize = get_core_id();
     let task = current_task().unwrap();
-    println!{"17"}
     let token = task.acquire_inner_lock().get_user_token();
-    println!{"-----------------"}
     token
 }
 
 pub fn current_trap_cx() -> &'static mut TrapContext {
-    println!{"18"}
     current_task().unwrap().acquire_inner_lock().get_trap_cx()
 }
 

@@ -66,7 +66,7 @@ pub fn trap_handler() -> ! {
             // cx is changed during sys_exec, so we have to call it again
             cx = current_trap_cx();
             cx.x[10] = result as usize;
-            println!{"cx written..."}
+            // println!{"cx written..."}
         }
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::InstructionFault) |
@@ -135,7 +135,7 @@ pub fn trap_handler() -> ! {
             panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
         }
     }
-    println!("before trap_return");
+    // println!("before trap_return");
     trap_return();
 }
 
@@ -152,7 +152,6 @@ pub fn trap_return() -> ! {
     //drop(inner);
     //drop(task);
     //println!{"{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-    //println!{"token6"}
     extern "C" {
         fn __alltraps();
         fn __restore();

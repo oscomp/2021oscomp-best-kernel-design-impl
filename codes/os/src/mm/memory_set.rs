@@ -296,9 +296,9 @@ impl MemorySet {
         }
         println!{"CoW starting..."};
         //This part is for copy on write
-        let mut parent_areas = user_space.areas.clone();
+        let mut parent_areas = &user_space.areas;
         let page_table = &mut user_space.page_table;
-        for area in parent_areas.iter_mut() {
+        for area in parent_areas.iter() {
             let head_vpn = area.vpn_range.get_start();
             let user_heap_top_addr: VirtAddr = user_heap_top.into();
             if head_vpn > user_heap_top_addr.floor() {

@@ -49,7 +49,7 @@ impl TaskControlBlockInner {
         &self.task_cx_ptr as *const usize
     }
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
-        println!{"trap_cx_ppn: {:X}", self.trap_cx_ppn.0}
+        // println!{"trap_cx_ppn: {:X}", self.trap_cx_ppn.0}
         self.trap_cx_ppn.get_mut()
     }
     pub fn get_user_token(&self) -> usize {
@@ -134,7 +134,6 @@ impl TaskControlBlock {
             }),
         };
         // prepare TrapContext in user space
-        println!{"19"}
         let trap_cx = task_control_block.acquire_inner_lock().get_trap_cx();
         *trap_cx = TrapContext::app_init_context(
             entry_point,
@@ -190,7 +189,6 @@ impl TaskControlBlock {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // **** hold current PCB lock
-        println!{"20"}
         let mut inner = self.acquire_inner_lock();
         // substitute memory_set
         // QUES
@@ -281,7 +279,6 @@ impl TaskControlBlock {
         self.pid.0
     }
     pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> usize {
-        println!{"23"}
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();
         let token = inner.get_user_token();
@@ -293,7 +290,6 @@ impl TaskControlBlock {
     }
 
     pub fn munmap(&self, start: usize, len: usize) -> isize {
-        println!{"24"}
         let mut inner = self.acquire_inner_lock();
         inner.memory_set.remove_area_with_start_vpn(VirtAddr::from(start).into());
         inner.mmap_area.remove(start, len)

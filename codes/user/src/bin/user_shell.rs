@@ -350,7 +350,7 @@ impl ArgMachine{
                     if pid == 0 {
                         // child process
                         if exec(programname, args_addr.as_slice()) == -1 {
-                            println!("Error when executing run_testsuites!");
+                            println!("Error when executing run_testsuites!1");
                             return false;
                         }
                         unreachable!();
@@ -431,7 +431,7 @@ impl ArgMachine{
                 //    ls("\0");
                 //}
                 if exec(programname, args_addr.as_slice()) == -1 {
-                    println!("Error when executing autorun_testsuites!");
+                    println!("Error when executing autorun_testsuites!2");
                     shutdown();
                 }
                 unreachable!();
@@ -522,7 +522,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    ArgMachine::auto_run_testsuites();
+    // ArgMachine::auto_run_testsuites();
     let mut line: String;
     let left = 3;
     // cursor_move_right!(left);
