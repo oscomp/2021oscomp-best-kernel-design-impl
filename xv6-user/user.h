@@ -65,7 +65,7 @@ static inline int remove(char *filename) {
     return unlinkat(AT_FDCWD, filename, 0);
 }
 static inline int rmdir(char *dirname) {
-    return unlinkat(AT_FDCWD, dirname, 01000);
+    return unlinkat(AT_FDCWD, dirname, S_IFDIR);
 }
 int trace();
 int sysinfo(struct sysinfo *);

@@ -694,7 +694,7 @@ int namepath(struct inode *ip, char *path, int max)
 	if (de == rootfs.root) {
 		path[0] = '/';
 		path[1] = '\0';
-		return 0;
+		return 2;
 	}
 
 	int len;
@@ -727,7 +727,7 @@ int namepath(struct inode *ip, char *path, int max)
 	len = max - (p - path);
 	memmove(path, p, len);		// memmove will handle overlap
 
-	return 0;
+	return len;
 }
 
 

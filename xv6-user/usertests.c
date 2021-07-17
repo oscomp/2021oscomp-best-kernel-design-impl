@@ -139,13 +139,13 @@ copyinstr2(char *s)
   b[MAXPATH] = '\0';
   
   int ret = remove(b);
-  if(ret != -1){
+  if(ret >= 0){
     printf("remove(%s) returned %d, not -1\n", b, ret);
     exit(1);
   }
 
   int fd = open(b, O_CREATE | O_WRONLY);
-  if(fd != -1){
+  if(fd >= 0){
     printf("open(%s) returned %d, not -1\n", b, fd);
     exit(1);
   }
@@ -209,13 +209,13 @@ copyinstr3(char *s)
   *b = 'x';
 
   int ret = remove(b);
-  if(ret != -1){
+  if(ret>= 0){
     printf("remove(%s) returned %d, not -1\n", b, ret);
     exit(1);
   }
 
   int fd = open(b, O_CREATE | O_WRONLY);
-  if(fd != -1){
+  if(fd>= 0){
     printf("open(%s) returned %d, not -1\n", b, fd);
     exit(1);
   }
@@ -2222,7 +2222,7 @@ validatetest(char *s)
   hi = 1100*1024;
   for(p = 0; p <= (uint)hi; p += PGSIZE){
     // try to crash the kernel by passing in a bad string pointer
-    if(open((char*)p, O_RDONLY) != -1){
+    if(open((char*)p, O_RDONLY) >= 0){
       printf("%s: link should not succeed\n", s);
       printf("bad string:[%s]\n", (char*)p);
       exit(1);

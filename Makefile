@@ -49,7 +49,8 @@ OBJS += \
   $K/mmap.o \
   $K/signal.o \
   $K/syssignal.o \
-  $K/utils/list.o
+  $K/utils/list.o \
+  $K/poll.o
 
 ifeq ($(platform), k210)
 OBJS += \

@@ -133,6 +133,9 @@ uint64 sys_wait4(void) {
 
 	struct proc *pr = myproc();
 	int mask = pr->tmask;
+	if (mask) {
+		printf(") ...\n");
+	}
 	int ret = wait4(pid, status, options);
 	if (mask) {
 		printf("pid %d: return from wait4(%p", pr->pid, status);

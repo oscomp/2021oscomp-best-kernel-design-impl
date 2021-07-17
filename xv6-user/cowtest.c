@@ -15,7 +15,7 @@ simpletest()
   struct sysinfo info;
   sysinfo(&info);
   
-  int sz = (info.freemem / 3) * 2;
+  int sz = (info.freeram / 3) * 2;
 
   printf("simple: ");
   

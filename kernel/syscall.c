@@ -168,6 +168,11 @@ extern uint64 sys_mprotect(void);
 extern uint64 sys_rt_sigaction(void);
 extern uint64 sys_rt_sigprocmask(void);
 extern uint64 sys_rt_sigreturn(void);
+extern uint64 sys_fstatat(void);
+extern uint64 sys_fcntl(void);
+extern uint64 sys_ppoll(void);
+extern uint64 sys_faccessat(void);
+extern uint64 sys_lseek(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -225,6 +230,11 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_mprotect]		sys_mprotect,
 	[SYS_exit_group]	sys_exit,
 	[SYS_ioctl]			sys_unimplemented,
+	[SYS_fstatat]		sys_fstatat,
+	[SYS_fcntl]			sys_fcntl,
+	[SYS_ppoll]			sys_ppoll,
+	[SYS_faccessat]		sys_faccessat,
+	[SYS_lseek]			sys_lseek,
 };
 
 static char *sysnames[] = {
@@ -281,6 +291,11 @@ static char *sysnames[] = {
 	[SYS_mprotect]		"mprotect",
 	[SYS_exit_group]	"exit_group",
 	[SYS_ioctl]			"ioctl",
+	[SYS_fstatat]		"fstatat",
+	[SYS_fcntl]			"fcntl",
+	[SYS_ppoll]			"ppoll",
+	[SYS_faccessat]		"faccessat",
+	[SYS_lseek]			"lseek",
 };
 
 void
@@ -329,9 +344,17 @@ sys_sysinfo(void)
 		return -1;
 	}
 
+	extern uint64 ticks;
+	extern char kernel_end[];
+
 	struct sysinfo info;
-	info.freemem = idlepages() << PGSHIFT;
-	info.nproc = procnum();
+	memset(&info, 0, sizeof(info));
+
+	info.uptime = ticks;
+	info.totalram = PHYSTOP - (uint64)kernel_end;
+	info.freeram = idlepages() << PGSHIFT;
+	info.procs = procnum();
+	info.mem_unit = PGSIZE;
 
 	// if (copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0) {
 	if (copyout2(addr, (char *)&info, sizeof(info)) < 0) {

@@ -81,7 +81,8 @@ struct superblock {
 #define I_STATE_LOCKED		(1 << 4)
 
 // For inode.mode
-#define I_MODE_DIR			(1 << 9)
+// #define I_MODE_DIR			(1 << 9)
+#define I_MODE_DIR			S_IFDIR
 
 struct inode {
 	uint64				inum;
