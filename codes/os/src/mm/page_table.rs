@@ -73,9 +73,9 @@ impl PageTableEntry {
     pub fn is_cow(&self) -> bool {
         self.bits & (1 << 9) != 0
     }
-    // fn set_bits(self, bits: usize) {
-    //     self.bits = bits;
-    // }
+    pub fn set_bits(&mut self, ppn: PhysPageNum, flags: PTEFlags) {
+        self.bits = ppn.0 << 10 | flags.bits as usize;
+    }
 }
 
 pub struct PageTable {
@@ -110,6 +110,7 @@ impl PageTable {
                 break;
             }
             if !pte.is_valid() {
+                println!{"invalid!!!!!!!!"}
                 let frame = frame_alloc().unwrap();
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
                 self.frames.push(frame);
@@ -142,10 +143,13 @@ impl PageTable {
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
     #[allow(unused)]
-    pub fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum) {
+    pub fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
         let pte = self.find_pte_create(vpn).unwrap();
-        pte.reset_cow();
-        pte.set_flags(pte.flags() | PTEFlags::W);
+        // println!{"remapping {:?}", 
+        *pte = PageTableEntry::new(ppn, pte.flags() | PTEFlags::W);
+        // pte.set_bits(ppn, pte.flags() | PTEFlags::W);
+        pte.set_cow();
+        // ppn.get_bytes_array().copy_from_slice(former_ppn.get_bytes_array());
     }
     #[allow(unused)]
     pub fn unmap(&mut self, vpn: VirtPageNum) {

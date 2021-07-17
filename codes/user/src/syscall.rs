@@ -89,7 +89,10 @@ pub fn sys_fork() -> isize {
 }
 
 pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
-    syscall(SYSCALL_EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0])
+    println!{"calling exec1..."}
+    let ret = syscall(SYSCALL_EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0]);
+    println!{"returned from os..."};
+    ret
 }
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {

@@ -98,7 +98,6 @@ pub fn rust_main() -> ! {
         //panic!("Unreachable in rust_main!");
     }
     //println!("clear bss");
-    println!{"pin8-----------------------"};
     clear_bss();
     //println!("init mm");
     mm::init();

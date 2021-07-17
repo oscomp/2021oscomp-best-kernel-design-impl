@@ -17,6 +17,8 @@ use crate::config::{
     USER_HEAP_SIZE,
     MMIO,
 };
+use crate::task::{current_task};
+
 
 extern "C" {
     fn stext();
@@ -97,8 +99,8 @@ impl MemorySet {
             self.areas.remove(idx);
         }
     }
-    fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum) {
-        self.page_table.remap_cow(vpn, ppn);
+    fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
+        self.page_table.remap_cow(vpn, ppn, former_ppn);
     }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
@@ -282,11 +284,13 @@ impl MemorySet {
                 //skipping the part using CoW
                 continue;
             }
+            println!{"mapping area with head {:?}", head_vpn}
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);
             for vpn in area.vpn_range {
                 let src_ppn = user_space.translate(vpn).unwrap().ppn();
                 let dst_ppn = memory_set.translate(vpn).unwrap().ppn();
+                println!{"mapping {:?} --- {:?}, src: {:?}", vpn, dst_ppn, src_ppn};
                 dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
             }
         }
@@ -304,7 +308,7 @@ impl MemorySet {
             let new_area = MapArea::from_another(area);
             // map the former physical address
             for vpn in area.vpn_range {
-                println!{"mapping {:?}", vpn};
+                // println!{"mapping {:?}", vpn};
                 //change the map permission of both pagetable
                 // get the former flags and ppn
                 let pte = page_table.translate(vpn).unwrap();
@@ -316,6 +320,7 @@ impl MemorySet {
                 page_table.set_cow(vpn);
                 // map the cow page table to src_ppn
                 memory_set.page_table.map(vpn, src_ppn, pte_flags);
+                println!{"mapping {:?} --- {:?}", vpn, src_ppn};
                 memory_set.set_cow(vpn);
             }
             memory_set.push_mapped(new_area);
@@ -324,11 +329,13 @@ impl MemorySet {
         memory_set
     }
 
-    pub fn cow_alloc(&mut self, vpn: VirtPageNum) -> usize {
-        println!{"pin8-----------------------"};
+    #[no_mangle]
+    pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        self.remap_cow(vpn, ppn);
+        println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
+        self.remap_cow(vpn, ppn, former_ppn);
+        println!{"finishing cow_alloc!"}
         0
     }
 

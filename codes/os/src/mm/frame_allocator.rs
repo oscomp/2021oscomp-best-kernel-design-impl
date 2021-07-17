@@ -62,6 +62,7 @@ impl FrameAllocator for StackFrameAllocator {
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
         if let Some(ppn) = self.recycled.pop() {
+            println!{"alloced recycled ppn: {:X}", ppn}
             Some(ppn.into())
         } else {
             if self.current == self.end {
@@ -74,6 +75,7 @@ impl FrameAllocator for StackFrameAllocator {
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
         let ppn = ppn.0;
+        println!{"dealloced ppn: {:X}", ppn}
         // validity check
         if ppn >= self.current || self.recycled
             .iter()

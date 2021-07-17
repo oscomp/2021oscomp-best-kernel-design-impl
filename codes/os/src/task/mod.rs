@@ -36,6 +36,7 @@ pub fn suspend_current_and_run_next() {
     let task = current_task().unwrap();
 
     // ---- hold current PCB lock
+    println!{"10"}
     let mut task_inner = task.acquire_inner_lock();
     let task_cx_ptr2 = task_inner.get_task_cx_ptr2();
     drop(task_inner);
@@ -47,15 +48,18 @@ pub fn suspend_current_and_run_next() {
 
 pub fn exit_current_and_run_next(exit_code: i32) {
     // Forbid more than one process exit
+    println!{"11"}
     let mut initproc_inner = INITPROC.acquire_inner_lock();
     // take from Processor
     let task = take_current_task().unwrap();
     // **** hold current PCB lock
+    println!{"12"}
     let mut inner = task.acquire_inner_lock();
     // Change status to Zombie
     inner.task_status = TaskStatus::Zombie;
     inner.exit_code = exit_code;
     for child in inner.children.iter() {
+        println!{"13"}
         child.acquire_inner_lock().parent = Some(Arc::downgrade(&INITPROC));
         initproc_inner.children.push(child.clone());
     }
