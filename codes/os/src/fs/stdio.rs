@@ -2,6 +2,7 @@ use super::File;
 use crate::mm::{UserBuffer};
 use crate::sbi::console_getchar;
 use crate::task::suspend_current_and_run_next;
+use k210_hal::{clock::Clocks, fpioa, pac, prelude::*};
 use lazy_static::*;
 use spin::Mutex;
 
@@ -136,8 +137,17 @@ pub fn init(){
 
 #[cfg(feature = "board_k210")]
 pub fn init(){
-    let serial = crate::drivers::Ns16550a::new(0x10000000, 0 /*, 11_059_200, 115200*/);
-    init_legacy_stdio_embedded_hal(serial);
+    //let serial = crate::drivers::Ns16550a::new(0x10000000, 0 /*, 11_059_200, 115200*/);
+    let p = pac::Peripherals::take().unwrap();
+    let mut sysctl = p.SYSCTL.constrain();
+    let fpioa = p.FPIOA.split(&mut sysctl.apb0);
+    let clocks = Clocks::new();
+    let _uarths_tx = fpioa.io5.into_function(fpioa::UARTHS_TX);
+    let _uarths_rx = fpioa.io4.into_function(fpioa::UARTHS_RX);
+    // Configure UART
+    let serial = p.UARTHS.configure(115_200.bps(), &clocks);
+    let (tx, rx) = serial.split();
+    init_legacy_stdio_embedded_hal_fuse(tx, rx);
 }
 
 #[doc(hidden)] // use through a macro
