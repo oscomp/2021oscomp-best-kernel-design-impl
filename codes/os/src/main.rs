@@ -105,12 +105,15 @@ pub fn rust_main() -> ! {
     mm::init();
     //println!("init mm ... ok");
     mm::remap_test();
+    fs::stdio::init();
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    //println!("init fs");
+    
     fs::init_rootfs();
     fs::list_apps();
+    //println!("init fs");
+    //prints!("init fs");
     task::add_initproc();
     let mask:usize = 1 << 1;
     sbi_send_ipi(&mask as *const usize as usize);

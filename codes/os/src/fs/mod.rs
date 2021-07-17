@@ -1,5 +1,5 @@
 mod pipe;
-mod stdio;
+pub mod stdio;
 mod inode;
 mod mount;
 mod finfo;
@@ -51,5 +51,5 @@ pub use finfo::{Dirent, Kstat, NewStat, DT_DIR, DT_REG, DT_UNKNOWN};
 pub use iovec::{IoVec, IoVecs};
 pub use pipe::{Pipe, make_pipe};
 pub use dev_fs::*;
-pub use stdio::{Stdin, Stdout};
+pub use stdio::{Stdin, Stdout, _print};
 pub use inode::{OSInode, open, init_rootfs, OpenFlags, list_apps, /*find_par_inode_id, */ch_dir, list_files,  DiskInodeType};
