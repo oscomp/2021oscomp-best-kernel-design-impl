@@ -2,6 +2,10 @@
 
 #define __module_name__		"signal"
 
+#ifndef __DEBUG_signal
+#undef DEBUG
+#endif 
+
 #include "proc.h"
 #include "kmalloc.h"
 #include "utils/list.h"
@@ -21,6 +25,8 @@
 int set_sigaction(int signum, struct sigaction const *act, struct sigaction *oldact) {
 	struct proc *p = myproc();
 	
+	__debug_info("set_sigaction", "(%d, %p, %p)\n", signum, act, oldact);
+
 	// search for wanted sigaction
 	ksigaction_t *tmp = p->sig_act;
 	while (NULL != tmp) {
@@ -34,14 +40,16 @@ int set_sigaction(int signum, struct sigaction const *act, struct sigaction *old
 
 	// never exists and we want to insert, create a new one
 	if (NULL == tmp && NULL != act) {
+		__debug_info("set_sigaction", "enter here\n");
 		tmp = (ksigaction_t*)kmalloc(sizeof(ksigaction_t));
-		__debug_assert("sigaction", NULL != tmp, "error kmalloc\n");
+		__debug_assert("set_sigaction", NULL != tmp, "error kmalloc\n");
 		tmp->signum = signum;
 		list_push_front(&(p->sig_act), tmp);
 	}
 	else {
 		// not found and we shall not create a new one 
-		__debug_warn("sigaction", "signum %d not found", signum);
+		__debug_warn("set_sigaction", "signum %d not found\n", signum);
+		__debug_warn("set_sigaction", "act = %p, oldact = %p\n", act, oldact);
 		return -1;
 	}
 
