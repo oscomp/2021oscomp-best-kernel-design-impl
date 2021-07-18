@@ -176,6 +176,8 @@ extern uint64 sys_lseek(void);
 extern uint64 sys_utimensat(void);
 extern uint64 sys_prlimit64(void);
 extern uint64 sys_adjtimex(void);
+extern uint64 sys_clock_settime(void);
+extern uint64 sys_clock_gettime(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -241,6 +243,8 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_utimensat]		sys_utimensat,
 	[SYS_prlimit64]		sys_prlimit64, 
 	[SYS_adjtimex]		sys_adjtimex, 
+	[SYS_clock_settime] sys_clock_settime, 
+	[SYS_clock_gettime] sys_clock_gettime, 
 };
 
 static char *sysnames[] = {
@@ -305,6 +309,8 @@ static char *sysnames[] = {
 	[SYS_utimensat]		"utimensat",
 	[SYS_prlimit64]		"prlimit64", 
 	[SYS_adjtimex]		"adjtimex", 
+	[SYS_clock_gettime]	"clock_gettime", 
+	[SYS_clock_settime]	"clock_settime", 
 };
 
 void

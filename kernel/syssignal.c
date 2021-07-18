@@ -10,6 +10,7 @@
 #include "include/printf.h"
 #include "include/param.h"
 #include "include/vm.h"
+#include "include/errno.h"
 
 #include "include/debug.h"
 
@@ -19,18 +20,21 @@ uint64 sys_rt_sigaction(void) {
 	uint64 uptr_oldact;		// struct sigaction *oldact
 
 	// extract user args
-	if (argint(0, &signum) < 0) 
-		return -1;
-	if (argaddr(1, &uptr_act) < 0) 
-		return -1;
-	if (argaddr(2, &uptr_oldact) < 0)
-		return -1;
+	if (argint(0, &signum) < 0) {
+		return -EINVAL;
+	}
+	if (argaddr(1, &uptr_act) < 0) {
+		return -EINVAL;
+	}
+	if (argaddr(2, &uptr_oldact) < 0) {
+		return -EINVAL;
+	}
 
 	// copy struct sigaction from user space 
 	struct sigaction act;
 	struct sigaction oldact;
 	if (uptr_act && copyin2((char*)&act, uptr_act, sizeof(struct sigaction)) < 0) {
-		return -1;
+		return -EFAULT;
 	}
 
 	if (set_sigaction(
@@ -38,12 +42,12 @@ uint64 sys_rt_sigaction(void) {
 		uptr_act ? &act : NULL, 
 		uptr_oldact ? &oldact : NULL
 	) < 0) {
-		return -1;
+		return -EINVAL;
 	}
 
 	// copyout old struct sigaction 
 	if (uptr_oldact && copyout2(uptr_oldact, (char*)&oldact, sizeof(struct sigaction)) < 0) {
-		return -1;
+		return -EFAULT;
 	}
 
 	return 0;
@@ -57,15 +61,15 @@ uint64 sys_rt_sigprocmask(void) {
 
 	// extract user arguments
 	if (argint(0, &how) < 0) 
-		return -1;
+		return -EINVAL;
 	if (argaddr(1, &uptr_set) < 0) 
-		return -1;
+		return -EINVAL;
 	if (argaddr(2, &uptr_oldset) < 0) 
-		return -1;
+		return -EINVAL;
 
 	// copy in __sigset_t 
 	if (uptr_set && copyin2((char*)&set, uptr_set, sizeof(__sigset_t)) < 0) {
-		return -1;
+		return -EFAULT;
 	}
 
 	if (sigprocmask(
@@ -73,11 +77,11 @@ uint64 sys_rt_sigprocmask(void) {
 		&set, 
 		uptr_oldset ? &oldset : NULL
 	)) {
-		return -1;
+		return -EINVAL;
 	}
 
 	if (uptr_oldset && copyout2(uptr_oldset, (char*)&oldset, sizeof(__sigset_t)) < 0) {
-		return -1;
+		return -EFAULT;
 	}
 
 	return 0;
