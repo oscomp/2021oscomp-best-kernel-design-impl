@@ -1,10 +1,12 @@
+use core::ops::Index;
+
 use crate::{console::print, mm::{
     MemorySet,
     PhysPageNum,
     KERNEL_SPACE, 
     KERNEL_MMAP_AREA, 
-    KERNEL_TOKEN,
-    PageTable,
+    //KERNEL_TOKEN,
+    //PageTable,
     VirtAddr,
     translated_refmut,
     MmapArea,
@@ -23,7 +25,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use core::fmt::{self, Debug, Formatter};
 use spin::{Mutex, MutexGuard};
-use crate::fs::{File, Stdin, Stdout, FileClass};
+use crate::fs::{ FileDiscripter, Stdin, Stdout, FileClass};
 
 pub struct AuxHeader{
     pub aux_type: usize,
@@ -51,6 +53,7 @@ pub struct TaskControlBlock {
     inner: Mutex<TaskControlBlockInner>,
 }
 
+pub type FdTable =  Vec<Option<FileDiscripter>>;
 pub struct TaskControlBlockInner {
     pub address: ProcAddress,
     pub trap_cx_ppn: PhysPageNum,
@@ -63,7 +66,7 @@ pub struct TaskControlBlockInner {
     pub parent: Option<Weak<TaskControlBlock>>,
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
-    pub fd_table: Vec<Option<FileClass>>,
+    pub fd_table: FdTable,
     pub current_path: String,
     pub mmap_area: MmapArea,
 }
@@ -102,6 +105,7 @@ impl TaskControlBlockInner {
     pub fn print_cx(&self) {
         unsafe{ 
             println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
+            println!("trap_cx = {:?}", *(self.trap_cx_ppn.0 as *const TrapContext) );
         }
     }
 
@@ -149,11 +153,20 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: vec![
                     // 0 -> stdin
-                    Some( FileClass::Abstr(Arc::new(Stdin)) ),
+                    Some( FileDiscripter::new(
+                        false,
+                        FileClass::Abstr(Arc::new(Stdin)) 
+                    )),
                     // 1 -> stdout
-                    Some( FileClass::Abstr(Arc::new(Stdout)) ),
+                    Some( FileDiscripter::new(
+                        false,
+                        FileClass::Abstr(Arc::new(Stdout)) 
+                    )),
                     // 2 -> stderr
-                    Some( FileClass::Abstr(Arc::new(Stdout)) ),
+                    Some( FileDiscripter::new(
+                        false,
+                        FileClass::Abstr(Arc::new(Stdout)) 
+                    )),
                 ],
                 current_path: String::from("/"), // 只有initproc在此建立，其他进程均为fork出
             }),
@@ -279,7 +292,7 @@ impl TaskControlBlock {
         let auxv_base = user_sp;
         // println!("[auxv]: base 0x{:X}", auxv_base);
         for i in 0..auxv.len() {
-            println!("[auxv]: {:?}", auxv[i]);
+            //println!("[auxv]: {:?}", auxv[i]);
             let addr = user_sp + core::mem::size_of::<AuxHeader>() * i;
             *translated_refmut(memory_set.token(), addr as *mut usize) = auxv[i].aux_type ;
             *translated_refmut(memory_set.token(), (addr + core::mem::size_of::<usize>()) as *mut usize) = auxv[i].value ;
@@ -318,6 +331,14 @@ impl TaskControlBlock {
         // println!("The heap start is {}", user_heap);
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
+
+        inner.fd_table.iter_mut()
+            .find(
+                |fd|{
+                    fd.is_some() && fd.as_ref().unwrap().get_cloexec()
+                }
+            ).take();
+
         // initialize trap_cx
         // println!("[exec] entry point = 0x{:X}", entry_point);
         
@@ -361,7 +382,7 @@ impl TaskControlBlock {
         // push a goto_trap_return task_cx on the top of kernel stack
         let task_cx_ptr = kernel_stack.push_on_top(TaskContext::goto_trap_return());
         // copy fd table
-        let mut new_fd_table: Vec<Option<FileClass>> = Vec::new();
+        let mut new_fd_table: FdTable = Vec::new();
         for fd in parent_inner.fd_table.iter() {
             if let Some(file) = fd {
                 new_fd_table.push(Some( file.clone() ));

@@ -5,8 +5,10 @@ use super::{
     VirtPageNum,
     VirtAddr,
     PhysAddr,
-    StepByOne
+    StepByOne,
+    Bytes
 };
+use crate::task::current_user_token;
 use alloc::vec::Vec;
 use alloc::vec;
 use alloc::string::String;
@@ -66,6 +68,7 @@ impl PageTableEntry {
     }
 
 }
+
 
 pub struct PageTable {
     root_ppn: PhysPageNum,
@@ -234,8 +237,6 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     v
 }
 
-
-
 /// Load a string from other address spaces into kernel space without an end `\0`.
 pub fn translated_str(token: usize, ptr: *const u8) -> String {
     let page_table = PageTable::from_token(token);
@@ -299,6 +300,46 @@ pub fn translated_array_copy<T>(token: usize, ptr: *mut T, len: usize) -> Vec< T
     ref_array
 }
 
+
+fn trans_to_bytes<T>(ptr: *const T)->&'static[u8]{
+    let size = core::mem::size_of::<T>();
+    unsafe {
+        core::slice::from_raw_parts(
+            ptr as usize as *const u8,
+            size,
+        )
+    }
+}
+
+fn trans_to_bytes_mut<T>(ptr: *mut T)->&'static mut [u8]{
+    let size = core::mem::size_of::<T>();
+    unsafe {
+        core::slice::from_raw_parts_mut(
+            ptr as usize as *mut u8,
+            size,
+        )
+    }
+}
+
+
+/* 从用户空间复制数据到指定地址 */
+pub fn copy_from_user<T>(dst: *mut T, src: usize, size: usize) {
+    let token = current_user_token();
+    // translated_ 实际上完成了地址合法检测
+    let buf = UserBuffer::new(translated_byte_buffer(token, src as *const u8, size));
+    let mut dst_bytes = trans_to_bytes_mut(dst);
+    buf.read(dst_bytes);
+}
+
+/* 从指定地址复制数据到用户空间 */
+pub fn copy_to_user<T>(dst: usize, src: *const T, size: usize) {
+    let token = current_user_token();
+    let mut buf = UserBuffer::new(translated_byte_buffer(token, dst as *const u8, size));
+    let src_bytes = trans_to_bytes(src);
+    buf.write(src_bytes);
+}
+
+
 pub struct UserBuffer {
     pub buffers: Vec<&'static mut [u8]>,
 }
@@ -350,8 +391,9 @@ impl UserBuffer {
         return len;
     }
 
+    // TODO: 把vlen去掉    
     pub fn read_as_vec(&self, vec: &mut Vec<u8>, vlen:usize)->usize{
-        let len = self.len().min(vlen);
+        let len = self.len();
         let mut current = 0;
         for sub_buff in self.buffers.iter() {
             let sblen = (*sub_buff).len();
@@ -365,6 +407,8 @@ impl UserBuffer {
         }
         return len;
     }
+
+   
 }
 
 impl IntoIterator for UserBuffer {

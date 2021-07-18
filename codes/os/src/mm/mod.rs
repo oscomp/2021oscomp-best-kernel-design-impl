@@ -18,6 +18,8 @@ pub use page_table::{
     translated_refmut,
     translated_ref_array,
     translated_array_copy,
+    copy_from_user,
+    copy_to_user,
     UserBuffer,
     UserBufferIterator,
 };
@@ -33,4 +35,8 @@ pub fn init() {
 
 pub fn init_othercore(){
     KERNEL_SPACE.lock().activate();
+}
+
+pub trait Bytes {
+    fn as_bytes(&self)->&[u8];
 }

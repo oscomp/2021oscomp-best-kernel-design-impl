@@ -3,7 +3,7 @@ use super::{VirtPageNum, VirtAddr, PhysPageNum, PhysAddr};
 use super::{FrameTracker, frame_alloc};
 use super::{VPNRange, StepByOne};
 use alloc::collections::BTreeMap;
-use alloc::string::ToString;
+//use alloc::string::ToString;
 use alloc::vec::Vec;
 use riscv::register::satp;
 use alloc::sync::Arc;
@@ -60,6 +60,7 @@ lazy_static! {
 pub fn kernel_token() -> usize {
     KERNEL_SPACE.lock().token()
 }
+
 
 pub struct MemorySet {
     page_table: PageTable,
@@ -194,7 +195,9 @@ impl MemorySet {
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
-        
+        //let sec = elf.find_section_by_name(".text").unwrap();
+        //println!("sec: {}", sec.offset());
+
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
@@ -333,6 +336,7 @@ impl MemorySet {
     }
 }
 
+#[derive(Clone)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
@@ -349,7 +353,8 @@ impl MapArea {
     ) -> Self {
         let start_vpn: VirtPageNum = start_va.floor();
         let end_vpn: VirtPageNum = end_va.ceil();
-        gdb_println!(MAP_ENABLE,"[MapArea new]: start_vpn:0x{:X} end_vpn:0x{:X}", start_vpn.0, end_vpn.0);
+        // [WARNING]:因为没有map，所以不能使用
+        //gdb_println!(MAP_ENABLE,"[MapArea new]: start_vpn:0x{:X} end_vpn:0x{:X}", start_vpn.0, end_vpn.0);
         Self {
             vpn_range: VPNRange::new(start_vpn, end_vpn),
             data_frames: BTreeMap::new(),
@@ -384,7 +389,8 @@ impl MapArea {
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        gdb_println!(MAP_ENABLE,"[map_one]: pte_flags:{:?} vpn:0x{:X}",pte_flags,vpn.0);
+        // [WARNING]:因为没有map，所以不能使用
+        //gdb_println!(MAP_ENABLE,"[map_one]: pte_flags:{:?} vpn:0x{:X}",pte_flags,vpn.0);
         page_table.map(vpn, ppn, pte_flags);
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {

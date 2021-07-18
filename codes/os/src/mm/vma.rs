@@ -1,5 +1,6 @@
 use super::{VirtAddr, UserBuffer, translated_byte_buffer};
 use crate::fs::{File, FileClass};
+use crate::task::FdTable;
 use alloc::sync::{Arc};
 use alloc::vec::Vec;
 
@@ -45,7 +46,7 @@ impl MmapArea {
     pub fn get_mmap_top(&mut self) -> VirtAddr { self.mmap_top }
 
     pub fn push(&mut self, start: usize, len: usize, prot: usize, flags: usize,
-                fd: isize, offset: usize, fd_table: Vec<Option<FileClass>>, token: usize) -> usize {
+                fd: isize, offset: usize, fd_table: FdTable, token: usize) -> usize {
         
         let start_addr = start.into();
 
@@ -101,7 +102,7 @@ impl MmapSpace{
         Self {oaddr, length, prot, flags, valid, fd}
     }
 
-    pub fn map_file(&mut self, va_start: VirtAddr, len: usize, offset: usize, fd_table: Vec<Option<FileClass>>, token: usize) -> isize {
+    pub fn map_file(&mut self, va_start: VirtAddr, len: usize, offset: usize, fd_table: FdTable, token: usize) -> isize {
         let flags = MmapFlags::from_bits(self.flags).unwrap();
         // print!("map_file: va_strat:0x{:X} flags:{:?}",va_start.0, flags);
         if flags.contains(MmapFlags::MAP_ANONYMOUS)
@@ -114,7 +115,7 @@ impl MmapSpace{
         if self.fd as usize >= fd_table.len() { return -1; }
 
         if let Some(file) = &fd_table[self.fd as usize] {
-            match file {
+            match &file.fclass {
                 FileClass::File(f)=>{
                     f.set_offset(offset);
                     if !f.readable() { return -1; }

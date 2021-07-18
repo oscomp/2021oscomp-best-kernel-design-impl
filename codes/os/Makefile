@@ -27,7 +27,7 @@ endif
 
 # Run K210
 K210-SERIALPORT	= /dev/ttyUSB0
-K210-BURNER	= ../tools/kflash.py/kflash.py
+K210-BURNER	= ../tools/kflash.py
 
 # Binutils
 OBJDUMP := rust-objdump --arch-name=riscv64

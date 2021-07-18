@@ -20,13 +20,7 @@ use crate::mm::{
     print_free_pages,
     PageTable,
 };
-use crate::fs::{
-    open,
-    //find_par_inode_id,
-    OpenFlags,
-    DiskInodeType,
-    FileClass,
-};
+use crate::fs::{DiskInodeType, FileClass, FileDiscripter, OpenFlags, open};
 use crate::config::PAGE_SIZE;
 use crate::gdb_print;
 use crate::gdb_println;
@@ -173,7 +167,7 @@ pub fn sys_gettid() -> isize {
 
 pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
     let current_va = current_task().unwrap().grow_proc(grow_size) as isize;
-    // gdb_println!(SYSCALL_ENABLE,"(sys_sbrk ret 0x{:X})",current_va);
+    gdb_println!(SYSCALL_ENABLE,"(sys_sbrk ret 0x{:X})",current_va);
     current_va
 }
 
@@ -248,7 +242,12 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         let len = app_inode.get_size();
         gdb_println!(EXEC_ENABLE,"[exec] File size: {} bytes", len);
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(FileClass::File(app_inode));
+        inner.fd_table[fd] = Some( 
+            FileDiscripter::new(
+                false, 
+                FileClass::File(app_inode)
+            )
+        );
         drop(inner);
         // print!("[exec 0]");
         let elf_buf = task.kmmap(0, len, 0, 0, fd as isize, 0);
@@ -369,7 +368,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
     let mut adjust_len = len;
     if adjust_len == 0{
         adjust_len = PAGE_SIZE;
-        println!("[sys_mmap]:adjust_len = {}",adjust_len);
+        //println!("[sys_mmap]:adjust_len = {}",adjust_len);
     }
     let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
     gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
