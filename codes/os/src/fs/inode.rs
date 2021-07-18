@@ -68,20 +68,21 @@ impl OSInode {
         v
     }
 
-    pub fn write_all(&self, str_vec:&Vec<u8>){
-        let mut inner = self.inner.lock();
-        let mut buffer = [0u8; 512];
-        let length = str_vec.len();
-        let base = 0;
-        loop {
-            if base >= length {
-                break;
-            }
-            base += 512;
-        }
-
-
-    }
+    //pub fn write_all(&self, str_vec:&Vec<u8>){
+    //    let mut inner = self.inner.lock();
+    //    let mut buffer = [0u8; 512];
+    //    let mut remain = str_vec.len();
+    //    let mut base = 0;
+    //    loop {
+    //        let len = remain.min(512);
+//
+    //        base += len;
+    //        remain -= len;
+    //        if remain == 0{
+    //            break;
+    //        }
+    //    }
+    //}
 
     pub fn find(&self, path:&str, flags:OpenFlags)->Option<Arc<OSInode>>{
         let inner = self.inner.lock();
