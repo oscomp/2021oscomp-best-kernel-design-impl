@@ -448,7 +448,7 @@ impl ArgMachine{
         //fail
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
-        testsuits.push("sh\0");
+        //testsuits.push("sh\0");
         testsuits.push("sleep\0 1\0");
 
         testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
@@ -585,7 +585,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    //ArgMachine::auto_run_testsuites();
+    ArgMachine::auto_run_testsuites();
     let mut line: String;
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();
