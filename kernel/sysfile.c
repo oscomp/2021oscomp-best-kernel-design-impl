@@ -596,28 +596,51 @@ sys_munmap(void)
 }
 
 uint64
-sys_writev(void)
+sys_readv(void)
 {
 	int fd, count;
-	struct iovec iov;
 	uint64 iovp;
 	struct file *f = NULL;
 	if (argfd(0, &fd, &f) < 0 || argaddr(1, &iovp) < 0 || argint(2, &count) < 0)
-		return -1;
+		return -EBADF;
 
-	uint64 n = 0;
-	while (count-- > 0) {
-		if (copyin2((char *)&iov, iovp, sizeof(iov)) < 0)
-			return -1;
-		
-		int64 ret = filewrite(f, (uint64)iov.iov_base, iov.iov_len);
-		if (ret < 0)
-			return -1;
-		
-		n += ret;
-		iovp += sizeof(iov);
+	struct iovec *ioarr = kmalloc(count * sizeof(struct iovec));
+	if (ioarr == NULL)
+		return -ENOMEM;
+
+	if (copyin2((char *)ioarr, iovp, count * sizeof(struct iovec)) < 0) {
+		kfree(ioarr);
+		return -EFAULT;
 	}
-	return n;
+
+	int ret = filereadv(f, ioarr, count);
+	
+	kfree(ioarr);
+	return ret;
+}
+
+uint64
+sys_writev(void)
+{
+	int fd, count;
+	uint64 iovp;
+	struct file *f = NULL;
+	if (argfd(0, &fd, &f) < 0 || argaddr(1, &iovp) < 0 || argint(2, &count) < 0)
+		return -EBADF;
+
+	struct iovec *ioarr = kmalloc(count * sizeof(struct iovec));
+	if (ioarr == NULL)
+		return -ENOMEM;
+
+	if (copyin2((char *)ioarr, iovp, count * sizeof(struct iovec)) < 0) {
+		kfree(ioarr);
+		return -EFAULT;
+	}
+
+	int ret = filewritev(f, ioarr, count);
+	
+	kfree(ioarr);
+	return ret;
 }
 
 uint64
@@ -853,4 +876,75 @@ sys_utimensat(void)
 	iunlockput(ip);
 
 	return ret;
+}
+
+// Temporarily
+uint64
+sys_ioctl(void)
+{
+	#define TIOCGWINSZ	0x5413
+	#define TCGETS		0x5401
+
+	struct winsize {
+		uint16 ws_row;		/* rows， in character */
+		uint16 ws_col; 		/* columns, in characters */
+		uint16 ws_xpixel;	/* horizontal size, pixels (unused) */
+		uint16 ws_ypixel;	/* vertical size, pixels (unused) */
+	};
+
+	#define ICRNL		0000400
+	#define OPOST		0000001
+	#define ONLCR		0000004
+	#define ICANON		0000002
+	#define ECHO		0000010
+
+
+	struct termios {
+		uint16 c_iflag; /* 输入模式标志*/
+		uint16 c_oflag; /* 输出模式标志*/
+		uint16 c_cflag; /* 控制模式标志*/
+		uint16 c_lflag; /*区域模式标志或本地模式标志或局部模式*/
+		uint8 c_line; /*行控制line discipline */
+		uint8 c_cc[8]; /* 控制字符特性*/
+	};
+
+	int fd;
+	struct file *f;
+	uint64 request;
+	uint64 argp;
+
+	if (argfd(0, &fd, &f) < 0 || argaddr(1, &request) < 0 || argaddr(2, &argp) < 0)
+		return -EBADF;
+	
+	if (f->type != FD_DEVICE)
+		return -EPERM;
+
+	switch (request) {
+	case TIOCGWINSZ: {
+		struct winsize win = {
+			.ws_row = 24,
+			.ws_col = 80,
+		};
+		if (copyout2(argp, (char*)&win, sizeof(win)) < 0)
+			return -EFAULT;
+		break;
+	}
+	case TCGETS: {
+		struct termios terminfo = {
+			.c_iflag = ICRNL,
+			.c_oflag = OPOST|ONLCR,
+			.c_cflag = 0,
+			.c_lflag = ICANON|ECHO,
+			.c_line = 0,
+			.c_cc = {0},
+		};
+		if (copyout2(argp, (char*)&terminfo, sizeof(terminfo)) < 0)
+			return -EFAULT;
+		break;
+	}
+	default:
+		return -EPERM;
+	}
+
+	return 0;
 }

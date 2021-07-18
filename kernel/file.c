@@ -23,6 +23,7 @@
 #include "include/vm.h"
 #include "include/kmalloc.h"
 #include "include/debug.h"
+#include "include/errno.h"
 
 // struct devsw devsw[NDEV];
 // struct {
@@ -260,6 +261,71 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 }
 
 
+int filereadv(struct file *f, struct iovec ioarr[], int count)
+{
+	int r = 0;
+	struct inode *ip = f->ip;
+
+	if (!f->readable)
+		return -1;
+
+	switch (f->type) {
+		case FD_PIPE:
+			r = pipereadv(f->pipe, ioarr, count);
+			break;
+		case FD_DEVICE:
+			r = ip->fop->readv(ip, ioarr, count, 0);
+			break;
+		case FD_INODE:
+			if (!ip->fop->readv)
+				return -EPERM;
+			ilock(ip);
+			r = ip->fop->readv(ip, ioarr, count, f->off);
+			iunlock(ip);
+			if (r > 0) {
+				acquire(&f->lock);
+				f->off += r;
+				release(&f->lock);
+			}
+			break;
+		default:
+			panic("filereadv");
+	}
+	return r;
+}
+
+int filewritev(struct file *f, struct iovec ioarr[], int count)
+{
+	int ret = 0;
+	struct inode *ip = f->ip;
+
+	if (!f->writable)
+		return -1;
+
+	switch (f->type) {
+		case FD_PIPE:
+			ret = pipewritev(f->pipe, ioarr, count);
+			break;
+		case FD_DEVICE:
+			ret = ip->fop->writev(ip, ioarr, count, 0);
+			break;
+		case FD_INODE:
+			if (!ip->fop->writev)
+				return -EPERM;
+			ilock(ip);
+			ret = ip->fop->writev(ip, ioarr, count, f->off);
+			iunlock(ip);
+			if (ret > 0) {
+				acquire(&f->lock);
+				f->off += ret;
+				release(&f->lock);
+			}
+			break;
+		default:
+			panic("filewritev");
+	}
+	return ret;
+}
 
 /**
  * File descriptors operations.

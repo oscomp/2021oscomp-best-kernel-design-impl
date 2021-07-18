@@ -53,6 +53,8 @@ int             fileread(struct file*, uint64, int n);
 int             filestat(struct file*, uint64 addr);
 int             filewrite(struct file*, uint64, int n);
 int             filereaddir(struct file *f, uint64 addr, uint64 n);
+int             filereadv(struct file *f, struct iovec ioarr[], int count);
+int             filewritev(struct file *f, struct iovec ioarr[], int count);
 
 int             copyfdtable(struct fdtable *fdt1, struct fdtable *fdt2);
 void            dropfdtable(struct fdtable *fdt);

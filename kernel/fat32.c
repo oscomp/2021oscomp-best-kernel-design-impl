@@ -69,6 +69,8 @@ struct file_op fat32_file_op = {
 	.read = fat_read_file,
 	.write = fat_write_file,
 	.readdir = fat_read_dir,
+	.readv = fat_read_file_vec,
+	.writev = fat_write_file_vec,
 };
 
 /**
@@ -444,6 +446,20 @@ int fat_read_file(struct inode *ip, int user_dst, uint64 dst, uint off, uint n)
 	return tot;
 }
 
+int fat_read_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint off)
+{
+	uint tot = 0;
+	for (int i = 0; i < count; i++) {
+		uint n = iovecs[i].iov_len;
+		uint ret = fat_read_file(ip, 1, (uint64)iovecs[i].iov_base, off + tot, n);
+		tot += ret;
+		if (ret != n) {
+			break;
+		}
+	}
+	return tot;
+}
+
 /**
  * Caller must hold ip->lock.
  * Write to the file that ip corresponds to.
@@ -491,6 +507,23 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 		ip->state |= I_STATE_DIRTY;
 	}
 	__debug_info("fat_write_file", "file:%s off:%d len:%d written:%d\n", ip->entry->filename, off, n, tot);
+	return tot;
+}
+
+int fat_write_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint off)
+{
+	uint tot = 0;
+	for (int i = 0; i < count; i++) {
+		uint n = iovecs[i].iov_len;
+		int ret = fat_write_file(ip, 1, (uint64)iovecs[i].iov_base, off + tot, n);
+		if (ret < 0) {
+			return ret;
+		}
+		tot += ret;
+		if (ret != n) {
+			break;
+		}
+	}
 	return tot;
 }
 

@@ -10,6 +10,12 @@
 //
 #include <stdarg.h>
 
+#ifndef __DEBUG_console
+#undef DEBUG
+#endif
+
+#define __module_name__ 	"console"
+
 
 #include "include/types.h"
 #include "include/param.h"
@@ -23,6 +29,8 @@
 #include "include/kmalloc.h"
 #include "include/buf.h"
 #include "include/printf.h"
+#include "include/vm.h"
+#include "include/debug.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
@@ -72,6 +80,32 @@ consolewrite(int user_src, uint64 src, int n)
 	}
 	release(&cons.lock);
 
+	return tot;
+}
+
+int consolewritev(struct inode *ip, struct iovec *iovecs, int count, uint off)
+{
+	int tot = 0;
+	char outbuf[INPUT_BUF];
+
+	acquire(&cons.lock);
+	for (int i = 0; i < count; i++) {
+		uint64 n = iovecs[i].iov_len;
+		int m, j;
+		for (j = 0; j < n; j += m, tot += m) {
+			m = n - j;  // left count
+			if (m > INPUT_BUF)
+				m = INPUT_BUF;
+			if (copyin2(outbuf, (uint64)iovecs[i].iov_base + j, m) < 0)
+				break;
+			for (int c = 0; c < m; c++) {
+				sbi_console_putchar(outbuf[c]);
+			}
+		}
+		if (j < n)
+			break;
+	}
+	release(&cons.lock);
 	return tot;
 }
 
@@ -130,6 +164,60 @@ consoleread(int user_dst, uint64 dst, int n)
 
 	return target - n;
 }
+
+int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
+{
+	uint tot = 0;
+	int c = 0;
+	char inbuf[INPUT_BUF];
+
+	acquire(&cons.lock);
+	for (int i = 0; i < count; i++) {
+		uint64 dst = (uint64)iovecs[i].iov_base;
+		uint64 n = iovecs[i].iov_len;
+		while (n > 0) {
+			// wait until interrupt handler has put some
+			// input into cons.buffer.
+			while (cons.r == cons.w) {
+				if (myproc()->killed) {
+					release(&cons.lock);
+					return -1;
+				}
+				sleep(&cons.r, &cons.lock);
+			}
+
+			int m = n < INPUT_BUF ? n : INPUT_BUF;
+			int j;
+			for (j = 0; j < m && cons.r < cons.w; ) {
+				c = inbuf[j++] = cons.buf[cons.r++ % INPUT_BUF];
+				if (c == '\n')
+					break;
+				if (c == C('D')) {
+					if (tot > 0) {	// Save ^D for the next time, 
+						cons.r--;	// to make sure caller gets a 0-byte result.
+					}
+					j--;
+					break;
+				}
+			}
+			// copy the input byte to the user-space buffer.
+			if (copyout2(dst, inbuf, j) < 0) {
+				count = 0; // break the out-level loop
+				break;
+			}
+			dst += j;
+			n -= j;
+			tot += j;
+			if (c == '\n' || c == C('D')) {
+				count = 0;
+				break;
+			}
+		}
+	}
+	release(&cons.lock);
+	return tot;
+}
+
 
 //
 // the console input interrupt handler.
@@ -221,4 +309,6 @@ struct file_op console_op = {
 	.read = __consoleread,
 	.write = __consolewrite,
 	.readdir = NULL,
+	.readv = consolereadv,
+	.writev = consolewritev,
 };

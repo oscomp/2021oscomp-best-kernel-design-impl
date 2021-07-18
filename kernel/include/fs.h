@@ -55,6 +55,8 @@ struct file_op {
 	int (*read)(struct inode *ip, int usr, uint64 dst, uint off, uint n);
 	int (*write)(struct inode *ip, int usr, uint64 src, uint off, uint n);
 	int (*readdir)(struct inode *ip, struct dirent *dent, uint off);
+	int (*readv)(struct inode *ip, struct iovec *iovecs, int count, uint off);
+	int (*writev)(struct inode *ip, struct iovec *iovecs, int count, uint off);
 };
 
 

@@ -61,6 +61,8 @@ struct file_op rootfs_file_op = {
 	.read = root_file_rw,
 	.write = root_file_rw,
 	.readdir = root_file_readdir,
+	.readv = NULL,
+	.writev = NULL,
 };
 
 struct inode_op rootfs_inode_op = {

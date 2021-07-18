@@ -162,6 +162,7 @@ extern uint64 sys_getuid(void);
 extern uint64 sys_geteuid(void);
 extern uint64 sys_getgid(void);
 extern uint64 sys_getegid(void);
+extern uint64 sys_readv(void);
 extern uint64 sys_writev(void);
 extern uint64 sys_readlinkat(void);
 extern uint64 sys_mprotect(void);
@@ -171,6 +172,7 @@ extern uint64 sys_ppoll(void);
 extern uint64 sys_faccessat(void);
 extern uint64 sys_lseek(void);
 extern uint64 sys_utimensat(void);
+extern uint64 sys_ioctl(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -220,11 +222,12 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_geteuid]		sys_getuid,
 	[SYS_getgid]		sys_getuid,
 	[SYS_getegid]		sys_getuid,
+	[SYS_readv]			sys_readv,
 	[SYS_writev]		sys_writev,
 	[SYS_readlinkat]	sys_unimplemented,
 	[SYS_mprotect]		sys_mprotect,
 	[SYS_exit_group]	sys_exit,
-	[SYS_ioctl]			sys_unimplemented,
+	[SYS_ioctl]			sys_ioctl,
 	[SYS_fstatat]		sys_fstatat,
 	[SYS_fcntl]			sys_fcntl,
 	[SYS_ppoll]			sys_ppoll,
@@ -279,6 +282,7 @@ static char *sysnames[] = {
 	[SYS_geteuid]		"geteuid",
 	[SYS_getgid]		"getgid",
 	[SYS_getegid]		"getegid",
+	[SYS_readv]			"readv",
 	[SYS_writev]		"writev",
 	[SYS_readlinkat]	"readlinkat",
 	[SYS_mprotect]		"mprotect",
@@ -314,7 +318,7 @@ syscall(void)
 		}
 		
 	} else {
-		printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
+		// printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
 		p->trapframe->a0 = -1;
 	}
 }

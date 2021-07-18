@@ -82,5 +82,7 @@ int                 fat_read_file(struct inode *ip, int user_dst, uint64 dst, ui
 int                 fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n);
 int                 fat_rename(struct inode *ip, struct inode *dp, char *name);
 int                 fat_set_file_attr(struct inode *ip, struct kstat *st);
+int                 fat_read_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint off);
+int                 fat_write_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint off);
 
 #endif
