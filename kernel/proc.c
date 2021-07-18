@@ -22,6 +22,7 @@
 #include "include/kmalloc.h"
 #include "include/usrmm.h"
 #include "include/signal.h"
+#include "include/errno.h"
 #include "include/debug.h"
 
 #include "include/proc.h"
@@ -595,7 +596,10 @@ int kill(int pid) {
 	__enter_proc_cs 
 
 	tmp = get_proc_no_lock(pid);
-	if (NULL == tmp) return -1;
+	if (NULL == tmp) {
+		__leave_proc_cs 
+		return -ESRCH;
+	}
 
 	tmp->killed = 1;
 	if (SLEEPING == tmp->state) {

@@ -1,1 +1,0 @@
-{"rustc":5739466548370532029,"features":"[\"default\", \"ticket_mutex\"]","target":8524337025134985022,"profile":16668067249205866872,"path":15574678220159962004,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"riscv64gc-unknown-none-elf/debug/.fingerprint/spin-fd7f503bd20f7417/dep-lib-spin"}}],"rustflags":["-C","link-arg=-Tlink-qemu.ld"],"metadata":9016220610436130891,"config":0}
