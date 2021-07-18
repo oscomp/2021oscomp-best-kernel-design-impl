@@ -13,7 +13,7 @@ use crate::gdb_print;
 use crate::monitor::*;
 //use easy_fs::DiskInodeType;
 use switch::__switch;
-pub use task::{TaskControlBlock, TaskStatus, FdTable};
+pub use task::{TaskControlBlock, TaskControlBlockInner, TaskStatus, FdTable};
 pub use info::*;
 use alloc::sync::Arc;
 use alloc::vec::Vec;

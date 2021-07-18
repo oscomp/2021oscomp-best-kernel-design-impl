@@ -18,19 +18,24 @@ pub const PROT_GROWSUP: usize = 0x02000000;
 pub const MAP_FILE: usize = 0;
 pub const MAP_SHARED: usize = 0x01;
 pub const MAP_PRIVATE: usize = 0x02;
+pub const MAP_ANONYMOUS: usize = 0x20;
+pub const MAP_FIXED: usize = 0x10;
+
 pub const MAP_FAILED: isize = -1;
 
-pub const USER_STACK_SIZE: usize = 4096 * 40;
-pub const USER_HEAP_SIZE: usize = 4096 * 8;
-pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
-pub const KERNEL_HEAP_SIZE: usize = 0x8_0000;
-pub const MEMORY_END: usize = 0x80800000;
-pub const PAGE_SIZE: usize = 0x1000;
+// Memory management
+pub const PAGE_SIZE: usize = 0x1000;//should not change
 pub const PAGE_SIZE_BITS: usize = 0xc;
+pub const USER_STACK_SIZE: usize = PAGE_SIZE * 20;
+pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 8;
+pub const KERNEL_STACK_SIZE: usize = PAGE_SIZE * 2;
+pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x80;
+pub const MEMORY_END: usize = 0x80800000;
 
 pub const MMAP_BASE: usize = 0x70000000;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+
 
 #[cfg(feature = "board_k210")]
 pub const CLOCK_FREQ: usize = 403000000 / 62;

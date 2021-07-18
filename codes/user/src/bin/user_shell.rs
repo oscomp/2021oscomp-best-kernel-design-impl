@@ -402,9 +402,6 @@ impl ArgMachine{
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("basename\0 /aaa/bbb\0");
         testsuits.push("clear\0");
-
-        
-
         testsuits.push("dirname\0 /aaa/bbb\0");
         testsuits.push("du\0");
         testsuits.push("uptime\0");
@@ -418,13 +415,16 @@ impl ArgMachine{
         testsuits.push("mkdir\0 test_dir\0");
         testsuits.push("tail\0 test.txt\0");
         testsuits.push("cat\0 test.txt\0");
+        testsuits.push("find\0 -name\0 \"busybox_cmd.txt\"\0");  
         
+        //half
+        testsuits.push("ls\0");
         
         //fail
         testsuits.push("cal\0");
         testsuits.push("expr\0 1\0 +\0 1\0");
         testsuits.push("pwd\0");
-        testsuits.push("ls\0");
+        
         testsuits.push("df\0");
         testsuits.push("dmesg\0");
         testsuits.push("which\0 ls\0");
@@ -442,7 +442,7 @@ impl ArgMachine{
         testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");
         testsuits.push("cp\0 busybox_cmd.txt busybox_cmd.bak\0");
         testsuits.push("rm\0 busybox_cmd.bak\0");
-        testsuits.push("find\0 -name\0 \"busybox_cmd.txt\"\0");  
+        
         
         testsuits.push("mv\0 test_dir\0 test\0"); 
         testsuits.push("rmdir\0 test\0"); 

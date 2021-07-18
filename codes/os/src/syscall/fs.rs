@@ -3,7 +3,8 @@ use core::usize;
 use crate::{
     fs::{/*OSInode,*/
         Kstat, NewStat, FileClass, 
-        File, Dirent, MNT_TABLE, IoVec, IoVecs, TTY
+        File, Dirent, MNT_TABLE, IoVec, IoVecs, TTY,
+        FileDiscripter
     }, 
     mm::{
         UserBuffer,
@@ -11,13 +12,17 @@ use crate::{
         translated_refmut,
         translated_str,
     }, 
-    task::FdTable
+    task::{
+        FdTable,
+        TaskControlBlockInner,
+    }
 };
 use crate::task::{current_user_token, current_task/* , print_core_info*/};
-use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType, FileDiscripter};
+use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::string::String;
+use spin::mutex::*;
 
 //use easy_fs::DiskInodeType;
 const AT_FDCWD:isize = -100;
@@ -185,30 +190,6 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
         }
     }
     
-}
-
-// TODO
-pub fn sys_open( path: *const u8, flags: u32 ) -> isize {
-    let task = current_task().unwrap();
-    let token = current_user_token();
-    // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
-    let path = translated_str(token, path);
-    let mut inner = task.acquire_inner_lock();
-    if let Some(inode) = open(
-        inner.get_work_path().as_str(),
-        path.as_str(),
-        OpenFlags::from_bits(flags).unwrap(),
-        DiskInodeType::File
-    ) {
-        let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some( FileDiscripter::new(
-            false,
-            FileClass::File(inode)
-        ));
-        fd as isize
-    } else {
-        -1
-    }
 }
 
 pub fn sys_close(fd: usize) -> isize {
@@ -584,43 +565,17 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
     //println!("unlink: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
-    if fd as isize == AT_FDCWD {
-        //println!("cwd = {}", inner.get_work_path().as_str());
-        if let Some(inode) = open(
-            inner.get_work_path().as_str(),
-            path.as_str(),
-            OpenFlags::from_bits(flags).unwrap(),
-            DiskInodeType::File
-        ) {
-            //println!("unlink dealloc {} clusters",inode.delete());
-            inode.delete();
-            return 0
-        } else {
-            return -1
-        }
-    } else {    
-        let fd_usz = fd as usize;
-        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
-            return -1
-        }
-        if let Some(file) = &inner.fd_table[fd_usz] {
-            // TODO
-            match &file.fclass {
-                FileClass::File(f) => {
-                    // print!("\n");
-                    let oflags = OpenFlags::from_bits(flags).unwrap();
-                    if let Some(tar_f) = f.find(path.as_str(), oflags){
-                        tar_f.delete();
-                        return 0
-                    }else{
-                        return -1
-                    }
-                },
-                _ => return -1,
+
+    if let Some(file) = get_file_discpt(fd as isize, path, &inner, OpenFlags::from_bits(flags).unwrap()){
+        match file {
+            FileClass::File(f)=>{
+                f.delete();
+                return 0
             }
-        } else {
-            return -1
-        }
+            _=> return -1
+        }    
+    } else{
+        return -1
     }
 }
 
@@ -692,11 +647,7 @@ pub fn fcntl(fd:usize, cmd:u32, arg:usize)->isize{
         }
     } else {
         return -1;
-    }
-
-    
-
-    
+    }    
 }
 
 /* dup the fd using the lowest-numbered available fd >= new_fd */
@@ -732,39 +683,91 @@ pub fn sys_utimensat(fd:usize, path:*const u8, time:usize, flags:u32)->isize{
     //println!("unlink: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
-    if fd as isize == AT_FDCWD {
-        //println!("cwd = {}", inner.get_work_path().as_str());
+    if let Some(file) = get_file_discpt(fd as isize, path, &inner,  OpenFlags::from_bits(flags).unwrap() ){
+        match file {
+            FileClass::File(f)=>{
+                return 0
+            }
+            _=> return -1
+        }    
+    } else{
+        return -2
+    }
+}
+
+
+pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_path:*const u8, flags: u32 )->isize{
+    if flags == 0 {
+        println!("[sys_renameat2] cannot handle flags != 0");
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let inner = task.acquire_inner_lock();
+    let oldpath = translated_str(token, old_path);
+    let newpath = translated_str(token, new_path);
+    
+    // find old file
+    let mut inner = task.acquire_inner_lock();
+    if let Some(old_file_class) = get_file_discpt(
+        old_dirfd, 
+        oldpath, 
+        & inner, 
+        OpenFlags::RDWR   
+    ){
+        match old_file_class {
+            FileClass::File(oldfile)=>{
+                // crate new file
+                if let Some(new_file) = get_file_discpt(
+                    new_dirfd, 
+                    newpath, 
+                    & inner, 
+                    OpenFlags::CREATE | OpenFlags::RDWR
+                ){
+                    // copy
+                    let data = oldfile.read_all();
+                    // TODO:
+                    oldfile.delete();
+                }    
+                
+            }
+            _=> return -1
+        }
+        
+    }    
+    return 0
+}
+
+fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockInner>, oflags: OpenFlags) -> Option<FileClass>{
+    if fd == AT_FDCWD {
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
             path.as_str(),
-            OpenFlags::from_bits(flags).unwrap(),
+            oflags,
             DiskInodeType::File
         ) {
-            return 0
+            return Some(FileClass::File(inode))
         } else {
-            return -2
+            return None
         }
-    } else {  
+    } else {    
         let fd_usz = fd as usize;
         if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
-            return -1
+            return None
         }
         if let Some(file) = &inner.fd_table[fd_usz] {
-            // TODO
             match &file.fclass {
                 FileClass::File(f) => {
-                    // print!("\n");
-                    let oflags = OpenFlags::from_bits(flags).unwrap();
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
-                        return 0
+                        return Some(FileClass::File(tar_f))
                     }else{
-                        return -2
+                        return None
                     }
                 },
-                _ => return -1,
+                _ => return None, // 如果是抽象类文件，不能open
             }
         } else {
-            return -1
+            return None
         }
     }
 }

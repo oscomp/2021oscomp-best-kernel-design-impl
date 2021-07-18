@@ -201,7 +201,9 @@ impl MemorySet {
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
-        
+        //let sec = elf.find_section_by_name(".text").unwrap();
+        //println!("sec: {}", sec.offset());
+
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();

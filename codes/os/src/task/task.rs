@@ -11,10 +11,9 @@ use crate::{console::print, mm::{
     translated_refmut,
     MmapArea,
     MapPermission,
-
 }};
 use crate::trap::{TrapContext, trap_handler};
-use crate::config::{TRAP_CONTEXT, USER_HEAP_SIZE, MMAP_BASE};
+use crate::config::*;
 use crate::gdb_println;
 use crate::monitor::*;
 use super::TaskContext;
@@ -240,10 +239,14 @@ impl TaskControlBlock {
         user_sp -= user_sp % 16;
         
         ////////////// auxv[] //////////////////////
-        user_sp -= user_sp % 16;
+        user_sp -=  16;
+        *translated_refmut(memory_set.token(), user_sp as *mut usize) = 6;
+        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>()) as *mut usize) = 0x1000;
+        
+        user_sp -=  16;
+        *translated_refmut(memory_set.token(), user_sp as *mut usize) = 0;
+        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>()) as *mut usize) = 0;
         let auxv_base = user_sp;
-        *translated_refmut(memory_set.token(), auxv_base as *mut usize) = 0;
-        *translated_refmut(memory_set.token(), (auxv_base + core::mem::size_of::<usize>()) as *mut usize) = 0;
 
         ////////////// *envp [] //////////////////////
         user_sp -= core::mem::size_of::<usize>();
@@ -374,15 +377,44 @@ impl TaskControlBlock {
         self.tgid
     }
 
-    pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> usize {
+    pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: isize, off: usize) -> usize {
+        // gdb_println!(SYSCALL_ENABLE,"[mmap](0x{:X},{},{},0x{:X},{},{})",start, len, prot, flags, fd, off);
+        
+        if start % PAGE_SIZE != 0{
+            panic!("mmap: start_va not aligned");
+        } 
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();
         let token = inner.get_user_token();
-        let va_top = inner.mmap_area.get_mmap_top();
-        let end_va = VirtAddr::from(va_top.0 + len);
-
-        inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::U | MapPermission::W | MapPermission::R);
-        inner.mmap_area.push(start, len, prot, flags, fd, off, fd_table, token)
+        let mut va_top = inner.mmap_area.get_mmap_top();
+        let mut end_va = VirtAddr::from(va_top.0 + len);
+        // "prot<<1" is equal to  meaning of "MapPermission"
+        let map_flags = (((prot & 0b111)<<1) + (1<<4))  as u8; // "1<<4" means user
+    
+        let mut startvpn = start/PAGE_SIZE;
+        
+        if start != 0 { // "Start" va Already mapped
+            while startvpn < (start+len)/PAGE_SIZE {
+                // println!("[mmap]:map_flags 0x{:X}",map_flags);
+                // inner.memory_set.print_pagetable();
+                if inner.memory_set.set_pte_flags(startvpn.into(), map_flags as usize) == -1{
+                    panic!("mmap: start_va not mmaped");
+                }
+                // inner.memory_set.print_pagetable();
+                startvpn +=1;
+            }
+            return start;
+        }
+        else{ // "Start" va not mapped
+            // println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
+            // println!("[insert_mmap_area]: flags 0x{:X}",flags);
+            // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
+            // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
+            // inner.memory_set.print_pagetable();
+            inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            // inner.memory_set.print_pagetable();
+            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token)
+        }
     }
 
     pub fn munmap(&self, start: usize, len: usize) -> isize {
@@ -411,8 +443,9 @@ impl TaskControlBlock {
         //unsafe{
         //    *(MMAP_BASE as *mut usize) = 5;
         //}
-    
-        kma_lock.push(start, len, prot, flags, fd, off, fd_table, token)
+        //kma_lock.push(start, len, prot, flags, fd, off, fd_table, token)
+        kma_lock.push(va_top.into(), len, prot, flags, fd as isize, off, fd_table, token)
+
     }
 
     pub fn kmunmap(&self, start: usize, len: usize) -> isize {
