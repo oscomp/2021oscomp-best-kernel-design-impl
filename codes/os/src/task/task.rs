@@ -308,11 +308,11 @@ impl TaskControlBlock {
         }
         
         ////////////// *argv [] //////////////////////
-        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        user_sp -= (args.len()) * core::mem::size_of::<usize>();
         let argv_base = user_sp;
-        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * (args.len())) as *mut usize) = 0;
-        for i in 0..args.len() {
-            *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * i) as *mut usize) = argv[i] ;
+        *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * (args.len()-1)) as *mut usize) = 0;
+        for i in 1..args.len() {
+            *translated_refmut(memory_set.token(), (user_sp + core::mem::size_of::<usize>() * (i-1)) as *mut usize) = argv[i] ;
         }
 
         ////////////// argc //////////////////////

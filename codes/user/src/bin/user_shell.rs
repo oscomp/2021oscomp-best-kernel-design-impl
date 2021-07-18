@@ -446,6 +446,7 @@ impl ArgMachine{
         //fail
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
+        testsuits.push("sh\0");
 
         testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
         testsuits.push("df\0");
@@ -461,6 +462,8 @@ impl ArgMachine{
         testsuits.push("hwclock\0");
         testsuits.push("ps\0");
         testsuits.push("sleep\0 1\0");
+
+        
 
         for programname_op in testsuits.iter(){
             let exec_op = String::from("busybox\0 ") + programname_op;
