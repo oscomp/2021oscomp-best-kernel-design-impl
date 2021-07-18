@@ -400,17 +400,17 @@ impl ArgMachine{
     pub fn auto_run_testsuites(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
-        // testsuits.push("sh\0");
-        testsuits.push("basename\0 /aaa/bbb\0");
-        testsuits.push("clear\0");
-        testsuits.push("dirname\0 /aaa/bbb\0");
-        testsuits.push("du\0");
-        testsuits.push("false\0");
-        testsuits.push("true\0");
-        testsuits.push("uname\0");
-        testsuits.push("printf\0 \"abc\n\"\0");
-        testsuits.push("kill\0 10\0");
-        testsuits.push("touch\0 test.txt\0");
+        testsuits.push("sh\0");
+        // testsuits.push("basename\0 /aaa/bbb\0");
+        // testsuits.push("clear\0");
+        // testsuits.push("dirname\0 /aaa/bbb\0");
+        // testsuits.push("du\0");
+        // testsuits.push("false\0");
+        // testsuits.push("true\0");
+        // testsuits.push("uname\0");
+        // testsuits.push("printf\0 \"abc\n\"\0");
+        // testsuits.push("kill\0 10\0");
+        // testsuits.push("touch\0 test.txt\0");
         for programname_op in testsuits.iter(){
             let exec_op = String::from("busybox\0 ") + programname_op;
             let mut exit_code = 0;
