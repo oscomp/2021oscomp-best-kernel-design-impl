@@ -524,7 +524,8 @@ extern "C" fn start_trap_rust(trap_frame: &mut TrapFrame) {
                 // ::"r"(rs1_vaddr)
                 mepc::write(mepc::read().wrapping_add(4)); // skip current instruction
             } else {
-                panic!("invalid instruction! mepc: {:016x?}, instruction: {:08x?}", mepc::read(), ins);
+                // panic!("invalid instruction! mepc: {:016x?}, instruction: {:08x?}", mepc::read(), ins);
+                mepc::write(mepc::read().wrapping_add(4));
             }
         }
         cause => panic!(

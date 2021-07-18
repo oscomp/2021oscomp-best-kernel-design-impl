@@ -21,6 +21,8 @@
 #include "include/vm.h"
 #include "include/kmalloc.h"
 #include "include/usrmm.h"
+#include "include/signal.h"
+#include "include/errno.h"
 #include "include/debug.h"
 
 #include "include/proc.h"
@@ -129,6 +131,10 @@ static void freeproc(struct proc *p) {
 
 	// parenting is handled in exit() 
 
+	// free sigact list 
+	if (p->sig_act)
+		sigact_free(p->sig_act);
+
 	// free the proc itself 
 	kfree(p);
 }
@@ -190,6 +196,8 @@ static struct proc *allocproc(void) {
 
 	p->child = NULL;
 
+	p->sig_act = NULL;
+
 	p->proc_tms.utime = 0;
 	p->proc_tms.stime = 0;
 	p->proc_tms.cutime = 0;
@@ -241,33 +249,6 @@ int fork_cow(void) {
 		freeproc(np);
 		return -1;
 	}
-	// struct seg *seg;
-	// struct seg **s2 = &(np->segment);
-	// for (seg = p->segment; seg != NULL; seg = seg->next) {
-	// 	struct seg *s = kmalloc(sizeof(struct seg));
-	// 	if (s == NULL) {
-	// 		__debug_warn("fork_cow", "seg kmalloc fail\n");
-	// 		freeproc(np);
-	// 		return -1;
-	// 	}
-	// 	// Copy user memory from parent to child.
-	// 	if (uvmcopy_cow(p->pagetable, np->pagetable, 
-	// 			seg->addr, seg->addr + seg->sz, seg->type) < 0) 
-	// 	{
-	// 		__debug_warn("fork_cow", "uvmcopy_cow fails\n");
-	// 		__debug_warn("fork_cow", "p %s\n", p->name);
-	// 		__debug_warn("fork_cow", "%p, %p, %d\n", 
-	// 				seg->addr, seg->addr + seg->sz, seg->type);
-	// 		kfree(s);
-	// 		__debug_warn("fork_cow", "exit kfree\n");
-	// 		freeproc(np);
-	// 		return -1;
-	// 	}
-	// 	memmove(s, seg, sizeof(struct seg));
-	// 	s->next = NULL;
-	// 	*s2 = s;
-	// 	s2 = &s->next;
-	// }
 
 	// filesystem 
 	if (copyfdtable(&p->fds, &np->fds) < 0) {
@@ -290,14 +271,12 @@ int fork_cow(void) {
 		p->child->sibling_prev = &(np->sibling_next);
 	}
 	p->child = np;
-	// __debug_info("fork_cow", "%d check children: ", p->pid);
-	// for (struct proc *tmp = p->child; tmp != NULL; tmp = tmp->sibling_next) {
-	// 	printf("%d ", tmp->pid);
-	// }
-	// printf("\n");
 	__leave_proc_cs
 
-    //__debug_assert("fork_cow", p->pid < np->pid, "child pid bigger\n");
+    // copy signal related information
+	sigact_copy(&np->sig_act, p->sig_act);
+	np->sig_set = p->sig_set;		// copy parent's mask setting 
+	memset((void*)&np->sig_pending, 0, sizeof(__sigset_t));	// do not copy pending list 
 
 	// copy debug info 
 	safestrcpy(np->name, p->name, sizeof(p->name));
@@ -341,33 +320,6 @@ int clone(uint64 flag, uint64 stack) {
 		freeproc(np);
 		return -1;
 	}
-	// struct seg *seg;
-	// struct seg **s2 = &(np->segment);
-	// for (seg = p->segment; seg != NULL; seg = seg->next) {
-	// 	struct seg *s = kmalloc(sizeof(struct seg));
-	// 	if (s == NULL) {
-	// 		__debug_warn("fork_cow", "seg kmalloc fail\n");
-	// 		freeproc(np);
-	// 		return -1;
-	// 	}
-	// 	// Copy user memory from parent to child.
-	// 	if (uvmcopy_cow(p->pagetable, np->pagetable, 
-	// 			seg->addr, seg->addr + seg->sz, seg->type) < 0) 
-	// 	{
-	// 		__debug_warn("fork_cow", "uvmcopy_cow fails\n");
-	// 		__debug_warn("fork_cow", "p %s\n", p->name);
-	// 		__debug_warn("fork_cow", "%p, %p, %d\n", 
-	// 				seg->addr, seg->addr + seg->sz, seg->type);
-	// 		kfree(s);
-	// 		__debug_warn("fork_cow", "exit kfree\n");
-	// 		freeproc(np);
-	// 		return -1;
-	// 	}
-	// 	memmove(s, seg, sizeof(struct seg));
-	// 	s->next = NULL;
-	// 	*s2 = s;
-	// 	s2 = &s->next;
-	// }
 
 	// these parts may be improved later 
 	// filesystem 
@@ -385,6 +337,7 @@ int clone(uint64 flag, uint64 stack) {
 	np->trapframe->sp = stack;
 
 	// parenting 
+	__enter_proc_cs
 	np->parent = p;
 	np->sibling_prev = &(p->child);
 	np->sibling_next = p->child;
@@ -392,6 +345,12 @@ int clone(uint64 flag, uint64 stack) {
 		p->child->sibling_prev = &(np->sibling_next);
 	}
 	p->child = np;
+	__leave_proc_cs
+
+	// copy signal related information
+	sigact_copy(&np->sig_act, p->sig_act);
+	np->sig_set = p->sig_set;		// copy parent's mask setting 
+	memset((void*)&np->sig_pending, 0, sizeof(__sigset_t));	// do not copy pending list 
 
     __debug_assert("clone", p->pid < np->pid, "child pid bigger\n");
 
@@ -605,49 +564,53 @@ void proc_tick(void) {
 	__leave_proc_cs 
 }
 
+static struct proc *get_proc_no_lock(int pid) {
+	struct proc *tmp;
+
+	// search runnable
+	for (int i = 0; i < PRIORITY_NUMBER; i ++) {
+		tmp = proc_runnable[i];
+		while (NULL != tmp) {
+			if (pid == tmp->pid) 
+				return tmp;
+			else 
+				tmp = tmp->next;
+		}
+	}
+
+	// search sleep 
+	tmp = proc_sleep;
+	while (NULL != tmp) {
+		if (pid == tmp->pid) 
+			return tmp;
+		else 
+			tmp = tmp->next;
+	}
+
+	return NULL;
+}
+
 int kill(int pid) {
 	struct proc *tmp;
 
 	__enter_proc_cs 
 
-	// search runnable 
-	for (int i = 0; i < PRIORITY_NUMBER; i ++) {
-		tmp = proc_runnable[i];
-		while (NULL != tmp) {
-			if (pid == tmp->pid) {
-				// found 
-				tmp->killed = 1;
-				__leave_proc_cs 
-				__debug_info("kill", "leave runnable\n");
-				return 0;
-			}
-			else {
-				tmp = tmp->next;
-			}
-		}
+	tmp = get_proc_no_lock(pid);
+	if (NULL == tmp) {
+		__leave_proc_cs 
+		return -ESRCH;
 	}
-	// search sleep 
-	tmp = proc_sleep;
-	while (NULL != tmp) {
-		if (pid == tmp->pid) {
-			// found 
-			tmp->killed = 1;
-			// wakeup the proc 
-			__remove(tmp);
-			tmp->timer = TIMER_IRQ;
-			__insert_runnable(PRIORITY_IRQ, tmp);
 
-			__leave_proc_cs 
-			__debug_info("kill", "leave sleep\n");
-			return 0;
-		}
-		else {
-			tmp = tmp->next;
-		}
+	tmp->killed = 1;
+	if (SLEEPING == tmp->state) {
+		__remove(tmp);
+		tmp->timer = TIMER_IRQ;
+		__insert_runnable(PRIORITY_IRQ, tmp);
 	}
 
 	__leave_proc_cs 
-	return -1;
+
+	return 0;
 }
 
 // turn current proc into `RUNNABLE`
@@ -859,6 +822,11 @@ void userinit(void) {
 	// prepare for the very first "return" from kernel to user 
 	p->trapframe->epc = 0x0;
 	p->trapframe->sp = PGSIZE;
+
+	// init signal-related fields
+	p->sig_act = NULL;
+	memset((void*)&(p->sig_set), 0, sizeof(__sigset_t));
+	memset((void*)&(p->sig_pending), 0, sizeof(__sigset_t));
 
 	safestrcpy(p->name, "initcode", sizeof(p->name));
 

@@ -47,6 +47,9 @@ OBJS += \
   $K/sysuname.o \
   $K/uname.o \
   $K/mmap.o \
+  $K/signal.o \
+  $K/syssignal.o \
+  $K/utils/list.o \
   $K/poll.o
 
 ifeq ($(platform), k210)
@@ -86,7 +89,7 @@ CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -g
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
-CFLAGS += -I.
+CFLAGS += -I. -I./$K/include
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
 ifeq ($(mode), debug) 
