@@ -470,8 +470,8 @@ impl ArgMachine{
         
 
         for programname_op in testsuits.iter(){
-            // let exec_op = String::from("busybox\0 ") + programname_op;
-            let exec_op = String::from("") + programname_op;
+            let exec_op = String::from("busybox\0 ") + programname_op;
+            // let exec_op = String::from("") + programname_op;
             let mut exit_code = 0;
             let args: Vec<&str> = exec_op.as_str().split(' ').collect();
             // for i in 0..args.len() {
@@ -493,7 +493,8 @@ impl ArgMachine{
                 unreachable!();
             } else {
                 waitpid(pid as usize, &mut exit_code);
-                if *programname_op != "false\0" && exit_code != 0{
+                let result = str::replace(*programname_op,"\0","");
+                if result != "false" && exit_code != 0{
                     println!("testcase {} fail", programname_op);
                 }
                 else{
@@ -584,7 +585,7 @@ pub fn main() -> i32 {
     unlink("initproc\0");
     unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    ArgMachine::auto_run_testsuites();
+    //ArgMachine::auto_run_testsuites();
     let mut line: String;
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();
