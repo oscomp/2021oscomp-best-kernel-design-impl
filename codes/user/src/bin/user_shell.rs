@@ -439,6 +439,8 @@ impl ArgMachine{
         testsuits.push("stat\0 test.txt\0");//?
         testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");  //ok
         testsuits.push("mkdir\0 test_dir\0");
+        testsuits.push("mv\0 test_dir\0 test\0"); 
+        testsuits.push("rmdir\0 test\0"); 
         
         //half
         testsuits.push("ls\0");
@@ -456,8 +458,9 @@ impl ArgMachine{
         //testsuits.push("more\0 test.txt\0");
         testsuits.push("cp\0 busybox_cmd.txt busybox_cmd.bak\0");
         testsuits.push("rm\0 busybox_cmd.bak\0");
-        testsuits.push("mv\0 test_dir\0 test\0"); 
-        testsuits.push("rmdir\0 test\0"); 
+        
+
+
         testsuits.push("rm\0 test.txt\0");    //ok           
         testsuits.push("free\0");
         testsuits.push("hwclock\0");
@@ -491,10 +494,10 @@ impl ArgMachine{
             } else {
                 waitpid(pid as usize, &mut exit_code);
                 if *programname_op != "false\0" && exit_code != 0{
-                    println!("testcase busybox {} fail", programname_op);
+                    println!("testcase {} fail", programname_op);
                 }
                 else{
-                    println!("testcase busybox {} success", programname_op);
+                    println!("testcase {} success", programname_op);
                 }
             }
         }

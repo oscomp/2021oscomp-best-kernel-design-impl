@@ -68,21 +68,21 @@ impl OSInode {
         v
     }
 
-    //pub fn write_all(&self, str_vec:&Vec<u8>){
-    //    let mut inner = self.inner.lock();
-    //    let mut buffer = [0u8; 512];
-    //    let mut remain = str_vec.len();
-    //    let mut base = 0;
-    //    loop {
-    //        let len = remain.min(512);
-//
-    //        base += len;
-    //        remain -= len;
-    //        if remain == 0{
-    //            break;
-    //        }
-    //    }
-    //}
+    pub fn write_all(&self, str_vec:&Vec<u8>){
+        let mut inner = self.inner.lock();
+        let mut remain = str_vec.len();
+        let mut base = 0;
+        loop {
+            let len = remain.min(512);
+            inner.inode.write_at(inner.offset, &str_vec.as_slice()[base .. base + len]);
+            inner.offset += len;
+            base += len;
+            remain -= len;
+            if remain == 0{
+                break;
+            }
+        }
+    }
 
     pub fn find(&self, path:&str, flags:OpenFlags)->Option<Arc<OSInode>>{
         let inner = self.inner.lock();

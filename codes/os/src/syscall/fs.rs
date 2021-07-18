@@ -699,14 +699,13 @@ pub fn sys_utimensat(fd:usize, path:*const u8, time:usize, flags:u32)->isize{
 pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_path:*const u8, flags: u32 )->isize{
     if flags == 0 {
         println!("[sys_renameat2] cannot handle flags != 0");
-        return -1;
+        //return -1;
     }
     let task = current_task().unwrap();
     let token = current_user_token();
     let inner = task.acquire_inner_lock();
     let oldpath = translated_str(token, old_path);
     let newpath = translated_str(token, new_path);
-    
     // find old file
     let mut inner = task.acquire_inner_lock();
     if let Some(old_file_class) = get_file_discpt(
@@ -718,7 +717,7 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
         match old_file_class {
             FileClass::File(oldfile)=>{
                 // crate new file
-                if let Some(new_file) = get_file_discpt(
+                if let Some(new_file_class) = get_file_discpt(
                     new_dirfd, 
                     newpath, 
                     & inner, 
@@ -727,14 +726,17 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
                     // copy
                     let data = oldfile.read_all();
                     // TODO:
-                    
+                    match new_file_class {
+                        FileClass::File(newfile)=>{
+                            newfile.write_all(&data);
+                        }
+                        _=> return -1
+                    }
                     oldfile.delete();
                 }    
-                
             }
             _=> return -1
         }
-        
     }    
     return 0
 }
