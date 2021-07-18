@@ -481,8 +481,8 @@ int wait4(int pid, uint64 status, uint64 options) {
 					panic("panic!\n");
 				}
 				__remove(np);
-				freeproc(np);
 				__leave_proc_cs 
+				freeproc(np);
 				return child_pid;
 			}
 			else {

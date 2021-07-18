@@ -18,6 +18,7 @@
 #include "include/string.h"
 #include "include/printf.h"
 #include "include/debug.h"
+#include "include/errno.h"
 
 /* On-disk directory entry structure */
 /* Fields that start with "_" are something we don't use */
@@ -60,7 +61,8 @@ struct inode_op fat32_inode_op = {
 	.unlink = fat_remove_entry,
 	.update = fat_update_entry,
 	.getattr = fat_stat_file,
-
+	.setattr = fat_set_file_attr,
+	.rename = fat_rename,
 };
 
 struct file_op fat32_file_op = {
@@ -458,7 +460,7 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 {
 	struct fat32_entry *entry = i2fat(ip);
 
-	if (off > entry->file_size || off + n < off || (uint64)off + n > 0xffffffff
+	if (/*off > entry->file_size || */off + n < off || (uint64)off + n > 0xffffffff
 		|| (entry->attribute & ATTR_READ_ONLY)) {
 		return -1;
 	}
@@ -497,9 +499,9 @@ static char *formatname(char *name)
 {
 	static char illegal[] = { '\"', '*', '/', ':', '<', '>', '?', '\\', '|', 0 };
 	char *p;
+	while (*name == ' ' || *name == '.') { name++; }
 	if (*name == '\0')
 		return NULL;
-	while (*name == ' ' || *name == '.') { name++; }
 	for (p = name; *p; p++) {
 		char c = *p;
 		if (c < 0x20 || strchr(illegal, c)) {
@@ -512,6 +514,8 @@ static char *formatname(char *name)
 			break;
 		}
 	}
+	if (p - name + 1 > FAT32_MAX_FILENAME)
+		return NULL;
 	return name;
 }
 
@@ -762,9 +766,9 @@ fail:
 int fat_remove_entry(struct inode *ip)
 {
 	if (ip->state & I_STATE_FREE)
-		return -1;
+		return -ENOENT;
 	if (ip->nlink == 0)
-		return -1;
+		return -ENOENT;
 	ip->nlink--;
 
 	struct fat32_sb *fat = sb2fat(ip->sb);
@@ -790,8 +794,8 @@ int fat_remove_entry(struct inode *ip)
 	return 0;
 
 fail:
-	__alert_fs_err("eremove");
-	return -1;
+	__alert_fs_err("fat_remove_entry");
+	return -EIO;
 }
 
 /**
@@ -839,6 +843,12 @@ int fat_stat_file(struct inode *ip, struct kstat *st)
 	st->mode = ip->mode;
 	st->nlink = ip->nlink;
 
+	return 0;
+}
+
+int fat_set_file_attr(struct inode *ip, struct kstat *st)
+{
+	// struct fat32_entry *ep = i2fat(ip);
 	return 0;
 }
 
@@ -1096,4 +1106,34 @@ struct inode *fat_lookup_dir(struct inode *dir, char *filename, uint *poff)
 	}
 
 	return ip;
+}
+
+
+int fat_rename(struct inode *ip, struct inode *dp, char *name)
+{
+	if ((name = formatname(name)) == NULL)
+		return -EINVAL;
+
+	uint off;
+	struct fat32_entry *dst;
+	dst = fat_lookup_dir_ent(dp, name, &off);
+	if (dst != NULL) { // file exists
+		kfree(dst);
+		panic("fat_rename"); // vfs should have checked this, what happened?
+		return -EEXIST;
+	}
+	if (fat_make_entry(dp, i2fat(ip), name, off, 1) < 0) {
+		return -ENOSPC;
+	}
+	int ret = fat_remove_entry(ip);
+	if (ret < 0) {
+		return ret;
+	}
+
+	safestrcpy(ip->entry->filename, name, FAT32_MAX_FILENAME + 1); // this is with no lock, dangerous
+	ip->nlink++; // fat_remove_entry decreased this, add it back
+	off = reloc_clus(dp, off, 0);
+	ip->inum = ((uint64)(i2fat(dp)->cur_clus) << 32) | off;
+
+	return 0;
 }

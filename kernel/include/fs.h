@@ -42,7 +42,8 @@ struct inode_op {
 	int (*unlink)(struct inode *ip);
 	int (*update)(struct inode *ip);
 	int (*getattr)(struct inode *ip, struct kstat *st);
-
+	int (*setattr)(struct inode *ip, struct kstat *st);
+	int (*rename)(struct inode *ip, struct inode *dp, char *newname);
 };
 
 struct dentry_op {
@@ -141,8 +142,10 @@ struct inode *nameifrom(struct inode *ip, char *path);
 struct inode *nameiparentfrom(struct inode *ip, char *path, char *name);
 int namepath(struct inode *ip, char *path, int max);
 
+int isdirempty(struct inode *dp);
 int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, void *data);
 int do_umount(struct inode *mntpoint, int flag);
+int do_rename(struct inode *iold, struct inode *dstdir, char *newname);
 
 static inline void iunlockput(struct inode *ip)
 {

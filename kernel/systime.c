@@ -14,6 +14,7 @@
 #include "include/timer.h"
 #include "include/vm.h"
 #include "include/riscv.h"
+#include "include/time.h"
 
 uint64 sys_times(void) {
 	uint64 tms;
@@ -28,10 +29,7 @@ uint64 sys_times(void) {
 	return ticks;
 }
 
-typedef struct {
-	uint64 sec;
-	uint64 usec;
-} TimeVal;
+typedef struct timeval TimeVal;
 
 uint64 sys_gettimeofday(void) {
 	TimeVal tval;

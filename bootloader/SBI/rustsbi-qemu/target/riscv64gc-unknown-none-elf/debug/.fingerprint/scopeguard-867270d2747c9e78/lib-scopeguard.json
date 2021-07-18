@@ -1,0 +1,1 @@
+{"rustc":5739466548370532029,"features":"[]","target":4257383469639592577,"profile":16668067249205866872,"path":4893631328949064310,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"riscv64gc-unknown-none-elf/debug/.fingerprint/scopeguard-867270d2747c9e78/dep-lib-scopeguard"}}],"rustflags":["-C","link-arg=-Tlink-qemu.ld"],"metadata":8648443508444719667,"config":0}

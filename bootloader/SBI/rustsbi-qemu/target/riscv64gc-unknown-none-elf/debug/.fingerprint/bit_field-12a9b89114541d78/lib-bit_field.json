@@ -1,0 +1,1 @@
+{"rustc":5739466548370532029,"features":"[]","target":2226500782426409248,"profile":16668067249205866872,"path":1098082103280217471,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"riscv64gc-unknown-none-elf/debug/.fingerprint/bit_field-12a9b89114541d78/dep-lib-bit_field"}}],"rustflags":["-C","link-arg=-Tlink-qemu.ld"],"metadata":17425952649129549558,"config":0}

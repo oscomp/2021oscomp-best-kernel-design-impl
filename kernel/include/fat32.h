@@ -80,5 +80,7 @@ int                 fat_stat_file(struct inode *ip, struct kstat *st);
 int                 fat_read_dir(struct inode *dir, struct dirent *dent, uint off);
 int                 fat_read_file(struct inode *ip, int user_dst, uint64 dst, uint off, uint n);
 int                 fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n);
+int                 fat_rename(struct inode *ip, struct inode *dp, char *name);
+int                 fat_set_file_attr(struct inode *ip, struct kstat *st);
 
 #endif

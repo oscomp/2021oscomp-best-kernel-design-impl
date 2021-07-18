@@ -1,0 +1,3 @@
+cargo:rustc-link-search=/home/retrhelo/Programming/xv6/xv6-k210/bootloader/SBI/rustsbi-qemu/target/riscv64gc-unknown-none-elf/debug/build/rustsbi-qemu-df91f574635625f7/out
+cargo:rerun-if-changed=build.rs
+cargo:rerun-if-changed=link-qemu.ld

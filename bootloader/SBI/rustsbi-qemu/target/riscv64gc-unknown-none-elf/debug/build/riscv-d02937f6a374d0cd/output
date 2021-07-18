@@ -1,0 +1,4 @@
+cargo:rustc-link-lib=static=riscv
+cargo:rustc-link-search=/home/retrhelo/Programming/xv6/xv6-k210/bootloader/SBI/rustsbi-qemu/target/riscv64gc-unknown-none-elf/debug/build/riscv-d02937f6a374d0cd/out
+cargo:rustc-cfg=riscv
+cargo:rustc-cfg=riscv64

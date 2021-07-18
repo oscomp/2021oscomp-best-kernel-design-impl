@@ -454,7 +454,11 @@ extern "C" fn start_trap_rust(trap_frame: &mut TrapFrame) {
                     _ => panic!("invalid target"),
                 }
                 mepc::write(mepc::read().wrapping_add(4)); // 跳过指令
-            } else {
+            }
+            else if let MPP::User = mstatus::read().mpp() {
+                mepc::write(mepc::read().wrapping_add(4));
+            }
+            else {
                 #[cfg(target_pointer_width = "64")]
                 panic!("invalid instruction, mepc: {:016x?}, instruction: {:016x?}", mepc::read(), ins);
                 #[cfg(target_pointer_width = "32")]

@@ -1,0 +1,1 @@
+{"rustc":5739466548370532029,"features":"","target":0,"profile":0,"path":0,"deps":[[4234946241801771251,"build_script_build",false,10792688359407501486]],"local":[{"RerunIfChanged":{"output":"riscv64gc-unknown-none-elf/debug/build/rustsbi-qemu-df91f574635625f7/output","paths":["build.rs","link-qemu.ld"]}}],"rustflags":[],"metadata":0,"config":0}

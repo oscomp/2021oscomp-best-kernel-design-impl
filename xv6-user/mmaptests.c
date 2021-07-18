@@ -88,7 +88,7 @@ void outoflen(char *testname)
     }
     char *addr;
     addr = mmap(NULL, stat.size + 1, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if (addr != MAP_FAILED) {
+    if ((int64)addr > 0) {
         fprintf(2, "mmap out of len success!\n");
         exit(1);
     }

@@ -25,7 +25,10 @@ struct sysinfo;
 int fork(void);
 int exit(int) __attribute__((noreturn));
 int wait(int*);
-int pipe(int*);
+int pipe2(int*, int);
+static inline int pipe(int *fdarr) {
+    return pipe2(fdarr, 0);
+}
 int write(int fd, const void *buf, int len);
 int read(int fd, void *buf, int len);
 int close(int fd);
@@ -65,11 +68,14 @@ static inline int remove(char *filename) {
     return unlinkat(AT_FDCWD, filename, 0);
 }
 static inline int rmdir(char *dirname) {
-    return unlinkat(AT_FDCWD, dirname, S_IFDIR);
+    return unlinkat(AT_FDCWD, dirname, AT_REMOVEDIR);
 }
 int trace();
 int sysinfo(struct sysinfo *);
-int rename(char *old, char *new);
+int renameat2(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, unsigned int flags);
+static inline int rename(const char *old, const char *new) {
+    return renameat2(AT_FDCWD, old, AT_FDCWD, new, 0);
+}
 int mount(char *dev, char *dir, char *fstype, uint64 flag, void *data);
 int getdents(int fd, struct dirent *buf, unsigned long len);
 int umount(char *dir, uint64 flag);

@@ -15,6 +15,7 @@
 #include "include/printf.h"
 #include "include/string.h"
 #include "include/debug.h"
+#include "include/errno.h"
 
 
 extern struct superblock *disk_fs_init(struct inode *dev);
@@ -69,6 +70,8 @@ struct inode_op rootfs_inode_op = {
 	.unlink = rootfs_iop1,
 	.update = rootfs_iop1,
 	.getattr = rootfs_getattr,
+	.setattr = NULL,
+	.rename = NULL,
 };
 
 // Must be called by initcode.
@@ -449,8 +452,8 @@ static struct dentry *de_check_cache(struct dentry *parent, char *name)
 // Caller must hold superblock's cache_lock.
 int de_delete(struct dentry *de)
 {
-	if (de->child != NULL)
-		panic("de_delete: has children");
+	// if (de->child != NULL)
+	// 	panic("de_delete: has children");
 
 	struct dentry **pde;
 	for (pde = &de->parent->child; *pde != NULL; pde = &(*pde)->next) {
@@ -852,4 +855,102 @@ int do_umount(struct inode *mntpoint, int flag)
 	fs_uninstall(sb);
 
 	return 0;
+}
+
+// Is the directory dp empty except for "." and ".." ?
+int isdirempty(struct inode *dp)
+{
+	struct dirent dent;
+	int off = 0, ret;
+	while (1) {
+		ret = dp->fop->readdir(dp, &dent, off);
+		if (ret < 0)
+			return -1;
+		else if (ret == 0)
+			return 1;
+		else if ((dent.name[0] == '.' && dent.name[1] == '\0') ||     // skip the "." and ".."
+				 (dent.name[0] == '.' && dent.name[1] == '.' && dent.name[2] == '\0'))
+		{
+			off += ret;
+		}
+		else
+			return 0;
+	}
+}
+
+int do_rename(struct inode *iold, struct inode *dstdir, char *newname)
+{
+	if (iold->sb != dstdir->sb)
+		return -EXDEV;
+	if (!dstdir->op->rename)
+		return -EACCES;
+
+	int ret = 0;
+	struct inode *inew = NULL;
+	// lock dstdir to check newname and avoid creating
+	ilock(dstdir);
+	if (trysleeplock(&iold->lock) < 0) { // just try, in case of deadlock
+		iunlock(dstdir);
+		return -EBUSY;
+	}
+
+	// In what universe can we move a directory into its child?
+	acquire(&iold->sb->cache_lock);
+	for (struct dentry *de = dstdir->entry; de != NULL; de = de->parent)
+		if (de == iold->entry) {
+			release(&iold->sb->cache_lock);
+			ret = -EINVAL;
+			goto end;
+		}
+	release(&iold->sb->cache_lock);
+
+	if ((inew = dirlookup(dstdir, newname, NULL)) != NULL) {	// new exists
+		if (trysleeplock(&inew->lock) < 0) {
+			iput(inew);
+			inew = NULL;
+			ret = -EBUSY;
+			goto end;
+		}
+		if (inew->mode & I_MODE_DIR) {			// it's ok to overwrite an empty dir
+			if (!(iold->mode & I_MODE_DIR)) {
+				ret = -EISDIR;
+				goto end;
+			} else if (isdirempty(inew) != 1) {
+				ret = -EEXIST;
+				goto end;
+			}
+			if (unlink(inew) < 0) {
+				ret = -EBUSY;
+				goto end;
+			}
+			iunlockput(inew);
+			inew = NULL;
+		} else {
+			ret = -EEXIST;
+			goto end;
+		}
+	}
+
+	ret = dstdir->op->rename(iold, dstdir, newname);
+	if (ret < 0) {
+		goto end;
+	}
+
+	struct dentry *oldent, *dstent;
+	oldent = iold->entry;
+	dstent = dstdir->entry;
+
+	acquire(&iold->sb->cache_lock);
+	de_delete(oldent);
+	oldent->parent = dstent;
+	oldent->next = dstent->child;
+	dstent->child = oldent;
+	release(&iold->sb->cache_lock);
+
+end:
+	iunlock(iold);
+	iunlock(dstdir);
+	if (inew)
+		iunlockput(inew);
+	return ret;
 }
