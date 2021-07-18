@@ -30,39 +30,38 @@
 #include "include/disk.h"
 #include "include/debug.h"
 
-struct {
-	struct spinlock lock;
-	struct buf buf[BNUM];
+#define BCACHE_TABLE_SIZE 233
+#define __hash_idx(idx) ((idx) % BCACHE_TABLE_SIZE)
 
-	// Linked list of all buffers, through prev/next.
-	// Sorted by how recently the buffer was used.
-	// head.next is most recent, head.prev is least.
-	struct buf head;
-} bcache;
+// struct {
+static struct spinlock bcachelock;
+static struct buf head;
+static struct buf *bcache[BCACHE_TABLE_SIZE];
+static struct buf bufs[BNUM];
+// } bcache;
 
 void
 binit(void)
 {
-	struct buf *b;
-
-	initlock(&bcache.lock, "bcache");
-
-	// Create linked list of buffers
-	bcache.head.prev = &bcache.head;
-	bcache.head.next = &bcache.head;
-	for(b = bcache.buf; b < bcache.buf+BNUM; b++){
+	initlock(&bcachelock, "bcache");
+	for (int i = 0; i < BCACHE_TABLE_SIZE; i++) {
+		bcache[i] = NULL;
+	}
+	head.next = &head;
+	head.prev = &head;
+	for (struct buf *b = bufs; b < bufs + BNUM; b++) {
 		b->refcnt = 0;
 		b->sectorno = ~0;
 		b->dev = ~0;
-		b->next = bcache.head.next;
-		b->prev = &bcache.head;
+		b->hash.pprev = NULL;
+		b->hash.next = NULL;
+
+		b->next = head.next;
+		b->prev = &head;
+		head.next->prev = b;
+		head.next = b;
 		initsleeplock(&b->lock, "buffer");
-		bcache.head.next->prev = b;
-		bcache.head.next = b;
 	}
-	#ifdef DEBUG
-	printf("binit\n");
-	#endif
 }
 
 // Look through buffer cache for block on device dev.
@@ -72,28 +71,47 @@ static struct buf*
 bget(uint dev, uint sectorno)
 {
 	struct buf *b;
+	int idx = __hash_idx(sectorno);
 
-	acquire(&bcache.lock);
-
+	__debug_info("bget", "search secno=%d, idx=%d\n", sectorno, idx);
+	acquire(&bcachelock);
 	// Is the block already cached?
-	for(b = bcache.head.next; b != &bcache.head; b = b->next){
-		if(b->dev == dev && b->sectorno == sectorno){
+	for (b = bcache[idx]; b != NULL; b = list_next(struct buf, b)) {
+		if (b->dev == dev && b->sectorno == sectorno) {
+			list_remove(b);
+			if (bcache[idx]) {
+				bcache[idx]->hash.pprev = &b->hash.next;
+			}
+			b->hash.next = (list_node_t *)bcache[idx];
+			b->hash.pprev = (list_node_t **)&bcache[idx];
+			bcache[idx] = b;
 			b->refcnt++;
-			release(&bcache.lock);
+			release(&bcachelock);
 			acquiresleep(&b->lock);
+			__debug_info("bget", "buffered, secno=%d\n", sectorno);
 			return b;
 		}
 	}
 
 	// Not cached.
 	// Recycle the least recently used (LRU) unused buffer.
-	for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-		if(b->refcnt == 0) {
+	__debug_info("bget", "not buffered, secno=%d\n", sectorno);
+	for (b = head.prev; b != &head; b = b->prev){
+		if (b->refcnt == 0) {
 			b->dev = dev;
 			b->sectorno = sectorno;
 			b->valid = 0;
 			b->refcnt = 1;
-			release(&bcache.lock);
+			if (b->hash.pprev) {
+				list_remove(b);
+			}
+			if (bcache[idx]) {
+				bcache[idx]->hash.pprev = &b->hash.next;
+			}
+			b->hash.next = (list_node_t *)bcache[idx];
+			b->hash.pprev = (list_node_t **)&bcache[idx];
+			bcache[idx] = b;
+			release(&bcachelock);
 			acquiresleep(&b->lock);
 			return b;
 		}
@@ -114,7 +132,6 @@ bread(uint dev, uint sectorno) {
 		__debug_info("bread", "done sno %d\n", sectorno);
 		b->valid = 1;
 	}
-
 	return b;
 }
 
@@ -136,31 +153,33 @@ brelse(struct buf *b)
 
 	releasesleep(&b->lock);
 
-	acquire(&bcache.lock);
+	acquire(&bcachelock);
 	b->refcnt--;
 	if (b->refcnt == 0) {
 		// no one is waiting for it.
 		b->next->prev = b->prev;
 		b->prev->next = b->next;
-		b->next = bcache.head.next;
-		b->prev = &bcache.head;
-		bcache.head.next->prev = b;
-		bcache.head.next = b;
+		b->next = head.next;
+		b->prev = &head;
+		head.next->prev = b;
+		head.next = b;
 	}
 	
-	release(&bcache.lock);
+	release(&bcachelock);
 }
 
-void
-bpin(struct buf *b) {
-	acquire(&bcache.lock);
-	b->refcnt++;
-	release(&bcache.lock);
-}
-
-void
-bunpin(struct buf *b) {
-	acquire(&bcache.lock);
-	b->refcnt--;
-	release(&bcache.lock);
+void bprint()
+{
+	acquire(&bcachelock);
+	printf("\nbuf cache:\n");
+	for (int i = 0; i < BCACHE_TABLE_SIZE; i++) {
+		struct buf *b = bcache[i];
+		if (b == NULL) { continue; }
+		printf(__INFO("%d")" ", i);
+		for (; b != NULL; b = list_next(struct buf, b)) {
+			printf("%d ", b->sectorno);
+		}
+		printf("\n");
+	}
+	release(&bcachelock);
 }

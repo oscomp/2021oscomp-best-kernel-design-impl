@@ -22,7 +22,7 @@ void _list_remove(list_node_t *node);
 #define list_insert(prev, node) \
 	(_list_insert((list_node_t*)(prev), (list_node_t*)(node)))
 #define list_remove(node) \
-	_list_remove((list_node_t**)(node))
+	_list_remove((list_node_t*)(node))
 
 // get each field of node 
 #define __next_field(node) \
