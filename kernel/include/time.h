@@ -13,4 +13,6 @@ struct timeval {
 	uint64 usec;		/* microseconds or milliseconds? */
 };
 
+#define CLOCK_REALTIME 		0
+
 #endif
