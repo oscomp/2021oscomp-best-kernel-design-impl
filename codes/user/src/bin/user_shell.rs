@@ -447,6 +447,7 @@ impl ArgMachine{
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
         testsuits.push("sh\0");
+        testsuits.push("sleep\0 1\0");
 
         testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
         testsuits.push("df\0");
@@ -461,12 +462,13 @@ impl ArgMachine{
         testsuits.push("free\0");
         testsuits.push("hwclock\0");
         testsuits.push("ps\0");
-        testsuits.push("sleep\0 1\0");
+        
 
         
 
         for programname_op in testsuits.iter(){
-            let exec_op = String::from("busybox\0 ") + programname_op;
+            // let exec_op = String::from("busybox\0 ") + programname_op;
+            let exec_op = programname_op;
             let mut exit_code = 0;
             let args: Vec<&str> = exec_op.as_str().split(' ').collect();
             // for i in 0..args.len() {
@@ -481,7 +483,7 @@ impl ArgMachine{
             // print!("ars:{:?}",args);
             let pid = fork();
             if pid == 0 {
-                if exec(args[0], args_addr.as_slice()) == -1 {
+                if exec("busybox\0", args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     shutdown();
                 }
