@@ -1,22 +1,13 @@
 use core::usize;
 
-use crate::{
-    fs::{/*OSInode,*/
+use crate::{fs::{/*OSInode,*/
         Kstat, NewStat, FileClass, 
         File, Dirent, MNT_TABLE, IoVec, IoVecs, TTY,
         FileDiscripter
-    }, 
-    mm::{
-        UserBuffer,
-        translated_byte_buffer,
-        translated_refmut,
-        translated_str,
-    }, 
-    task::{
+    }, mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str}, task::{
         FdTable,
         TaskControlBlockInner,
-    }
-};
+    }};
 use crate::task::{current_user_token, current_task/* , print_core_info*/};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
@@ -452,7 +443,7 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
             userbuf.write(stat.as_bytes());
             return 0
         } else {
-            return -1
+            return -2
         }
     } else {
         let fd_usz = fd as usize;
@@ -469,7 +460,7 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
                 _ => return -1,
             }
         } else {
-            return -1
+            return -2
         }
     }
 }   
@@ -697,7 +688,7 @@ pub fn sys_utimensat(fd:usize, path:*const u8, time:usize, flags:u32)->isize{
 
 
 pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_path:*const u8, flags: u32 )->isize{
-    if flags == 0 {
+    if flags != 0 {
         println!("[sys_renameat2] cannot handle flags != 0");
         //return -1;
     }
@@ -707,7 +698,7 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
     let oldpath = translated_str(token, old_path);
     let newpath = translated_str(token, new_path);
     // find old file
-    let mut inner = task.acquire_inner_lock();
+    //let mut inner = task.acquire_inner_lock();
     if let Some(old_file_class) = get_file_discpt(
         old_dirfd, 
         oldpath, 
@@ -717,11 +708,19 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
         match old_file_class {
             FileClass::File(oldfile)=>{
                 // crate new file
+                let oflags= {
+                    if oldfile.is_dir() {
+                        OpenFlags::CREATE | OpenFlags::RDWR | OpenFlags::DIRECTROY
+                    } else {
+                        OpenFlags::CREATE | OpenFlags::RDWR
+                    }
+                };
+                
                 if let Some(new_file_class) = get_file_discpt(
                     new_dirfd, 
                     newpath, 
                     & inner, 
-                    OpenFlags::CREATE | OpenFlags::RDWR
+                    oflags
                 ){
                     // copy
                     let data = oldfile.read_all();
@@ -733,22 +732,93 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
                         _=> return -1
                     }
                     oldfile.delete();
-                }    
+                } else {
+                    return -1;
+                }   
             }
             _=> return -1
         }
-    }    
+    } else {
+        return -1;
+    }
     return 0
 }
 
+/* return the num of bytes */
+pub fn sys_sendfile(out_fd:isize, in_fd:isize, offset_ptr: *mut usize, count: usize)->isize {
+    /* 
+        If offset is not NULL, then it points to a variable holding the
+        file offset from which sendfile() will start reading data from
+        in_fd.  
+
+        When sendfile() returns, 
+        *** this variable will be set to the offset of the byte following 
+        the last byte that was read. ***  
+        
+        If offset is not NULL, then sendfile() does not modify the file
+        offset of in_fd; otherwise the file offset is adjusted to reflect
+        the number of bytes read from in_fd.
+
+        If offset is NULL, then data will be read from in_fd starting at
+        the file offset, and the file offset will be updated by the call.
+    */
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let inner = task.acquire_inner_lock();
+
+    //task.kmmap(0, count, 0, 0, in_fd, off);
+    
+    if let Some(file_in) = &inner.fd_table[in_fd as usize]{
+        // file_in exists
+        match &file_in.fclass {
+            FileClass::File(fin)=>{
+                if let Some(file_out) = &inner.fd_table[out_fd as usize]{
+                    //file_out exists
+                    match &file_out.fclass {
+                        FileClass::File(fout)=>{
+                            if offset_ptr as usize != 0 { //won't influence file.offset                            
+                                let offset = translated_refmut(token, offset_ptr);
+                                let data = fin.read_vec(*offset as isize, count);
+                                let wlen =  fout.write_all(&data);
+                                *offset += wlen;
+                                return wlen as isize
+                            } else {  //use file.offset
+                                let data = fin.read_vec(-1, count);
+                                let wlen =  fout.write_all(&data);
+                                return wlen as isize
+                            }
+                        }
+                        _=> return -1
+                    }
+                } else {
+                    return -1
+                }
+            }
+            _=> return -1
+        }
+    } else {
+        return -1
+    }
+}
+
+
+
 fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockInner>, oflags: OpenFlags) -> Option<FileClass>{
+    let type_ = {
+        if oflags.contains(OpenFlags::DIRECTROY) {
+            DiskInodeType::Directory
+        } else {
+            DiskInodeType::File
+        }
+    };
     if fd == AT_FDCWD {
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
             path.as_str(),
             oflags,
-            DiskInodeType::File
+            type_
         ) {
+            //println!("find old");
             return Some(FileClass::File(inode))
         } else {
             return None
@@ -761,10 +831,18 @@ fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockIn
         if let Some(file) = &inner.fd_table[fd_usz] {
             match &file.fclass {
                 FileClass::File(f) => {
-                    if let Some(tar_f) = f.find(path.as_str(), oflags){
-                        return Some(FileClass::File(tar_f))
+                    if oflags.contains(OpenFlags::CREATE){
+                        if let Some(tar_f) = f.create(path.as_str(), type_){
+                            return Some(FileClass::File(tar_f))
+                        }else{
+                            return None
+                        }
                     }else{
-                        return None
+                        if let Some(tar_f) = f.find(path.as_str(), oflags){
+                            return Some(FileClass::File(tar_f))
+                        }else{
+                            return None
+                        }
                     }
                 },
                 _ => return None, // 如果是抽象类文件，不能open

@@ -4,7 +4,7 @@ use super::{
     layout::*,
     get_info_cache,
     CacheMode,
-    //println,
+    println,
     //print
 };
 use alloc::sync::Arc;
@@ -628,8 +628,16 @@ impl VFile{
             let (_,_,_,_,_,_,ctime) = sde.get_creation_time();
             let (_,_,_,_,_,_,atime) = sde.get_accessed_time();
             let (_,_,_,_,_,_,mtime) = sde.get_modification_time();
-            let size = sde.get_size();
+            let mut size = sde.get_size();
             let first_clu = sde.first_cluster();
+            if self.is_dir() {
+                let fs_reader = self.fs.read();
+                let fat = fs_reader.get_fat();
+                let fat_reader = fat.read();
+                let cluster_num = fat_reader.count_claster_num( first_clu, self.block_device.clone());
+                size = cluster_num * fs_reader.bytes_per_cluster();
+                //println!("{} {}",cluster_num, fs_reader.bytes_per_cluster());
+            }
             (size as i64, atime as i64, mtime as i64, ctime as i64, first_clu as u64)
         })
     }
@@ -793,6 +801,7 @@ impl VFile{
             .get_fat().read()
             .get_all_cluster_of(first_cluster, self.block_device.clone());
         self.fs.write().dealloc_cluster(all_clusters.clone());
+        //self.fs.write().cache_write_back();
         return all_clusters.len()
     }
 

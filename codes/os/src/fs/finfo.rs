@@ -1,8 +1,43 @@
+//use bitflags::*;
+
 pub const DT_UNKNOWN:u8 = 0;
 pub const DT_DIR:u8 = 4;
 pub const DT_REG:u8 = 4; //常规文件
 
 pub const NAME_LIMIT:usize = 128; // TODO:太大了会有跨页问题。。
+
+
+
+
+pub const S_IFMT    :u32 = 0170000;   //bit mask for the file type bit field
+pub const S_IFSOCK  :u32 = 0140000;   //socket
+pub const S_IFLNK   :u32 = 0120000;   //symbolic link
+pub const S_IFREG   :u32 = 0100000;   //regular file
+pub const S_IFBLK   :u32 = 0060000;   //block device
+pub const S_IFDIR   :u32 = 0040000;   //directory
+pub const S_IFCHR   :u32 = 0020000;   //character device
+pub const S_IFIFO   :u32 = 0010000;   //FIFO
+
+pub const S_ISUID:u32 = 04000;   //set-user-ID bit (see execve(2))
+pub const S_ISGID:u32 = 02000;   //set-group-ID bit (see below)
+pub const S_ISVTX:u32 = 01000;   //sticky bit (see below)
+
+pub const S_IRWXU:u32 = 00700;   //owner has read, write, and execute permission
+pub const S_IRUSR:u32 = 00400;   //owner has read permission
+pub const S_IWUSR:u32 = 00200;   //owner has write permission
+pub const S_IXUSR:u32 = 00100;   //owner has execute permission
+
+pub const S_IRWXG:u32 = 00070;   //group has read, write, and execute permission
+pub const S_IRGRP:u32 = 00040;   //group has read permission
+pub const S_IWGRP:u32 = 00020;   //group has write permission
+pub const S_IXGRP:u32 = 00010;   //group has execute permission
+
+pub const S_IRWXO:u32 = 00007;   //others (not in group) have read, write,and execute permission
+pub const S_IROTH:u32 = 00004;   //others have read permission
+pub const S_IWOTH:u32 = 00002;   //others have write permission
+pub const S_IXOTH:u32 = 00001;   //others have execute permission
+
+
 
 #[repr(C)]
 #[derive(Debug)]
@@ -187,6 +222,7 @@ impl Kstat {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct NewStat{
     st_dev  :u64,   /* ID of device containing file */

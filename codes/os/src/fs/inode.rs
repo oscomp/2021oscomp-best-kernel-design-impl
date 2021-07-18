@@ -6,9 +6,10 @@ use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
 use spin::Mutex;
-use super::{DT_DIR, DT_REG, DT_UNKNOWN, Dirent, File, Kstat, NewStat};
+use super::{DT_DIR, DT_REG, DT_UNKNOWN, Dirent, File, Kstat, NewStat, finfo};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
+
 
 #[derive(PartialEq,Copy,Clone,Debug)]
 pub enum DiskInodeType {
@@ -52,7 +53,44 @@ impl OSInode {
             }),
         }
     }
+
+    pub fn is_dir(&self)->bool{
+        let inner = self.inner.lock();
+        inner.inode.is_dir()
+    }
     
+    /* this func will not influence the file offset 
+    * @parm: if offset == -1, file offset will be used
+    */
+    pub fn read_vec(&self, offset:isize, len:usize)->Vec<u8>{
+        let mut inner = self.inner.lock();
+        let mut len = len;
+        let ori_off = inner.offset;
+        if offset >= 0 {
+            inner.offset = offset as usize;
+        }
+        let mut buffer = [0u8; 512];
+        let mut v: Vec<u8> = Vec::new();
+        loop {
+            let rlen = inner.inode.read_at(inner.offset, &mut buffer);
+            if rlen == 0 {
+                break;
+            }
+            inner.offset += rlen;
+            v.extend_from_slice(&buffer[..rlen.min(len)]);
+            if len > rlen {
+                len -= rlen;
+            } else {
+                break;
+            }
+        }
+        if offset >= 0 {
+            inner.offset = ori_off; 
+        }
+        v
+
+    }
+
     pub fn read_all(&self) -> Vec<u8> {
         let mut inner = self.inner.lock();
         let mut buffer = [0u8; 512];
@@ -68,7 +106,7 @@ impl OSInode {
         v
     }
 
-    pub fn write_all(&self, str_vec:&Vec<u8>){
+    pub fn write_all(&self, str_vec:&Vec<u8>)->usize{
         let mut inner = self.inner.lock();
         let mut remain = str_vec.len();
         let mut base = 0;
@@ -82,6 +120,7 @@ impl OSInode {
                 break;
             }
         }
+        return base
     }
 
     pub fn find(&self, path:&str, flags:OpenFlags)->Option<Arc<OSInode>>{
@@ -147,10 +186,17 @@ impl OSInode {
         let vfile = inner.inode.clone();
         let (size, atime, mtime, ctime, ino) = vfile.stat();
         //println!("info = {:?}", (size, atime, mtime, ctime));
+        let st_mod:u32 = {
+            if vfile.is_dir() {
+                finfo::S_IFDIR | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
+            } else {
+                finfo::S_IFREG | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
+            }
+        };
         stat.fill_info(
             0, 
             ino, 
-            0, 
+            st_mod, 
             1, 
             size, 
             atime, 
@@ -176,13 +222,9 @@ impl OSInode {
         let (readable, writable) = (true, true);
         if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // already exists, clear
-            inode.clear();
-            Some(Arc::new(OSInode::new(
-                readable,
-                writable,
-                inode,
-            )))
-        } else {
+            inode.remove();
+        }  
+        {
             // create file
             let name = pathv.pop().unwrap();
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
@@ -374,13 +416,14 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
         if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // clear size
             //println!("clear size");
-            inode.clear();
-            Some(Arc::new(OSInode::new(
-                readable,
-                writable,
-                inode,
-            )))
-        } else {
+            inode.remove();
+            //Some(Arc::new(OSInode::new(
+            //    readable,
+            //    writable,
+            //    inode,
+            //)))
+        } 
+        {
             // create file
             //println!("start create");
             let name = pathv.pop().unwrap();

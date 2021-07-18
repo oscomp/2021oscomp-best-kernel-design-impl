@@ -88,6 +88,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITEV => sys_writev(args[0], args[1], args[2]),
+        SYSCALL_SENDFILE=> sys_sendfile(args[0] as isize, args[1] as isize, args[2] as *mut usize, args[3] as usize),
         SYSCALL_NEW_FSTATAT => sys_newfstatat(args[0] as isize, args[1] as *const u8, args[2] as *mut u8, args[3] as u32),
         SYSCALL_FSTAT=>sys_fstat(args[0] as isize, args[1] as *mut u8),
         SYSCALL_UTIMENSAT => sys_utimensat(args[0], args[1] as *const u8, args[2], args[3] as u32),

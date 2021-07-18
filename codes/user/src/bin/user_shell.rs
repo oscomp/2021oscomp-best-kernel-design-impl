@@ -401,72 +401,69 @@ impl ArgMachine{
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
         // testsuits.push("sh\0");
-        testsuits.push("echo\0 \"#### independent command test\"\0");
-        testsuits.push("basename\0 /aaa/bbb\0");
-        testsuits.push("cal\0");
-        testsuits.push("clear\0");
-        testsuits.push("expr\0 1\0 +\0 1\0");
-        testsuits.push("pwd\0");
-        testsuits.push("dirname\0 /aaa/bbb\0");
-        testsuits.push("du\0");
-        testsuits.push("uptime\0");
-        testsuits.push("date\0");
-        testsuits.push("false\0");
-        testsuits.push("true\0");
-        testsuits.push("uname\0");
-        testsuits.push("printf\0 \"abc\n\"\0");
-        testsuits.push("kill\0 10\0");
-        testsuits.push("echo\0 \"#### file opration test\"\0");
-        testsuits.push("touch\0 test.txt\0");
-        testsuits.push("echo\0 \"hello world\"\0 >>\0 test.txt\0");
-        testsuits.push("tail\0 test.txt\0");
-        testsuits.push("cat\0 test.txt\0");
-        testsuits.push("cut\0 -c\0 3\0 test.txt\0");
-        testsuits.push("od\0 test.txt\0");
-        testsuits.push("head\0 test.txt\0");
-        testsuits.push("hexdump\0 -C\0 test.txt\0");
-        testsuits.push("md5sum\0 test.txt\0");
-        testsuits.push("strings\0 test.txt\0");
-        testsuits.push("wc\0 test.txt\0");
-        testsuits.push("find\0 -name\0 \"busybox_cmd.txt\"\0");  
-        testsuits.push("dmesg\0");
-        testsuits.push("echo\0 \"ccccccc\"\0 >>\0 test.txt\0");
-        testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
-        testsuits.push("echo\0 \"aaaaaaa\"\0 >>\0 test.txt\0");
-        testsuits.push("echo\0 \"2222222\"\0 >>\0 test.txt\0");
-        testsuits.push("echo\0 \"1111111\"\0 >>\0 test.txt\0");
-        testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
-        testsuits.push("stat\0 test.txt\0");//?
-        testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");  //ok
-        testsuits.push("mkdir\0 test_dir\0");
-        testsuits.push("mv\0 test_dir\0 test\0"); 
-        testsuits.push("rmdir\0 test\0"); 
+        //testsuits.push("echo\0 \"#### independent command test\"\0");
+        //testsuits.push("basename\0 /aaa/bbb\0");
+        //testsuits.push("cal\0");
+        //testsuits.push("clear\0");
+        //testsuits.push("expr\0 1\0 +\0 1\0");
+        //testsuits.push("pwd\0");
+        //testsuits.push("dirname\0 /aaa/bbb\0");
+        //testsuits.push("du\0");
+        //testsuits.push("uptime\0");
+        //testsuits.push("date\0");
+        //testsuits.push("false\0");
+        //testsuits.push("true\0");
+        //testsuits.push("uname\0");
+        //testsuits.push("printf\0 \"abc\n\"\0");
+        //testsuits.push("kill\0 10\0");
+        //testsuits.push("echo\0 \"#### file opration test\"\0");
+        //testsuits.push("touch\0 test.txt\0");
+        //testsuits.push("echo\0 \"hello world\"\0 >>\0 test.txt\0");
+        //testsuits.push("tail\0 test.txt\0");
+        //testsuits.push("cat\0 test.txt\0");
+        //testsuits.push("cut\0 -c\0 3\0 test.txt\0");
+        //testsuits.push("od\0 test.txt\0");
+        //testsuits.push("head\0 test.txt\0");
+        //testsuits.push("hexdump\0 -C\0 test.txt\0");
+        //testsuits.push("md5sum\0 test.txt\0");
+        //testsuits.push("strings\0 test.txt\0");
+        //testsuits.push("wc\0 test.txt\0");
+        //testsuits.push("find\0 -name\0 \"busybox_cmd.txt\"\0");  
+        //testsuits.push("dmesg\0");
+        //testsuits.push("echo\0 \"ccccccc\"\0 >>\0 test.txt\0");
+        //testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
+        //testsuits.push("echo\0 \"aaaaaaa\"\0 >>\0 test.txt\0");
+        //testsuits.push("echo\0 \"2222222\"\0 >>\0 test.txt\0");
+        //testsuits.push("echo\0 \"1111111\"\0 >>\0 test.txt\0");
+        //testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
+        //testsuits.push("stat\0 test.txt\0");//?
+        //testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");  //ok
+        //testsuits.push("mkdir\0 test_dir\0");
+        //testsuits.push("mv\0 test_dir\0 test\0"); 
+        //testsuits.push("rmdir\0 test\0"); 
+        //testsuits.push("which\0 ls\0");
+        testsuits.push("cp\0 busybox_cmd.txt\0 busybox_cmd.bak\0");
+        testsuits.push("rm\0 busybox_cmd.bak\0");
         
         //half
         testsuits.push("ls\0");
-        
-        //fail
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
-        //testsuits.push("sh\0");
         testsuits.push("sleep\0 1\0");
-
+        
+        //fail
+        //testsuits.push("sh\0");
         testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
         testsuits.push("df\0");
-        testsuits.push("which\0 ls\0");
+        
         testsuits.push("[\0 -f\0 test.txt\0 ]\0");
         //testsuits.push("more\0 test.txt\0");
-        testsuits.push("cp\0 busybox_cmd.txt busybox_cmd.bak\0");
-        testsuits.push("rm\0 busybox_cmd.bak\0");
         
-
-
+        
         testsuits.push("rm\0 test.txt\0");    //ok           
         testsuits.push("free\0");
         testsuits.push("hwclock\0");
         testsuits.push("ps\0");
-        
-
         
 
         for programname_op in testsuits.iter(){

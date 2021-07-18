@@ -2,7 +2,7 @@ mod pipe;
 pub mod stdio;
 mod inode;
 mod mount;
-mod finfo;
+pub mod finfo;
 mod iovec;
 mod dev_fs;
 
@@ -47,7 +47,7 @@ pub trait File : Send + Sync {
 }
 
 pub use mount::MNT_TABLE;
-pub use finfo::{Dirent, Kstat, NewStat, DT_DIR, DT_REG, DT_UNKNOWN};
+pub use finfo::{Dirent, Kstat, NewStat, DT_DIR, DT_REG, DT_UNKNOWN, *};
 pub use iovec::{IoVec, IoVecs};
 pub use pipe::{Pipe, make_pipe};
 pub use dev_fs::*;
