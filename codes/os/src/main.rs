@@ -105,7 +105,7 @@ pub fn rust_main() -> ! {
     mm::init();
     //println!("init mm ... ok");
     mm::remap_test();
-    fs::stdio::init();
+    //fs::stdio::init();
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();

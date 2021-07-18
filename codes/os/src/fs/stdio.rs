@@ -138,15 +138,22 @@ pub fn init(){
 #[cfg(feature = "board_k210")]
 pub fn init(){
     //let serial = crate::drivers::Ns16550a::new(0x10000000, 0 /*, 11_059_200, 115200*/);
+    println!("0");
     let p = pac::Peripherals::take().unwrap();
+    println!("1");
     let mut sysctl = p.SYSCTL.constrain();
+    println!("2");
     let fpioa = p.FPIOA.split(&mut sysctl.apb0);
+    println!("3");
     let clocks = Clocks::new();
+    println!("4");
     let _uarths_tx = fpioa.io5.into_function(fpioa::UARTHS_TX);
     let _uarths_rx = fpioa.io4.into_function(fpioa::UARTHS_RX);
     // Configure UART
+    println!("5");
     let serial = p.UARTHS.configure(115_200.bps(), &clocks);
     let (tx, rx) = serial.split();
+    println!("6");
     init_legacy_stdio_embedded_hal_fuse(tx, rx);
 }
 

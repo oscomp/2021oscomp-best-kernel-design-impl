@@ -23,8 +23,8 @@ pub fn print(args: fmt::Arguments) {
 #[macro_export]
 macro_rules! print {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        //$crate::console::print(format_args!($fmt $(, $($arg)+)?));
-        $crate::fs::_print(format_args!($fmt $(, $($arg)+)?));
+        $crate::console::print(format_args!($fmt $(, $($arg)+)?));
+        //$crate::fs::_print(format_args!($fmt $(, $($arg)+)?));
     }
 }
 
@@ -32,12 +32,12 @@ macro_rules! print {
 #[macro_export]
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        //$crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
-        $crate::fs::_print(format_args!(core::concat!($fmt, "\n") $(, $($arg)+)?));
+        $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+        //$crate::fs::_print(format_args!(core::concat!($fmt, "\n") $(, $($arg)+)?));
     }
 }
 
-
+/* 
 #[cfg(feature = "board_k210")]
 #[macro_export]
 macro_rules! print {
@@ -54,6 +54,6 @@ macro_rules! println {
         $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
         //$crate::fs::_print(format_args!(core::concat!($fmt, "\n") $(, $($arg)+)?));
     }
-}
+}*/
 
 

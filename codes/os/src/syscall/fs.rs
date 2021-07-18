@@ -126,16 +126,17 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     }
     ////////////////////////////////////////////////////////////////////////
 
+    let oflags = OpenFlags::from_bits(flags).unwrap();
     if dirfd == AT_FDCWD {
         if let Some(inode) = open(
             inner.get_work_path().as_str(),
             path.as_str(),
-            OpenFlags::from_bits(flags).unwrap(),
+            oflags,
             DiskInodeType::File
         ) {
             let fd = inner.alloc_fd();
             inner.fd_table[fd] = Some( FileDiscripter::new(
-                false,
+                oflags.contains(OpenFlags::CLOEXEC),
                 FileClass::File(inode)
             ));
             fd as isize
@@ -151,13 +152,13 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             // TODO
             match &file.fclass {
                 FileClass::File(f) => {
-                    let oflags = OpenFlags::from_bits(flags).unwrap();
+                    //let oflags = OpenFlags::from_bits(flags).unwrap();
                     // 需要新建文件
                     if oflags.contains(OpenFlags::CREATE){ 
                         if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
                             let fd = inner.alloc_fd();
                             inner.fd_table[fd] = Some( FileDiscripter::new(
-                                false,
+                                oflags.contains(OpenFlags::CLOEXEC),
                                 FileClass::File(tar_f)
                             ));
                             return fd as isize
@@ -169,7 +170,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
                         let fd = inner.alloc_fd();
                         inner.fd_table[fd] = Some( FileDiscripter::new(
-                            false,
+                            oflags.contains(OpenFlags::CLOEXEC),
                             FileClass::File(tar_f)
                         ));
                         fd as isize
@@ -720,4 +721,50 @@ fn dup_inc( old_fd:usize, new_fd:usize, fd_table: &mut FdTable) -> isize {
     }
     inner.fd_table[act_fd] = Some(inner.fd_table[old_fd].as_ref().unwrap().clone());
     act_fd as isize
+}
+
+pub fn sys_utimensat(fd:usize, path:*const u8, time:usize, flags:u32)->isize{
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
+    let path = translated_str(token, path);
+    //print!("\n");
+    //println!("unlink: path = {}", path);
+    let mut inner = task.acquire_inner_lock();
+    //println!("openat: fd = {}", dirfd);
+    if fd as isize == AT_FDCWD {
+        //println!("cwd = {}", inner.get_work_path().as_str());
+        if let Some(inode) = open(
+            inner.get_work_path().as_str(),
+            path.as_str(),
+            OpenFlags::from_bits(flags).unwrap(),
+            DiskInodeType::File
+        ) {
+            return 0
+        } else {
+            return -2
+        }
+    } else {  
+        let fd_usz = fd as usize;
+        if fd_usz >= inner.fd_table.len() && fd_usz > FD_LIMIT {
+            return -1
+        }
+        if let Some(file) = &inner.fd_table[fd_usz] {
+            // TODO
+            match &file.fclass {
+                FileClass::File(f) => {
+                    // print!("\n");
+                    let oflags = OpenFlags::from_bits(flags).unwrap();
+                    if let Some(tar_f) = f.find(path.as_str(), oflags){
+                        return 0
+                    }else{
+                        return -2
+                    }
+                },
+                _ => return -1,
+            }
+        } else {
+            return -1
+        }
+    }
 }
