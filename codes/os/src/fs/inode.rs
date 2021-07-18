@@ -68,6 +68,17 @@ impl OSInode {
         v
     }
 
+    pub fn write_all(&self, str_vec:&Vec<u8>){
+        let mut inner = self.inner.lock();
+        let mut buffer = [0u8; 512];
+        //let length = bu
+        loop {
+
+        }
+
+
+    }
+
     pub fn find(&self, path:&str, flags:OpenFlags)->Option<Arc<OSInode>>{
         let inner = self.inner.lock();
         let mut pathv:Vec<&str> = path.split('/').collect();

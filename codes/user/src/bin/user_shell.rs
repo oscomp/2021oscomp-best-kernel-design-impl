@@ -468,7 +468,7 @@ impl ArgMachine{
 
         for programname_op in testsuits.iter(){
             // let exec_op = String::from("busybox\0 ") + programname_op;
-            let exec_op = programname_op;
+            let exec_op = String::from("") + programname_op;
             let mut exit_code = 0;
             let args: Vec<&str> = exec_op.as_str().split(' ').collect();
             // for i in 0..args.len() {
