@@ -495,10 +495,10 @@ impl ArgMachine{
                 waitpid(pid as usize, &mut exit_code);
                 let result = str::replace(*programname_op,"\0","");
                 if result != "false" && exit_code != 0{
-                    println!("testcase busybox {} fail", programname_op);
+                    println!("testcase busybox {} fail", result);
                 }
                 else{
-                    println!("testcase busybox {} success", programname_op);
+                    println!("testcase busybox {} success", result);
                 }
             }
         }
