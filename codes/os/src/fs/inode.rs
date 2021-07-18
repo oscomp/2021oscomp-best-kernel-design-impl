@@ -71,9 +71,13 @@ impl OSInode {
     pub fn write_all(&self, str_vec:&Vec<u8>){
         let mut inner = self.inner.lock();
         let mut buffer = [0u8; 512];
-        //let length = bu
+        let length = str_vec.len();
+        let base = 0;
         loop {
-
+            if base >= length {
+                break;
+            }
+            base += 512;
         }
 
 
