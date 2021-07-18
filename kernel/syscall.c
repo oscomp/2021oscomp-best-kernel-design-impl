@@ -174,6 +174,8 @@ extern uint64 sys_ppoll(void);
 extern uint64 sys_faccessat(void);
 extern uint64 sys_lseek(void);
 extern uint64 sys_utimensat(void);
+extern uint64 sys_prlimit64(void);
+extern uint64 sys_adjtimex(void);
 
 extern uint64 sys_unimplemented(void);
 
@@ -237,6 +239,8 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_faccessat]		sys_faccessat,
 	[SYS_lseek]			sys_lseek,
 	[SYS_utimensat]		sys_utimensat,
+	[SYS_prlimit64]		sys_prlimit64, 
+	[SYS_adjtimex]		sys_adjtimex, 
 };
 
 static char *sysnames[] = {
@@ -299,6 +303,8 @@ static char *sysnames[] = {
 	[SYS_faccessat]		"faccessat",
 	[SYS_lseek]			"lseek",
 	[SYS_utimensat]		"utimensat",
+	[SYS_prlimit64]		"prlimit64", 
+	[SYS_adjtimex]		"adjtimex", 
 };
 
 void

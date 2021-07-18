@@ -329,3 +329,10 @@ sys_mprotect(void)
 
 	return uvmprotect(p->pagetable, addr, len, prot);
 }
+
+uint64 
+sys_prlimit64(void) {
+	// for now it's not very necessary to implement this syscall 
+	// may be implemented later 
+	return 0;
+}

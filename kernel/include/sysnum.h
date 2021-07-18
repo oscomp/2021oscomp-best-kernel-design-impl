@@ -48,6 +48,7 @@
 #define SYS_times			153
 #define SYS_uname			160
 #define SYS_gettimeofday	169
+#define SYS_adjtimex		171
 #define SYS_getpid			172
 #define SYS_getppid			173
 #define SYS_getuid			174
@@ -62,6 +63,7 @@
 #define SYS_mmap			222
 #define SYS_mprotect		226
 #define SYS_wait4			260
+#define SYS_prlimit64		261
 #define SYS_renameat2		276
 
 #endif

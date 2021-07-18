@@ -48,3 +48,7 @@ uint64 sys_gettimeofday(void) {
 	}
 	return 0;
 }
+
+uint64 sys_adjtimex(void) {
+	return 0;
+}
