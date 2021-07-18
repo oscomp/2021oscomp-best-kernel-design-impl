@@ -172,17 +172,23 @@ pub fn sys_gettid() -> isize {
 }
 
 pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
-    current_task().unwrap().grow_proc(grow_size) as isize
+    let current_va = current_task().unwrap().grow_proc(grow_size) as isize;
+    // gdb_println!(SYSCALL_ENABLE,"(sys_sbrk ret 0x{:X})",current_va);
+    current_va
 }
 
 pub fn sys_brk(brk_addr: usize) -> isize{
+    let mut addr_new = 0;
     if brk_addr == 0 {
-        return sys_sbrk(0, 0) as isize
+        addr_new = sys_sbrk(0, 0) as usize;
     }
-    let former_addr = current_task().unwrap().grow_proc(0);
-    let grow_size: isize = (brk_addr - former_addr) as isize;
-    current_task().unwrap().grow_proc(grow_size);
-    0
+    else{
+        let former_addr = current_task().unwrap().grow_proc(0);
+        let grow_size: isize = (brk_addr - former_addr) as isize;
+        addr_new = current_task().unwrap().grow_proc(grow_size);
+    }
+    gdb_println!(SYSCALL_ENABLE,"sys_brk(0x{:X}) = 0x{:X}", brk_addr, addr_new);
+    addr_new as isize
 }
 
 //long clone(unsigned long flags, void *child_stack,
@@ -244,22 +250,17 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         let fd = inner.alloc_fd();
         inner.fd_table[fd] = Some(FileClass::File(app_inode));
         drop(inner);
-        let elf_buf = task.kmmap(0, len, 0, 0, fd, 0);
-        
-        //let page_table = PageTable::from_token(KERNEL_TOKEN.token());
-        //println!("ppn2 = 0x{:X}", page_table.translate(VirtAddr::from(elf_buf).floor()).unwrap().bits);
+        // print!("[exec 0]");
+        let elf_buf = task.kmmap(0, len, 0, 0, fd as isize, 0);
+        // print!("[exec 1]");
         let argc = args_vec.len();
-        // println!("argc:{}",argc);
-        //println!("[sys_exec2]");
         unsafe{
-
+            // print!("[exec 2]");
             let elf_ref = slice::from_raw_parts(elf_buf as *const u8, len);
             task.exec(elf_ref, args_vec);
             let inner = task.acquire_inner_lock();
-            let target = 0xffffffffffffcfe8 as *mut u8;
-            let c = *translated_refmut(inner.memory_set.token(), target);
-            // println!("c {}",c as char);
         }
+        // print!("[exec 3]");
         // print_free_pages();
         task.kmunmap(elf_buf, len);
         // drop fd
@@ -360,9 +361,19 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     // ---- release current PCB lock automatically
 }
 
-pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: usize, off: usize) -> isize {
+// not support full flags: MAP_FIXED
+// WARNING: if mmap len is 0, we will alloc one page for it, which actually should be forbidden.
+
+pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, off: usize) -> isize {
     let task = current_task().unwrap();
-    task.mmap(start, len, prot, flags, fd, off) as isize
+    let mut adjust_len = len;
+    if adjust_len == 0{
+        adjust_len = PAGE_SIZE;
+        println!("[sys_mmap]:adjust_len = {}",adjust_len);
+    }
+    let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
+    gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
+    return result_addr as isize;
 }
 
 pub fn sys_munmap(start: usize, len: usize) -> isize {
@@ -372,6 +383,7 @@ pub fn sys_munmap(start: usize, len: usize) -> isize {
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{
     if (addr % PAGE_SIZE != 0) || (len % PAGE_SIZE != 0){ // Not align
+        println!("sys_mprotect: not align");
         return -1
     }
     let task = current_task().unwrap();

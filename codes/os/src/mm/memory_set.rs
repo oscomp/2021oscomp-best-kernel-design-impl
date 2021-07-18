@@ -9,17 +9,10 @@ use riscv::register::satp;
 use alloc::sync::Arc;
 use lazy_static::*;
 use spin::Mutex;
-use crate::config::{
-    MEMORY_END,
-    PAGE_SIZE,
-    TRAMPOLINE,
-    TRAP_CONTEXT,
-    USER_STACK_SIZE,
-    USER_HEAP_SIZE,
-    MMAP_BASE,
-    MMIO,
-};
+use crate::config::*;
 use crate::mm::MmapArea;
+use crate::monitor::*;
+use crate::task::AuxHeader;
 
 extern "C" {
     fn stext();
@@ -193,7 +186,8 @@ impl MemorySet {
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp and entry point.
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize) {
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize, usize, Vec<AuxHeader>) {
+        let mut auxv:Vec<AuxHeader> = Vec::new();
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
@@ -205,7 +199,23 @@ impl MemorySet {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         let mut max_end_vpn = VirtPageNum(0);
-
+        // push ELF related auxv
+        let ph_head_addr = (elf.find_section_by_name(".text").unwrap().address() as usize )- (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
+        // let ph_head_addr = (elf.header.pt2.entry_point() as usize) - (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
+        auxv.push(AuxHeader{aux_type: AT_PHDR, value: ph_head_addr as usize});
+        auxv.push(AuxHeader{aux_type: AT_PHENT, value: elf.header.pt2.ph_entry_size() as usize});// ELF64 header 64bytes
+        auxv.push(AuxHeader{aux_type: AT_PHNUM, value: ph_count as usize});
+        auxv.push(AuxHeader{aux_type: AT_PAGESZ, value: PAGE_SIZE as usize});
+        auxv.push(AuxHeader{aux_type: AT_BASE, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_FLAGS, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_ENTRY, value: elf.header.pt2.entry_point() as usize});
+        auxv.push(AuxHeader{aux_type: AT_UID, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_EUID, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_GID, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_EGID, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_PLATFORM, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_HWCAP, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_CLKTCK, value: 100 as usize});
         for ph in elf.program_iter(){
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
                 let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
@@ -275,7 +285,7 @@ impl MemorySet {
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
 
-        (memory_set, user_stack_top, user_heap_bottom, elf.header.pt2.entry_point() as usize)
+        (memory_set, user_stack_top, user_heap_bottom, elf.header.pt2.entry_point() as usize, auxv)
     }
  
     pub fn from_existed_user(user_space: &MemorySet) -> MemorySet {
@@ -305,12 +315,21 @@ impl MemorySet {
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
     }
+
+    // WARNING: This function causes inconsistency between pte flags and 
+    //          map_area flags.
+    // return -1 if not found, 0 if found
     pub fn set_pte_flags(&mut self, vpn: VirtPageNum, flags: usize) -> isize{
         self.page_table.set_pte_flags(vpn, flags)
     }
+    
     pub fn recycle_data_pages(&mut self) {
         //*self = Self::new_bare();
         self.areas.clear();
+    }
+
+    pub fn print_pagetable(&mut self){
+        self.page_table.print_pagetable();
     }
 }
 
@@ -330,6 +349,7 @@ impl MapArea {
     ) -> Self {
         let start_vpn: VirtPageNum = start_va.floor();
         let end_vpn: VirtPageNum = end_va.ceil();
+        gdb_println!(MAP_ENABLE,"[MapArea new]: start_vpn:0x{:X} end_vpn:0x{:X}", start_vpn.0, end_vpn.0);
         Self {
             vpn_range: VPNRange::new(start_vpn, end_vpn),
             data_frames: BTreeMap::new(),
@@ -345,6 +365,8 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
+
+    // Alloc and map one page
     pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         let ppn: PhysPageNum;
         match self.map_type {
@@ -362,6 +384,7 @@ impl MapArea {
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
+        gdb_println!(MAP_ENABLE,"[map_one]: pte_flags:{:?} vpn:0x{:X}",pte_flags,vpn.0);
         page_table.map(vpn, ppn, pte_flags);
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
@@ -373,6 +396,8 @@ impl MapArea {
         }
         page_table.unmap(vpn);
     }
+    
+    // Alloc and map all pages
     pub fn map(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
             self.map_one(page_table, vpn);

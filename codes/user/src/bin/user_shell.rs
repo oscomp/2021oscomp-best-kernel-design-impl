@@ -400,6 +400,7 @@ impl ArgMachine{
     pub fn auto_run_testsuites(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
+        // testsuits.push("sh\0");
         testsuits.push("basename\0 /aaa/bbb\0");
         testsuits.push("clear\0");
         testsuits.push("dirname\0 /aaa/bbb\0");

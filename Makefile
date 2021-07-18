@@ -8,6 +8,9 @@ run:
 	cd codes/os && make fat32
 	cd codes/os && make run
 
+runos:
+	cd codes/os && make run
+
 runsimple:
 	cd codes/os && make runsimple
 

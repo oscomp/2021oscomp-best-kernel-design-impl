@@ -100,15 +100,15 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         // SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
         SYSCALL_MMAP => {
             sys_mmap(args[0] as usize, args[1] as usize, args[2] as usize, 
-            args[3] as usize, args[4] as usize, args[5] as usize)
+            args[3] as usize, args[4] as isize, args[5] as usize)
         },
         SYSCALL_MUNMAP => { sys_munmap(args[0] as usize, args[1] as usize) },
         SYSCALL_MPROTECT => {sys_mprotect(args[0] as usize, args[1] as usize, args[2] as isize)},
         SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => shutdown(),
         SYSCALL_CLEAR => sys_clear(args[0] as *const u8),
-        _ => 0
-        // _ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
+        // _ => 0
+        _ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
         //_ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

@@ -64,6 +64,7 @@ impl PageTableEntry {
     pub fn set_flags(&mut self, flags: usize) {
         self.bits = (self.bits & !(0b1110 as usize)) | ( flags & (0b1110 as usize));
     }
+
 }
 
 pub struct PageTable {
@@ -125,10 +126,10 @@ impl PageTable {
     }
     
     // only X+W+R can be set
+    // return -1 if find no such pte
     pub fn set_pte_flags(&mut self, vpn: VirtPageNum, flags: usize) -> isize{
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
-        let mut result: Option<&PageTableEntry> = None;
         for i in 0..3 {
             let pte = &mut ppn.get_pte_array()[idxs[i]];
             if i == 2 {
@@ -146,6 +147,36 @@ impl PageTable {
             ppn = pte.ppn();
         }
         0
+    }
+
+    pub fn print_pagetable(&mut self){
+        let idxs = [0 as usize;3];
+        let mut ppns = [PhysPageNum(0);3];
+        ppns[0] = self.root_ppn;
+        for i in 0..512{
+            let pte = &mut ppns[0].get_pte_array()[i];
+            if !pte.is_valid(){
+                continue;
+            }
+            ppns[1] = pte.ppn();
+            for j in 0..512{
+                let pte = &mut ppns[1].get_pte_array()[j];
+                if !pte.is_valid(){
+                    continue;
+                }
+                ppns[2] = pte.ppn();
+                for k in 0..512{
+                    let pte = &mut ppns[2].get_pte_array()[k];
+                    if !pte.is_valid(){
+                        continue;
+                    }
+                    let va = ((((i<<9)+j)<<9)+k)<<12 ;
+                    let pa = pte.ppn().0 << 12 ;
+                    let flags = pte.flags();
+                    println!("va:0x{:X}  pa:0x{:X} flags:{:?}",va,pa,flags);
+                }
+            }
+        }
     }
     
     #[allow(unused)]
