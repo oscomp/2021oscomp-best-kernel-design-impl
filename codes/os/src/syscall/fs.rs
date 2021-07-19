@@ -112,7 +112,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
-    gdb_println!(SYSCALL_ENABLE, "openat: path = {}", path);
+    //gdb_println!(SYSCALL_ENABLE, "openat: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     
     /////////////////////////////// WARNING ////////////////////////////////
@@ -742,11 +742,11 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
                     oflags
                 ){
                     // copy
-                    let data = oldfile.read_all();
+                    let first_cluster = oldfile.get_head_cluster();
                     // TODO:
                     match new_file_class {
                         FileClass::File(newfile)=>{
-                            newfile.write_all(&data);
+                            newfile.set_head_cluster(first_cluster);
                         }
                         _=> return -1
                     }

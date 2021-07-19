@@ -158,6 +158,7 @@ pub fn add_initproc_into_fs() {
             app_start[1] as *mut u8,
             app_start[2] - app_start[1]
         )});
+        //data.extend_from_slice(  )
         // println!("Start write user_shell ");
         inode.write(UserBuffer::new(data));
         // println!("User_shell OK");

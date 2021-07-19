@@ -494,6 +494,12 @@ impl VFile{
         })
     }
 
+    pub fn set_first_cluster(&self, clu:u32){
+        self.modify_short_dirent(|se:&mut ShortDirEntry|{
+            se.set_first_cluster(clu);
+        })
+    }
+
     /* 获取当前目录下的所有文件名以及属性，以Vector形式返回 */
     // 如果出现错误，返回None
     pub fn ls(&self)-> Option<Vec<(String, u8)>>{   
@@ -780,6 +786,12 @@ impl VFile{
     pub fn modification_time(&self) -> (u32,u32,u32,u32,u32,u32,u64){
         self.read_short_dirent(|sde:&ShortDirEntry|{
             sde.get_modification_time()
+        })
+    }
+
+    pub fn set_delete_bit(&self){
+        self.modify_short_dirent(|se:&mut ShortDirEntry|{
+            se.delete();
         })
     }
 

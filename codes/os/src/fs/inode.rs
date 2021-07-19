@@ -264,7 +264,24 @@ impl OSInode {
         let inner = self.inner.lock();
         inner.inode.remove()
     }
+
+    pub fn set_head_cluster(&self, cluster:u32) {
+        let inner = self.inner.lock();
+        let vfile = &inner.inode;
+        vfile.set_first_cluster(cluster);
+    }    
+
+    pub fn get_head_cluster(&self)->u32 {
+        let inner = self.inner.lock();
+        let vfile = &inner.inode;
+        vfile.first_cluster()
+    }
     
+    pub fn set_delete_bit(&self) {
+        let inner = self.inner.lock();
+        inner.inode.set_delete_bit();
+    }
+
     pub fn set_offset(& self, off:usize){
         let mut inner = self.inner.lock();
         inner.offset = off;

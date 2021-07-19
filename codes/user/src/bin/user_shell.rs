@@ -475,7 +475,6 @@ impl ArgMachine{
         testsuits.push("sh\0 -c\0 exit\0");
         testsuits.push("sleep\0 1\0");
         
-
         for programname_op in testsuits.iter() {
             let mut is_lua = false;
             let exec_path = {
