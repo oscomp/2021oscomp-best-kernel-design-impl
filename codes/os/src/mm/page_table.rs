@@ -374,6 +374,22 @@ impl UserBuffer {
         return len;
     }
 
+    pub fn write_at(&mut self, offset:usize, char:u8)->isize{
+        if offset > self.len() {
+            return -1
+        }
+        let mut head = 0;
+        for b in self.buffers.iter_mut() {
+            if offset > head && offset < head + b.len() {
+                (**b)[offset - head] = char;
+                //b.as_mut_ptr()
+            } else {
+                head += b.len();
+            }
+        }
+        0
+    }
+
     // 将UserBuffer的数据读入一个Buffer，返回读取长度
     pub fn read(&self, buff:&mut [u8])->usize{
         let len = self.len().min(buff.len());
