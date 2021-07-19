@@ -402,21 +402,21 @@ impl ArgMachine{
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
         // testsuits.push("sh\0");
-        testsuits.push("echo\0 \"#### independent command test\"\0");
-        testsuits.push("basename\0 /aaa/bbb\0");
-        testsuits.push("cal\0");
-        testsuits.push("clear\0");
-        testsuits.push("expr\0 1\0 +\0 1\0");
-        testsuits.push("pwd\0");
-        testsuits.push("dirname\0 /aaa/bbb\0");
-        testsuits.push("du\0");
-        testsuits.push("uptime\0");
-        testsuits.push("date\0");
-        testsuits.push("false\0");
-        testsuits.push("true\0");
-        testsuits.push("uname\0");
-        testsuits.push("printf\0 \"abc\n\"\0");
-        testsuits.push("kill\0 10\0");
+        //testsuits.push("echo\0 \"#### independent command test\"\0");
+        //testsuits.push("basename\0 /aaa/bbb\0");
+        //testsuits.push("cal\0");
+        //testsuits.push("clear\0");
+        //testsuits.push("expr\0 1\0 +\0 1\0");
+        //testsuits.push("pwd\0");
+        //testsuits.push("dirname\0 /aaa/bbb\0");
+        //testsuits.push("du\0");
+        //testsuits.push("uptime\0");
+        //testsuits.push("date\0");
+        //testsuits.push("false\0");
+        //testsuits.push("true\0");
+        //testsuits.push("uname\0");
+        //testsuits.push("printf\0 \"abc\n\"\0");
+        //testsuits.push("kill\0 10\0");
         
         // file
         testsuits.push("echo\0 \"#### file opration test\"\0");
@@ -521,6 +521,7 @@ impl ArgMachine{
             let pid = fork();
             if pid == 0 {
                 if need_pipe {
+                    print!("\n");
                     close(1); // close stdout
                     close(pipe_fd[0]); //close read end
                     if exec(exec_path.as_str(), args_addr1.as_slice()) == -1 {
@@ -536,9 +537,10 @@ impl ArgMachine{
                 unreachable!();
             } else {
                 if need_pipe {
+                    print!("\n");
                     let pid2 = fork();
                     if pid2 == 0{
-                        close(1); // close stdin
+                        close(0); // close stdin
                         close(pipe_fd[1]); //clise write end
                         if exec(exec_path.as_str(), args_addr2.as_slice()) == -1 {
                             println!("Error when executing autorun_testsuites!");
