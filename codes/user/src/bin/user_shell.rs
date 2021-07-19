@@ -61,7 +61,8 @@ use user_lib::{
     chdir,
     shutdown,
     ls,
-    unlink
+    unlink,
+    pipe
 };
 use user_lib::console::getchar;
 
@@ -397,7 +398,7 @@ impl ArgMachine{
 
     }
 
-    pub fn auto_run_testsuites(){
+    pub fn auto_run_testsuites( ){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
         // testsuits.push("sh\0");
@@ -420,6 +421,7 @@ impl ArgMachine{
         // file
         testsuits.push("echo\0 \"#### file opration test\"\0");
         testsuits.push("touch\0 test.txt\0");
+        testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
         testsuits.push("echo\0 \"hello world\"\0 >\0 test.txt\0");
         testsuits.push("tail\0 test.txt\0");
         testsuits.push("cat\0 test.txt\0");
@@ -440,6 +442,7 @@ impl ArgMachine{
         testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
         testsuits.push("stat\0 test.txt\0");//?
         testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");  //ok
+
         
         // dir test
         testsuits.push("mkdir\0 test_dir\0");
@@ -451,7 +454,6 @@ impl ArgMachine{
 
         // half
         testsuits.push("ps\0");
-        //testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
         testsuits.push("df\0");     
         testsuits.push("[\0 -f\0 test.txt\0 ]\0");
         testsuits.push("more\0 test.txt\0");
@@ -474,8 +476,11 @@ impl ArgMachine{
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
         testsuits.push("sleep\0 1\0");
+
+        let mut pipe_fd = [0usize; 2];
         
         for programname_op in testsuits.iter() {
+            let need_pipe = (*programname_op).contains("|\0");
             let mut is_lua = false;
             let exec_path = {
                 if programname_op.contains("lua") {
@@ -499,14 +504,50 @@ impl ArgMachine{
             args_addr.push(0 as *const u8 );
             // print!("args_addr.as_slice():{:?}",args_addr.as_slice());
             // print!("ars:{:?}",args);
+
+            let mut exeop1 = String::new();
+            let mut exeop2 = String::new();
+            let mut args_addr1: Vec<*const u8> = Vec::new();
+            let mut args_addr2: Vec<*const u8> = Vec::new();
+            if need_pipe {
+                pipe(&mut pipe_fd);
+                let prog_op:Vec<&str> = programname_op.split(" |\0 ").collect();
+                exeop1 = exec_path.clone() + " " + prog_op[0];
+                exeop2.push_str(prog_op[1]);
+                args_addr1 = get_args_addr(&exeop1);
+                args_addr2 = get_args_addr(&exeop2);
+            }
+
             let pid = fork();
             if pid == 0 {
-                if exec(exec_path.as_str(), args_addr.as_slice()) == -1 {
-                    println!("Error when executing autorun_testsuites!");
-                    shutdown();
+                if need_pipe {
+                    close(1); // close stdout
+                    close(pipe_fd[0]); //close read end
+                    if exec(exec_path.as_str(), args_addr1.as_slice()) == -1 {
+                        println!("Error when executing autorun_testsuites!");
+                        shutdown();
+                    }
+                } else {
+                    if exec(exec_path.as_str(), args_addr.as_slice()) == -1 {
+                        println!("Error when executing autorun_testsuites!");
+                        shutdown();
+                    }
                 }
                 unreachable!();
             } else {
+                if need_pipe {
+                    let pid2 = fork();
+                    if pid2 == 0{
+                        close(1); // close stdin
+                        close(pipe_fd[1]); //clise write end
+                        if exec(exec_path.as_str(), args_addr2.as_slice()) == -1 {
+                            println!("Error when executing autorun_testsuites!");
+                            shutdown();
+                        }
+                        unreachable!();
+                    }
+                    waitpid(pid2 as usize, &mut exit_code);
+                }
                 waitpid(pid as usize, &mut exit_code);
                 let result = str::replace(*programname_op,"\0","");
                 let result = str::replace(&result.as_str(),"\n","\\n");
@@ -602,6 +643,22 @@ impl ArgMachine{
 
     
 }
+
+
+fn get_args_addr(op:&String)->Vec<*const u8>{
+    let args: Vec<&str> = op.as_str().split(' ').collect();
+    // for i in 0..args.len() {
+    //     args[i].push('\0');
+    // }
+    let mut args_addr: Vec<*const u8> = Vec::new();
+    for i in 0..args.len() {
+        //println!("{:?}", args[i]);
+        args_addr.push(args[i].as_ptr() as usize as *const u8);
+    }
+    args_addr.push(0 as *const u8 );
+    args_addr
+}
+
 
 #[no_mangle]
 pub fn main() -> i32 {
