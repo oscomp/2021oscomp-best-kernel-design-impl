@@ -734,7 +734,7 @@ impl VFile{
         //self.fs.write().dealloc_cluster(all_clusters);
         let fs_reader = self.fs.read();
         fs_reader.dealloc_cluster(all_clusters);
-        fs_reader.cache_write_back();
+        //fs_reader.cache_write_back();
     }
 
     /* 查找可用目录项，返回offset，簇不够也会返回相应的offset，caller需要及时分配 */

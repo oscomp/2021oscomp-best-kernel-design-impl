@@ -209,7 +209,7 @@ impl FAT32Manager {
             self.block_device.clone());
         // 写入分配的最后一个簇
         self.fsinfo.write_first_free_cluster(current_cluster, self.block_device.clone());
-        self.cache_write_back();
+        //self.cache_write_back();
         //println!("[fs]: after alloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
         Some(first_cluster)
     }
