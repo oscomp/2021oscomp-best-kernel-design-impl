@@ -106,6 +106,7 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
         let cur_sec = get_time_s();
         let cur_usec = get_time_us();
         if compare_time(end_sec, end_usec, cur_sec, cur_usec) {
+            print!("\n");
             suspend_current_and_run_next();
         }
         else{
