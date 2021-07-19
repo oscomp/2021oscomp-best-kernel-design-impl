@@ -948,3 +948,29 @@ sys_ioctl(void)
 
 	return 0;
 }
+
+uint64
+sys_statfs(void)
+{
+	char path[MAXPATH];
+	uint64 addr;
+	if (argstr(0, path, MAXPATH) < 0 || argaddr(1, &addr) < 0)
+		return -ENAMETOOLONG;
+
+	struct inode *ip = namei(path);
+	if (ip == NULL)
+		return -ENOENT;
+	
+	struct superblock *sb = ip->sb;
+	iput(ip);
+	
+	struct statfs stat;
+	if (!sb->op.statfs)
+		return -EPERM;
+	if (sb->op.statfs(sb, &stat) < 0)
+		return -EIO;
+	if (copyout2(addr, (char *)&stat, sizeof(stat)) < 0)
+		return -EFAULT;
+	
+	return 0;
+}

@@ -22,6 +22,7 @@
 #define SYS_unlinkat		35
 #define SYS_umount			39
 #define SYS_mount			40
+#define SYS_statfs			43
 #define SYS_faccessat		48
 #define SYS_chdir			49
 #define SYS_openat			56

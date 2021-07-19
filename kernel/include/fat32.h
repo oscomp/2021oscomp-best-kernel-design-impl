@@ -36,6 +36,9 @@ struct fat32_sb {
 	uint32  data_sec_cnt;
 	uint32  data_clus_cnt;
 	uint32  byts_per_clus;
+	uint32  free_count;		// of cluster
+	uint32  next_free;		// clus
+	uint16	fs_info;
 	struct {
 		uint16  byts_per_sec;
 		uint8   sec_per_clus;
@@ -68,9 +71,11 @@ struct fat32_entry {
 
 
 struct fat32_sb*    fat32_init(char *boot_sector);
+int                 fat32_info_init(struct fat32_sb* fat, char *fsinfo_sector);
 struct inode*       fat32_root_init(struct superblock *sb);
 struct inode*       fat_lookup_dir(struct inode *dir, char *filename, uint *poff);
 struct inode*       fat_alloc_inode(struct superblock *sb);
+int                 fat_stat_fs(struct superblock *sb, struct statfs *stat);
 void                fat_destroy_inode(struct inode *ip);
 struct inode*       fat_alloc_entry(struct inode *dir, char *name, int mode);
 int                 fat_update_entry(struct inode *ip);

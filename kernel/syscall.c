@@ -180,6 +180,7 @@ extern uint64 sys_prlimit64(void);
 extern uint64 sys_adjtimex(void);
 extern uint64 sys_clock_settime(void);
 extern uint64 sys_clock_gettime(void);
+extern uint64 sys_statfs(void);
 
 
 static uint64 (*syscalls[])(void) = {
@@ -247,6 +248,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_adjtimex]		sys_adjtimex, 
 	[SYS_clock_settime] sys_clock_settime, 
 	[SYS_clock_gettime] sys_clock_gettime, 
+	[SYS_statfs]		sys_statfs,
 };
 
 static char *sysnames[] = {
@@ -314,6 +316,7 @@ static char *sysnames[] = {
 	[SYS_adjtimex]		"adjtimex", 
 	[SYS_clock_gettime]	"clock_gettime", 
 	[SYS_clock_settime]	"clock_settime", 
+	[SYS_statfs]		"statfs",
 };
 
 void
@@ -351,6 +354,8 @@ sys_test_proc(void) {
 	return 0;
 }
 
+#include "include/buf.h"
+
 uint64
 sys_sysinfo(void)
 {
@@ -362,14 +367,14 @@ sys_sysinfo(void)
 	}
 
 	extern uint64 ticks;
-	extern char kernel_end[];
 
 	struct sysinfo info;
 	memset(&info, 0, sizeof(info));
 
 	info.uptime = ticks;
-	info.totalram = PHYSTOP - (uint64)kernel_end;
+	info.totalram = PHYSTOP - RUSTSBI_BASE;
 	info.freeram = idlepages() << PGSHIFT;
+	info.bufferram = BSIZE * BNUM;
 	info.procs = procnum();
 	info.mem_unit = PGSIZE;
 
