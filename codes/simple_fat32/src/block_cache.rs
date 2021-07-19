@@ -212,9 +212,15 @@ pub fn get_info_cache(
     let phy_blk_id = INFO_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
+        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
+        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }

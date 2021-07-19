@@ -611,6 +611,7 @@ impl VFile{
                 } 
                 let attribute = short_ent.attribute();
                 let first_cluster = short_ent.first_cluster();
+                offset += DIRENT_SZ;
                 return Some((name, offset as u32, first_cluster,attribute))
             } else {
                 is_long = true;

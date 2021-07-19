@@ -66,7 +66,7 @@ impl File for TtyINode {
     }
 
     fn ioctl(&self, cmd: u32, arg: usize)->isize{
-        //println!("ioctl: cmd={}; arg={}", cmd, arg);
+        //println!("ioctl: cmd={}; arg={:X}", cmd, arg);
         let cmd = cmd as usize;
         match cmd {
             TIOCGPGRP => {
@@ -83,9 +83,10 @@ impl File for TtyINode {
                 0
             }
             TIOCGWINSZ => {
-                let winsize = arg as *mut Winsize;
+                let winsize = Winsize::default();
                 let size = size_of::<Winsize>();
-                copy_to_user(arg, winsize, size);
+                //println!("size = {}", size);
+                copy_to_user(arg, &winsize as *const Winsize, size);
                 0
             }
             TCGETS => {

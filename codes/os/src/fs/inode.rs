@@ -1,3 +1,4 @@
+use crate::monitor::SYSCALL_ENABLE;
 use crate::{drivers::BLOCK_DEVICE, println};
 use crate::color_text;
 use _core::usize;
@@ -10,7 +11,8 @@ use spin::Mutex;
 use super::{DT_DIR, DT_REG, DT_UNKNOWN, Dirent, File, Kstat, NewStat, finfo};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
-use crate::config::*;
+//use crate::config::*;
+//use crate::gdb_println;
 
 
 #[derive(PartialEq,Copy,Clone,Debug)]
@@ -141,9 +143,10 @@ impl OSInode {
         }
     }
 
-    pub fn getdirent(&self, dirent: &mut Dirent, offset:isize)->isize {
-        let inner = self.inner.lock();
-        if let Some((name, offset, first_clu,attri)) 
+    pub fn getdirent(&self, dirent: &mut Dirent /*, offset:isize*/)->isize {
+        let mut inner = self.inner.lock();
+        let offset = inner.offset as u32;
+        if let Some((name, off, first_clu,attri)) 
         = inner.inode.dirent_info(offset as usize){
             let mut d_type:u8 = 0;
             if attri & ATTRIBUTE_DIRECTORY != 0 {
@@ -156,11 +159,13 @@ impl OSInode {
             dirent.fill_info(
                 name.as_str(), 
                 first_clu as usize, 
-                offset as isize, 
+                (off - offset) as isize, 
                 name.len() as u16, 
                 d_type
             );
-            (name.len() + 8*4) as isize
+            inner.offset = off as usize; 
+            let len = (name.len() + 8*4) as isize;
+            len
         } else {
             -1
         }
@@ -310,13 +315,14 @@ lazy_static! {
 
 pub fn init_rootfs(){
     println!("[fs] build rootfs ... start");
-    let dir_etc = open("/","etc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    println!("[fs] build rootfs: creating /etc");
-    let dir_dev = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //let dir_etc = open("/","etc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //println!("[fs] build rootfs: creating /etc");
+    let file = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     println!("[fs] build rootfs: creating /dev");
-    let root_dev = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    let file = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     println!("[fs] build rootfs: creating userdir");
-    let file_pswd = open("/etc","passwd", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    //let file_pswd = open("/etc","passwd", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    
     println!("[fs] build rootfs: creating /proc");
     let file = open("/","proc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     println!("[fs] build rootfs: init /proc");
@@ -325,9 +331,9 @@ pub fn init_rootfs(){
     let file = open("/proc","mounts", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let meminfo = open("/proc","meminfo", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let file = open("/","ls", OpenFlags::CREATE, DiskInodeType::File).unwrap();
-    let mut meminfo_data = String::new();
-    meminfo_data.push_str("MemTotal:    8192 kB\n");
-    meminfo.write_all(&Vec::from(meminfo_data.as_str()));
+    //let mut meminfo_data = String::new();
+    //meminfo_data.push_str("MemTotal:    8192 kB\n");
+    //meminfo.write_all(&Vec::from(meminfo_data.as_str()));
     println!("[fs] build rootfs ... finish");
 }
 

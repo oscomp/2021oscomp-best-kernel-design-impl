@@ -351,6 +351,7 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
 }
 
 pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
+    //return 0;
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
@@ -366,9 +367,9 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
             OpenFlags::RDONLY,
             DiskInodeType::Directory
         ) {
-            let len = file.getdirent(&mut dirent, 0);
+            let len = file.getdirent(&mut dirent);
             userbuf.write(dirent.as_bytes());
-            return len;
+            return 0; //warning
         } else {
             return -1
         }
@@ -380,9 +381,9 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
         if let Some(file) = &inner.fd_table[fd_usz] {
             match &file.fclass {
                 FileClass::File(f) => {
-                    let len = f.getdirent(&mut dirent, 0);
+                    let len = f.getdirent(&mut dirent);
                     userbuf.write(dirent.as_bytes());
-                    return len;
+                    return 0; //warning
                 },
                 _ => return -1,
             }
@@ -627,8 +628,11 @@ pub fn fcntl(fd:usize, cmd:u32, arg:usize)->isize{
         return -1;
     }
 
+    gdb_println!(SYSCALL_ENABLE,"cmd = {}", cmd);
+
     if let Some(file) = &mut inner.fd_table[fd] {
         match cmd {
+            
             F_DUPFD => {
                 return dup_inc(fd, arg, &mut inner.fd_table)
             },
@@ -637,6 +641,7 @@ pub fn fcntl(fd:usize, cmd:u32, arg:usize)->isize{
             }
             F_SETFD=> {
                 file.set_cloexec((arg & 1) == 1);
+                //println!("oj8k");
                 return 0;
             }
             F_DUPFD_CLOEXEC =>{

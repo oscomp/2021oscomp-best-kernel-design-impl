@@ -438,10 +438,10 @@ impl ArgMachine{
         testsuits.push("echo\0 \"2222222\"\0 >>\0 test.txt\0");
         testsuits.push("echo\0 \"1111111\"\0 >>\0 test.txt\0");
         testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
-        
-        // dir test
         testsuits.push("stat\0 test.txt\0");//?
         testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");  //ok
+        
+        // dir test
         testsuits.push("mkdir\0 test_dir\0");
         testsuits.push("mv\0 test_dir\0 test\0"); 
         testsuits.push("rmdir\0 test\0"); 
@@ -450,7 +450,7 @@ impl ArgMachine{
         testsuits.push("rm\0 busybox_cmd.bak\0");
 
         // half
-        //testsuits.push("ps\0");
+        testsuits.push("ps\0");
         //testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
         testsuits.push("df\0");     
         testsuits.push("[\0 -f\0 test.txt\0 ]\0");
