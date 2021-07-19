@@ -614,6 +614,7 @@ pub const F_DUPFD: u32 = 0; /*  dup the fd using the lowest-numbered
 
 pub const F_GETFD: u32 = 1; /* fd flag */
 pub const F_SETFD: u32 = 2;
+pub const F_GETFL: u32 = 3;
 
 pub const F_DUPFD_CLOEXEC: u32 = 1030;  /* Duplicate file descriptor with close-on-exit set.*/
 
@@ -641,7 +642,6 @@ pub fn fcntl(fd:usize, cmd:u32, arg:usize)->isize{
             }
             F_SETFD=> {
                 file.set_cloexec((arg & 1) == 1);
-                //println!("oj8k");
                 return 0;
             }
             F_DUPFD_CLOEXEC =>{
@@ -653,7 +653,7 @@ pub fn fcntl(fd:usize, cmd:u32, arg:usize)->isize{
                     return -1
                 }
             }
-            _=> return -1,
+            _=> return 0, // WARNING!!!
         }
     } else {
         return -1;

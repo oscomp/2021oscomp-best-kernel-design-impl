@@ -317,10 +317,10 @@ pub fn init_rootfs(){
     println!("[fs] build rootfs ... start");
     //let dir_etc = open("/","etc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     //println!("[fs] build rootfs: creating /etc");
-    let file = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    println!("[fs] build rootfs: creating /dev");
-    let file = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    println!("[fs] build rootfs: creating userdir");
+    //let file = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //println!("[fs] build rootfs: creating /dev");
+    //let file = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //println!("[fs] build rootfs: creating userdir");
     //let file_pswd = open("/etc","passwd", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     
     println!("[fs] build rootfs: creating /proc");

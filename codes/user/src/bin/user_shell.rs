@@ -510,7 +510,7 @@ impl ArgMachine{
             } else {
                 waitpid(pid as usize, &mut exit_code);
                 let result = str::replace(*programname_op,"\0","");
-                let result = str::replace(*programname_op,"\n","\\n");
+                let result = str::replace(&result.as_str(),"\n","\\n");
                 if result != "false" && exit_code != 0{
                     if is_lua {
                         println!("testcase lua {} fail", result);
