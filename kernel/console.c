@@ -31,6 +31,7 @@
 #include "include/printf.h"
 #include "include/vm.h"
 #include "include/debug.h"
+#include "include/buf.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
@@ -239,6 +240,9 @@ consoleintr(int c)
 		break;
 	case C('K'):  // Print mem-alloc list.
 		kmview();
+		break;
+	case C('B'):  // Print mem-alloc list.
+		bprint();
 		break;
 	case C('U'):  // Kill line.
 		while(cons.e != cons.w &&
