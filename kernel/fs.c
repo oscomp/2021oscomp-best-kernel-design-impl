@@ -34,6 +34,7 @@ static int rootfs_iop1(struct inode *ip);
 static int rootfs_getattr(struct inode *ip, struct kstat *st);
 static int root_file_rw(struct inode *ip, int usr, uint64 dst, uint off, uint n);
 static int root_file_readdir(struct inode *ip, struct dirent *dent, uint off);
+static int mountinfo_read(struct inode *ip, int usr, uint64 dst, uint off, uint n);
 
 /**
  * Root file system functions.
@@ -76,6 +77,16 @@ struct inode_op rootfs_inode_op = {
 	.rename = NULL,
 };
 
+struct file_op imount_fop = {
+	.read = mountinfo_read,
+	.write = root_file_rw,
+	.readdir = root_file_readdir,
+	.readv = NULL,
+	.writev = NULL,
+};
+
+static struct inode *imount;
+
 // Must be called by initcode.
 void rootfs_init()
 {
@@ -88,21 +99,30 @@ void rootfs_init()
 	if ((rootfs.root = de_root_generate(NULL, "/", 0, I_MODE_DIR, 0, 0)) == NULL)
 		panic("rootfs_init 1");
 
-	struct dentry *de, *home, *con;
-	if ((de = de_root_generate(rootfs.root, "dev", 1, I_MODE_DIR, 0, 0)) == NULL)
-		panic("rootfs_init 2");
+	struct dentry *dev, *home, *con, *proc, *vda, *mount;
+	if ((dev = de_root_generate(rootfs.root, "dev", 1, I_MODE_DIR, 0, 0)) == NULL)
+		panic("rootfs_init: /dev");
 	if ((home = de_root_generate(rootfs.root, "home", 2, I_MODE_DIR, 0, 1)) == NULL)
-		panic("rootfs_init 3");
-	if ((con = de_root_generate(de, "console", 3, 0, 2, 0)) == NULL)
-		panic("rootfs_init 4");
-	if ((de = de_root_generate(de, "vda2", 4, 0, ROOTDEV, 1)) == NULL)
-		panic("rootfs_init 5");
+		panic("rootfs_init: /home");
+	if ((con = de_root_generate(dev, "console", 3, 0, 2, 0)) == NULL)
+		panic("rootfs_init: /dev/console");
+	if ((vda = de_root_generate(dev, "vda2", 4, 0, ROOTDEV, 1)) == NULL)
+		panic("rootfs_init: /dev/vda2");
+	if ((proc = de_root_generate(rootfs.root, "proc", 5, I_MODE_DIR, 0, 2)) == NULL)
+		panic("rootfs_init: /proc");
+	if ((mount = de_root_generate(proc, "mounts", 6, 0, 0, 0)) == NULL)
+		panic("rootfs_init: /proc/mounts");
+	if (de_root_generate(proc, "meminfo", 7, 0, 0, 1) == NULL)
+		panic("rootfs_init: /proc/meminfo");
 
 	extern struct file_op console_op;
 	con->inode->fop = &console_op;
 
-	if (do_mount(de->inode, home->inode, "fat32", 0, 0) < 0)
-		panic("rootfs_init 6");
+	imount = mount->inode;
+	imount->fop = &imount_fop;
+
+	if (do_mount(vda->inode, home->inode, "fat32", 0, 0) < 0)
+		panic("rootfs_init: mount sd");
 
 	__debug_info("rootfs_init", "done\n");
 }
@@ -626,6 +646,11 @@ static struct inode *lookup_path(struct inode *ip, char *path, int parent, char 
 {
 	struct inode *next;
 	if (*path == '/') {
+		if (strncmp(path, "/proc/self/exe", 15) == 0) {
+			struct proc *p = myproc();
+			if (p->elf) return idup(p->elf);
+			return NULL;
+		}
 		ip = idup(rootfs.root->inode);
 	} else if (*path != '\0') {
 		if (ip != NULL)
@@ -742,6 +767,58 @@ int namepath(struct inode *ip, char *path, int max)
  * 
  */
 
+static int mountinfo_read(struct inode *ip, int usr, uint64 dst, uint off, uint n)
+{
+	if (ip != imount)
+		return -EPERM;
+
+	uint tot = 0;
+	int const bufsz = 512;
+	char *buf = kmalloc(bufsz);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	char *p = buf;
+
+	struct superblock *sb = rootfs.next;
+	for (; sb; sb = sb->next) {
+		int len = namepath(sb->dev, p, bufsz - tot);
+		p[len - 1] = ' ';
+		p += len;
+		tot += len;
+		if (tot >= bufsz) {
+			tot = bufsz;
+			break;
+		}
+		len = namepath(sb->root->inode, p, bufsz - tot);
+		p[len - 1] = ' ';
+		p += len;
+		tot += len;
+		if (tot >= bufsz) {
+			tot = bufsz;
+			break;
+		}
+		len = strlen(sb->type);
+		if (tot + len + 1 >= bufsz) {
+			break;
+		}
+		safestrcpy(p, sb->type, sizeof(sb->type));
+		p[len++] = '\n';
+		p += len;
+		tot += len;
+	}
+
+	uint ret = 0;
+	if (off < tot) {
+		ret = tot - off < n ? tot - off : n;
+		if (either_copyout(usr, dst, buf + off, ret) < 0)
+			ret = -EFAULT;
+	}
+
+	kfree(buf);
+	return ret;
+}
+
 extern struct superblock *image_fs_init(struct inode *img);
 extern void fs_uninstall(struct superblock *sb);
 
@@ -796,6 +873,7 @@ int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, vo
 	psb->next = sb;
 	sb->root->parent = dmnt;
 	safestrcpy(sb->root->filename, dmnt->filename, sizeof(dmnt->filename));
+	safestrcpy(sb->type, type, sizeof(sb->type));
 	dmnt->mount = sb;
 
 	release(&rootfs.cache_lock);

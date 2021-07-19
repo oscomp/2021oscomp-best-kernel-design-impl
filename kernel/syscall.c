@@ -177,7 +177,6 @@ extern uint64 sys_lseek(void);
 extern uint64 sys_utimensat(void);
 extern uint64 sys_ioctl(void);
 
-extern uint64 sys_unimplemented(void);
 
 static uint64 (*syscalls[])(void) = {
 	[SYS_fork]			sys_fork,
@@ -230,7 +229,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_getegid]		sys_getuid,
 	[SYS_readv]			sys_readv,
 	[SYS_writev]		sys_writev,
-	[SYS_readlinkat]	sys_unimplemented,
+	[SYS_readlinkat]	sys_readlinkat,
 	[SYS_mprotect]		sys_mprotect,
 	[SYS_exit_group]	sys_exit,
 	[SYS_ioctl]			sys_ioctl,
@@ -327,7 +326,7 @@ syscall(void)
 		}
 		
 	} else {
-		// printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
+		printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
 		p->trapframe->a0 = -1;
 	}
 }

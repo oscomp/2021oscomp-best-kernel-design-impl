@@ -644,42 +644,42 @@ sys_writev(void)
 }
 
 uint64
-// sys_readlinkat(void)
-sys_unimplemented(void)
-{/*
+sys_readlinkat(void)
+{
 	int dirfd;
-	uint64 path, ubuf, size;
+	uint64 ubuf, size;
+	char path[MAXPATH];
 	struct file *f;
-	// struct inode *dp;
+	struct inode *dp, *ip;
 
 	if (argfd(0, &dirfd, &f) < 0) {
 		if (dirfd != AT_FDCWD) {
-			return -1;
+			return -EBADF;
 		}
-	// 	dp = myproc()->cwd;
-	// } else {
-	// 	dp = f->ip;
+		dp = myproc()->cwd;
+	} else {
+		dp = f->ip;
 	}
 
-	if (argaddr(1, &path) < 0 || argaddr(2, &ubuf) < 0 || argaddr(3, &size) < 0)
-		return -1;
+	if (argstr(1, path, MAXPATH) < 0 || argaddr(2, &ubuf) < 0 || argaddr(3, &size) < 0)
+		return -ENAMETOOLONG;
 
-	char buf[MAXPATH];
-	if (copyinstr2(buf, path, sizeof(buf)) < 0)
-		return -1;
+	__debug_info("sys_readlinkat", "path=%s\n", path);
 
-	__debug_info("sys_readlinkat", "path=%s\n", buf);
-	// special handler, since we run on fat, which has no links
-	if (strncmp(buf, "/proc/self/exe", sizeof(buf)) == 0) {
-		char res[] = "/home/busybox";
-		int const len = sizeof(res) - 1;
-		if (len > size || copyout2(ubuf, res, len) < 0) {
-			return -1;
-		}
-		return len;
-	}
-*/
-	return -1;
+	ip = nameifrom(dp, path);
+	if (ip == NULL)
+		return -ENOENT;
+
+	int len;
+	len = namepath(ip, path, MAXPATH);
+	iput(ip);
+
+	if (len > size)
+		len = size;
+	if (copyout2(ubuf, path, len) < 0)
+		return -EFAULT;
+
+	return len;
 }
 
 uint64
