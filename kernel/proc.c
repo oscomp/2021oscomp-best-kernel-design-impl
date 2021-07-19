@@ -410,6 +410,7 @@ void exit(int xstate) {
 	// write in xstate 
 	p->xstate = xstate;
 
+	__enter_proc_cs 
 	// re-parent all it's child to `__initproc`
 	struct proc *tmp = p->child;
 	while (NULL != tmp) {
@@ -428,7 +429,6 @@ void exit(int xstate) {
 	__debug_info("exit", "leave\n");
 
 	// jump into scheduler 
-	__enter_proc_cs 
 
 	__remove(p);		// remove p from its list 
 	__insert_zombie(p);	// re-insert p into `proc_zombie`
