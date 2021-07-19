@@ -448,6 +448,17 @@ impl ArgMachine{
         testsuits.push("which\0 ls\0");
         testsuits.push("cp\0 busybox_cmd.txt\0 busybox_cmd.bak\0");
         testsuits.push("rm\0 busybox_cmd.bak\0");
+
+        // half
+        //testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
+        testsuits.push("df\0");     
+        testsuits.push("[\0 -f\0 test.txt\0 ]\0");
+        //testsuits.push("more\0 test.txt\0");
+        testsuits.push("rm\0 test.txt\0");    //ok    
+        testsuits.push("free\0");
+        //testsuits.push("hwclock\0");
+        //testsuits.push("ps\0");
+        testsuits.push("ls\0");
         
         // lua: all pass
         testsuits.push("date.lua\0");
@@ -460,23 +471,9 @@ impl ArgMachine{
         testsuits.push("sort.lua\0");
         testsuits.push("strings.lua\0");
         
-        //half
-        
-
-        //fail
-        testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
-        testsuits.push("df\0");     
-        testsuits.push("[\0 -f\0 test.txt\0 ]\0");
-        //testsuits.push("more\0 test.txt\0");
-        testsuits.push("rm\0 test.txt\0");    //ok    
-        testsuits.push("free\0");
-        testsuits.push("hwclock\0");
-        //testsuits.push("ps\0");
-
-        testsuits.push("sleep\0 1\0");
-        testsuits.push("ls\0");
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
+        testsuits.push("sleep\0 1\0");
         
 
         for programname_op in testsuits.iter() {
