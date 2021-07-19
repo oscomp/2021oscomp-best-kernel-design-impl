@@ -66,6 +66,7 @@ impl File for TtyINode {
     }
 
     fn ioctl(&self, cmd: u32, arg: usize)->isize{
+        //println!("ioctl: cmd={}; arg={}", cmd, arg);
         let cmd = cmd as usize;
         match cmd {
             TIOCGPGRP => {
@@ -98,6 +99,10 @@ impl File for TtyINode {
                 let size = size_of::<Termios>();
                 copy_from_user(&mut termios as *mut Termios, arg, size);
                 *self.termios.write() = termios;
+                0
+            }
+            /* WARNING: 仅临时handle */
+            RTC_RD_TIME=> {
                 0
             }
             _ => -1,// not support

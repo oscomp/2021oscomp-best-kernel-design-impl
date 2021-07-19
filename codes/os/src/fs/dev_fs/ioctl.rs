@@ -19,6 +19,8 @@ pub const FIONCLEX: usize = 0x5450;
 // for non-blocking/blocking IO control setting
 pub const FIONBIO: usize = 0x5421;
 
+pub const RTC_RD_TIME:usize = 0x80247009;
+
 
 /*  The termios functions describe a general terminal interface that
     is provided to control asynchronous communications ports. 

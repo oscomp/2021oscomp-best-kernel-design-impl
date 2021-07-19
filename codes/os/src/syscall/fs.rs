@@ -596,6 +596,7 @@ pub fn sys_ioctl(fd:usize, cmd:u32, arg:usize)->isize{
             FileClass::File(f)=>{f.clone()},
             _ => return -1,
         };
+        drop(inner);
         return file.ioctl(cmd, arg)
     } else {
         return -1

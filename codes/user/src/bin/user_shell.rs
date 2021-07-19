@@ -450,14 +450,14 @@ impl ArgMachine{
         testsuits.push("rm\0 busybox_cmd.bak\0");
 
         // half
+        //testsuits.push("ps\0");
         //testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
         testsuits.push("df\0");     
         testsuits.push("[\0 -f\0 test.txt\0 ]\0");
-        //testsuits.push("more\0 test.txt\0");
+        testsuits.push("more\0 test.txt\0");
         testsuits.push("rm\0 test.txt\0");    //ok    
         testsuits.push("free\0");
-        //testsuits.push("hwclock\0");
-        //testsuits.push("ps\0");
+        testsuits.push("hwclock\0");
         testsuits.push("ls\0");
         
         // lua: all pass
@@ -510,6 +510,7 @@ impl ArgMachine{
             } else {
                 waitpid(pid as usize, &mut exit_code);
                 let result = str::replace(*programname_op,"\0","");
+                let result = str::replace(*programname_op,"\n","\\n");
                 if result != "false" && exit_code != 0{
                     if is_lua {
                         println!("testcase lua {} fail", result);
