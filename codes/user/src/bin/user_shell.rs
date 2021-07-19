@@ -392,7 +392,7 @@ impl ArgMachine{
     }
 
     pub fn auto_run_busy_box(){
-        unlink("result.txt\0");
+        //unlink("result.txt\0");
         open("result.txt\0", OpenFlags::CREATE);
 
     }
@@ -606,8 +606,8 @@ impl ArgMachine{
 #[no_mangle]
 pub fn main() -> i32 {
     // delete init programs in fs
-    unlink("initproc\0");
-    unlink("user_shell\0");
+    //unlink("initproc\0");
+    //unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
     ArgMachine::auto_run_testsuites();
     let mut line: String;
