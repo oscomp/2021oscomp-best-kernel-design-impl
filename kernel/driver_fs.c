@@ -101,9 +101,11 @@ struct superblock *image_fs_init(struct inode *img)
 	if ((sb = kmalloc(sizeof(struct superblock))) == NULL) {
 		return NULL;
 	}
-	if ((sb_buf = kmalloc(128)) == NULL || 
-		img->fop->read(img, 0, (uint64)sb_buf, 0, 128) != 128 ||
-		(fat = fat32_init(sb_buf)) == NULL)
+	if ((sb_buf = kmalloc(512)) == NULL || 
+		img->fop->read(img, 0, (uint64)sb_buf, 0, 512) != 512 ||
+		(fat = fat32_init(sb_buf)) == NULL ||
+		img->fop->read(img, 0, (uint64)sb_buf, fat->fs_info * 512, 512) != 512 ||
+		fat32_info_init(fat, sb_buf) < 0)
 	{
 		goto fail;
 	}
@@ -122,6 +124,7 @@ struct superblock *image_fs_init(struct inode *img)
 	sb->op.read = imgfs_read;
 	sb->op.write = imgfs_write;
 	sb->op.clear = imgfs_clear;
+	sb->op.statfs = fat_stat_fs;
 
 	// Initialize in-mem root.
 	iroot = fat32_root_init(sb);
@@ -224,6 +227,13 @@ struct superblock *disk_fs_init(struct inode *dev)
 		__debug_error("fat32_init", "byts_per_sec: %d != BSIZE: %d\n", fat->bpb.byts_per_sec, BSIZE);
 		goto fail;
 	}
+	b = bread(dev->dev, fat->fs_info);
+	if (fat32_info_init(fat, (char *)b->data) < 0) {
+		__debug_error("fat32_init", "fail to read fs info! fs_info_sec=%d\n", fat->fs_info);
+		brelse(b);
+		goto fail;
+	}
+	brelse(b);
 
 	__debug_info("disk_fs_init", "stub 1\n");
 	sb->real_sb = fat;
@@ -233,6 +243,7 @@ struct superblock *disk_fs_init(struct inode *dev)
 	sb->op.read = diskfs_read;
 	sb->op.write = diskfs_write;
 	sb->op.clear = diskfs_clear;
+	sb->op.statfs = fat_stat_fs;
 	initsleeplock(&sb->sb_lock, "diskfs_sb");
 	initlock(&sb->cache_lock, "diskfs_dcache");
 	sb->next = NULL;

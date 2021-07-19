@@ -102,6 +102,7 @@ struct fat32_sb *fat32_init(char *boot_sector)
 	fat->bpb.tot_sec = *(uint32 *)(boot_sector + 32);
 	fat->bpb.fat_sz = *(uint32 *)(boot_sector + 36);
 	fat->bpb.root_clus = *(uint32 *)(boot_sector + 44);
+	fat->fs_info = *(uint16 *)(boot_sector + 48);
 	fat->first_data_sec = fat->bpb.rsvd_sec_cnt + fat->bpb.fat_cnt * fat->bpb.fat_sz;
 	fat->data_sec_cnt = fat->bpb.tot_sec - fat->first_data_sec;
 	fat->data_clus_cnt = fat->data_sec_cnt / fat->bpb.sec_per_clus;
@@ -117,6 +118,23 @@ struct fat32_sb *fat32_init(char *boot_sector)
 	__debug_info("FAT32 init", "done\n");
 
 	return fat;
+}
+
+int fat32_info_init(struct fat32_sb* fat, char *fsinfo_sector)
+{
+	if (*(uint32*)fsinfo_sector != 0x41615252 || 
+		*(uint32*)(fsinfo_sector + 484) != 0x61417272 ||
+		*(uint32*)(fsinfo_sector + 508) != 0xaa550000)
+	{
+		return -1;
+	}
+
+	fat->free_count = *(uint32*)(fsinfo_sector + 488);
+	fat->next_free = *(uint32*)(fsinfo_sector + 492);
+	__debug_info("fat32_info_init", "free_count: %d\n", fat->free_count);
+	__debug_info("fat32_info_init", "next_free: %d\n", fat->next_free);
+
+	return 0;
 }
 
 // Convert to FAT32 superblock.
@@ -155,6 +173,26 @@ struct inode *fat32_root_init(struct superblock *sb)
 	__debug_info("fat32_root_init", "root cluster: %d\n", root->first_clus);
 
 	return iroot;
+}
+
+int fat_stat_fs(struct superblock *sb, struct statfs *stat)
+{
+	struct fat32_sb *fat = sb2fat(sb);
+	
+	stat->f_type = 0x4d44;	// fat32 magic
+	stat->f_bsize = fat->byts_per_clus;
+	stat->f_blocks = fat->bpb.tot_sec / fat->bpb.sec_per_clus;
+	stat->f_bfree = fat->free_count;
+	stat->f_bavail = fat->free_count;
+	stat->f_files = 0;
+	stat->f_ffree = 0;
+	stat->f_fsid[0] = sb->devnum;
+	stat->f_fsid[1] = 0;
+	stat->f_namelen = FAT32_MAX_FILENAME;
+	stat->f_frsize = 0;
+	stat->f_flags = 0;
+
+	return 0;
 }
 
 static inline void __alert_fs_err(const char *func)

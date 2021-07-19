@@ -176,6 +176,7 @@ extern uint64 sys_faccessat(void);
 extern uint64 sys_lseek(void);
 extern uint64 sys_utimensat(void);
 extern uint64 sys_ioctl(void);
+extern uint64 sys_statfs(void);
 
 
 static uint64 (*syscalls[])(void) = {
@@ -239,6 +240,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_faccessat]		sys_faccessat,
 	[SYS_lseek]			sys_lseek,
 	[SYS_utimensat]		sys_utimensat,
+	[SYS_statfs]		sys_statfs,
 };
 
 static char *sysnames[] = {
@@ -302,6 +304,7 @@ static char *sysnames[] = {
 	[SYS_faccessat]		"faccessat",
 	[SYS_lseek]			"lseek",
 	[SYS_utimensat]		"utimensat",
+	[SYS_statfs]		"statfs",
 };
 
 void
@@ -339,6 +342,8 @@ sys_test_proc(void) {
 	return 0;
 }
 
+#include "include/buf.h"
+
 uint64
 sys_sysinfo(void)
 {
@@ -350,14 +355,14 @@ sys_sysinfo(void)
 	}
 
 	extern uint64 ticks;
-	extern char kernel_end[];
 
 	struct sysinfo info;
 	memset(&info, 0, sizeof(info));
 
 	info.uptime = ticks;
-	info.totalram = PHYSTOP - (uint64)kernel_end;
+	info.totalram = PHYSTOP - RUSTSBI_BASE;
 	info.freeram = idlepages() << PGSHIFT;
+	info.bufferram = BSIZE * BNUM;
 	info.procs = procnum();
 	info.mem_unit = PGSIZE;
 
