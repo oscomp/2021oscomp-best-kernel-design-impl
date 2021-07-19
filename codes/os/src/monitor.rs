@@ -4,13 +4,13 @@ use crate::config::{MEMORY_END, PAGE_SIZE};
 
 
 // GDB debug pin
-pub const QEMU:usize = 1; // 1: open in qemu mode, 0: close in real world
+pub const QEMU:usize = 0; // 1: open in qemu mode, 0: close in real world
 pub const MEMORY_GDB_START:usize  = MEMORY_END - PAGE_SIZE;
 pub const PROCESSOR_ENABLE:usize  = MEMORY_GDB_START + 0;
 pub const EXIT_ENABLE:usize       = MEMORY_GDB_START + 1;
 pub const EXEC_ENABLE:usize       = MEMORY_GDB_START + 2;
-//pub const SYSCALL_ENABLE:usize       = MEMORY_GDB_START + 3;
-pub const SYSCALL_ENABLE:usize       = 1; //always open
+pub const SYSCALL_ENABLE:usize       = MEMORY_GDB_START + 3;
+//pub const SYSCALL_ENABLE:usize       = 1; //always open
 pub const TIMER_ENABLE:usize       = MEMORY_GDB_START + 4;
 // pub const TIMER_ENABLE:usize       = 1;
 pub const FORK_ENABLE:usize       = MEMORY_GDB_START + 5;

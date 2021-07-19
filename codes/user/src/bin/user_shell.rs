@@ -467,7 +467,7 @@ impl ArgMachine{
         testsuits.push("sleep\0 1\0");
 
         //fail
-        testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
+        testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
         testsuits.push("df\0");     
         testsuits.push("[\0 -f\0 test.txt\0 ]\0");
         //testsuits.push("more\0 test.txt\0");

@@ -124,14 +124,14 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             FileClass::Abstr(TTY.clone())));
         return fd as isize
     }
-    if path.contains("|") {
-        let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some( FileDiscripter::new(
-            false,
-            FileClass::Abstr(  )
-        ));
-        return fd as isize
-    }
+    //if path.contains("|") {
+    //    let fd = inner.alloc_fd();
+    //    inner.fd_table[fd] = Some( FileDiscripter::new(
+    //        false,
+    //        FileClass::Abstr(  )
+    //    ));
+    //    return fd as isize
+    //}
 
     ////////////////////////////////////////////////////////////////////////
 
