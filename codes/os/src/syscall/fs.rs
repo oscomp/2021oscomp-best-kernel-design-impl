@@ -4,10 +4,14 @@ use crate::{fs::{/*OSInode,*/
         Kstat, NewStat, FileClass, 
         File, Dirent, MNT_TABLE, IoVec, IoVecs, TTY,
         FileDiscripter
-    }, mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str}, task::{
+    }, 
+    mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str}, task::{
         FdTable,
         TaskControlBlockInner,
-    }};
+    },
+    gdb_println,
+    monitor::*
+};
 use crate::task::{current_user_token, current_task/* , print_core_info*/};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
@@ -108,7 +112,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
-    //println!("openat: path = {}", path);
+    gdb_println!(SYSCALL_ENABLE, "openat: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     
     /////////////////////////////// WARNING ////////////////////////////////
@@ -120,6 +124,15 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             FileClass::Abstr(TTY.clone())));
         return fd as isize
     }
+    if path.contains("|") {
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some( FileDiscripter::new(
+            false,
+            FileClass::Abstr(  )
+        ));
+        return fd as isize
+    }
+
     ////////////////////////////////////////////////////////////////////////
 
     let oflags = OpenFlags::from_bits(flags).unwrap();

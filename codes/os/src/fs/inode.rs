@@ -5,10 +5,12 @@ use alloc::sync::Arc;
 use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
+use alloc::string::String;
 use spin::Mutex;
 use super::{DT_DIR, DT_REG, DT_UNKNOWN, Dirent, File, Kstat, NewStat, finfo};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
+use crate::config::*;
 
 
 #[derive(PartialEq,Copy,Clone,Debug)]
@@ -314,7 +316,19 @@ pub fn init_rootfs(){
     println!("[fs] build rootfs: creating /dev");
     let root_dev = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     println!("[fs] build rootfs: creating userdir");
-    let file_pswd = open("/dev","passwd", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    let file_pswd = open("/etc","passwd", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    println!("[fs] build rootfs: creating /proc");
+    let file = open("/","proc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    println!("[fs] build rootfs: init /proc");
+    let file = open("/proc","0", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    let file = open("/proc","1", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    let file = open("/proc","mounts", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    let meminfo = open("/proc","meminfo", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    let file = open("/","ls", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    let mut meminfo_data = String::new();
+    meminfo_data.push_str("MemTotal:    8192 kB\n");
+    meminfo.write_all(&Vec::from(meminfo_data.as_str()));
+
     println!("[fs] build rootfs ... finish");
 }
 

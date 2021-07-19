@@ -416,9 +416,11 @@ impl ArgMachine{
         testsuits.push("uname\0");
         testsuits.push("printf\0 \"abc\n\"\0");
         testsuits.push("kill\0 10\0");
+        
+        // file
         testsuits.push("echo\0 \"#### file opration test\"\0");
         testsuits.push("touch\0 test.txt\0");
-        testsuits.push("echo\0 \"hello world\"\0 >>\0 test.txt\0");
+        testsuits.push("echo\0 \"hello world\"\0 >\0 test.txt\0");
         testsuits.push("tail\0 test.txt\0");
         testsuits.push("cat\0 test.txt\0");
         testsuits.push("cut\0 -c\0 3\0 test.txt\0");
@@ -436,6 +438,8 @@ impl ArgMachine{
         testsuits.push("echo\0 \"2222222\"\0 >>\0 test.txt\0");
         testsuits.push("echo\0 \"1111111\"\0 >>\0 test.txt\0");
         testsuits.push("echo\0 \"bbbbbbb\"\0 >>\0 test.txt\0");
+        
+        // dir test
         testsuits.push("stat\0 test.txt\0");//?
         testsuits.push("grep\0 hello\0 busybox_cmd.txt\0");  //ok
         testsuits.push("mkdir\0 test_dir\0");
@@ -444,7 +448,7 @@ impl ArgMachine{
         testsuits.push("which\0 ls\0");
         testsuits.push("cp\0 busybox_cmd.txt\0 busybox_cmd.bak\0");
         testsuits.push("rm\0 busybox_cmd.bak\0");
-        testsuits.push("rm\0 test.txt\0");    //ok    
+        
         // lua: all pass
         testsuits.push("date.lua\0");
         testsuits.push("file_io.lua\0");
@@ -461,17 +465,18 @@ impl ArgMachine{
         testsuits.push("ash\0 -c\0 exit\0");
         testsuits.push("sh\0 -c\0 exit\0");
         testsuits.push("sleep\0 1\0");
-        
+
         //fail
-        //testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
-        //testsuits.push("df\0");     
-        //testsuits.push("[\0 -f\0 test.txt\0 ]\0");
-        ////testsuits.push("more\0 test.txt\0");
-        //testsuits.push("free\0");
-        //testsuits.push("hwclock\0");
+        testsuits.push("sort\0 test.txt\0 |\0 ./busybox uniq\0");
+        testsuits.push("df\0");     
+        testsuits.push("[\0 -f\0 test.txt\0 ]\0");
+        //testsuits.push("more\0 test.txt\0");
+        testsuits.push("rm\0 test.txt\0");    //ok    
+        testsuits.push("free\0");
+        testsuits.push("hwclock\0");
         //testsuits.push("ps\0");
 
-        for programname_op in testsuits.iter(){
+        for programname_op in testsuits.iter() {
             let mut is_lua = false;
             let exec_path = {
                 if programname_op.contains("lua") {
