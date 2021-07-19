@@ -320,15 +320,14 @@ pub fn init_rootfs(){
     println!("[fs] build rootfs: creating /proc");
     let file = open("/","proc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     println!("[fs] build rootfs: init /proc");
-    let file = open("/proc","0", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    let file = open("/proc","1", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //let file = open("/proc","0", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //let file = open("/proc","1", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     let file = open("/proc","mounts", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let meminfo = open("/proc","meminfo", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let file = open("/","ls", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let mut meminfo_data = String::new();
     meminfo_data.push_str("MemTotal:    8192 kB\n");
     meminfo.write_all(&Vec::from(meminfo_data.as_str()));
-
     println!("[fs] build rootfs ... finish");
 }
 

@@ -461,10 +461,7 @@ impl ArgMachine{
         testsuits.push("strings.lua\0");
         
         //half
-        testsuits.push("ls\0");
-        testsuits.push("ash\0 -c\0 exit\0");
-        testsuits.push("sh\0 -c\0 exit\0");
-        testsuits.push("sleep\0 1\0");
+        
 
         //fail
         testsuits.push("sort\0 test.txt\0 |\0 ./busybox\0 uniq\0");
@@ -475,6 +472,12 @@ impl ArgMachine{
         testsuits.push("free\0");
         testsuits.push("hwclock\0");
         //testsuits.push("ps\0");
+
+        testsuits.push("sleep\0 1\0");
+        testsuits.push("ls\0");
+        testsuits.push("ash\0 -c\0 exit\0");
+        testsuits.push("sh\0 -c\0 exit\0");
+        
 
         for programname_op in testsuits.iter() {
             let mut is_lua = false;

@@ -111,7 +111,7 @@ pub fn rust_main() -> ! {
     timer::set_next_trigger();
     
     fs::init_rootfs();
-    fs::list_apps();
+    //fs::list_apps();
     //println!("init fs");
     //prints!("init fs");
     task::add_initproc();
