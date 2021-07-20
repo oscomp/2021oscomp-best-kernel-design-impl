@@ -691,7 +691,7 @@ sys_fcntl(void)
 	if (argfd(0, &fd, &f) < 0 || argint(1, &cmd) < 0 || argaddr(2, &arg) < 0)
 		return -1;
 
-	if (cmd == F_DUPFD || F_DUPFD_CLOEXEC) {
+	if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
 		int minfd = (int) arg;
 		if (minfd < 0)
 			return -1;
