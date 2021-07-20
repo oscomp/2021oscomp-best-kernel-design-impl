@@ -31,14 +31,16 @@
 #include "hoitFsCache.h"
 #include "hoitFsCmd.h"
 #include "hoitFsLog.h"
+#include "hoitWriteBuffer.h"
 #include "../../driver/mtd/nor/nor.h"
-
+#include "../tools/crc/crc32.h"
 /*********************************************************************************************************
   裁剪宏
 *********************************************************************************************************/
 #if LW_CFG_MAX_VOLUMES > 0
 
 #ifndef HOITFSLIB_DISABLE
+#define NS hoitFsLib
 /*********************************************************************************************************
 ** 函数名称: __hoit_just_open
 ** 功能描述: 打开某个已打开的目录文件下面的一个文件
@@ -51,7 +53,6 @@
 PHOIT_INODE_INFO  __hoit_just_open(PHOIT_INODE_INFO  pdir,
     PCHAR       pName)
 {
-
     if (pdir == LW_NULL || !S_ISDIR(pdir->HOITN_mode)) {
         printk("Error in hoit_just_open\n");
         return (LW_NULL);
@@ -179,6 +180,7 @@ PHOIT_INODE_INFO __hoit_get_full_file(PHOIT_VOLUME pfs, UINT ino) {
         pNewInode->HOITN_mode = (*ppDnodeList)->HOITFD_file_type;
         pNewInode->HOITN_volume = pfs;
         pNewInode->HOITN_pcLink = LW_NULL;
+        __hoit_new_write_buffer(pNewInode); /* 07-18 增加初始化WriteBuffer By HZS */
 
         PHOIT_FRAG_TREE_LIST_HEADER pFTlistHeader = hoitFragTreeCollectRange(pNewInode->HOITN_rbtree, 0, INT_MAX);
         PHOIT_FRAG_TREE_LIST_NODE pFTlistNode = pFTlistHeader->pFTlistHeader->pFTlistNext;
@@ -258,6 +260,9 @@ VOID  __hoit_add_dirent(PHOIT_INODE_INFO  pFatherInode,
     lib_memcpy(pFileName, pSonDirent->HOITFD_file_name, lib_strlen(pSonDirent->HOITFD_file_name));
 
     UINT phys_addr = 0;
+
+    pRawDirent->crc = 0;
+    pRawDirent->crc = crc32_le(pWriteBuf, totlen);
     __hoit_write_flash(pfs, (PVOID)pWriteBuf, totlen, &phys_addr, needLog);
 
     pRawInfo->phys_addr = phys_addr;
@@ -509,13 +514,19 @@ UINT8 __hoit_del_raw_data(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRawInfo) {
     __hoit_read_flash(pfs, pRawInfo->phys_addr, buf, pRawInfo->totlen);
 
     PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)buf;
+    crc32_check(pRawHeader);
+
     if (pRawHeader->magic_num != HOIT_MAGIC_NUM || (pRawHeader->flag & HOIT_FLAG_NOT_OBSOLETE) == 0) {
         printk("Error in hoit_del_raw_data\n");
         return HOIT_ERROR;
     }
-    pRawHeader->flag &= (~HOIT_FLAG_NOT_OBSOLETE);      //将obsolete标志变为0，代表过期
-    
-    __hoit_write_flash_thru(pfs, (PVOID)pRawHeader, pRawInfo->totlen, pRawInfo->phys_addr);
+    //!pRawHeader->flag &= (~HOIT_FLAG_NOT_OBSOLETE);      //将obsolete标志变为0，代表过期
+    __hoit_mark_obsolete(pfs, pRawHeader, pRawInfo);
+    // /* 将obsolete标志位清0后写回原地址 */
+    // pRawHeader->crc = 0;
+    // pRawHeader->crc = crc32_le(pRawHeader, pRawInfo->totlen);
+    // __hoit_write_flash_thru(pfs, (PVOID)pRawHeader, pRawInfo->totlen, pRawInfo->phys_addr);
+
     __SHEAP_FREE(buf);
     return 0;
 }
@@ -588,6 +599,8 @@ UINT8 __hoit_get_inode_nodes(PHOIT_VOLUME pfs, PHOIT_INODE_CACHE pInodeInfo, PHO
         
         __hoit_read_flash(pfs, pRawInfo->phys_addr, pBuf, pRawInfo->totlen);
         PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)pBuf;
+        crc32_check(pRawHeader);
+
         if (!__HOIT_IS_OBSOLETE(pRawHeader)) {
             if (__HOIT_IS_TYPE_DIRENT(pRawHeader)) {
                 PHOIT_RAW_DIRENT pRawDirent = (PHOIT_RAW_DIRENT)pRawHeader;
@@ -636,6 +649,8 @@ UINT8 __hoit_get_inode_nodes(PHOIT_VOLUME pfs, PHOIT_INODE_CACHE pInodeInfo, PHO
 BOOL __hoit_add_to_sector_list(PHOIT_VOLUME pfs, PHOIT_ERASABLE_SECTOR pErasableSector) {
     pErasableSector->HOITS_next = pfs->HOITFS_erasableSectorList;
     pfs->HOITFS_erasableSectorList = pErasableSector;
+    //!TODO: mount初始化链表，封装链表转移函数
+    __hoit_fix_up_sector_list(pfs, pErasableSector);
     return LW_TRUE;
 }
 /*********************************************************************************************************
@@ -646,7 +661,10 @@ BOOL __hoit_add_to_sector_list(PHOIT_VOLUME pfs, PHOIT_ERASABLE_SECTOR pErasable
 ** 全局变量:
 ** 调用模块:
 *********************************************************************************************************/
-BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, PHOIT_RAW_LOG * ppRawLogHdr) {
+BOOL __hoit_scan_single_sector(ScanThreadAttr* pThreadAttr) {
+    PHOIT_VOLUME pfs    = pThreadAttr->pfs;
+    UINT8 sector_no     = pThreadAttr->sector_no;
+
     UINT                    uiSectorSize;         
     UINT                    uiSectorOffset;
     UINT                    uiFreeSize;
@@ -685,9 +703,25 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
     lib_bzero(pReadBuf, uiSectorSize);
 
     __hoit_read_flash(pfs, uiSectorOffset, pReadBuf, uiSectorSize);
+    crc32_check(pReadBuf);
 
-    PCHAR pNow = pReadBuf;
-    while (pNow < pReadBuf + uiSectorSize) {
+    /* 2021-07-10 Modified by HZS */
+    size_t pageAmount       = uiSectorSize / (HOIT_FILTER_EBS_ENTRY_SIZE + HOIT_FILTER_PAGE_SIZE);
+    size_t EBSStartAddr     = HOIT_FILTER_PAGE_SIZE * pageAmount;
+
+    PHOIT_EBS_ENTRY pEntry  = (PHOIT_EBS_ENTRY)(pReadBuf + EBSStartAddr);
+    UINT32 uPageIndex       = 0;
+
+    while ((PCHAR)pEntry < pReadBuf + uiSectorSize) {
+
+        if (pEntry->HOIT_EBS_ENTRY_obsolete == 0) {/* 0是过期 */
+            pEntry      += 1;
+            uPageIndex  += 1;
+            continue;
+        }
+
+        PCHAR pNow = pReadBuf + uPageIndex * HOIT_FILTER_PAGE_SIZE;    /* 拿到Entry对应的Page首地址 */
+
         PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)pNow;
         if(sector_no == 0 
         && pRawHeader->ino != -1
@@ -786,15 +820,16 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
                     }
                 }
             }
-            else if (__HOIT_IS_TYPE_LOG(pRawHeader)) {
-                *hasLog = 1;
-                PHOIT_RAW_LOG pRawLog = (PHOIT_RAW_LOG)pRawHeader;
-                if (pRawLog->uiLogFirstAddr != -1) {    /* LOG HDR */
-                    /* hoitLogOpen(pfs, pRawLog); */
-                    *ppRawLogHdr = (PHOIT_RAW_LOG)lib_malloc(sizeof(HOIT_RAW_LOG));
-                    lib_memcpy(*ppRawLogHdr, pRawLog, sizeof(HOIT_RAW_LOG));
-                }
-            }
+            
+            //else if (__HOIT_IS_TYPE_LOG(pRawHeader)) {
+            //    *hasLog = 1;
+            //    PHOIT_RAW_LOG pRawLog = (PHOIT_RAW_LOG)pRawHeader;
+            //    if (pRawLog->uiLogFirstAddr != -1) {    /* LOG HDR */
+            //        /* hoitLogOpen(pfs, pRawLog); */
+            //        *ppRawLogHdr = (PHOIT_RAW_LOG)lib_malloc(sizeof(HOIT_RAW_LOG));
+            //        lib_memcpy(*ppRawLogHdr, pRawLog, sizeof(HOIT_RAW_LOG));
+            //    }
+            //}
             
             if (pRawHeader->ino > pfs->HOITFS_highest_ino)
                 pfs->HOITFS_highest_ino = pRawHeader->ino;
@@ -806,11 +841,15 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
 
             } 
             //pNow += __HOIT_MIN_4_TIMES(pRawHeader->totlen);
-            pNow += pRawHeader->totlen;
+            //pNow += pRawHeader->totlen;
+            pEntry += 1;
+            uPageIndex += 1;
         }
         else {
             //pNow += 4;   /* 每次移动4字节 */
-            pNow += 1;   /* 每次移动1字节 */
+            //pNow += 1;   /* 每次移动1字节 */
+            pEntry += 1;
+            uPageIndex += 1;
         }
     }
     pErasableSector->HOITS_uiUsedSize = uiUsedSize;
@@ -820,6 +859,7 @@ BOOL __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, P
     __hoit_add_to_sector_list(pfs, pErasableSector);
 
     __SHEAP_FREE(pReadBuf);
+    __SHEAP_FREE(pThreadAttr);
     return LW_TRUE;
 }
 
@@ -869,16 +909,18 @@ PHOIT_INODE_INFO __hoit_new_inode_info(PHOIT_VOLUME pfs, mode_t mode, CPCHAR pcL
     pRawInode->flag = HOIT_FLAG_TYPE_INODE | HOIT_FLAG_NOT_OBSOLETE;
     pRawInode->offset = 0;
     pRawInode->version = pfs->HOITFS_highest_version++;
-
+    pRawInode->crc = 0;
     
 
     UINT phys_addr;
     if (S_ISLNK(mode)) {
         PCHAR pLink = ((PCHAR)pRawInode) + sizeof(HOIT_RAW_INODE);
         lib_memcpy(pLink, cFullPathName, lib_strlen(cFullPathName));  /* 链接文件 */
+        pRawInode->crc = crc32_le(pRawInode, totlen);
         __hoit_write_flash(pfs, (PVOID)pRawInode, totlen, &phys_addr, 1);
     }
     else {
+        pRawInode->crc = crc32_le(pRawInode, sizeof(HOIT_RAW_INODE));
         __hoit_write_flash(pfs, (PVOID)pRawInode, sizeof(HOIT_RAW_INODE), &phys_addr, 1);
     }
     
@@ -948,6 +990,7 @@ PCHAR __hoit_get_data_after_raw_inode(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pInodeInf
     PCHAR pTempBuf = (PCHAR)__SHEAP_ALLOC(pInodeInfo->totlen);
 
     __hoit_read_flash(pfs, pInodeInfo->phys_addr, pTempBuf, pInodeInfo->totlen);
+    crc32_check(pTempBuf);
 
     PCHAR pData = (PCHAR)__SHEAP_ALLOC(iDataLen + 1);
     lib_bzero(pData, iDataLen + 1);
@@ -968,8 +1011,26 @@ PCHAR __hoit_get_data_after_raw_inode(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pInodeInf
 VOID __hoit_add_raw_info_to_sector(PHOIT_ERASABLE_SECTOR pSector, PHOIT_RAW_INFO pRawInfo) {
     INTREG iregInterLevel;
     //API_SpinLockQuick(&pSector->HOITS_lock, &iregInterLevel);
-
+    //TODO: Sector的HOITS_uiObsoleteEntityCount和HOITS_uiAvailableEntityCount初始化位置？
+    /*                      
+                          |--------------------------------|
+                          |     Sector                     |      Sector
+                          |    /     \                     |    /       \
+        InodeCache----RawInfo(ino)-----RawInfo(ino2)-----RawInfo(ino)-----RawInfo(ino)
+                        |                   |               |               |
+                ---------------------------------------------------------------------
+                   | [H][Entity]       [H][Entity]  |    [H][Entity]   [H][Entity]  |
+                ------------------------------------------------------------------
+    */
     pRawInfo->next_phys = LW_NULL;
+    if(pRawInfo->is_obsolete){
+        pSector->HOITS_uiObsoleteEntityCount++;
+    }
+    else {
+        pSector->HOITS_uiAvailableEntityCount++;
+    }
+
+    //调用转移函数
 #ifdef LIB_DEBUG
     printf("[%s]:add raw info at %p for sector %d\n", __func__, pRawInfo, pSector->HOITS_bno);
 #endif // LIB_DEBUG
@@ -1010,6 +1071,7 @@ BOOL __hoit_move_home(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRawInfo) {
     lib_bzero(pReadBuf, pRawInfo->totlen);
 
     __hoit_read_flash(pfs, pRawInfo->phys_addr, pReadBuf, pRawInfo->totlen);
+    crc32_check(pReadBuf);
 
     PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)pReadBuf;
     if (pRawHeader->magic_num != HOIT_MAGIC_NUM 
@@ -1017,9 +1079,12 @@ BOOL __hoit_move_home(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRawInfo) {
         //printk("Error in hoit_move_home\n");
         return LW_FALSE;
     }
-    pRawHeader->flag &= (~HOIT_FLAG_NOT_OBSOLETE);      //将obsolete标志变为0，代表过期
-    /* 将obsolete标志位清0后写回原地址 */
-    __hoit_write_flash_thru(pfs, (PVOID)pRawHeader, pRawInfo->totlen, pRawInfo->phys_addr);
+    //!pRawHeader->flag &= (~HOIT_FLAG_NOT_OBSOLETE);      //将obsolete标志变为0，代表过期
+    __hoit_mark_obsolete(pfs, pRawHeader, pRawInfo);
+    // /* 将obsolete标志位清0后写回原地址 */
+    // pRawHeader->crc = 0;
+    // pRawHeader->crc = crc32_le(pRawHeader, pRawInfo->totlen);
+    // __hoit_write_flash_thru(pfs, (PVOID)pRawHeader, pRawInfo->totlen, pRawInfo->phys_addr);
     
     /* 将obsolete标志位恢复后写到新地址 */
     pRawHeader->flag |= HOIT_FLAG_NOT_OBSOLETE;         //将obsolete标志变为1，代表未过期
@@ -1027,7 +1092,9 @@ BOOL __hoit_move_home(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRawInfo) {
 
     //!2021-05-16 修改now_sector指针 modified by PYQ 
     pfs->HOITFS_now_sector = pfs->HOITFS_curGCSuvivorSector;
-
+    
+    pRawHeader->crc = 0;
+    pRawHeader->crc = crc32_le(pRawHeader, pRawInfo->totlen);
     __hoit_write_flash(pfs, pReadBuf, pRawInfo->totlen, &phys_addr, 1);
     pRawInfo->phys_addr = phys_addr;
 
@@ -1177,7 +1244,7 @@ __find_error:
             *pbLast = LW_TRUE;
         }
         else {
-            *pbLast = LW_FALSE;
+            *pbLast = LW_FALSE; 
         }
     }
     return  (LW_NULL);                                                  /*  无法找到节点                */
@@ -1697,6 +1764,11 @@ ssize_t  __hoit_write(PHOIT_INODE_INFO  pInodeInfo, CPVOID  pvBuffer, size_t  st
         PHOIT_FRAG_TREE_NODE pTreeNode = newHoitFragTreeNode(pFullDnode, stNBytes, stOft, stOft);
         hoitFragTreeInsertNode(pInodeInfo->HOITN_rbtree, pTreeNode);
         hoitFragTreeOverlayFixUp(pInodeInfo->HOITN_rbtree);
+
+        if (stNBytes < HOIT_WRITE_BUFFER_FRAGSIZE) {
+            __hoit_new_write_entry(pInodeInfo, pInodeInfo->HOITN_pWriteBuffer, pTreeNode);
+        }
+
         return stNBytes;
     }
     else {
@@ -1775,14 +1847,40 @@ VOID  __hoit_mount(PHOIT_VOLUME  pfs)
     pfs->HOITFS_highest_ino = 0;
     pfs->HOITFS_highest_version = 0;
 
-    INT             hasLog      = 0;
-    UINT            phys_addr   = 0;
-    UINT8           sector_no   = hoitGetSectorNo(phys_addr);
-    PHOIT_RAW_LOG   pRawLogHdr  = LW_NULL;
+    INT                 i;
+    INT                 hasLog      = 0;
+    UINT                phys_addr   = 0;
+    UINT8               sector_no   = hoitGetSectorNo(phys_addr);
+    PHOIT_RAW_LOG       pRawLogHdr  = LW_NULL;
+    
+    LW_CLASS_THREADATTR scThreadAttr;
+    LW_OBJECT_HANDLE ulObjectHandle[NOR_FLASH_NSECTOR];
+    INT handleSize = 0;
+
     while (hoitGetSectorSize(sector_no) != -1) {
-        __hoit_scan_single_sector(pfs, sector_no, &hasLog, &pRawLogHdr);
+
+        ScanThreadAttr* pThreadAttr = (ScanThreadAttr*)lib_malloc(sizeof(ScanThreadAttr));
+        pThreadAttr->pfs = pfs;
+        pThreadAttr->sector_no = sector_no;
+
+        API_ThreadAttrBuild(&scThreadAttr,
+            4 * LW_CFG_KB_SIZE,
+            LW_PRIO_NORMAL,
+            LW_OPTION_THREAD_STK_CHK,
+            (VOID*)pThreadAttr);
+
+        ulObjectHandle[handleSize++] = API_ThreadCreate("t_scan_thread",
+            (PTHREAD_START_ROUTINE)__hoit_scan_single_sector,
+            &scThreadAttr,
+            LW_NULL);
         sector_no++;
     }
+
+    int i;
+    for (i = 0; i < handleSize; i++) {
+        API_ThreadJoin(ulObjectHandle[i], LW_NULL);
+    }
+    
     pfs->HOITFS_highest_ino++;
     pfs->HOITFS_highest_version++;
     printf("now sector offs: %d \n", pfs->HOITFS_now_sector->HOITS_offset);
@@ -1869,6 +1967,98 @@ VOID  __hoit_redo_log(PHOIT_VOLUME  pfs) {
         __SHEAP_FREE(p);
     }
 }
+
+/*********************************************************************************************************
+** 函数名称: __hoit_erasable_sector_list_check_exist
+** 功能描述: 检查链表上是否有该sector。
+** 输　入  :
+**          HOITFS_sectorList   将要检查的列表
+**          pErasableSector     需要添加到列表的sector
+** 输　出  : 存在，返回LW_TRUE指针；不存在，返回LW_FALSE
+** 全局变量:
+** 调用模块:
+*********************************************************************************************************/
+USE_LIST_TEMPLATE(NS, HOIT_ERASABLE_SECTOR);
+
+BOOL __hoit_erasable_sector_list_check_exist(List(HOIT_ERASABLE_SECTOR) HOITFS_sectorList, PHOIT_ERASABLE_SECTOR pErasableSector) {
+    Iterator(HOIT_ERASABLE_SECTOR)      iter;
+    InitIterator(iter, NS, HOIT_ERASABLE_SECTOR);
+
+    PHOIT_ERASABLE_SECTOR               psector;
+    for(iter->begin(iter, HOITFS_sectorList); iter->isValid(iter); iter->next(iter)) {
+        psector = iter->get(iter);
+        if (psector == pErasableSector) {
+            return LW_TRUE;
+        }
+    }
+
+    FreeIterator(iter);
+    return LW_FALSE;
+}
+
+
+//TODO: 只在初始化阶段调用，其他写入或GC操作部分也应该调用
+/*********************************************************************************************************
+** 函数名称: __hoit_fix_up_sector_list
+** 功能描述: 检查一个sector的类型（dirty，clean或free），并添加到volume对应链表上。
+**          如果sector已经在对应链表中，则不做处理
+** 输　入  :
+**          pfs                 文件卷
+**          pErasableSector     需要添加到列表的sector
+** 输　出  : 
+** 全局变量:
+** 调用模块:
+*********************************************************************************************************/
+VOID __hoit_fix_up_sector_list(PHOIT_VOLUME pfs, PHOIT_ERASABLE_SECTOR pErasableSector) {
+    if (pErasableSector->HOITS_uiFreeSize == GET_SECTOR_SIZE(pErasableSector->HOITS_bno)) { /* 空sector */
+        if (!__hoit_erasable_sector_list_check_exist(GET_FREE_LIST(pfs), pErasableSector)) {
+            GET_FREE_LIST(pfs)->insert(GET_FREE_LIST(pfs), pErasableSector, 0);
+        }
+    }
+    if (pErasableSector->HOITS_uiObsoleteEntityCount != 0) {
+        /* 目前是只要有脏数据实体，就把sector放到dirty list中 */
+        if (!__hoit_erasable_sector_list_check_exist(GET_DIRTY_LIST(pfs), pErasableSector)) {
+            GET_DIRTY_LIST(pfs)->insert(GET_DIRTY_LIST(pfs), pErasableSector, 0);
+        }
+    } else if (pErasableSector->HOITS_uiAvailableEntityCount != 0) {
+        if (!__hoit_erasable_sector_list_check_exist(GET_CLEAN_LIST(pfs), pErasableSector)) {
+            GET_CLEAN_LIST(pfs)->insert(GET_CLEAN_LIST(pfs), pErasableSector, 0);
+        }
+    }
+}
+
+
+/*********************************************************************************************************
+** 函数名称: __hoit_mark_obsolete
+** 功能描述: 
+** 输　入  :
+** 输　出  : 
+** 全局变量:
+** 调用模块:
+*********************************************************************************************************/
+//! 2021-07-07 ZN整合标注过期
+VOID __hoit_mark_obsolete(PHOIT_VOLUME pfs, PHOIT_RAW_HEADER pRawHeader, PHOIT_RAW_INFO pRawInfo){
+    PHOIT_CACHE_HDR pcacheHdr = pfs->HOITFS_cacheHdr;
+    UINT32  EBS_entry_flag  = 0;
+    UINT32  i;
+    UINT32  EBS_entry_addr  = (pRawInfo->phys_addr/HOIT_FILTER_PAGE_SIZE) *                    /* EBS entry首地址 */
+                                HOIT_FILTER_EBS_ENTRY_SIZE+pcacheHdr->HOITCACHE_EBSStartAddr + 
+                                sizeof(UINT32);
+    UINT32  EBS_entry_num   = pRawInfo->totlen % HOIT_FILTER_PAGE_SIZE ?                       /* 需要标过期的entry数量 */
+                                pRawInfo->totlen / HOIT_FILTER_PAGE_SIZE + 1 : 
+                                pRawInfo->totlen / HOIT_FILTER_PAGE_SIZE;
+
+    pRawHeader->flag &= (~HOIT_FLAG_NOT_OBSOLETE);      //将obsolete标志变为0，代表过期
+    //TODO 修改flash上EBS采用写不分配
+    pRawHeader->crc = 0;
+    pRawHeader->crc = crc32_le(pRawHeader, pRawInfo->totlen);
+    __hoit_write_flash_thru(pfs, (PVOID)pRawHeader, pRawInfo->totlen, pRawInfo->phys_addr);
+    //! 2021-07-07 修改EBS区域
+    for(i=0 ; i<EBS_entry_num ; i++) {
+        __hoit_write_flash_thru(pfs, (PVOID)&EBS_entry_flag, sizeof(UINT32), EBS_entry_addr + i *sizeof(HOIT_EBS_ENTRY));
+    }
+}
+
 
 #endif                                                                  /*  LW_CFG_MAX_VOLUMES > 0      */
 #endif //HOITFSLIB_DISABLE

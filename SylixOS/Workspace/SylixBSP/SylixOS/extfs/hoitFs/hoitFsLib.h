@@ -31,6 +31,10 @@
 
 #include "hoitType.h"
 
+typedef struct scanThreadAttr { /* 一个局部定义的结构体, 只用来给scan_single_sector传参 */
+    PHOIT_VOLUME    pfs;
+    UINT8           sector_no;
+}ScanThreadAttr;
 
 /*********************************************************************************************************
   裁剪宏
@@ -55,7 +59,7 @@ UINT8                   __hoit_del_raw_info(PHOIT_INODE_CACHE pInodeCache, PHOIT
 UINT8                   __hoit_del_raw_data(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRawInfo);
 UINT8                   __hoit_del_full_dirent(PHOIT_FULL_DIRENT* ppFatherDents, PHOIT_FULL_DIRENT pFullDirent);
 UINT8                   __hoit_del_inode_cache(PHOIT_VOLUME pfs, PHOIT_INODE_CACHE pInodeCache);
-BOOL                    __hoit_scan_single_sector(PHOIT_VOLUME pfs, UINT8 sector_no, INT* hasLog, PHOIT_RAW_LOG * ppRawLogHdr);
+BOOL                    __hoit_scan_single_sector(ScanThreadAttr* pThreadAttr);
 PHOIT_INODE_INFO        __hoit_new_inode_info(PHOIT_VOLUME pfs, mode_t mode, CPCHAR pcLink);
 VOID                    __hoit_get_nlink(PHOIT_INODE_INFO pInodeInfo);
 BOOL                    __hoit_add_to_sector_list(PHOIT_VOLUME pfs, PHOIT_ERASABLE_SECTOR pErasableSector);
@@ -93,5 +97,35 @@ VOID                    __hoit_redo_log(PHOIT_VOLUME  pfs);
 UINT8                   __hoit_get_inode_nodes(PHOIT_VOLUME pfs, PHOIT_INODE_CACHE pInodeInfo, PHOIT_FULL_DIRENT* ppDirentList, PHOIT_FULL_DNODE* ppDnodeList);
 VOID                    __hoit_close(PHOIT_INODE_INFO  pInodeInfo, INT  iFlag);
 
+//! Added By ZN
+VOID __hoit_fix_up_sector_list(PHOIT_VOLUME pfs, PHOIT_ERASABLE_SECTOR pErasableSector);
+BOOL __hoit_erasable_sector_list_check_exist(List(HOIT_ERASABLE_SECTOR) HOITFS_sectorList, PHOIT_ERASABLE_SECTOR pErasableSector);
+VOID __hoit_mark_obsolete(PHOIT_VOLUME pfs, PHOIT_RAW_HEADER pRawHeader, PHOIT_RAW_INFO pRawInfo);
+
+#define CRCPOLY_LE 0xedb88320
+
+static inline UINT32 crc32_le(unsigned char const* p, size_t len)
+{
+    INT i;
+    UINT32 crc;
+    while (len--) {
+        crc ^= *p++;
+        for (i = 0; i < 8; i++)
+            crc = (crc >> 1) ^ ((crc & 1) ? CRCPOLY_LE : 0);
+    }
+    return crc;
+}
+
+void crc32_check(PHOIT_RAW_HEADER pRawHeader) {
+    /* 检查crc校验码 */
+    UINT32 uPrevCrc = pRawHeader->crc;
+    pRawHeader->crc = 0;
+    UINT32 uNowCrc = crc32_le((unsigned char*)pRawHeader, pRawHeader->totlen);
+    if (uPrevCrc != uNowCrc) {
+        printf("Error in CRC!\n");
+    }
+
+    pRawHeader->crc = uPrevCrc; /* 还原CRC到进入函数之前 */
+}
 #endif                                                                  /*  LW_CFG_MAX_VOLUMES > 0       */
 #endif                                                                  /*  __HOITFSLIB_H                */

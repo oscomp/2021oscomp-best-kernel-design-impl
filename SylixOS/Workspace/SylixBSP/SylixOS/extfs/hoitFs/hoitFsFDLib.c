@@ -22,6 +22,7 @@
 #include "hoitFsLib.h"
 #include "hoitFsCache.h"
 #include "../../driver/mtd/nor/nor.h"
+#include "../tools/crc/crc32.h"
 
 /*********************************************************************************************************
 ** 函数名称: __hoit_delete_full_dnode
@@ -38,6 +39,7 @@ BOOL __hoit_delete_full_dnode(PHOIT_VOLUME pfs, PHOIT_FULL_DNODE pFullDnode, INT
         hoitReadFromCache(pfs->HOITFS_cacheHdr, pFullDnode->HOITFD_raw_info->phys_addr, read_buf, pFullDnode->HOITFD_raw_info->totlen);
 
 		PHOIT_RAW_HEADER pRawHeader = (PHOIT_RAW_HEADER)read_buf;
+        crc32_check(pRawHeader);
 
 		PHOIT_INODE_CACHE pInodeCache = __hoit_get_inode_cache(pfs, pRawHeader->ino);
 		if (!pInodeCache) {
@@ -93,6 +95,7 @@ PHOIT_FULL_DNODE __hoit_truncate_full_dnode(PHOIT_VOLUME pfs, PHOIT_FULL_DNODE p
     hoitReadFromCache(pfs->HOITFS_cacheHdr, pRawInfo->phys_addr, read_buf, pRawInfo->totlen);
 
     PHOIT_RAW_INODE pRawInode = (PHOIT_RAW_INODE)read_buf;
+    crc32_check(pRawInode);
 
     /* 在write_buf中组装好要写入的数据 */
     PCHAR write_buf = (PCHAR)__SHEAP_ALLOC(sizeof(struct HOIT_RAW_INODE) + length);  /* 注意避免内存泄露 */
@@ -114,6 +117,9 @@ PHOIT_FULL_DNODE __hoit_truncate_full_dnode(PHOIT_VOLUME pfs, PHOIT_FULL_DNODE p
     lib_memcpy(write_buf + sizeof(struct HOIT_RAW_INODE), read_buf + sizeof(struct HOIT_RAW_INODE) + offset, length);
 
     UINT phys_addr = 0;
+    
+    pNewRawInode->crc = 0;
+    pNewRawInode->crc = crc32_le(write_buf, sizeof(struct HOIT_RAW_INODE) + length);
     __hoit_write_flash(pfs, write_buf, sizeof(struct HOIT_RAW_INODE) + length, &phys_addr, 1);
 
     PHOIT_RAW_INFO pNewRawInfo = (PHOIT_RAW_INFO)__SHEAP_ALLOC(sizeof(struct HOIT_RAW_INFO)); /* 注意避免内存泄露 */
@@ -181,6 +187,9 @@ PHOIT_FULL_DNODE __hoit_write_full_dnode(PHOIT_INODE_INFO pInodeInfo, UINT offse
 
     UINT phys_addr = 0;
     //TODO:合并写入
+
+    pRawInode->crc = 0;
+    pRawInode->crc = crc32_le(pBuf, totlen);
     __hoit_write_flash(pfs, pBuf, totlen, &phys_addr, needLog);
 
     PHOIT_RAW_INFO pRawInfo = (PHOIT_RAW_INFO)__SHEAP_ALLOC(sizeof(HOIT_RAW_INFO));
@@ -214,6 +223,7 @@ PHOIT_FULL_DNODE __hoit_bulid_full_dnode(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRawIn
     PCHAR read_buf = (PCHAR)__SHEAP_ALLOC(pRawInfo->totlen);        /* 注意内存泄露 */
     hoitReadFromCache(pfs->HOITFS_cacheHdr, pRawInfo->phys_addr, read_buf, pRawInfo->totlen);
     PHOIT_RAW_INODE pRawInode = (PHOIT_RAW_INODE)read_buf;
+    crc32_check(pRawInode);
     
     PHOIT_FULL_DNODE pFullDnode = (PHOIT_FULL_DNODE)__SHEAP_ALLOC(sizeof(HOIT_FULL_DNODE));
     pFullDnode->HOITFD_file_type = pRawInode->file_type;
@@ -237,6 +247,7 @@ PHOIT_FULL_DIRENT __hoit_bulid_full_dirent(PHOIT_VOLUME pfs, PHOIT_RAW_INFO pRaw
     PCHAR read_buf = (PCHAR)__SHEAP_ALLOC(pRawInfo->totlen);        /* 注意内存泄露 */
     hoitReadFromCache(pfs->HOITFS_cacheHdr, pRawInfo->phys_addr, read_buf, pRawInfo->totlen);
     PHOIT_RAW_DIRENT pRawDirent = (PHOIT_RAW_DIRENT)read_buf;
+    crc32_check(pRawDirent);
 
     PHOIT_FULL_DIRENT pFullDirent = (PHOIT_FULL_DIRENT)__SHEAP_ALLOC(sizeof(HOIT_FULL_DIRENT));
     PCHAR pFileName = read_buf + sizeof(HOIT_RAW_DIRENT);

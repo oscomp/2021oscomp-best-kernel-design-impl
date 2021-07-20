@@ -54,7 +54,7 @@ BOOL __hoitGCSectorRawInfoFixUp(PHOIT_ERASABLE_SECTOR pErasableSector){
     pRawInfoTraverse    = pErasableSector->HOITS_pRawInfoFirst;
     
     bIsReset = LW_FALSE;
-
+    
     if((pErasableSector->HOITS_pRawInfoCurGC 
     && pErasableSector->HOITS_pRawInfoCurGC->is_obsolete == HOIT_FLAG_OBSOLETE) 
     || pErasableSector->HOITS_pRawInfoCurGC == LW_NULL){                /* 如果当前GC RawInfo过期，或还不存在当前GC RawInfo，则重新开始RawInfo的GC */

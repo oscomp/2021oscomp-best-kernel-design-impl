@@ -74,6 +74,7 @@ static inline PHOIT_FRAG_TREE_NODE newHoitFragTreeNode(PHOIT_FULL_DNODE pFDnode,
     pFTn->uiOfs = uiOfs;
     pFTn->uiSize = uiSize;
     pFTn->pFDnode = pFDnode;
+    pFTn->pWriteEntry = LW_NULL;    /* 07-18 By HZS */
     return pFTn;
 }
 

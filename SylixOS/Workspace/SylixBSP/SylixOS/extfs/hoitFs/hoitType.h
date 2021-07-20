@@ -23,6 +23,9 @@
 #define  __SYLIXOS_KERNEL
 #include "stdio.h"
 #include "SylixOS.h"
+#include "../tools/list/list_interface.h"
+
+//!2021-06-06 修改块级管理结构（三个链表） by zn
 /*********************************************************************************************************
   HoitFs Lib 相关测试
 *********************************************************************************************************/
@@ -81,6 +84,9 @@
 #define __HOIT_VOLUME_LOCK(pfs)             API_SemaphoreMPend(pfs->HOITFS_hVolLock, \
                                             LW_OPTION_WAIT_INFINITE)
 #define __HOIT_VOLUME_UNLOCK(pfs)           API_SemaphoreMPost(pfs->HOITFS_hVolLock)
+#define GET_FREE_LIST(pfs)   pfs->HOITFS_freeSectorList
+#define GET_DIRTY_LIST(pfs)   pfs->HOITFS_dirtySectorList
+#define GET_CLEAN_LIST(pfs)   pfs->HOITFS_cleanSectorList
 #define __HOIT_MIN_4_TIMES(value)           ((value+3)/4*4) /* 将value扩展到4的倍数 */
 
 /*********************************************************************************************************
@@ -112,9 +118,13 @@ typedef struct hoit_frag_tree_list_header HOIT_FRAG_TREE_LIST_HEADER;
 
 typedef struct HOIT_CACHE_BLK             HOIT_CACHE_BLK;
 typedef struct HOIT_CACHE_HDR             HOIT_CACHE_HDR;
+typedef struct HOIT_EBS_ENTRY             HOIT_EBS_ENTRY;
 
 typedef struct HOIT_LOG_INFO              HOIT_LOG_INFO;
 typedef struct HOIT_RAW_LOG               HOIT_RAW_LOG;
+
+typedef struct hoit_write_buffer          HOIT_WRITE_BUFFER;
+typedef struct hoit_write_entry           HOIT_WRITE_ENTRY;
 
 typedef HOIT_VOLUME*                      PHOIT_VOLUME;
 typedef HOIT_RAW_HEADER*                  PHOIT_RAW_HEADER;
@@ -137,13 +147,19 @@ typedef HOIT_FRAG_TREE_LIST_HEADER *      PHOIT_FRAG_TREE_LIST_HEADER;
 
 typedef HOIT_CACHE_BLK *                  PHOIT_CACHE_BLK;
 typedef HOIT_CACHE_HDR *                  PHOIT_CACHE_HDR;
+typedef HOIT_EBS_ENTRY *                  PHOIT_EBS_ENTRY;
 
 typedef HOIT_LOG_INFO *                   PHOIT_LOG_INFO;
 typedef HOIT_RAW_LOG *                    PHOIT_RAW_LOG;
+
+typedef HOIT_WRITE_BUFFER *               PHOIT_WRITE_BUFFER;
+typedef HOIT_WRITE_ENTRY *                PHOIT_WRITE_ENTRY;
 DEV_HDR          HOITFS_devhdrHdr;
 
+DECLARE_LIST_TEMPLATE(HOIT_ERASABLE_SECTOR);
+DECLARE_LIST_TEMPLATE(HOIT_FRAG_TREE_NODE);
 
-
+USE_LIST_TEMPLATE(hoitType, HOIT_FRAG_TREE_NODE);
 /*********************************************************************************************************
   HoitFs super block类型
 *********************************************************************************************************/
@@ -172,6 +188,10 @@ typedef struct HOIT_VOLUME{
     
                                                                            /*! GC 相关 */
     PHOIT_ERASABLE_SECTOR   HOITFS_erasableSectorList;                     /* 可擦除Sector列表 */
+    List(HOIT_ERASABLE_SECTOR) HOITFS_dirtySectorList;                     /* 含有obsolete的块 */ 
+    List(HOIT_ERASABLE_SECTOR) HOITFS_cleanSectorList;                     /* 不含obsolete的块 */
+    List(HOIT_ERASABLE_SECTOR) HOITFS_freeSectorList;                      /* 啥都不含的块 */
+    
     PHOIT_ERASABLE_SECTOR   HOITFS_curGCSector;                            /* 当前正在GC的Sector */
     PHOIT_ERASABLE_SECTOR   HOITFS_curGCSuvivorSector;                      /* 目标搬家地址 */
     LW_OBJECT_HANDLE        HOITFS_GCMsgQ;                                 /* GC线程消息队列*/
@@ -197,6 +217,7 @@ struct HOIT_RAW_HEADER{
     mode_t              file_type;
     UINT                ino;
     UINT                version;
+    UINT32              crc;
 };
 
 
@@ -210,6 +231,7 @@ struct HOIT_RAW_INODE {
     mode_t              file_type;
     UINT                ino;
     UINT                version;
+    UINT32              crc;
     UINT                offset;     /* 记录文件内部偏移 */
 };
 
@@ -223,14 +245,15 @@ struct HOIT_RAW_DIRENT{
     mode_t              file_type;
     UINT                ino;
     UINT                version;
+    UINT32              crc;
     UINT                pino;
 };
 
 struct HOIT_RAW_INFO{
     UINT                phys_addr;
     UINT                totlen;
-    PHOIT_RAW_INFO      next_phys;
-    PHOIT_RAW_INFO      next_logic;
+    PHOIT_RAW_INFO      next_phys;                                     /* 物理上邻接的下一个 */
+    PHOIT_RAW_INFO      next_logic;                                    /* 同属一个ino的下一个 */
     UINT                is_obsolete;
 };
                                                                     
@@ -274,6 +297,7 @@ struct HOIT_INODE_INFO{
     PHOIT_VOLUME        HOITN_volume;
     UINT                HOITN_ino;                                      /*  规定根目录的ino为1          */
     PCHAR               HOITN_pcLink;
+    PHOIT_WRITE_BUFFER  HOITN_pWriteBuffer;
 
     uid_t               HOITN_uid;                                      /*  用户 id                     */
     gid_t               HOITN_gid;                                      /*  组   id                     */
@@ -292,6 +316,8 @@ struct HOIT_ERASABLE_SECTOR{
     UINT                          HOITS_addr;
     UINT                          HOITS_length;
     UINT                          HOITS_offset;                                   /* 当前在写物理地址 = addr+offset  */
+    UINT                          HOITS_uiObsoleteEntityCount;                    /* sector当前包含过期实体数量 */
+    UINT                          HOITS_uiAvailableEntityCount;                   /* sector当前包含有效实体数量 */
     //TODO: 写入、GC时，需要持有该锁
     spinlock_t                    HOITS_lock;                                     /* 每个Sector持有一个? */ 
 
@@ -305,7 +331,7 @@ struct HOIT_ERASABLE_SECTOR{
     PHOIT_RAW_INFO                HOITS_pRawInfoCurGC;                            /* 当前即将回收的数据实体，注：一次仅回收一个数据实体 */
     PHOIT_RAW_INFO                HOITS_pRawInfoPrevGC;
     PHOIT_RAW_INFO                HOITS_pRawInfoLastGC;                           /* 最后一块应当被GC的Raw Info */
-
+  
     ULONG                         HOITS_tBornAge;                                 /* 当前Sector的出生时间 */                        
 };
 
@@ -359,6 +385,7 @@ struct hoit_frag_tree_node
     PHOIT_FULL_DNODE pFDnode;
     UINT32 uiSize;
     UINT32 uiOfs;
+    PHOIT_WRITE_ENTRY pWriteEntry;
 };
 
 /*********************************************************************************************************
@@ -406,11 +433,25 @@ typedef struct HOIT_CACHE_HDR
     UINT32                  HOITCACHE_blockNums;    /* 当前cache数量 */
     LW_OBJECT_HANDLE        HOITCACHE_hLock;        /* cache自旋锁? */
     UINT32                  HOITCACHE_flashBlkNum;  /* 将flash分块后的块数 */
-    PHOIT_CACHE_BLK         HOITCACHE_cacheLineHdr;  /* cache链表 */
+    PHOIT_CACHE_BLK         HOITCACHE_cacheLineHdr;  /* cache链表头，注意该节点不保存数据 */
     UINT32                  HOITCACHE_nextBlkToWrite;/* 下一个要输出的块 */
+
+    //! 2021-07-04 ZN filter层
+    // size_t                  HOITCACHE_EBSEntrySize; /* EBS enty大小 */
+    size_t                  HOITCACHE_EBSStartAddr; /* EBS 在sector中起始地址 */
+    // size_t                  HOITCACHE_PageSize;     /* 单页大小 */
+    size_t                  HOITCACHE_PageAmount;     /* 单个cache页数量 */
 }HOIT_CACHE_HDR;
 
-
+//! 2021-7-04 ZN EBS项
+/*********************************************************************************************************
+  HOITFS EBS entry
+*********************************************************************************************************/
+typedef struct HOIT_EBS_ENTRY
+{
+    UINT32  HOIT_EBS_ENTRY_inodeNo;     /* 所属文件inode号 */
+    UINT32  HOIT_EBS_ENTRY_obsolete;    /* 过期标志 */
+}HOIT_EBS_ENTRY;
 
 /*********************************************************************************************************
   HOITFS log 文件头
@@ -437,6 +478,22 @@ struct HOIT_RAW_LOG
     UINT                uiLogSize;
     UINT                uiLogFirstAddr;
 };
+/*********************************************************************************************************
+  HOITFS WriteBuffer 结构
+*********************************************************************************************************/
+struct hoit_write_buffer
+{
+    UINT32                  size;
+    UINT32                  threshold;  //触发合并操作的节点数
+    PHOIT_WRITE_ENTRY       pList;
+};
+struct hoit_write_entry
+{
+    PHOIT_FRAG_TREE_NODE    pTreeNode;
+    PHOIT_WRITE_ENTRY       pNext;
+    PHOIT_WRITE_ENTRY       pPrev;
+};
+
 /*********************************************************************************************************
   偏移量计算
 *********************************************************************************************************/

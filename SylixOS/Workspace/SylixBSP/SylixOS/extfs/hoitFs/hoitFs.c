@@ -48,7 +48,7 @@ static ssize_t  __hoitFsReadlink();
 /*********************************************************************************************************
   裁剪宏
 *********************************************************************************************************/
-#if LW_CFG_MAX_VOLUMES > 0 //&& LW_CFG_RAMFS_EN > 0
+//#if LW_CFG_MAX_VOLUMES > 0 //&& LW_CFG_RAMFS_EN > 0
 #include "HoitFsLib.h"
 /*********************************************************************************************************
 ** 函数名称: API_HoitFsDrvInstall
@@ -107,6 +107,7 @@ INT  API_HoitFsDrvInstall(VOID)
 ** 调用模块:
                                            API 函数
 *********************************************************************************************************/
+USE_LIST_TEMPLATE(hoitFs, HOIT_ERASABLE_SECTOR);
 LW_API
 INT  API_HoitFsDevCreate(PCHAR   pcName, PLW_BLK_DEV  pblkd)
 {
@@ -161,9 +162,14 @@ INT  API_HoitFsDevCreate(PCHAR   pcName, PLW_BLK_DEV  pblkd)
     pfs->HOITFS_curGCSector        = LW_NULL;
     pfs->HOITFS_curGCSuvivorSector  = LW_NULL;
     pfs->HOITFS_erasableSectorList = LW_NULL;
+
+    InitList(pfs->HOITFS_dirtySectorList,   hoitFs, HOIT_ERASABLE_SECTOR); /* 初始化模板链表 */
+    InitList(pfs->HOITFS_cleanSectorList,   hoitFs, HOIT_ERASABLE_SECTOR);
+    InitList(pfs->HOITFS_freeSectorList,    hoitFs, HOIT_ERASABLE_SECTOR);
                                                                         /* Log相关 */
     pfs->HOITFS_logInfo            = LW_NULL;
     //__ram_mount(pramfs);
+
     hoitEnableCache(GET_SECTOR_SIZE(8), 8, pfs);
     __hoit_mount(pfs);
     hoitStartGCThread(pfs, 64 * 26 * 1024);
@@ -473,7 +479,6 @@ __re_umount_vol:
         iosDevDelete((LW_DEV_HDR *)pfs);                             /*  IO 系统移除设备             */
         API_SemaphoreMDelete(&pfs->HOITFS_hVolLock);
          
-        //TODO __hoit_unmount尚未定义
         __hoit_unmount(pfs);
         __SHEAP_FREE(pfs);
 
@@ -1129,7 +1134,7 @@ static INT  __hoitFsStatfs (PLW_FD_ENTRY  pfdentry, struct statfs *pstatfs)
     }
 
     //TODO __hoit_statfs尚未完工
-    /*__hoit_statfs(pfs, pstatfs);*/
+    __hoit_statfs(pfs, pstatfs);
 
     __HOIT_VOLUME_UNLOCK(pfs);
 
@@ -1563,6 +1568,7 @@ static INT  __hoitFsIoctl(PLW_FD_ENTRY  pfdentry,
     case FIOSYNC:                                                       /*  将文件缓存回写              */
     case FIOFLUSH:
     case FIODATASYNC:
+        hoitFlushCache(pfs->HOITFS_cacheHdr);
         return  (ERROR_NONE);
         
     case FIOCHMOD:
@@ -1668,5 +1674,5 @@ INT  __hoitFsHardlink(PHOIT_VOLUME   pfs,
     return  (ERROR_NONE);
 }
 
-#endif                                                                  /*  LW_CFG_MAX_VOLUMES > 0      */
+//#endif                                                                  /*  LW_CFG_MAX_VOLUMES > 0      */
 #endif // HOITFS_DISABLE

@@ -357,6 +357,11 @@ BOOL hoitFragTreeDeleteNode(PHOIT_FRAG_TREE pFTTree, PHOIT_FRAG_TREE_NODE pFTn, 
     if(pFTTree->uiNCnt == 0)
         return LW_FALSE;
     
+    /* 07-18 增加删除红黑树节点检查其是否在WriteBuffer链上的代码 */
+    if (pFTn->pWriteEntry != LW_NULL) {
+        pFTn->pWriteEntry->pTreeNode = LW_NULL;
+    }
+    
     res = hoitRbDeleteNode(pFTTree->pRbTree, &pFTn->pRbn);
     if(res){
         pFTTree->uiNCnt--;

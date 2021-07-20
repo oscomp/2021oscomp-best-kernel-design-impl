@@ -42,8 +42,10 @@
 #define HOIT_CACHE_TYPE_DATA        1
 #define HOIT_CACHE_TYPE_DATA_EMPTY  2        
 
-
-
+/* EBS 配置 */
+#define HOIT_FILTER_EBS_ENTRY_SIZE                  (sizeof(PHOIT_EBS_ENTRY))               /* 即8B */
+#define HOIT_FILTER_PAGE_SIZE                       (sizeof(PHOIT_EBS_ENTRY) * ( 8 - 1 ))   /* 即56B，7倍的EBS entry size */
+#define HOIT_FILTER_EBS_AREA_SIZE(pcacheHdr)        (pcacheHdr->HOITCACHE_PageAmount * HOIT_FILTER_EBS_ENTRY_SIZE)
 /*********************************************************************************************************
   内联函数偏移修改，注意这里默认cache块大小与flash的sector
 *********************************************************************************************************/
@@ -64,13 +66,16 @@ static inline UINT32 hoitGetSectorOffset(UINT8 sector_no){
 /*
     获取一个flash sector 大小
 */
+//! 2021-07-07 减去EBS区域
 static inline UINT hoitGetSectorSize(UINT8 sector_no){
     sector_no += GET_SECTOR_NO(NOR_FLASH_START_OFFSET);
 
     if(sector_no < 0 || sector_no >= NOR_FLASH_NSECTOR){
         return -1;
     }
-    return 1024 * (_G_am29LV160DB_sector_infos[sector_no].sector_size);     
+    UINT origin_sector_size = 1024 * (_G_am29LV160DB_sector_infos[sector_no].sector_size);
+    UINT pageNum = origin_sector_size/(HOIT_FILTER_EBS_ENTRY_SIZE + HOIT_FILTER_PAGE_SIZE);
+    return origin_sector_size - pageNum * HOIT_FILTER_EBS_ENTRY_SIZE;     
 }
 /*
     获取flash sector的regoin_no
@@ -109,7 +114,7 @@ static inline BOOL hoiCheckSectorDirty(UINT32 base, UINT8 sector_no){
 
 
 /*********************************************************************************************************
- * ????
+ * cache层函数
 *********************************************************************************************************/
 PHOIT_CACHE_HDR     hoitEnableCache(UINT32 uiCacheBlockSize, 
                                     UINT32 uiCacheBlockNums, 
@@ -119,14 +124,12 @@ PHOIT_CACHE_BLK     hoitAllocCache(PHOIT_CACHE_HDR pcacheHdr,
                                    UINT32 flashBlkNo, 
                                    UINT32 cacheType, 
                                    PHOIT_ERASABLE_SECTOR pSector);
-
 PHOIT_CACHE_BLK     hoitCheckCacheHit(PHOIT_CACHE_HDR pcacheHdr, 
                                       UINT32 flashBlkNo);
 BOOL                hoitReadFromCache(PHOIT_CACHE_HDR pcacheHdr, 
                                       UINT32 uiOfs, 
                                       PCHAR pContent, 
                                       UINT32 uiSize);
-
 UINT32              hoitFlushCache(PHOIT_CACHE_HDR pcacheHdr);
 UINT32              hoitFindNextToWrite(PHOIT_CACHE_HDR pcacheHdr, 
                                         UINT32 cacheType,
@@ -138,11 +141,16 @@ BOOL                hoitWriteThroughCache(PHOIT_CACHE_HDR pcacheHdr,
 UINT32              hoitWriteToCache(PHOIT_CACHE_HDR pcacheHdr,
                                      PCHAR pContent, 
                                      UINT32 uiSize);
-
 PHOIT_ERASABLE_SECTOR hoitFindSector(PHOIT_CACHE_HDR pcacheHdr, 
                                      UINT32 sector_no);
 VOID                hoitResetSectorState(PHOIT_CACHE_HDR pcacheHdr, 
-                                         PHOIT_ERASABLE_SECTOR pErasableSector);                    
+                                         PHOIT_ERASABLE_SECTOR pErasableSector);        
+
+/*********************************************************************************************************
+ * filter层函数
+*********************************************************************************************************/
+UINT32              hoitInitFilter(PHOIT_CACHE_HDR pcacheHdr, 
+                                    UINT32 uiCacheBlockSize);
 #ifdef HOIT_CACHE_TEST
 BOOL    test_hoit_cache();
 #endif
