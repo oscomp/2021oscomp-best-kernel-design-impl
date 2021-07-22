@@ -736,13 +736,14 @@ void sched(void) {
 	mycpu()->intena = intena;
 }
 
+void cpuinit(void) {
+	memset(cpus, 0, sizeof(cpus));
+}
+
 void procinit(void) {
 	// init pid 
 	__pid = 1;
 	initlock(&pid_lock, "pid_lock");
-
-	// init cpus 
-	memset(cpus, 0, sizeof(cpus));
 
 	// init list 
 	for (int i = 0; i < PRIORITY_NUMBER; i ++) 

@@ -177,6 +177,7 @@ struct cpu *mycpu(void);
 struct proc *myproc(void);
 
 /* Initialization */
+void cpuinit(void);
 void procinit(void);
 
 /* Set up first user process. */

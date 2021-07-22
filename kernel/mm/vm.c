@@ -28,6 +28,9 @@ pagetable_t kernel_pagetable;
 static struct spinlock page_ref_lock;
 static uint8 page_ref_table[MAX_PAGES_NUM];  // user pages ref, for COW fork mechanism
 
+// back to this point when fail to handle a page fault
+static uint64 save_point = 0;
+
 extern char etext[];  // kernel.ld sets this to end of kernel code.
 extern char trampoline[]; // trampoline.S
 extern char kernel_end[]; // first address after kernel.
@@ -37,6 +40,8 @@ extern char kernel_end[]; // first address after kernel.
 void
 kvminit()
 {
+	save_point = 0;
+
 	if (idlepages() > MAX_PAGES_NUM)
 		panic("kvminit: page_ref_table[] not enough");
 
@@ -697,8 +702,7 @@ kvmfree(pagetable_t pagetable, int stack_free)
  * process exit() in usertrap().
  */
 
-// back to this point when fail to handle a page fault
-static uint64 save_point = 0;
+
 
 // a page fault failed to handle, kerneltrap() called for help
 uint64 kern_pgfault_escape(uint64 badaddr)
