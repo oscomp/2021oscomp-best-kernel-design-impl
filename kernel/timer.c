@@ -1,13 +1,13 @@
 // Timer Interrupt handler
 
-#include "include/types.h"
-#include "include/param.h"
-#include "include/riscv.h"
-#include "include/sbi.h"
-#include "include/spinlock.h"
-#include "include/timer.h"
-#include "include/printf.h"
-#include "include/proc.h"
+#include "types.h"
+#include "param.h"
+#include "hal/riscv.h"
+#include "sbi.h"
+#include "sync/spinlock.h"
+#include "timer.h"
+#include "printf.h"
+#include "sched/proc.h"
 
 struct spinlock tickslock;
 uint64 ticks;

@@ -1,95 +1,30 @@
 # platform	:= k210
 platform	:= qemu
-mode := debug
-# mode := release
-K=kernel
-U=xv6-user
-T=target
+mode 		:= debug
+# mode		:= release
 
-OBJS =
-ifeq ($(platform), k210)
-OBJS += $K/entry_k210.o
-else
-OBJS += $K/entry_qemu.o
-endif
+K := kernel
+U := xv6-user
+T := target
+BUILD_DIR := build
 
-OBJS += \
-  $K/printf.o \
-  $K/pm.o \
-  $K/kmalloc.o \
-  $K/intr.o \
-  $K/spinlock.o \
-  $K/string.o \
-  $K/main.o \
-  $K/vm.o \
-  $K/proc.o \
-  $K/swtch.o \
-  $K/trampoline.o \
-  $K/trap.o \
-  $K/syscall.o \
-  $K/sysproc.o \
-  $K/bio.o \
-  $K/sleeplock.o \
-  $K/fs.o \
-  $K/file.o \
-  $K/pipe.o \
-  $K/exec.o \
-  $K/sysfile.o \
-  $K/kernelvec.o \
-  $K/timer.o \
-  $K/disk.o \
-  $K/fat32.o \
-  $K/plic.o \
-  $K/console.o \
-  $K/usrmm.o \
-  $K/driver_fs.o \
-  $K/systime.o \
-  $K/sysuname.o \
-  $K/uname.o \
-  $K/mmap.o \
-  $K/signal.o \
-  $K/syssignal.o \
-  $K/utils/list.o \
-  $K/poll.o
-
-ifeq ($(platform), k210)
-OBJS += \
-  $K/spi.o \
-  $K/gpiohs.o \
-  $K/fpioa.o \
-  $K/utils.o \
-  $K/sdcard.o \
-  $K/dmac.o \
-  $K/sysctl.o \
-
-else
-OBJS += \
-  $K/virtio_disk.o \
-  #$K/uart.o \
-
-endif
-
-QEMU = qemu-system-riscv64
-
-ifeq ($(platform), k210)
-RUSTSBI = ./bootloader/SBI/sbi-k210
-else
-RUSTSBI = ./bootloader/SBI/sbi-qemu
-endif
-
-#TOOLPREFIX	:= riscv64-unknown-elf-
+# config toolchain
+# TOOLPREFIX 	:= riscv64-unknown-elf-
 TOOLPREFIX	:= riscv64-linux-gnu-
-CC = $(TOOLPREFIX)gcc
-AS = $(TOOLPREFIX)gas
-LD = $(TOOLPREFIX)ld
-OBJCOPY = $(TOOLPREFIX)objcopy
-OBJDUMP = $(TOOLPREFIX)objdump
+CC 		:= $(TOOLPREFIX)gcc
+AS		:= $(TOOLPREFIX)gas
+LD		:= $(TOOLPREFIX)ld
+OBJCOPY	:= $(TOOLPREFIX)objcopy
+OBJDUMP	:= $(TOOLPREFIX)objdump
 
+QEMU	:= qemu-system-riscv64
+
+# flags
 CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -g
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
-CFLAGS += -I. -I./$K/include
+CFLAGS += -Iinclude/
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
 ifeq ($(mode), debug) 
@@ -111,36 +46,15 @@ ifeq ($(platform), qemu)
 linker = ./linker/qemu.ld
 endif
 
-# Compile Kernel
-$T/kernel: $(OBJS) $(linker) $U/initcode
-	@if [ ! -d "./target" ]; then mkdir target; fi
-	@$(LD) $(LDFLAGS) -T $(linker) -o $T/kernel $(OBJS)
-	@$(OBJDUMP) -S $T/kernel > $T/kernel.asm
-	@$(OBJDUMP) -t $T/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $T/kernel.sym
-  
-build: $T/kernel userprogs
-
-# Compile RustSBI
-RUSTSBI:
+# RustSBI
 ifeq ($(platform), k210)
-	@cd ./bootloader/SBI/rustsbi-k210 && cargo build && cp ./target/riscv64gc-unknown-none-elf/debug/rustsbi-k210 ../sbi-k210
-	@$(OBJDUMP) -S ./bootloader/SBI/sbi-k210 > $T/rustsbi-k210.asm
+	RUSTSBI := ./sbi/sbi-k210
 else
-	@cd ./bootloader/SBI/rustsbi-qemu && cargo build && cp ./target/riscv64gc-unknown-none-elf/debug/rustsbi-qemu ../sbi-qemu
-	@$(OBJDUMP) -S ./bootloader/SBI/sbi-qemu > $T/rustsbi-qemu.asm
+	RUSTSBI	:= ./sbi/sbi-qemu
 endif
 
-rustsbi-clean:
-	@cd ./bootloader/SBI/rustsbi-k210 && cargo clean
-	@cd ./bootloader/SBI/rustsbi-qemu && cargo clean
-
-image = $T/kernel.bin
-k210 = $T/k210.bin
-k210-serialport := /dev/ttyUSB0
-
-ifndef CPUS
+# QEMU 
 CPUS := 2
-endif
 
 QEMUOPTS = -machine virt -kernel $T/kernel -m 8M -nographic
 
@@ -153,78 +67,164 @@ QEMUOPTS += -bios $(RUSTSBI)
 QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
-run: build
-ifeq ($(platform), k210)
-	@$(OBJCOPY) $T/kernel --strip-all -O binary $(image)
-	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $(k210)
-	@dd if=$(image) of=$(k210) bs=128k seek=1
-	@$(OBJDUMP) -D -b binary -m riscv $(k210) > $T/k210.asm
+k210-serialport := /dev/ttyUSB0
+
+# entry file 
+ifeq ($(platform), k210) 
+SRC := $K/entry_k210.S
+else 
+SRC := $K/entry_qemu.S
+endif 
+
+SRC	+= \
+	$K/printf.c \
+	$K/console.c \
+	$K/exec.c \
+	$K/intr.c \
+	$K/logo.c \
+	$K/main.c \
+	$K/timer.c \
+	$K/uname.c \
+	$K/fs/bio.c \
+	$K/fs/driver_fs.c \
+	$K/fs/fat32.c \
+	$K/fs/file.c \
+	$K/fs/fs.c \
+	$K/fs/pipe.c \
+	$K/fs/poll.c \
+	$K/mesg/signal.c \
+	$K/mm/kmalloc.c \
+	$K/mm/mmap.c \
+	$K/mm/pm.c \
+	$K/mm/usrmm.c \
+	$K/mm/vm.c \
+	$K/sched/proc.c \
+	$K/sched/swtch.S \
+	$K/sync/sleeplock.c \
+	$K/sync/spinlock.c \
+	$K/syscall/syscall.c \
+	$K/syscall/sysfile.c \
+	$K/syscall/sysproc.c \
+	$K/syscall/syssignal.c \
+	$K/syscall/systime.c \
+	$K/syscall/sysuname.c \
+	$K/trap/kernelvec.S \
+	$K/trap/trampoline.S \
+	$K/trap/trap.c \
+	$K/utils/list.c \
+	$K/utils/string.c \
+	$K/hal/plic.c \
+	$K/hal/disk.c
+
+ifeq ($(platform), k210) 
+SRC += \
+	$K/hal/spi.c \
+	$K/hal/gpiohs.c \
+	$K/hal/fpioa.c \
+	$K/hal/sdcard.c \
+	$K/hal/dmac.c \
+	$K/hal/sysctl.c \
+	$K/utils/utils.c
+else 
+SRC += \
+	$K/hal/virtio_disk.c
+endif 
+
+# linker script 
+ifeq ($(platform), k210) 
+linker = ./linker/k210.ld
+else 
+linker = ./linker/qemu.ld
+endif 
+
+# object files 
+OBJ := $(basename $(SRC))
+OBJ := $(addsuffix .o, $(OBJ))
+
+
+# Generate binary file to burn onto k210
+all: $T/kernel $(RUSTSBI) 
+ifeq ($(platform), k210) 
+	@$(OBJCOPY) $T/kernel --strip-all -O binary $T/kernel.bin
+	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $T/k210.bin
+	@dd if=$T/kernel.bin of=$T/k210.bin bs=128k seek=1
+	cp $T/k210.bin ./k210.bin
+endif 
+
+# Compile Kernel
+$T/kernel: $(OBJ) 
+	@if [ ! -d "$T" ]; then mkdir $T; fi
+	@$(LD) $(LDFLAGS) -T $(linker) -o $@ $^
+	@$(OBJDUMP) -S $@ >$T/kernel.asm
+
+# Compile RustSBI 
+#! This may not work now
+$(RUSTSBI): 
+ifeq ($(mode), release)
+	@cd ./sbi/$(addprefix rust, $@) && cargo build --release
+else 
+	@cd ./sbi/$(addprefix rust, $@) && cargo build 
+endif 
+
+run: all
+ifeq ($(platform), k210) 
 	@sudo chmod 777 $(k210-serialport)
-	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t $(k210)
-else
+	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t ./k210.bin
+else 
 	$(QEMU) $(QEMUOPTS)
-endif
+endif 
 
-# try to generate a unique GDB port
-GDBPORT = $(shell expr `id -u` % 5000 + 25000)
-# QEMU's gdb stub command line changed in 0.11
-QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
-	then echo "-gdb tcp::$(GDBPORT)"; \
-	else echo "-s -p $(GDBPORT)"; fi)
 
-.gdbinit: debug/.gdbinit.tmpl-riscv
-	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
+# UPROGS := \
+# 	$U/_init\
+# 	$U/_sh\
+# 	$U/_cat\
+# 	$U/_echo\
+# 	$U/_grep\
+# 	$U/_ls\
+# 	$U/_kill\
+# 	$U/_mkdir\
+# 	$U/_xargs\
+# 	$U/_sleep\
+# 	$U/_find\
+# 	$U/_rm\
+# 	$U/_rmdir\
+# 	$U/_wc\
+# 	$U/_info\
+# 	$U/_usertests\
+# 	$U/_strace\
+# 	$U/_mv\
+# 	$U/_test\
+# 	$U/_grind\
+# 	$U/_forktest\
+# 	$U/_stressfs\
+# 	$U/_cowtest\
+# 	$U/_lazytests\
+# 	$U/_mount\
+# 	$U/_umount\
+# 	$U/_dup3\
+# 	$U/_mmaptests
 
-qemu-gdb: $T/kernel .gdbinit fs.img
-	@echo "*** Now run 'gdb' in another window." 1>&2
-	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+# userprogs: $(UPROGS)
 
-all: build 
-	@$(OBJCOPY) $T/kernel --strip-all -O binary $(image)
-	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $(k210)
-	@dd if=$(image) of=$(k210) bs=128k seek=1
-	cp $(k210) ./k210.bin
 
-ulinker = ./linker/user.ld
+# # Compile User-Space Programs
+# _%: %.o $(ULIB)
+# 	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
+# 	$(OBJDUMP) -S $@ >$.asm
 
-$U/initcode: $U/initcode.S
-	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
-	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
-	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
-	$(OBJDUMP) -S $U/initcode.o > $U/initcode.asm
+# $U/crt.o: $U/crt.c
+# 	$(CC) $(CFLAGS) -c -o $U/crt.o $U/crt.c
+# 	$(OBJDUMP) -S $U/crt.o >$U/crt.asm
 
-$U/ostest: $U/ostest.c $U/ostest_asm.S 
-	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/ostest.c -o $U/ostest.o
-	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/ostest_asm.S -o $U/ostest_asm.o
-	$(LD) $(LDFLAGS) -N -e _entry -Ttext 0 -o $U/ostest.out $U/ostest.o $U/ostest_asm.o 
-	$(OBJCOPY) -S -O binary $U/ostest.out $U/ostest
-	$(OBJDUMP) -S $U/ostest.out > $U/ostest.asm
+# $U/usys.S: $U/usys.pl
+# 	@perl $U/usys.pl >$@
 
-tags: $(OBJS) _init
-	@etags *.S *.c
-
-ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o $U/crt.o
-
-_%: %.o $(ULIB)
-	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
-	$(OBJDUMP) -S $@ > $*.asm
-	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
-
-$U/crt.o:
-	$(CC) $(CFLAGS) -c -o $U/crt.o $U/crt.c
-	$(OBJDUMP) -S $U/crt.o > $U/crt.asm
-
-$U/usys.S : $U/usys.pl
-	@perl $U/usys.pl > $U/usys.S
-
-$U/usys.o : $U/usys.S
-	$(CC) $(CFLAGS) -c -o $U/usys.o $U/usys.S
-
-$U/_forktest: $U/forktest.o $(ULIB)
-	# forktest has less library code linked in - needs to be small
-	# in order to be able to max out the proc table.
-	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
-	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
+# $U/_forktest: $U/forktest.o $(ULIB)
+# 	# forktest has less library code linked in - needs to be small
+# 	# in order to be able to max out the proc table 
+# 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
+# 	$(OBJDUMP) -S $U/_forktest >$U/forktest.asm
 
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
@@ -232,68 +232,9 @@ $U/_forktest: $U/forktest.o $(ULIB)
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
 
-UPROGS=\
-	$U/_init\
-	$U/_sh\
-	$U/_cat\
-	$U/_echo\
-	$U/_grep\
-	$U/_ls\
-	$U/_kill\
-	$U/_mkdir\
-	$U/_xargs\
-	$U/_sleep\
-	$U/_find\
-	$U/_rm\
-	$U/_rmdir\
-	$U/_wc\
-	$U/_info\
-	$U/_usertests\
-	$U/_strace\
-	$U/_mv\
-	$U/_test\
-	$U/_grind\
-	$U/_forktest\
-	$U/_stressfs\
-	$U/_cowtest\
-	$U/_lazytests\
-	$U/_mount\
-	$U/_umount\
-	$U/_dup3\
-	$U/_mmaptests
-
-userprogs: $(UPROGS)
-
-dst=/mnt
-
-# Make fs image
-fs: $(UPROGS)
-	@if [ ! -f "fs.img" ]; then \
-		echo "making fs image..."; \
-		dd if=/dev/zero of=fs.img bs=512k count=512; \
-		mkfs.vfat -F 32 fs.img; fi
-	@sudo mount fs.img $(dst)
-	@make sdcard dst=$(dst)
-	@sudo umount $(dst)
-
-# Write sdcard mounted at $dst
-sdcard: userprogs
-	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
-	@for file in $$( ls $U/_* ); do \
-		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
-	@sudo cp $U/_init $(dst)/init
-	@sudo cp $U/_sh $(dst)/sh
-	@sudo cp $U/shrc $(dst)/shrc
-	@sudo cp $U/_echo $(dst)/echo
-	@sudo cp README $(dst)/README
+.PHONY: clean
 
 clean: 
-	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
-	*/*.o */*.d */*.asm */*.sym \
-	$T/* \
-	$U/initcode $U/initcode.out \
-	$U/ostest $U/ostest.out \
-	$K/kernel \
-	.gdbinit \
-	$U/usys.S \
-	$(UPROGS)
+	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \
+		target \
+		k210.bin

@@ -17,21 +17,21 @@
 #define __module_name__ 	"console"
 
 
-#include "include/types.h"
-#include "include/param.h"
-#include "include/spinlock.h"
-#include "include/sleeplock.h"
-#include "include/file.h"
-#include "include/memlayout.h"
-#include "include/riscv.h"
-#include "include/proc.h"
-#include "include/sbi.h"
-#include "include/kmalloc.h"
-#include "include/buf.h"
-#include "include/printf.h"
-#include "include/vm.h"
-#include "include/debug.h"
-#include "include/buf.h"
+#include "types.h"
+#include "param.h"
+#include "sync/spinlock.h"
+#include "sync/sleeplock.h"
+#include "fs/file.h"
+#include "memlayout.h"
+#include "hal/riscv.h"
+#include "sched/proc.h"
+#include "sbi.h"
+#include "mm/kmalloc.h"
+#include "fs/buf.h"
+#include "printf.h"
+#include "mm/vm.h"
+#include "utils/debug.h"
+#include "fs/buf.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
@@ -297,7 +297,7 @@ consoleinit(void)
 	// devsw[CONSOLE].write = consolewrite;
 }
 
-#include "include/fs.h"
+#include "fs/fs.h"
 
 int __consoleread(struct inode *ip, int usr, uint64 dst, uint off, uint n)
 {

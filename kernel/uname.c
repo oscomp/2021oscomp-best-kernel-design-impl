@@ -6,12 +6,12 @@
 
 #define __module_name__ 	"uname"
 
-#include "include/types.h"
-#include "include/vm.h"
-#include "include/string.h"
-#include "include/debug.h"
+#include "types.h"
+#include "mm/vm.h"
+#include "utils/string.h"
+#include "utils/debug.h"
 
-#include "include/uname.h"
+#include "uname.h"
 
 char const UNAME_SYSNAME[] = "xv6-k210";
 char const UNAME_NODENAME[] = "none";

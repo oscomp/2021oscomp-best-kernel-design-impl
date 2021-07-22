@@ -1,8 +1,8 @@
-#include "include/types.h"
-#include "include/param.h"
-#include "include/proc.h"
-#include "include/intr.h"
-#include "include/printf.h"
+#include "types.h"
+#include "param.h"
+#include "sched/proc.h"
+#include "intr.h"
+#include "printf.h"
 
 // push_off/pop_off are like intr_off()/intr_on() except that they are matched:
 // it takes two pop_off()s to undo two push_off()s.  Also, if interrupts
