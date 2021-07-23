@@ -8,7 +8,7 @@
 
 #include "param.h"
 #include "fs/fs.h"
-#include "fs/fat32.h"
+#include "fat32/fat32.h"
 #include "fs/buf.h"
 #include "mm/kmalloc.h"
 #include "sched/proc.h"

@@ -345,10 +345,10 @@ sfence_vma()
 	#ifdef QEMU
 	asm volatile("sfence.vma");
 	#else
-	asm volatile("fence");
-	asm volatile("fence.i");
+	// asm volatile("fence");
+	// asm volatile("fence.i");
 	asm volatile(".word 0x10400073");
-	asm volatile("fence");
+	// asm volatile("fence");
 	asm volatile("fence.i");
 	#endif
 }

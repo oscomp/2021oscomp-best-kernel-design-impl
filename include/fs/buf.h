@@ -2,7 +2,7 @@
 #define __BUF_H
 
 #define BSIZE 512
-#define BNUM  2000
+#define BNUM  500
 
 #include "sync/sleeplock.h"
 #include "utils/list.h"

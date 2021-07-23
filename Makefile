@@ -87,7 +87,10 @@ SRC	+= \
 	$K/uname.c \
 	$K/fs/bio.c \
 	$K/fs/driver_fs.c \
-	$K/fs/fat32.c \
+	$K/fs/fat32/cluster.c \
+	$K/fs/fat32/fat.c \
+	$K/fs/fat32/dirent.c \
+	$K/fs/fat32/fat32.c \
 	$K/fs/file.c \
 	$K/fs/fs.c \
 	$K/fs/pipe.c \
@@ -112,6 +115,7 @@ SRC	+= \
 	$K/trap/trampoline.S \
 	$K/trap/trap.c \
 	$K/utils/list.c \
+	$K/utils/rbtree.c \
 	$K/utils/string.c \
 	$K/hal/plic.c \
 	$K/hal/disk.c
