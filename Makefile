@@ -175,64 +175,13 @@ else
 endif 
 
 
-# UPROGS := \
-# 	$U/_init\
-# 	$U/_sh\
-# 	$U/_cat\
-# 	$U/_echo\
-# 	$U/_grep\
-# 	$U/_ls\
-# 	$U/_kill\
-# 	$U/_mkdir\
-# 	$U/_xargs\
-# 	$U/_sleep\
-# 	$U/_find\
-# 	$U/_rm\
-# 	$U/_rmdir\
-# 	$U/_wc\
-# 	$U/_info\
-# 	$U/_usertests\
-# 	$U/_strace\
-# 	$U/_mv\
-# 	$U/_test\
-# 	$U/_grind\
-# 	$U/_forktest\
-# 	$U/_stressfs\
-# 	$U/_cowtest\
-# 	$U/_lazytests\
-# 	$U/_mount\
-# 	$U/_umount\
-# 	$U/_dup3\
-# 	$U/_mmaptests
-
-# userprogs: $(UPROGS)
-
-
-# # Compile User-Space Programs
-# _%: %.o $(ULIB)
-# 	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
-# 	$(OBJDUMP) -S $@ >$.asm
-
-# $U/crt.o: $U/crt.c
-# 	$(CC) $(CFLAGS) -c -o $U/crt.o $U/crt.c
-# 	$(OBJDUMP) -S $U/crt.o >$U/crt.asm
-
-# $U/usys.S: $U/usys.pl
-# 	@perl $U/usys.pl >$@
-
-# $U/_forktest: $U/forktest.o $(ULIB)
-# 	# forktest has less library code linked in - needs to be small
-# 	# in order to be able to max out the proc table 
-# 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
-# 	$(OBJDUMP) -S $U/_forktest >$U/forktest.asm
-
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
 
-.PHONY: clean
+.PHONY: clean run all
 
 clean: 
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \

@@ -1,0 +1,6 @@
+[submodule "sbi/rustsbi-qemu"]
+	path = sbi/rustsbi-qemu
+	url = git@github.com:retrhelo/rustsbi-qemu.git
+[submodule "sbi/rustsbi-k210"]
+	path = sbi/rustsbi-k210
+	url = git@github.com:retrhelo/rustsbi-k210.git
