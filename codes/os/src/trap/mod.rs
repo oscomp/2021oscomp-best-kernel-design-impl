@@ -58,7 +58,7 @@ pub fn trap_handler() -> ! {
     let stval = stval::read();
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
-            println!{"pinUserEnvCall"}
+            // println!{"pinUserEnvCall"}
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
@@ -107,12 +107,12 @@ pub fn trap_handler() -> ! {
             println!{"PageTableEntry: {}", pte.bits};
             // if the virtPage is a CoW
             if pte.is_cow() {
-                println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                // println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
-                println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                println!{"cow_alloc returned..."}
+                // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                // println!{"cow_alloc returned..."}
                 let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
-                println!{"PageTableEntry: {}", pte.bits};
+                // println!{"PageTableEntry: {}", pte.bits};
             } else {
                 println!(
                     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
@@ -126,13 +126,13 @@ pub fn trap_handler() -> ! {
             println!{"Trap solved..."}
         }
         Trap::Exception(Exception::IllegalInstruction) => {
-            println!{"pinIllegalInstruction"}
+            // println!{"pinIllegalInstruction"}
             println!("[kernel] IllegalInstruction in application, core dumped.");
             // illegal instruction exit code
             exit_current_and_run_next(-3);
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            println!{"pinSupervisorTimer"}
+            // println!{"pinSupervisorTimer"}
             set_next_trigger();
             suspend_current_and_run_next();
         }
@@ -146,7 +146,7 @@ pub fn trap_handler() -> ! {
 
 #[no_mangle]
 pub fn trap_return() -> ! {
-    println!("trap_return");
+    // println!("trap_return");
     set_user_trap_entry();
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;

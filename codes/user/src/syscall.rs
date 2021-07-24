@@ -84,14 +84,14 @@ pub fn sys_getpid() -> isize {
 pub fn sys_fork() -> isize {
     //SIGCHILD=17
     let res = syscall(SYSCALL_FORK, [17, 0, 0]);
-    println!{"user got result..."};
+    // println!{"user got result..."};
     res
 }
 
 pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
-    println!{"calling exec1..."}
+    // println!{"calling exec1..."}
     let ret = syscall(SYSCALL_EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0]);
-    println!{"returned from os..."};
+    // println!{"returned from os..."};
     ret
 }
 

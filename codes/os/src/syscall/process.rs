@@ -169,8 +169,11 @@ pub fn sys_fork(flags: usize, stack_ptr: usize) -> isize {
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     println!{"exec called!"};
     let token = current_user_token();
+    // println!{"----------pin1"}
     let path = translated_str(token, path);
+    // println!{"----------pin2"}
     let mut args_vec: Vec<String> = Vec::new();
+    // println!{"----------pin3"}
     loop {
         let arg_str_ptr = *translated_ref(token, args);
         if arg_str_ptr == 0 {
@@ -182,12 +185,16 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
     //println!("try get app {}{}", inner.current_path.as_str(), path);
+    // println!{"----------pin4"}
     if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
         drop(inner);
         //let par_inode_id:u32 = find_par_inode_id(path.as_str());
+        // println!{"----------pin5"}
         let all_data = app_inode.read_all();
         //let task = current_task().unwrap();
+        // println!{"----------pin6"}
         let argc = args_vec.len();
+        // println!{"----------pin7"}
         task.exec(all_data.as_slice(), args_vec);
         // return argc because cx.x[10] will be covered with it later
         println!{"exec return!"};

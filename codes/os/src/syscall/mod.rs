@@ -76,13 +76,13 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETPPID => sys_getppid(),
         SYSCALL_FORK => {
             let res = sys_fork(args[0] as usize, args[1] as  usize);
-            println!{"fork returning to user..."}
+            // println!{"fork returning to user..."}
             res
         },
         SYSCALL_EXEC => { 
-            println!{"calling exec..."}
+            // println!{"calling exec..."}
             let ret = sys_exec(args[0] as *const u8, args[1] as *const usize);
-            println!{"exec returning to user..."};
+            // println!{"exec returning to user..."};
             ret
         }
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),

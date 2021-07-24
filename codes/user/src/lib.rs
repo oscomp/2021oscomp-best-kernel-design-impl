@@ -36,6 +36,7 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
     unsafe {
         HEAP.lock()
             .init(HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
+        // println!{"``````````````````the address of heap_space is {:?}", HEAP_SPACE.as_ptr()}
     }
     let mut v: Vec<&'static str> = Vec::new();
     for i in 0..argc {
@@ -84,7 +85,7 @@ pub fn get_time() -> isize { sys_get_time() }
 pub fn getpid() -> isize { sys_getpid() }
 pub fn fork() -> isize { sys_fork() }
 pub fn exec(path: &str, args: &[*const u8]) -> isize { 
-    println!{"calling exec2..."}
+    // println!{"calling exec2..."}
     sys_exec(path, args) }
 pub fn wait(exit_code: &mut i32) -> isize {
     loop {

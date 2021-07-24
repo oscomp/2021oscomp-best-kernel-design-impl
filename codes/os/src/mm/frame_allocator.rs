@@ -4,6 +4,8 @@ use spin::Mutex;
 use crate::config::MEMORY_END;
 use lazy_static::*;
 use core::fmt::{self, Debug, Formatter};
+use alloc::collections::BTreeMap;
+
 
 #[derive(Clone)]
 pub struct FrameTracker {
@@ -17,6 +19,9 @@ impl FrameTracker {
         for i in bytes_array {
             *i = 0;
         }
+        Self { ppn }
+    }
+    pub fn from_ppn(ppn: PhysPageNum) -> Self {
         Self { ppn }
     }
 }
@@ -37,12 +42,15 @@ trait FrameAllocator {
     fn new() -> Self;
     fn alloc(&mut self) -> Option<PhysPageNum>;
     fn dealloc(&mut self, ppn: PhysPageNum);
+    fn add_ref(&mut self, ppn: PhysPageNum);
+    fn enquire_ref(&self, ppn: PhysPageNum) -> usize;
 }
 
 pub struct StackFrameAllocator {
     current: usize,
     end: usize,
     recycled: Vec<usize>,
+    refcounter: BTreeMap<usize, u8>,
 }
 
 impl StackFrameAllocator {
@@ -58,33 +66,55 @@ impl FrameAllocator for StackFrameAllocator {
             current: 0,
             end: 0,
             recycled: Vec::new(),
+            refcounter: BTreeMap::new(),
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
         if let Some(ppn) = self.recycled.pop() {
-            println!{"alloced recycled ppn: {:X}", ppn}
+            // println!{"alloced recycled ppn: {:X}", ppn}
+            self.refcounter.insert(ppn, 1);
             Some(ppn.into())
         } else {
             if self.current == self.end {
                 None
             } else {
+                // println!{"alloced ppn: {:X}", self.current}
                 self.current += 1;
+                self.refcounter.insert(self.current - 1, 1);
                 Some((self.current - 1).into())
             }
         }
     }
     fn dealloc(&mut self, ppn: PhysPageNum) {
-        let ppn = ppn.0;
-        println!{"dealloced ppn: {:X}", ppn}
-        // validity check
-        if ppn >= self.current || self.recycled
-            .iter()
-            .find(|&v| {*v == ppn})
-            .is_some() {
-            panic!("Frame ppn={:#x} has not been allocated!", ppn);
+        let ppn = ppn.0; 
+        // if self.refcounter.contains_key(&ppn) {
+        // let no_ref = false;
+        let ref_times = self.refcounter.get_mut(&ppn).unwrap();
+        *ref_times -= 1;
+        // println!{"the refcount of {:X} decrease to {}", ppn, ref_times}
+        if *ref_times == 0 {
+            self.refcounter.remove(&ppn);
+            // println!{"dealloced ppn: {:X}", ppn}
+            // validity check
+            if ppn >= self.current || self.recycled
+                .iter()
+                .find(|&v| {*v == ppn})
+                .is_some() {
+                // panic!("Frame ppn={:#x} has not been allocated!", ppn);
+            }
+            // recycle
+            self.recycled.push(ppn);
         }
-        // recycle
-        self.recycled.push(ppn);
+    }
+    fn add_ref(&mut self, ppn: PhysPageNum) {
+        let ppn = ppn.0; 
+        let ref_times = self.refcounter.get_mut(&ppn).unwrap();
+        *ref_times += 1;
+    }
+    fn enquire_ref(&self, ppn: PhysPageNum) -> usize{
+        let ppn = ppn.0; 
+        let ref_times = self.refcounter.get(&ppn).unwrap();
+        (*ref_times).clone() as usize
     }
 }
 
@@ -111,10 +141,28 @@ pub fn frame_alloc() -> Option<FrameTracker> {
         .map(|ppn| FrameTracker::new(ppn))
 }
 
+pub fn frame_add_ref(ppn: PhysPageNum) {
+    FRAME_ALLOCATOR
+        .lock()
+        .add_ref(ppn)
+}
+
+pub fn frame_alloc_raw() -> Option<PhysPageNum> {
+    FRAME_ALLOCATOR
+        .lock()
+        .alloc()
+}
+
 pub fn frame_dealloc(ppn: PhysPageNum) {
     FRAME_ALLOCATOR
         .lock()
         .dealloc(ppn);
+}
+
+pub fn enquire_refcount(ppn: PhysPageNum) -> usize {
+    FRAME_ALLOCATOR
+        .lock()
+        .enquire_ref(ppn)
 }
 
 #[allow(unused)]

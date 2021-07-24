@@ -73,7 +73,7 @@ impl TaskControlBlockInner {
     pub fn print_cx(&self) {
         unsafe{ 
             //println!("tcx_ptr = {:X}", self.task_cx_ptr);
-            println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
+            // println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
         }
     }
     pub fn get_work_path(&self)->String{
@@ -83,7 +83,9 @@ impl TaskControlBlockInner {
         self.memory_set.translate(vpn).unwrap()
     }
     pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
-        self.memory_set.cow_alloc(vpn, former_ppn)
+        let ret = self.memory_set.cow_alloc(vpn, former_ppn);
+        println!{"finished cow_alloc!"}
+        ret
     }
 }
 
@@ -150,16 +152,20 @@ impl TaskControlBlock {
     }
     pub fn exec(&self, elf_data: &[u8], args: Vec<String>) {
         // memory_set with elf program headers/trampoline/trap context/user stack
+        // println!{"--------------------pin10"}
         let (memory_set, mut user_sp, user_heap, entry_point) = MemorySet::from_elf(elf_data);
+        // println!{"--------------------pin11"}
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
             .ppn();
         // push arguments on user stack
         // sp减小[参数个数*usize]，用于存放参数地址 
+        // println!{"--------------------pin12"}
         user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
         let argv_base = user_sp;
         
+        // println!{"--------------------pin13"}
         let mut argv: Vec<_> = (0..=args.len())
             .map(|arg| {
                 translated_refmut(
@@ -172,6 +178,7 @@ impl TaskControlBlock {
         // argv的类型实际为 Vec<&'static mut T>
         // 所以这里直接往对应的地址写数据
         *argv[args.len()] = 0;
+        // println!{"--------------------pin14"}
         for i in 0..args.len() {
             // sp继续向下增长，留空间给每个参数
             // +1是因为需要'\0'
@@ -189,6 +196,7 @@ impl TaskControlBlock {
         user_sp -= user_sp % core::mem::size_of::<usize>();
 
         // **** hold current PCB lock
+        // println!{"--------------------pin15"}
         let mut inner = self.acquire_inner_lock();
         // substitute memory_set
         // QUES
@@ -200,6 +208,7 @@ impl TaskControlBlock {
         // update trap_cx ppn
         inner.trap_cx_ppn = trap_cx_ppn;
         // initialize trap_cx
+        // println!{"--------------------pin16"}
         let mut trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,
@@ -210,12 +219,13 @@ impl TaskControlBlock {
         trap_cx.x[10] = args.len();
         trap_cx.x[11] = argv_base;
         *inner.get_trap_cx() = trap_cx;
+        // println!{"--------------------pin17"}
         // **** release current PCB lock
     }
     pub fn fork(self: &Arc<TaskControlBlock>) -> Arc<TaskControlBlock> {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();
-        println!{"trap context of pid{}: {:X}", self.pid.0, parent_inner.trap_cx_ppn.0}
+        // println!{"trap context of pid{}: {:X}", self.pid.0, parent_inner.trap_cx_ppn.0}
         parent_inner.print_cx();
         let user_heap_top = parent_inner.heap_start + USER_HEAP_SIZE;
         // copy user space(include trap context)
@@ -229,7 +239,7 @@ impl TaskControlBlock {
             .ppn();
         // alloc a pid and a kernel stack in kernel space
         let pid_handle = pid_alloc();
-        println!{"1--------trap_cx of the pid{:?}: {:X}", pid_handle.0, trap_cx_ppn.0}
+        // println!{"1--------trap_cx of the pid{:?}: {:X}", pid_handle.0, trap_cx_ppn.0}
         let kernel_stack = KernelStack::new(&pid_handle);
         let kernel_stack_top = kernel_stack.get_top();
         // push a goto_trap_return task_cx on the top of kernel stack
