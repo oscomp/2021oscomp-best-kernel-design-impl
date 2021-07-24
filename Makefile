@@ -86,15 +86,17 @@ SRC	+= \
 	$K/timer.c \
 	$K/uname.c \
 	$K/fs/bio.c \
-	$K/fs/driver_fs.c \
+	$K/fs/blkdev.c \
 	$K/fs/fat32/cluster.c \
-	$K/fs/fat32/fat.c \
 	$K/fs/fat32/dirent.c \
+	$K/fs/fat32/fat.c \
 	$K/fs/fat32/fat32.c \
 	$K/fs/file.c \
 	$K/fs/fs.c \
+	$K/fs/mount.c \
 	$K/fs/pipe.c \
 	$K/fs/poll.c \
+	$K/fs/rootfs.c \
 	$K/mesg/signal.c \
 	$K/mm/kmalloc.c \
 	$K/mm/mmap.c \
@@ -236,7 +238,30 @@ endif
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
 
-.PHONY: clean
+dst=/mnt
+
+# Make fs image
+fs:
+	@if [ ! -f "fs.img" ]; then \
+		echo "making fs image..."; \
+		dd if=/dev/zero of=fs.img bs=512k count=512; \
+		mkfs.vfat -F 32 fs.img; fi
+	@sudo mount fs.img $(dst)
+	@make sdcard dst=$(dst)
+	@sudo umount $(dst)
+
+# Write sdcard mounted at $(dst)
+sdcard:
+	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
+	@for file in $$( ls $U/_* ); do \
+		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
+	@sudo cp $U/_init $(dst)/init
+	@sudo cp $U/_sh $(dst)/sh
+	@sudo cp $U/shrc $(dst)/shrc
+	@sudo cp $U/_echo $(dst)/echo
+	@sudo cp README $(dst)/README
+
+.PHONY: clean fs sdcard
 
 clean: 
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \

@@ -415,7 +415,7 @@ uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, struct file *f, in
 			__debug_warn("mmap", "length overflows!\n");
 			return -EINVAL;
 		}
-		if (ip->mode & I_MODE_DIR)
+		if (S_ISDIR(ip->mode))
 			return -EISDIR;
 		if ((f->readable ^ (prot & PROT_READ)) || (f->writable ^ ((prot & PROT_WRITE) >> 1))) {
 			__debug_warn("mmap", "unmatched priviledge");

@@ -64,7 +64,7 @@ struct inode_op {
 
 struct dentry_op {
 	int (*delete)(struct dentry *de);
-	// int (*compare)(struct dentry *de, char *name);
+	struct dentry *(*cache)(struct dentry *parent, char *childname);
 };
 
 struct file_op {
@@ -82,7 +82,6 @@ struct superblock {
 	struct inode		*dev;
 	char				type[16];
 
-	void				*real_sb;
 	struct superblock	*next;
 	int					ref;		// sum of refs of all its inodes
 	
@@ -100,25 +99,20 @@ struct superblock {
 #define I_STATE_FREE		(1 << 3)
 #define I_STATE_LOCKED		(1 << 4)
 
-// For inode.mode
-// #define I_MODE_DIR			(1 << 9)
-#define I_MODE_DIR			S_IFDIR
-
 struct inode {
 	uint64				inum;
 	int					ref;
 	int					state;
-	int16				mode;
+	uint16				mode;
 	int16				dev;
 	int					size;
 	int					nlink;	// useless on FAT
-	void				*real_i;
 	struct superblock	*sb;
 
-	struct sleeplock	lock;
+	struct sleeplock	lock;	// mutex, I/O control
 	struct inode_op		*op;
 	struct file_op		*fop;
-	// struct spinlock		lock;
+	struct spinlock		ilock;	// protect itself
 	struct mapped 		*maphead;
 
 	struct dentry		*entry;
@@ -139,10 +133,7 @@ struct dentry {
 };
 
 
-#define IMODE_READ_ONLY		(1 << 0)
-#define IMODE_HIDDEN		(1 << 1)
-#define IMODE_DIRECTORY		(1 << 2)
-
+extern struct superblock rootfs;
 
 void rootfs_init();
 void rootfs_print();
@@ -154,6 +145,18 @@ struct inode *idup(struct inode *ip);
 void iput(struct inode *ip);
 void ilock(struct inode *ip);
 void iunlock(struct inode *ip);
+
+int de_delete(struct dentry *de);
+struct dentry *de_check_cache(struct dentry *parent, char *name);
+/**
+ * If de is a moint point, return the mounted root.
+ */
+static inline struct dentry *de_mnt_in(struct dentry *de)
+{
+	while (de->mount != NULL)
+		de = de->mount->root;
+	return de;
+}
 
 struct inode *namei(char *path);
 struct inode *nameiparent(char *path, char *name);

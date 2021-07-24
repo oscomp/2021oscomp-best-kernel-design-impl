@@ -203,7 +203,7 @@ sys_openat(void)
 		return -ENAMETOOLONG;
 
 	if(omode & O_CREATE){
-		ip = create(dp, path, fmode & (~I_MODE_DIR));
+		ip = create(dp, path, (fmode & ~S_IFMT) | S_IFREG);
 		if(ip == NULL){
 			return -1;
 		}
@@ -213,12 +213,12 @@ sys_openat(void)
 			return -ENOENT;
 		}
 		ilock(ip);
-		if ((ip->mode & I_MODE_DIR) && (omode & (O_WRONLY|O_RDWR))) {
+		if (S_ISDIR(ip->mode) && (omode & (O_WRONLY|O_RDWR))) {
 			iunlockput(ip);
 			__debug_warn("sys_openat", "illegel mode 0x%x\n", omode);
 			return -EISDIR;
 		}
-		if ((omode & O_DIRECTORY) && !(ip->mode & I_MODE_DIR)) {
+		if ((omode & O_DIRECTORY) && !S_ISDIR(ip->mode)) {
 			iunlockput(ip);
 			__debug_warn("sys_openat", "o_dir\n");
 			return -ENOTDIR;
@@ -233,11 +233,13 @@ sys_openat(void)
 		return -ENOMEM;
 	}
 
-	if (!(ip->mode & I_MODE_DIR) && (omode & O_TRUNC) && (omode & (O_WRONLY|O_RDWR))) {
+	__debug_info("sys_openat", "[%s] ip->mode=0x%x\n", path, ip->mode);
+
+	if (!S_ISDIR(ip->mode) && (omode & O_TRUNC) && (omode & (O_WRONLY|O_RDWR))) {
 		ip->op->truncate(ip);
 	}
 
-	if (ip->dev) {
+	if (!S_ISREG(ip->mode) && !S_ISDIR(ip->mode)) {
 		f->type = FD_DEVICE;
 	} else {
 		f->type = FD_INODE;
@@ -273,7 +275,7 @@ sys_mkdirat(void)
 		return -ENAMETOOLONG;
 	}
 	__debug_info("mkdirat", "create dir %s\n", path);
-	if ((ip = create(dp, path, mode | I_MODE_DIR)) == NULL) {
+	if ((ip = create(dp, path, (mode & ~S_IFMT) | S_IFDIR)) == NULL) {
 		__debug_warn("mkdirat", "create fail\n");
 		return -1;
 	}
@@ -291,7 +293,7 @@ sys_chdir(void)
 	if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == NULL){
 		return -1;
 	}
-	if (!(ip->mode & I_MODE_DIR)) {
+	if (!S_ISDIR(ip->mode)) {
 		iput(ip);
 		return -1;
 	}
@@ -388,7 +390,7 @@ sys_unlinkat(void)
 		dp = myproc()->cwd;
 	} else {
 		dp = f->ip;
-		if (!(dp->mode & I_MODE_DIR)) {
+		if (!S_ISDIR(dp->mode)) {
 			return -ENOTDIR;
 		}
 	}
@@ -410,16 +412,17 @@ sys_unlinkat(void)
 		__debug_warn("sys_unlinkat", "can namei %s\n", path);
 		return -1;
 	}
-	if ((ip->mode & I_MODE_DIR) && mode != AT_REMOVEDIR) {
+	int isdir = S_ISDIR(ip->mode);
+	if (isdir && mode != AT_REMOVEDIR) {
 		iput(ip);
 		__debug_warn("sys_unlinkat", "illegel mode 0x%x against 0x%x\n", mode, ip->mode);
 		return -EISDIR;
-	} else if (!(ip->mode & I_MODE_DIR) && mode == AT_REMOVEDIR) {
+	} else if (!isdir && mode == AT_REMOVEDIR) {
 		iput(ip);
 		return -ENOTDIR;
 	}
 	ilock(ip);
-	if ((ip->mode & I_MODE_DIR) && isdirempty(ip) != 1) {
+	if (isdir && isdirempty(ip) != 1) {
 		iunlockput(ip);
 		__debug_warn("sys_unlinkat", "dir isn't empty\n");
 		return -1;
@@ -452,7 +455,7 @@ sys_renameat(void)
 	} else
 		ip2 = f2->ip;
 
-	if (!(ip1->mode & ip2->mode & I_MODE_DIR))
+	if (!S_ISDIR(ip1->mode) || !S_ISDIR(ip2->mode))
 		return -ENOTDIR;
 
 	if (argstr(1, name1, MAXPATH) < 0 || argstr(3, name2, MAXPATH) < 0 || argint(4, &flags))

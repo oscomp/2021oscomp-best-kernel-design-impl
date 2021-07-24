@@ -1,4 +1,4 @@
-#ifndef __DEBUG_fat32 
+#ifndef __DEBUG_cluster
 #undef DEBUG 
 #endif 
 
@@ -76,36 +76,34 @@ static int fill_clus_table(struct superblock *sb, struct clus_table *table, uint
 	uint32 clus;
 	int i;
 	if ((i = table->num) > 0) {		// If table is not empty...
-		clus = table->clus[i - 1];
-	} else {	// or take the arg preclus
-		if (preclus == 0)
-			panic("fill_clus_table: bad pre-clus");
-		clus = preclus;
+		preclus = table->clus[i - 1];
+	} else if (preclus == 0) {		// or take the arg preclus
+		panic("fill_clus_table: bad pre-clus");
 	}
 
 	for (; i < CLUS_TABLE_SIZE; i++) {
-		clus = read_fat(sb, clus);	// get next cluster number
-		__debug_info("fill_clus_table", "read: i=%d, clus=0x%x, base=%d\n", i, clus, table->base);
+		clus = read_fat(sb, preclus);	// get next cluster number
+		// __debug_info("fill_clus_table", "read: i=%d, clus=0x%x, base=%d\n", i, clus, table->base);
 		if (clus >= FAT32_EOC) {
-			while (i < alloc_end_idx) {
-				if ((clus = alloc_clus(sb)) == 0 || write_fat(sb, table->clus[i], clus) < 0) {
+			while (i <= alloc_end_idx) {
+				if ((clus = alloc_clus(sb)) == 0 || write_fat(sb, preclus, clus) < 0) {
 					if (clus)
 						write_fat(sb, clus, 0);
 					table->num = i;
 					return -1;
 				}
+				preclus = table->clus[i] = clus;
+				// __debug_info("fill_clus_table", "write: i=%d, clus=0x%x\n", i, clus);
 				i++;
-				table->clus[i] = clus;
-				__debug_info("fill_clus_table", "write: i=%d, clus=0x%x\n", i, clus);
 			}
-			i++;
 			break;
 		} else {
 			table->clus[i] = clus;
 		}
+		preclus = clus;
 	}
 
-	__debug_info("fill_clus_table", "end: i=%d, alloc_end_idx=%d\n", i, alloc_end_idx);
+	// __debug_info("fill_clus_table", "end: i=%d, alloc_end_idx=%d\n", i, alloc_end_idx);
 	table->num = i;
 	return i;
 }
@@ -120,8 +118,8 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 	uint const dst_key = clus_cnt / CLUS_TABLE_SIZE;
 	int const dst_idx = clus_cnt % CLUS_TABLE_SIZE;
 
-	__debug_info("expand_rb_clus", "clus_cnt=%d, dstkey=%d, dstidx=%d, parent=%p\n",
-				clus_cnt, dst_key, dst_idx, parent);
+	// __debug_info("expand_rb_clus", "clus_cnt=%d, dstkey=%d, dstidx=%d, parent=%p\n",
+	// 			clus_cnt, dst_key, dst_idx, parent);
 
 	struct clus_table *table;
 	struct rb_node **p;
@@ -139,7 +137,7 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 		table->base = 0;
 		table->num = 1;
 		table->clus[0] = entry->first_clus;
-
+		__debug_info("expand_rb_clus", "first: clus=%d\n", entry->first_clus);
 		parent = &table->rb;
 		rb_link_node(parent, NULL, &entry->rb_clus.rb_node);
 		rb_insert_color(parent, &entry->rb_clus);
@@ -149,7 +147,7 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 
 	if (table->num < CLUS_TABLE_SIZE) {	// step 1: fill the last table
 		idx = alloc ? 
-				(table->base == dst_key ? dst_idx : CLUS_TABLE_SIZE - 1) : 0;
+				(table->base == dst_key ? dst_idx : CLUS_TABLE_SIZE - 1) : -1;
 		
 		idx = fill_clus_table(ip->sb, table, 0, idx);
 		if (idx < 0)						// case: allocation fail
@@ -171,9 +169,9 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 		memset(table->clus, 0, sizeof(table->clus));
 		table->num = 0;
 
-		__debug_info("expand_rb_clus", "newtable: base=%d, pre-clus=0x%x\n", base_key, clus);
+		// __debug_info("expand_rb_clus", "newtable: base=%d, pre-clus=0x%x\n", base_key, clus);
 		idx = alloc ? 
-				(table->base == dst_key ? dst_idx : CLUS_TABLE_SIZE - 1) : 0;
+				(table->base == dst_key ? dst_idx : CLUS_TABLE_SIZE - 1) : -1;
 		idx = fill_clus_table(ip->sb, table, clus, idx);
 		if (idx < 0) {						// case: allocation fail
 			if (table->num == 0)
@@ -186,7 +184,7 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 
 		rb_link_node(&table->rb, parent, p);
 		rb_insert_color(&table->rb, &entry->rb_clus);
-	
+
 		if (table->num < CLUS_TABLE_SIZE)	// not full, meet end of fat chain
 			break;
 
@@ -199,6 +197,7 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 	return table;
 
 fail: // If fail, no need to free tables that have been allocated (for future use).
+	__debug_warn("expand_rb_clus", "fail\n");
 	return NULL;
 }
 
@@ -208,9 +207,9 @@ fail: // If fail, no need to free tables that have been allocated (for future us
  * @param   ip          to get its fat32_entry and modify the cur_clus field
  * @param   off         the offset from the beginning of the relative file
  * @param   alloc       whether alloc new cluster when meeting end of FAT chains
- * @return              the offset from the new cur_clus or -1 if fail
+ * @return              the next cluster number
  */
-int reloc_clus(struct inode *ip, uint off, int alloc)
+uint32 reloc_clus(struct inode *ip, uint off, int alloc)
 {
 	struct fat32_entry *entry = i2fat(ip);
 	struct fat32_sb *fat = sb2fat(ip->sb);
@@ -218,41 +217,42 @@ int reloc_clus(struct inode *ip, uint off, int alloc)
 	uint const rb_key = clus_cnt / CLUS_TABLE_SIZE;
 
 	struct rb_node *node = entry->rb_clus.rb_node;
-	struct clus_table *table;
+	struct clus_table *table = entry->cur_clus;
 
 	// __debug_info("reloc_clus", "begin: node=%p\n", node);
-	while (node) {
-		// __debug_info("reloc_clus", "search: node=%p\n", node);
-		table = rb_clus_table(node);
-		if (rb_key < table->base)
-			node = node->rb_left;
-		else if (rb_key > table->base)
-			node = node->rb_right;
-		else
-			break;
+	if (!table || table->base != rb_key) {
+		while (node) {
+			// __debug_info("reloc_clus", "search: node=%p\n", node);
+			table = rb_clus_table(node);
+			if (rb_key < table->base)
+				node = node->rb_left;
+			else if (rb_key > table->base)
+				node = node->rb_right;
+			else
+				break;
+		}
 	}
-	__debug_info("reloc_clus", "get: node=%p, off=%p\n", node, off);
 
 	int const idx = clus_cnt % CLUS_TABLE_SIZE;
 	if (!node) {
 		table = expand_rb_clus(ip, off, alloc);
+		// __debug_info("reloc_clus", "get expand, base=%d, off=%p\n", table ? table->base : -1, off);
 		if (table == NULL || table->base != rb_key)
 			goto fail;
 	} else if (!table->clus[idx]) {
+		// __debug_info("reloc_clus", "get table, base=%d, off=%p\n", table->base, off);
 		if (!alloc)
 			goto fail;
 		if (fill_clus_table(ip->sb, table, 0, idx) < 0)
 			goto fail;
 	}
 
-	entry->cur_clus = table->clus[idx];
-	entry->clus_cnt = clus_cnt;
-	return off % fat->byts_per_clus;
+	// __debug_info("reloc_clus", "end: clus=%d, off=%d\n", entry->cur_clus, off);
+	entry->cur_clus = table;
+	return table->clus[idx];
 
 fail:
-	entry->cur_clus = entry->first_clus;
-	entry->clus_cnt = 0;
-	return -1;
+	return 0;
 }
 
 void free_clus_cache(struct fat32_entry *entry)
@@ -276,7 +276,7 @@ void free_clus_cache(struct fat32_entry *entry)
 			}
 
 			table = rb_clus_table(node);
-			__debug_info("free_clus_cache", "base=%d\n", table->base);
+			__debug_info("free_clus_cache", "base=%d, num=%d\n", table->base, table->num);
 			kfree(table);
 			node = parent;
 		}

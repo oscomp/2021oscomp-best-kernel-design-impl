@@ -18,6 +18,7 @@
 #include "utils/string.h"
 #include "syscall.h"
 #include "utils/debug.h"
+#include "errno.h"
 
 // Load a program segment into pagetable at virtual address va.
 // va must be page-aligned (not necessary)
@@ -61,7 +62,7 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
 	char *buf;
 
 	if ((buf = allocpage()) == NULL) {
-		return -1;
+		return -ENOMEM;
 	}
 	for (argc = 0; utable; argc++) {
 		if (argc >= maxc || fetchaddr((uint64)(utable + argc), &argp) < 0)
@@ -88,14 +89,14 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
 bad:
 	if (buf)
 		freepage(buf);
-	return -1;
+	return -EFAULT;
 }
 
 // All argvs are pointers came from user space, and should be checked by sys_caller
 int execve(char *path, char **argv, char **envp)
 {
 	__debug_info("exeve", "path = %s\n", path);
-
+	int ret;
 	struct inode *ip = NULL;
 	pagetable_t pagetable = NULL;
 	struct seg *seghead = NULL, *seg;
@@ -104,13 +105,16 @@ int execve(char *path, char **argv, char **envp)
 	__debug_info("execve", "in\n");
 	if ((ip = namei(path)) == NULL) {
 		__debug_warn("execve", "can't open %s\n", path);
+		ret = -ENOENT;
 		goto bad;
 	}
 
 	// Make a copy of p->pagetable without old user space, 
 	// but with the same kstack we are using now, which can't be changed.
-	if ((pagetable = (pagetable_t)allocpage()) == NULL)
+	if ((pagetable = (pagetable_t)allocpage()) == NULL) {
+		ret = -ENOMEM;
 		goto bad;
+	}
 	memmove(pagetable, p->pagetable, PGSIZE);
 	// Remove old u-map from the new pt, but don't free since later op might fail.
 	for (int i = 0; i < PX(2, MAXUVA); i++) {
@@ -123,6 +127,7 @@ int execve(char *path, char **argv, char **envp)
 	struct elfhdr elf;
 	if (ip->fop->read(ip, 0, (uint64) &elf, 0, sizeof(elf)) != sizeof(elf) || elf.magic != ELF_MAGIC) {
 		iunlock(ip);
+		ret = -ENOEXEC;
 		goto bad;
 	}
 
@@ -135,6 +140,7 @@ int execve(char *path, char **argv, char **envp)
 		if (ip->fop->read(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph)) {
 			__debug_warn("execve", "fail to read ELF file\n");
 			iunlock(ip);
+			ret = -EIO;
 			goto bad;
 		}
 		if (ph.type != ELF_PROG_LOAD)
@@ -143,6 +149,7 @@ int execve(char *path, char **argv, char **envp)
 		if (ph.memsz < ph.filesz || ph.vaddr + ph.memsz < ph.vaddr) {
 			__debug_warn("execve", "funny ELF file: va=%p msz=0x%x fsz=0x%x\n", ph.vaddr, ph.memsz, ph.filesz);
 				iunlock(ip);
+			ret = -ENOEXEC;
 			goto bad;
 		}
 
@@ -155,6 +162,7 @@ int execve(char *path, char **argv, char **envp)
 		if(seg == NULL) {
 			__debug_warn("execve", "newseg fail: vaddr=%p, memsz=%d\n", ph.vaddr, ph.memsz);
 			iunlock(ip);
+			ret = -ENOMEM;
 			goto bad;
 		}
 		seghead = seg;
@@ -167,7 +175,7 @@ int execve(char *path, char **argv, char **envp)
 		seg->f_sz = ph.filesz;
 		if (ph.vaddr <= elf.entry && elf.entry < ph.vaddr + ph.filesz) {
 			__debug_info("execve", "meet entry segment: entry=0x%x, va=0x%x, sz=0x%x\n", elf.entry, ph.vaddr, ph.filesz);
-			if (loadseg(pagetable, elf.entry, seg, ip) < 0) {
+			if ((ret = loadseg(pagetable, elf.entry, seg, ip)) < 0) {
 				__debug_warn("execve", "load segment\n");
 				iunlock(ip);
 				goto bad;
@@ -183,6 +191,7 @@ int execve(char *path, char **argv, char **envp)
 	seg = newseg(pagetable, seghead, HEAP, PGROUNDUP(seg->addr + seg->sz), 0, flags);
 	if(seg == NULL) {
 		__debug_warn("execve", "new heap fail\n");
+		ret = -ENOMEM;
 		goto bad;
 	}
 	seghead = seg;
@@ -196,6 +205,7 @@ int execve(char *path, char **argv, char **envp)
 	stackbase += PGSIZE * 3;
 	if(seg == NULL || uvmalloc(pagetable, stackbase, sp, flags) == 0) {
 		__debug_warn("execve", "new stack fail\n");
+		ret = -ENOMEM;
 		goto bad;
 	}
 	seghead = seg;
@@ -211,12 +221,15 @@ int execve(char *path, char **argv, char **envp)
 	if ((envc = pushstack(pagetable, uenvp, envp, MAXENV, &sp)) < 0 ||
 		(argc = pushstack(pagetable, uargv, argv, MAXARG, &sp)) < 0) {
 		__debug_warn("execve", "fail to push argv or envp into user stack\n");
+		ret = envc < 0 ? envc : argc;
 		goto bad;
 	}
 	uint64 random[2] = { 0xcde142a16cb93072, 0x128a39c127d8bbf2 };
 	sp -= 16;
-	if (sp < stackbase || copyout(pagetable, sp, (char *)random, 16) < 0)
+	if (sp < stackbase || copyout(pagetable, sp, (char *)random, 16) < 0) {
+		ret = -EINVAL;
 		goto bad;
+	}
 
 	uint64 auxvec[][2] = {
 		// {AT_HWCAP, 0x112d},
@@ -252,6 +265,7 @@ int execve(char *path, char **argv, char **envp)
 		copyout(pagetable, sp, (char *)&argc, sizeof(uint64)) < 0)
 	{
 		__debug_warn("execve", "fail to copy argv/envp table into user stack\n");
+		ret = -EINVAL;
 		goto bad;
 	}
 	p->trapframe->a1 = a1;
@@ -295,5 +309,5 @@ int execve(char *path, char **argv, char **envp)
 	if (ip) {
 		iput(ip);
 	}
-	return -1;
+	return ret;
 }

@@ -11,6 +11,7 @@
 #include "mm/vm.h"
 #include "utils/string.h"
 #include "utils/debug.h"
+#include "errno.h"
 
 struct seg*
 newseg(pagetable_t pagetable, struct seg *head, enum segtype type, uint64 offset, uint64 sz, long flag)
@@ -210,7 +211,7 @@ loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip)
 
 	void *pa = allocpage();
 	if (pa == NULL)
-		return -1;
+		return -ENOMEM;
 
 	memset(pa, 0, PGSIZE);
 	__debug_info("loadseg", "pa=%p, base=0x%x, f_off=0x%x, size=%d\n", pa, va, off, size);

@@ -189,6 +189,7 @@ filewrite(struct file *f, uint64 addr, int n)
 	if(f->writable == 0)
 		return -1;
 
+	// __debug_info("filewrite", "addr=%p, n=%d\n", addr, n);
 	if(f->type == FD_PIPE){
 		ret = pipewrite(f->pipe, addr, n);
 	} else if(f->type == FD_DEVICE){
@@ -212,6 +213,7 @@ filewrite(struct file *f, uint64 addr, int n)
 		panic("filewrite");
 	}
 
+	// __debug_info("filewrite", "ret=%d\n", ret);
 	return ret;
 }
 
@@ -220,15 +222,15 @@ filewrite(struct file *f, uint64 addr, int n)
 int
 filereaddir(struct file *f, uint64 addr, uint64 n)
 {
-	// struct proc *p = myproc();
+	__debug_info("filereaddir", "f->type=%d, f->readable=%d\n", f->type, f->readable);
 	if (f->type != FD_INODE || f->readable == 0)
 		return -1;
 
 	struct dirent dent;
 	struct inode *ip = f->ip;
 
-	if(!(ip->mode & I_MODE_DIR))
-		return -1;
+	if(!S_ISDIR(ip->mode))
+		return -ENOTDIR;
 
 	int ret;
 	uint off = f->off;
@@ -240,7 +242,7 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 			break;
 
 		if(copyout2(addr, (char *)&dent, dent.reclen) < 0) {
-			ret = -1;
+			ret = -EFAULT;
 			break;	
 		}
 
@@ -256,7 +258,7 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 	release(&f->lock);
 
 	if (ret < 0)
-		return -1;
+		return -ret;
 	return addr - old;
 }
 

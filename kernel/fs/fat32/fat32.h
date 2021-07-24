@@ -51,10 +51,13 @@ struct fat32_sb {
 		uint32	fat_sz;			// count of sectors for a FAT region
 		uint32	root_clus;
 	} bpb;
+	struct superblock vfs_sb;
 };
 
 
 #include "utils/rbtree.h"
+
+struct clus_table;
 
 /* Inode of FAT32 in-memory format */
 struct fat32_entry {
@@ -63,27 +66,27 @@ struct fat32_entry {
 	uint16	create_time;
 	uint16	create_date;
 	uint16	last_access_date;
-	uint32	first_clus;
 	uint16	last_write_time;
 	uint16	last_write_date;
+	uint32	first_clus;
 	uint32	file_size;
 
-	uint	ent_cnt;
-	uint32	cur_clus;
-	uint	clus_cnt;
-	struct rb_root	rb_clus;
+	uint32	ent_cnt;
+	struct clus_table	*cur_clus;
+	struct rb_root		rb_clus;
+	struct inode 		vfs_inode;
 };
 
 // Convert to FAT32 superblock.
 static inline struct fat32_sb *sb2fat(struct superblock *sb)
 {
-	return (struct fat32_sb *)sb->real_sb;
+	return container_of(sb, struct fat32_sb, vfs_sb);
 }
 
 // Convert to the so-call inode of FAT32.
 static inline struct fat32_entry *i2fat(struct inode *ip)
 {
-	return (struct fat32_entry *)ip->real_i;
+	return container_of(ip, struct fat32_entry, vfs_inode);
 }
 
 /**
@@ -96,10 +99,13 @@ static inline uint32 first_sec_of_clus(struct fat32_sb *fat, uint32 cluster)
 }
 
 
+extern struct inode_op fat32_inode_op;
+extern struct file_op fat32_file_op;
+
 // cluster.c
 uint32				alloc_clus(struct superblock *sb);
 int 				free_clus(struct superblock *sb, uint32 cluster);
-int					reloc_clus(struct inode *ip, uint off, int alloc);
+uint32				reloc_clus(struct inode *ip, uint off, int alloc);
 void				free_clus_cache(struct fat32_entry *entry);
 // fat.c
 uint32				read_fat(struct superblock *sb, uint32 cluster);
@@ -114,32 +120,25 @@ int					fat_read_entry(struct inode *dir, struct fat32_entry *ep,
 									char *namebuf, uint off, int *count);
 int					fat_rename_entry(struct inode *ip, struct inode *dp, char *name);
 // fat32.c
-void 				__alert_fs_err(const char *func);
+struct superblock*	fat32_get_sb(void);
+void				fat32_kill_sb(struct superblock *sb);
+struct inode*		fat32_init(struct superblock *sb);
+int					fat_stat_fs(struct superblock *sb, struct statfs *stat);
 uint				fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user,
 									uint64 data, uint off, uint n);
 struct inode*		fat_alloc_inode(struct superblock *sb);
 void				fat_destroy_inode(struct inode *ip);
-struct fat32_entry*	fat_lookup_dir_ent(struct inode *dir, char *filename, uint *poff);
-
-
-struct fat32_sb*	fat32_init(char *boot_sector);
-int					fat32_info_init(struct fat32_sb* fat, char *fsinfo_sector);
-struct inode*		fat32_root_init(struct superblock *sb);
-struct inode*		fat_lookup_dir(struct inode *dir, char *filename, uint *poff);
-// struct inode*		fat_alloc_inode(struct superblock *sb);
-int					fat_stat_fs(struct superblock *sb, struct statfs *stat);
-// void				fat_destroy_inode(struct inode *ip);
-// struct inode*		fat_alloc_entry(struct inode *dir, char *name, int mode);
-// int					fat_update_entry(struct inode *ip);
-// int					fat_remove_entry(struct inode *ip);
 int					fat_truncate_file(struct inode *ip);
 int					fat_stat_file(struct inode *ip, struct kstat *st);
-int					fat_read_dir(struct inode *dir, struct dirent *dent, uint off);
+int					fat_set_file_attr(struct inode *ip, struct kstat *st);
 int					fat_read_file(struct inode *ip, int user_dst, uint64 dst, uint off, uint n);
 int					fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n);
-// int					fat_rename(struct inode *ip, struct inode *dp, char *name);
-int					fat_set_file_attr(struct inode *ip, struct kstat *st);
+int					fat_read_dir(struct inode *dir, struct dirent *dent, uint off);
 int					fat_read_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint off);
 int					fat_write_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint off);
+struct fat32_entry*	fat_lookup_dir_ent(struct inode *dir, char *filename, uint *poff);
+struct inode*		fat_lookup_dir(struct inode *dir, char *filename, uint *poff);
+
+void 				__alert_fs_err(const char *func);
 
 #endif

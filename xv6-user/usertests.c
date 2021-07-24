@@ -158,8 +158,8 @@ copyinstr2(char *s)
 
   char *args[] = { "xx", 0 };
   ret = exec(b, args);
-  if(ret != -1){
-    printf("exec(%s) returned %d, not -1\n", b, fd);
+  if(ret >= 0){
+    printf("exec(%s) returned %d, not negative\n", b, fd);
     exit(1);
   }
 

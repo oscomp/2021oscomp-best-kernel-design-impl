@@ -111,6 +111,8 @@ int fat_make_entry(struct inode *dir, struct fat32_entry *ep, char *filename, ui
 	if (off % sizeof(union fat_disk_entry))
 		panic("fat_make_entry: not aligned");
 
+	uint32 const bpc = sb2fat(dir->sb)->byts_per_clus;
+	uint32 clus;
 	union fat_disk_entry de;
 	memset(&de, 0, sizeof(de));
 	if (!islong) {
@@ -145,9 +147,9 @@ int fat_make_entry(struct inode *dir, struct fat32_entry *ep, char *filename, ui
 					case 11:    w = (uint8 *)de.lne.name3; break;
 				}
 			}
-			int off2 = reloc_clus(dir, off, 1);
+			clus = reloc_clus(dir, off, 1);
 			// __debug_info("fat_make_entry", "name:%s clus:%d off:%d\n", ep->filename, dp->cur_clus, off2);
-			if (off2 < 0 || fat_rw_clus(dir->sb, dp->cur_clus, 1, 0, (uint64)&de, off2, sizeof(de)) != sizeof(de))
+			if (!clus || fat_rw_clus(dir->sb, clus, 1, 0, (uint64)&de, off % bpc, sizeof(de)) != sizeof(de))
 				return -1;
 			off += sizeof(de);
 		}
@@ -158,9 +160,9 @@ int fat_make_entry(struct inode *dir, struct fat32_entry *ep, char *filename, ui
 	de.sne.fst_clus_hi = (uint16)(ep->first_clus >> 16);      // first clus high 16 bits
 	de.sne.fst_clus_lo = (uint16)(ep->first_clus & 0xffff);     // low 16 bits
 	de.sne.file_size = ep->file_size;                         // filesize is updated in eupdate()
-	int off2 = reloc_clus(dir, off, 1);
+	clus = reloc_clus(dir, off, 1);
 	// __debug_info("fat_make_entry", "name:%s clus:%d off:%d\n", ep->filename, dp->cur_clus, off2);
-	if (off2 < 0 || fat_rw_clus(dir->sb, dp->cur_clus, 1, 0, (uint64)&de, off2, sizeof(de)) != sizeof(de))
+	if (!clus || fat_rw_clus(dir->sb, clus, 1, 0, (uint64)&de, off % bpc, sizeof(de)) != sizeof(de))
 		return -1;
 	return 0;
 }
@@ -223,27 +225,15 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 	ip->fop = dir->fop;
 	ip->mode = mode | 0x1ff;
 
-	struct fat32_entry *ep;
-	if ((ep = kmalloc(sizeof(struct fat32_entry))) == NULL) {
-		kfree(ip);
-		__debug_warn("fat_alloc_entry", "3\n");
-		return NULL;
-	}
-	ep->attribute = (mode & I_MODE_DIR) ? ATTR_DIRECTORY : 0;
-	ep->file_size = 0;
-	ep->first_clus = 0;
-	ep->clus_cnt = 0;
-	ep->cur_clus = 0;
+	struct fat32_entry *ep = i2fat(ip);
+	ep->attribute = S_ISDIR(mode) ? ATTR_DIRECTORY : 0;
 	ep->ent_cnt = (strlen(name) + CHAR_LONG_NAME - 1) / CHAR_LONG_NAME + 1;
-	// safestrcpy(ep->filename, name, sizeof(ep->filename));
-	ip->real_i = ep;
-	reloc_clus(dir, off, 0);
-	ip->inum = ((uint64)dp->cur_clus << 32) | (off % sb2fat(sb)->byts_per_clus);
+	ip->inum = ((uint64)reloc_clus(dir, off, 0) << 32) | (off % sb2fat(sb)->byts_per_clus);
 
-	if (mode & I_MODE_DIR) {    // generate "." and ".." for ep
-		if ((ep->cur_clus = ep->first_clus = alloc_clus(sb)) < 0
-			|| fat_make_entry(ip, ep, ".          ", 0, 0) < 0
-			|| fat_make_entry(ip, dp, "..         ", 32, 0) < 0)
+	if (S_ISDIR(mode)) {    // generate "." and ".." for ep
+		if ((ep->first_clus = alloc_clus(sb)) == 0 ||
+			fat_make_entry(ip, ep, ".          ", 0, 0) < 0 ||
+			fat_make_entry(ip, dp, "..         ", 32, 0) < 0)
 		{
 			if (ep->first_clus > 0)
 				free_clus(sb, ep->first_clus);
@@ -254,7 +244,6 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 		ep->attribute |= ATTR_ARCHIVE;
 	}
 
-	ep->rb_clus.rb_node = NULL;
 	if (fat_make_entry(dir, ep, name, off, 1) < 0)
 		goto fail;
 
@@ -263,8 +252,7 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 fail:
 	__debug_warn("fat_alloc_entry", "fail\n");
 	__alert_fs_err("fat_alloc_entry");
-	kfree(ip);
-	kfree(ep);
+	fat_destroy_inode(ip);
 	return NULL;
 }
 
@@ -285,18 +273,19 @@ int fat_remove_entry(struct inode *ip)
 	uint32 clus = ip->inum >> 32;
 	uint32 off = ip->inum & 0xffffffff;
 
-	// __debug_info("fat_remove_entry", "clus:%d off:%d entcnt:%d\n", clus, off, entry->ent_cnt);
+	__debug_info("fat_remove_entry", "clus:%d off:%d entcnt:%d\n", clus, off, entry->ent_cnt);
 	uint8 flag = EMPTY_ENTRY;
 	for (int i = 0; i < entry->ent_cnt; i++) {
-		// __debug_info("fat_remove_entry", "name:%s clus:%d off:%d i:%d\n", entry->filename, clus, off, i);
+		__debug_info("fat_remove_entry", "name:%s clus:%d off:%d i:%d\n", ip->entry->filename, clus, off, i);
 		if (fat_rw_clus(ip->sb, clus, 1, 0, (uint64)&flag, off, 1) != 1)
 			goto fail;
-		if ((off += 32) >= fat->byts_per_clus) {
+		if ((off += 32) >= fat->byts_per_clus && i + 1 < entry->ent_cnt) {
 			if ((clus = read_fat(ip->sb, clus)) == 0 || clus >= FAT32_EOC) {
+				__debug_info("fat_remove_entry", "read_fat fail! clus=%d\n", clus);
 				goto fail;
 			}
 			off %= fat->byts_per_clus;
-			// __debug_info("fat_remove_entry", "entries over clus! new_clus:%d new_off:%d\n", clus, off);
+			__debug_info("fat_remove_entry", "entries over clus! new_clus:%d new_off:%d\n", clus, off);
 		}
 	}
 
@@ -401,8 +390,6 @@ static void read_entry_info(struct fat32_entry *entry, union fat_disk_entry *d)
 	entry->last_write_date = d->sne.lst_wrt_date;
 	
 	entry->file_size = d->sne.file_size;
-	entry->cur_clus = entry->first_clus;
-	entry->clus_cnt = 0;
 }
 
 /**
@@ -428,11 +415,12 @@ int fat_read_entry(struct inode *dir, struct fat32_entry *ep, char *namebuf, uin
 		panic("enext not align");
 
 	union fat_disk_entry de;
+	uint32 const bpc = sb2fat(dir->sb)->byts_per_clus;
 	int empty = 0, cnt = 0;
 	memset(namebuf, 0, FAT32_MAX_FILENAME + 1);
-	for (int off2; (off2 = reloc_clus(dir, off, 0)) != -1; off += sizeof(de))
+	for (uint32 clus; (clus = reloc_clus(dir, off, 0)) != 0; off += sizeof(de))
 	{
-		if (fat_rw_clus(dir->sb, dp->cur_clus, 0, 0, (uint64)&de, off2, sizeof(de)) != sizeof(de)
+		if (fat_rw_clus(dir->sb, clus, 0, 0, (uint64)&de, off % bpc, sizeof(de)) != sizeof(de)
 			|| de.lne.order == END_OF_DIR) {
 			return -1;
 		}
@@ -460,7 +448,7 @@ int fat_read_entry(struct inode *dir, struct fat32_entry *ep, char *namebuf, uin
 				read_entry_name(namebuf, &de);
 			}
 			read_entry_info(ep, &de);
-			__debug_info("fat_dir_next", "from off=%d get %s\n", off, namebuf);
+			__debug_info("fat_dir_next", "get %s\n", namebuf);
 			return 1;
 		}
 	}
@@ -495,8 +483,8 @@ int fat_rename_entry(struct inode *ip, struct inode *dp, char *name)
 
 	safestrcpy(ip->entry->filename, name, FAT32_MAX_FILENAME + 1); // this is with no lock, dangerous
 	ip->nlink++; // fat_remove_entry decreased this, add it back
-	off = reloc_clus(dp, off, 0);
-	ip->inum = ((uint64)(i2fat(dp)->cur_clus) << 32) | off;
+	uint64 clus = reloc_clus(dp, off, 0);
+	ip->inum = (clus << 32) | (off % sb2fat(dp->sb)->byts_per_clus);
 
 	return 0;
 }

@@ -7,3 +7,7 @@
 *.o 
 *.example.*
 *.back.*
+/xv6-user/_*
+/xv6-user/*.asm
+/xv6-user/*.sym
+/xv6-user/*.S
