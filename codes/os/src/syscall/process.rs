@@ -104,7 +104,9 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
             suspend_current_and_run_next();
         }
         else{
-            *translated_refmut(token, time_remain) = 0 as u64;
+            if time_remain as usize != 0{
+                *translated_refmut(token, time_remain) = 0 as u64;
+            }
             *translated_refmut(token, unsafe { time_remain.add(1) }) = 0 as u64;
             return 0;
         }

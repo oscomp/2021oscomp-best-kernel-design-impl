@@ -8,6 +8,7 @@ const SYSCALL_PIPE: usize = 59;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
+const SYSCALL_NANOSLEEP: usize = 101;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_GET_TIME: usize = 169;
 const SYSCALL_GETPID: usize = 172;
@@ -18,6 +19,11 @@ const SYSCALL_WAIT4: usize = 260;
 // Not standard POSIX sys_call
 const SYSCALL_LS: usize = 500;
 const SYSCALL_SHUTDOWN: usize = 501;
+
+pub struct TimeVal{
+    sec: u64,
+    usec: u64,
+}
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -102,6 +108,11 @@ pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
 
 pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: usize) -> isize {
     syscall(SYSCALL_WAIT4, [pid as usize, wstatus as usize, option])
+}
+
+pub fn sys_sleep(period_ms: usize)  -> isize {
+    let time = TimeVal{sec:0, usec:(period_ms*1000) as u64};
+    syscall(SYSCALL_NANOSLEEP, [&time as *const TimeVal as usize,  &time as *const TimeVal as usize,0])
 }
 
 // Not standard POSIX sys_call
