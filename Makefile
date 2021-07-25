@@ -78,6 +78,7 @@ endif
 
 SRC	+= \
 	$K/printf.c \
+	$K/sprintf.c \
 	$K/console.c \
 	$K/exec.c \
 	$K/intr.c \
