@@ -186,4 +186,5 @@ endif
 clean: 
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \
 		target \
-		k210.bin
+		k210.bin \
+		$U/*.d $U/*.o

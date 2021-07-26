@@ -5,5 +5,5 @@
 /target/
 *.d
 *.o 
-*.example.*
-*.back.*
+*.example*
+*.back*
