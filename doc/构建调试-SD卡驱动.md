@@ -39,7 +39,7 @@
 把代码整理一下 push 到 github 上去后，整个人松了一口气。  
 
 ## 运行结果
-![sdcard](../img/sdcard.png)  
+![sdcard](./img/sdcard.png)  
 
 
 ## 尾声
