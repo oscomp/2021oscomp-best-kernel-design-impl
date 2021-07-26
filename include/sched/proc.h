@@ -79,6 +79,7 @@ struct proc {
 	pagetable_t pagetable;			// user pagetable 
 	struct trapframe *trapframe;	// data page for trampoline.S 
 	struct seg *segment;			// first seg list node 
+	uint64 pbrk;					// program break
 
 	// file system 
 	struct fdtable fds;				// Open files
@@ -151,7 +152,7 @@ void sched(void);
 
 /* Grow or shrink user memory by `n` bytes. 
 	Return 0 on success, -1 on failure. */
-int growproc(int n);
+int growproc(uint64 newbrk);
 
 /* Create a user pagetable for a given process, 
 	with no user memory, but with trampoline pages. */

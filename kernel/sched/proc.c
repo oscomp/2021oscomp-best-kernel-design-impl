@@ -249,6 +249,7 @@ int fork_cow(void) {
 		freeproc(np);
 		return -1;
 	}
+	np->pbrk = p->pbrk;
 
 	// filesystem 
 	if (copyfdtable(&p->fds, &np->fds) < 0) {
@@ -320,6 +321,7 @@ int clone(uint64 flag, uint64 stack) {
 		freeproc(np);
 		return -1;
 	}
+	np->pbrk = p->pbrk;
 
 	// these parts may be improved later 
 	// filesystem 
@@ -843,30 +845,35 @@ void userinit(void) {
 
 // Grow or shrink user memory by n bytes. 
 // Return 0 on success, -1 on failure 
-int growproc(int n) {
-  struct proc *p = myproc();
+int growproc(uint64 newbrk)
+{
+	struct proc *p = myproc();
+	struct seg *heap = getseg(p->segment, HEAP);
 
-  struct seg *heap = getseg(p->segment, HEAP);
-  uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
+	while (heap && p->pbrk != heap->addr + heap->sz)
+		heap = getseg(heap->next, HEAP);
 
-  uint64 oldva = heap->addr + heap->sz;
-  uint64 newva = oldva + n;
-
-  if(n > 0){
-    if (newva > boundary - PGSIZE ||
-        uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
-      return -1;
-    }
-  } else if(n < 0){
-	if (newva < heap->addr || newva > oldva) {
-	  newva = heap->addr;
+	if (!heap)	
+	 	heap = locateseg(p->segment, p->pbrk - 1);
+	if (!heap || heap->type != HEAP || newbrk < heap->addr) { // mmap or munmap ruined this
+		return -1;
 	}
 
-	uvmdealloc(p->pagetable, newva, oldva, HEAP);
-	sfence_vma();
-  }
-  heap->sz += n;
-  return 0;
+	uint64 boundary = heap->next == NULL ?
+						MAXUVA : PGROUNDDOWN(heap->next->addr) - PGSIZE;
+	if (newbrk > boundary) {
+		return -1;
+	}
+
+	if (newbrk < p->pbrk) { // only handle shrinking case, leave growing case for pg-fault
+		uvmdealloc(p->pagetable, newbrk, p->pbrk, HEAP);
+		sfence_vma();
+	}
+
+	int64 diff = newbrk - p->pbrk;
+	heap->sz += diff;
+	p->pbrk = newbrk;
+	return 0;
 }
 
 // Copy to either a user address, or kernel address,

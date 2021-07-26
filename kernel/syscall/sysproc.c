@@ -158,18 +158,20 @@ sys_sbrk(void)
 		return -1;
 	
 	struct proc *p = myproc();
-	struct seg *heap = getseg(p->segment, HEAP);
-	uint64 addr = heap->addr + heap->sz;
-	if (n < 0) {
-		if (growproc(n) < 0)  // growproc takes care of p->sz
-			return -1;
-	} else {                // lazy page allocation
-		uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
-		if (addr + n > boundary - PGSIZE) {
-			return -1;
-		}
-		heap->sz += n;
-	}
+	uint64 addr = p->pbrk;
+
+	if (growproc(addr + n) < 0)
+		return -1;
+	// if (n < 0) {
+	// 	if (growproc(n) < 0)  // growproc takes care of p->sz
+	// 		return -1;
+	// } else {                // lazy page allocation
+	// 	uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
+	// 	if (addr + n > boundary - PGSIZE) {
+	// 		return -1;
+	// 	}
+	// 	heap->sz += n;
+	// }
 	return addr;
 }
 
@@ -181,25 +183,24 @@ sys_brk(void)
 		return -1;
 	
 	struct proc *p = myproc();
-	struct seg *heap = getseg(p->segment, HEAP);
-	if (addr == 0) {
-		return heap->addr + heap->sz;
-	} else if (addr < heap->addr) {
-		return -1;
-	}
-	int n = addr - (heap->addr + heap->sz);
-	if (n < 0) {
-		if (growproc(n) < 0)  // growproc takes care of p->sz
-			return -1;
-	} else {                // lazy page allocation
-		uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
-		if (addr > boundary - PGSIZE) {
-			return -1;
-		}
-		heap->sz += n;
-	}
-	return heap->addr + heap->sz;
-	return 0;
+	if (addr == 0)
+		return p->pbrk;
+
+	uint64 old = p->pbrk;
+	if (growproc(addr) < 0)
+		return old;
+	// int n = addr - (heap->addr + heap->sz);
+	// if (n < 0) {
+	// 	if (growproc(n) < 0)  // growproc takes care of p->sz
+	// 		return -1;
+	// } else {                // lazy page allocation
+	// 	uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
+	// 	if (addr > boundary - PGSIZE) {
+	// 		return -1;
+	// 	}
+	// 	heap->sz += n;
+	// }
+	return addr;
 }
 
 uint64

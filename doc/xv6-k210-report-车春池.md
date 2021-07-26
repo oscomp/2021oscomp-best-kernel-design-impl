@@ -40,7 +40,7 @@ marp: true
 
 ---
 ## **运行**
-![run](../img/xv6-k210_on_k210.gif)  
+![run](./img/xv6-k210_on_k210.gif)  
 
 ---
 ## **为什么选择 xv6**
@@ -54,7 +54,6 @@ marp: true
 + `MIT` 开源协议
 + `xv6` 复杂程度
 + 架构设计：RISC-V SBI 标准
-![riscv_software_stack](../img/riscv_software_stack.png)
 
 + 虚拟环境 vs 真实硬件环境
 + 虚拟硬盘 vs SD 卡
@@ -143,7 +142,7 @@ xv6-k210
 
 ---
 ## **多核启动**
-![boot](../img/boot.jpg)  
+![boot](./img/boot.jpg)  
 
 ---
 ## **虚拟内存管理**
@@ -170,7 +169,7 @@ xv6-k210
 ---
 ## **虚拟内存管理**
 <!-- <img src="../img/mem_map.jpg">   -->
-![mem_map](../img/mem_map.jpg)
+![mem_map](./img/mem_map.jpg)
 
 ---
 ## **时钟中断**
@@ -222,7 +221,7 @@ match cause {
 
 ---
 ## **用户多进程**
-![proc](../img/proc.jpg)  
+![proc](./img/proc.jpg)  
 
 ---
 ## **SD 卡驱动**

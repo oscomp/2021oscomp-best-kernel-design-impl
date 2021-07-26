@@ -369,15 +369,14 @@ int fat_write_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint o
 int fat_truncate_file(struct inode *ip)
 {
 	struct fat32_entry *entry = i2fat(ip);
+	uint32 const bpc = sb2fat(ip->sb)->byts_per_clus;
+	uint32 off = 0;
+	uint32 clus = reloc_clus(ip, off, 0);
 
-	for (uint32 clus = entry->first_clus; clus >= 2 && clus < FAT32_EOC; ) {
-		uint32 next = read_fat(ip->sb, clus);
-		if (next < 2) {
-			__alert_fs_err("fat_truncate_file");
-			return -1;
-		}
+	while (clus != 0) {
 		free_clus(ip->sb, clus);
-		clus = next;
+		off += bpc;
+		clus = reloc_clus(ip, off, 0);
 	}
 	free_clus_cache(entry);
 	ip->size = entry->file_size = 0;

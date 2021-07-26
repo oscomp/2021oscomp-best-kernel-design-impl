@@ -187,8 +187,9 @@ int execve(char *path, char **argv, char **envp)
 	// Heap
 	flags = PTE_R | PTE_W;
 	for (seg = seghead; seg->next != NULL; seg = seg->next);
-	__debug_info("execve", "making heap, start=%p\n", PGROUNDUP(seg->addr + seg->sz));
-	seg = newseg(pagetable, seghead, HEAP, PGROUNDUP(seg->addr + seg->sz), 0, flags);
+	uint64 brk = PGROUNDUP(seg->addr + seg->sz) + PGSIZE;
+	__debug_info("execve", "making heap, start=%p\n", brk);
+	seg = newseg(pagetable, seghead, HEAP, brk, 0, flags);
 	if(seg == NULL) {
 		__debug_warn("execve", "new heap fail\n");
 		ret = -ENOMEM;
@@ -279,6 +280,7 @@ int execve(char *path, char **argv, char **envp)
 	seg = p->segment;
 	p->pagetable = pagetable;
 	p->segment = seghead;
+	p->pbrk = brk;
 	p->trapframe->epc = elf.entry;  // initial program counter = main
 	p->trapframe->sp = sp; // initial stack pointer
 	if (p->elf)
