@@ -160,7 +160,9 @@ fileread(struct file *f, uint64 addr, int n)
 				// if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
 				//   return -1;
 				// r = devsw[f->major].read(1, addr, n);
+				ilock(ip);
 				r = ip->fop->read(ip, 1, addr, 0, n);
+				iunlock(ip);
 				break;
 		case FD_INODE:
 				ilock(ip);
@@ -189,6 +191,7 @@ filewrite(struct file *f, uint64 addr, int n)
 	if(f->writable == 0)
 		return -1;
 
+	struct inode *ip = f->ip;
 	// __debug_info("filewrite", "addr=%p, n=%d\n", addr, n);
 	if(f->type == FD_PIPE){
 		ret = pipewrite(f->pipe, addr, n);
@@ -196,9 +199,8 @@ filewrite(struct file *f, uint64 addr, int n)
 		// if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
 		//   return -1;
 		// ret = devsw[f->major].write(1, addr, n);
-		ret = f->ip->fop->write(f->ip, 1, addr, 0, n);
+		ret = ip->fop->write(ip, 1, addr, 0, n);
 	} else if(f->type == FD_INODE){
-		struct inode *ip = f->ip;
 		ilock(ip);
 		ret = ip->fop->write(ip, 1, addr, f->off, n);
 		iunlock(ip);
@@ -276,11 +278,13 @@ int filereadv(struct file *f, struct iovec ioarr[], int count)
 			r = pipereadv(f->pipe, ioarr, count);
 			break;
 		case FD_DEVICE:
+			ilock(ip);
 			r = ip->fop->readv(ip, ioarr, count, 0);
+			iunlock(ip);
 			break;
 		case FD_INODE:
-			if (!ip->fop->readv)
-				return -EPERM;
+			// if (!ip->fop->readv)
+			// 	return -EPERM;
 			ilock(ip);
 			r = ip->fop->readv(ip, ioarr, count, f->off);
 			iunlock(ip);
@@ -312,8 +316,8 @@ int filewritev(struct file *f, struct iovec ioarr[], int count)
 			ret = ip->fop->writev(ip, ioarr, count, 0);
 			break;
 		case FD_INODE:
-			if (!ip->fop->writev)
-				return -EPERM;
+			// if (!ip->fop->writev)
+			// 	return -EPERM;
 			ilock(ip);
 			ret = ip->fop->writev(ip, ioarr, count, f->off);
 			iunlock(ip);
@@ -346,9 +350,9 @@ int copyfdtable(struct fdtable *fdt1, struct fdtable *fdt2)
 		fd->exec_close = fdt1->exec_close;
 		for (int i = 0; i < NOFILE; i++) {
 			if (fdt1->arr[i]) {
-				fdt2->arr[i] = filedup(fdt1->arr[i]);
+				fd->arr[i] = filedup(fdt1->arr[i]);
 			} else {
-				fdt2->arr[i] = NULL;
+				fd->arr[i] = NULL;
 			}
 		}
 		fdt1 = fdt1->next;

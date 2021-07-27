@@ -27,6 +27,7 @@ int dummy_iop1(struct inode *ip) { return -1; }
 int dummy_setattr(struct inode *ip, struct kstat *st) { return -1; }
 int dummy_rename(struct inode *ip, struct inode *dp, char *newname) { return -1; }
 int dummy_file_rw(struct inode *ip, int usr, uint64 dst, uint off, uint n) { return 0; }
+int dummy_file_readdir(struct inode *dp, struct dirent *dent, uint off) { return -1; }
 int dummy_file_rw_vec(struct inode *ip, struct iovec *iovecs, int count, uint off) { return 0; }
 
 static int rootfs_getattr(struct inode *ip, struct kstat *st)

@@ -4,16 +4,19 @@
 #include "types.h"
 #include "fs/file.h"
 #include "sync/spinlock.h"
+#include "sync/sleeplock.h"
 
 #define PIPESIZE 512
 
 struct pipe {
-	struct spinlock lock;
-	char data[PIPESIZE];
-	uint nread;     // number of bytes read
-	uint nwrite;    // number of bytes written
-	int readopen;   // read fd is still open
-	int writeopen;  // write fd is still open
+	struct spinlock		lock;
+	struct sleeplock	wlock;
+	struct sleeplock	rlock;
+	uint	nread;			// number of bytes read
+	uint	nwrite;			// number of bytes written
+	int		readopen;		// read fd is still open
+	int		writeopen;		// write fd is still open
+	char	data[PIPESIZE];
 };
 
 int pipealloc(struct file **f0, struct file **f1);

@@ -67,7 +67,7 @@ consolewrite(int user_src, uint64 src, int n)
 	int m, tot;
 	char outbuf[INPUT_BUF];
 
-	acquire(&cons.lock);
+	// acquire(&cons.lock);	// use inode's lock instead
 	for (tot = 0; tot < n; tot += m, src += m) {
 		m = n - tot;  // left count
 		if (m > INPUT_BUF) {
@@ -79,7 +79,7 @@ consolewrite(int user_src, uint64 src, int n)
 			sbi_console_putchar(outbuf[i]);
 		}
 	}
-	release(&cons.lock);
+	// release(&cons.lock);
 
 	return tot;
 }
@@ -89,7 +89,7 @@ int consolewritev(struct inode *ip, struct iovec *iovecs, int count, uint off)
 	int tot = 0;
 	char outbuf[INPUT_BUF];
 
-	acquire(&cons.lock);
+	// acquire(&cons.lock);	// use inode's lock instead
 	for (int i = 0; i < count; i++) {
 		uint64 n = iovecs[i].iov_len;
 		int m, j;
@@ -106,7 +106,7 @@ int consolewritev(struct inode *ip, struct iovec *iovecs, int count, uint off)
 		if (j < n)
 			break;
 	}
-	release(&cons.lock);
+	// release(&cons.lock);
 	return tot;
 }
 
@@ -119,51 +119,49 @@ int consolewritev(struct inode *ip, struct iovec *iovecs, int count, uint off)
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
-	uint target;
-	int c;
-	char cbuf;
+	int c = 0;
+	char inbuf[INPUT_BUF];
+	uint tot = 0;
 
-	target = n;
-	acquire(&cons.lock);
-	while(n > 0){
+	while (n > 0) {
 		// wait until interrupt handler has put some
 		// input into cons.buffer.
-		while(cons.r == cons.w){
-			if(myproc()->killed){
+		acquire(&cons.lock);
+		while (cons.r == cons.w) {
+			if (myproc()->killed) {
 				release(&cons.lock);
 				return -1;
 			}
 			sleep(&cons.r, &cons.lock);
 		}
 
-		c = cons.buf[cons.r++ % INPUT_BUF];
-
-		if(c == C('D')){  // end-of-file
-			if(n < target){
-				// Save ^D for next time, to make sure
-				// caller gets a 0-byte result.
-				cons.r--;
+		int m = n < INPUT_BUF ? n : INPUT_BUF;
+		int j;
+		for (j = 0; j < m && cons.r < cons.w; ) {
+			c = inbuf[j++] = cons.buf[cons.r++ % INPUT_BUF];
+			if (c == '\n')
+				break;
+			if (c == C('D')) {
+				if (tot > 0) {	// Save ^D for the next time, 
+					cons.r--;	// to make sure caller gets a 0-byte result.
+				}
+				j--;
+				break;
 			}
-			break;
 		}
-
+		release(&cons.lock);
+		
 		// copy the input byte to the user-space buffer.
-		cbuf = c;
-		if(either_copyout(user_dst, dst, &cbuf, 1) == -1)
+		if (either_copyout(user_dst, dst, inbuf, j) < 0)
 			break;
-
-		dst++;
-		--n;
-
-		if(c == '\n'){
-			// a whole line has arrived, return to
-			// the user-level read().
+		dst += j;
+		n -= j;
+		tot += j;
+		if (c == '\n' || c == C('D'))
 			break;
-		}
 	}
-	release(&cons.lock);
 
-	return target - n;
+	return tot;
 }
 
 int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
@@ -172,13 +170,13 @@ int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
 	int c = 0;
 	char inbuf[INPUT_BUF];
 
-	acquire(&cons.lock);
 	for (int i = 0; i < count; i++) {
 		uint64 dst = (uint64)iovecs[i].iov_base;
 		uint64 n = iovecs[i].iov_len;
 		while (n > 0) {
 			// wait until interrupt handler has put some
 			// input into cons.buffer.
+			acquire(&cons.lock);
 			while (cons.r == cons.w) {
 				if (myproc()->killed) {
 					release(&cons.lock);
@@ -201,6 +199,8 @@ int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
 					break;
 				}
 			}
+			release(&cons.lock);
+
 			// copy the input byte to the user-space buffer.
 			if (copyout2(dst, inbuf, j) < 0) {
 				count = 0; // break the out-level loop
@@ -215,7 +215,6 @@ int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
 			}
 		}
 	}
-	release(&cons.lock);
 	return tot;
 }
 
@@ -309,10 +308,12 @@ int __consolewrite(struct inode *ip, int usr, uint64 dst, uint off, uint n)
 	return consolewrite(usr, dst, n);
 }
 
+extern int dummy_file_readdir(struct inode *, struct dirent *, uint);
+
 struct file_op console_op = {
 	.read = __consoleread,
 	.write = __consolewrite,
-	.readdir = NULL,
+	.readdir = dummy_file_readdir,
 	.readv = consolereadv,
 	.writev = consolewritev,
 };

@@ -599,6 +599,7 @@ uvmclear(pagetable_t pagetable, uint64 va)
  * Caller must check legality via usrmm module before calling to this.
  * TODO: If protecting legal but not-valid-at-present pages, how can we maintain the
  *       protect flags we set in this function? Since mappages may over-write them.
+ * --DONE
  */
 int
 uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
@@ -608,7 +609,8 @@ uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
 		panic("uvmprotect");
 	}
 	
-	int flag = 0;
+	int protw = prot & PTE_W;
+	int fence = 0;
 	uint64 i;
 	for (i = 0; i < len; i += PGSIZE) {
 		pte_t *pte = walk(pagetable, va + i, 1);
@@ -616,28 +618,37 @@ uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
 			break;
 
 		if (*pte & PTE_V) {
-			flag = 1;
-			if (!(*pte & (PTE_W|PTE_COW)) && (prot & PTE_W)) { // may lead to conflict
-				uint64 pa = PTE2PA(*pte);
-				if (!monopolizepage(pa)) { // a shared page, must be unwritavle
-					char *copy = (char *)allocpage();
-					if (copy == NULL) {
-						pagecopydone();
-						break;
-					}
-					memmove(copy, (char *)pa, PGSIZE);
-					pagecopydone();
-					pagereg((uint64)copy, 1);
-					*pte = PA2PTE(copy) | PTE_FLAGS(*pte);
-				}
+			fence = 1;
+			if (protw && !(*pte & (PTE_W|PTE_COW))) { // may lead to conflict
+				/**
+				 * Case: the page wasn't writable, but user wants to write it.
+				 * Only mark it as copy-on-write, don't mark it writable directly,
+				 * let page fault handler take care of that.
+				 */
+				*pte = (*pte & ~(PTE_X|PTE_W|PTE_R)) | (prot & ~PTE_W) | PTE_COW;
+
+			} else if ((*pte & (PTE_W|PTE_COW)) && !protw) { // cancel writable
+				/**
+				 * Case: the page was writable, but user wants to cancel it.
+				 * Unmark PTE_COW no matter whether the pte has this marked or not.
+				 */
+				*pte = (*pte & ~(PTE_COW|PTE_X|PTE_W|PTE_R)) | prot;
+
+			} else {
+				*pte = (*pte & ~(PTE_X|PTE_W|PTE_R)) | prot;
 			}
-			*pte = (*pte & ~(PTE_X|PTE_W|PTE_R)) | prot;
-		} else {
-			*pte = prot | PTE_U; // pre-mark a PTE_U here, if mappages meets a pte without PTE_V but PTE_U, it knows how to do.
+		}
+		else {
+			/**
+			 * Case: protecting a not-present page.
+			 * Pre-mark a PTE_U here, if mappages() meets a pte without PTE_V but PTE_U,
+			 * it knows how to handle that.
+			 */
+			*pte = prot | PTE_U;
 		}
 	}
 
-	if (flag)
+	if (fence)
 		sfence_vma();
 
 	return i < len ? -1 : 0;
@@ -711,21 +722,10 @@ uint64 kern_pgfault_escape(uint64 badaddr)
 	return save_point;
 }
 
-static uint64 get_copy_badaddr(uint64 old)
+static uint64 safememmove(char *dst, char *src, uint64 len)
 {
-	struct proc *p = myproc();
-	if (p->kstack != old) {
-		uint64 ret = p->kstack;
-		p->kstack = old;
-		return ret;
-	}
-	return old;
-}
-
-static uint64 safememmove(char *dst, char *src, uint len)
-{
-	struct proc *p = myproc();
-	uint64 old = p->kstack;			// p->kstack might store the stval later
+	struct proc * volatile p = myproc();
+	uint64 volatile old = p->kstack;			// p->kstack might store the stval later
 
 	// kerneltrap() in trap.c can look up for this safe escape.
 	uint64 safe_pc;
@@ -735,34 +735,22 @@ static uint64 safememmove(char *dst, char *src, uint len)
 		save_point = safe_pc;
 	}
 
-	uint64 badaddr = get_copy_badaddr(old);
+	// __sync_synchronize();
+
+	uint64 badaddr = p->kstack;
 	if (badaddr == old) {
 		permit_usr_mem();
 		while (len--) {         // There is no overlap between user and kernel space
 			*dst++ = *src++;  // this is possible to raise a page fault
 		}
 		badaddr = 0;
+	} else {
+		p->kstack = old;
 	}
 	protect_usr_mem();
 	
 	__debug_info("do_safememmove", "badaddr=0x%x\n", badaddr);
 	return badaddr;
-}
-
-static int handle_copy_elf_miss(pagetable_t pagetable, uint64 badaddr, struct seg *s, struct inode *elf)
-{
-	pte_t *pte = walk(pagetable, badaddr, 0);
-	if (pte != NULL && (*pte & PTE_V)) {	// this part has already been loaded
-		return -1;							// which indicas a permission problem
-	}
-	ilock(elf);
-	if (loadseg(pagetable, badaddr, s, elf) < 0) {
-		iunlock(elf);
-		return -1;
-	}
-	iunlock(elf);
-	sfence_vma();
-	return 0;
 }
 
 // Copy from kernel to user.
@@ -799,20 +787,7 @@ copyout2(uint64 dstva, char *src, uint64 len)
 		// __debug_warn("copyout2", "%p, %p, %d\n", s, dstva, len);
 		return -1;
 	}
-	uint64 badaddr;
-	do {
-		badaddr = safememmove((char *)dstva, src, len);
-		if (badaddr && s->type == LOAD) { // maybe meet unloaded elf part, must do it outside the excep-handler
-			if (handle_copy_elf_miss(p->pagetable, badaddr, s, p->elf) < 0)
-				return -1;
-
-			int diff = badaddr - dstva;
-			dstva += diff;
-			src += diff;
-			len -= diff;
-		}
-		else break;
-	} while (1);
+	uint64 badaddr = safememmove((char *)dstva, src, len);
 	return badaddr == 0 ? 0 : -1;
 }
 
@@ -849,21 +824,7 @@ copyin2(char *dst, uint64 srcva, uint64 len)
 	if (s == NULL) {
 		return -1;
 	}
-	uint64 badaddr;
-	do {
-		badaddr = safememmove(dst, (char *)srcva, len);
-		if (badaddr && s->type == LOAD) { // maybe meet unloaded elf part, must do it outside the excep-handler
-			__debug_info("copyin2", "elf needs to load at badaddr=0x%x\n", badaddr);
-			if (handle_copy_elf_miss(p->pagetable, badaddr, s, p->elf) < 0)
-				return -1;
-
-			int diff = badaddr - srcva;
-			dst += diff;
-			srcva += diff;
-			len -= diff;
-		}
-		else break;
-	} while (1);
+	uint64 badaddr = safememmove(dst, (char *)srcva, len);
 	return badaddr == 0 ? 0 : -1;
 }
 
@@ -1011,10 +972,6 @@ static int handle_page_fault_lazy(uint64 badaddr)
 
 static int handle_page_fault_loadelf(uint64 badaddr, struct seg *s)
 {
-	if ((r_sstatus() & SSTATUS_SPP) != 0) {// don't handle this in S-mode exception: need to read disk and sleep
-		__debug_warn("handle_page_fault_loadelf", "kernel triggered! badaddr=%p\n", badaddr);
-		return -1;
-	}
 	struct proc *p = myproc();
 	__debug_info("handle_page_fault_loadelf", "badaddr=%p, pid=%d, name=%s\n", badaddr, p->pid, p->name);
 	ilock(p->elf);
@@ -1029,7 +986,7 @@ static int handle_page_fault_loadelf(uint64 badaddr, struct seg *s)
 }
 
 /**
- * @param   kind      load-0 | store-1 | access-2 | 
+ * @param   kind      load-0 | store-1 | execute-2 | 
  * @param   badaddr   the stval
  */
 int handle_page_fault(int kind, uint64 badaddr)
@@ -1045,12 +1002,42 @@ int handle_page_fault(int kind, uint64 badaddr)
 				"\nbadaddr=%p, pte=%p, *pte=%p, kind=%d, segtype=%d\n",
 				badaddr, pte, pte == NULL ? 0 : *pte, kind, seg->type);
 
-	if (kind == 1 && pte && (*pte & PTE_COW)) {
-		// mapped and store-type, might be a COW fault
-		return handle_store_page_fault_cow(pte);
+	if (pte) {
+		if (kind == 1 && (*pte & PTE_COW)) {
+			// mapped and store-type, might be a COW fault
+			return handle_store_page_fault_cow(pte);
+		}
+	 	if (*pte & PTE_V) {
+			/**
+			 * The page has been mapped,
+			 * so it's not an elf-load/lazy-alloc problem,
+			 * but a real illegal access.
+			 */
+			return -1;
+		}
+		if (*pte & PTE_U) {
+			/**
+			 * If the page is without PTE_V but with PTE_U,
+			 * it indicates that the page has been pre-marked.
+			 * Check whether the access kind breaks the protection
+			 * before we handle it.
+			 */
+			int illegel;
+			switch (kind) {
+			case 0:
+				illegel = !(*pte & PTE_R); break;
+			case 1:
+				illegel = !(*pte & PTE_W); break;
+			case 2:
+				illegel = !(*pte & PTE_X); break;
+			default:
+				illegel = 0;
+				panic("handle_page_fault: kind");
+			}
+			if (illegel)
+				return -1;
+		}
 	}
-	if (pte && (*pte & PTE_V)) // the page has been mapped, so it's not an elf-load/lazy-alloc problem
-		return -1;
 	if (seg->type == LOAD) {
 		return handle_page_fault_loadelf(badaddr, seg);
 	}
