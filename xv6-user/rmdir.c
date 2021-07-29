@@ -1,4 +1,4 @@
-#include "xv6-user/user.h"
+#include "user.h"
 
 int
 main(int argc, char *argv[])

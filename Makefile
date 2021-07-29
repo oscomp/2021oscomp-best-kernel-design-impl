@@ -182,11 +182,63 @@ else
 endif 
 
 
+# Compile user programs
+ulinker = ./linker/user.ld
+
+$U/initcode: $U/initcode.S
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
+	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
+	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
+	$(OBJDUMP) -S $U/initcode.o > $U/initcode.asm
+
+ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o $U/crt.o
+
+_%: %.o $(ULIB)
+	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
+	$(OBJDUMP) -S $@ > $*.asm
+
+$U/usys.o : $U/usys.pl
+	@perl $U/usys.pl > $U/usys.S
+	$(CC) $(CFLAGS) -c -o $U/usys.o $U/usys.S
+
+
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
+
+UPROGS=\
+	$U/_init\
+	$U/_sh\
+	$U/_cat\
+	$U/_echo\
+	$U/_grep\
+	$U/_ls\
+	$U/_kill\
+	$U/_mkdir\
+	$U/_xargs\
+	$U/_sleep\
+	$U/_find\
+	$U/_rm\
+	$U/_rmdir\
+	$U/_wc\
+	$U/_info\
+	$U/_usertests\
+	$U/_strace\
+	$U/_mv\
+	$U/_test\
+	$U/_grind\
+	$U/_forktest\
+	$U/_stressfs\
+	$U/_cowtest\
+	$U/_lazytests\
+	$U/_mount\
+	$U/_umount\
+	$U/_dup3\
+	$U/_mmaptests
+
+user: $(UPROGS)
 
 dst=/mnt
 
@@ -201,7 +253,7 @@ fs:
 	@sudo umount $(dst)
 
 # Write sdcard mounted at $(dst)
-sdcard:
+sdcard: user
 	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
 	@for file in $$( ls $U/_* ); do \
 		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
@@ -211,10 +263,10 @@ sdcard:
 	@sudo cp $U/_echo $(dst)/echo
 	@sudo cp README $(dst)/README
 
-.PHONY: clean run all fs sdcard
+.PHONY: clean run all fs sdcard user
 
 clean: 
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \
 		target \
 		k210.bin \
-		$U/*.d $U/*.o
+		$U/*.d $U/*.o $U/*.asm $U/usys.S $U/_*

@@ -52,6 +52,8 @@ uint64          walkaddr(pagetable_t, uint64);
 uint64          kwalkaddr(pagetable_t pagetable, uint64 va);
 uint64          kvmpa(uint64);
 
+void            pagereg(uint64 pa, uint8 init);
+int             pageput(uint64 pa);
 int             mappages(pagetable_t pt, uint64 va, uint64 size, uint64 pa, int perm);
 void            unmappages(pagetable_t pt, uint64 va, uint64 npages, int flag);
 

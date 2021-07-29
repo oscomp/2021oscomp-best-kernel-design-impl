@@ -1,7 +1,7 @@
-#include "kernel/include/types.h"
-#include "kernel/include/stat.h"
-#include "kernel/include/sysinfo.h"
-#include "xv6-user/user.h"
+#include "types.h"
+#include "fs/stat.h"
+#include "sysinfo.h"
+#include "user.h"
 
 int main()
 {

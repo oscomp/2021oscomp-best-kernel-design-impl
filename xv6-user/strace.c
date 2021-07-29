@@ -1,7 +1,7 @@
-#include "kernel/include/param.h"
-#include "kernel/include/types.h"
-#include "kernel/include/stat.h"
-#include "xv6-user/user.h"
+#include "param.h"
+#include "types.h"
+#include "fs/stat.h"
+#include "user.h"
 
 char *getenv(char *envp[], char *envvar)
 {

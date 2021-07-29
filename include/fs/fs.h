@@ -99,6 +99,8 @@ struct superblock {
 #define I_STATE_FREE		(1 << 3)
 #define I_STATE_LOCKED		(1 << 4)
 
+#include "utils/rbtree.h"
+
 struct inode {
 	uint64				inum;
 	int					ref;
@@ -113,7 +115,8 @@ struct inode {
 	struct inode_op		*op;
 	struct file_op		*fop;
 	struct spinlock		ilock;	// protect itself
-	struct mapped 		*maphead;
+	// struct mapped 		*maphead;
+	struct rb_root		mapping;
 
 	struct dentry		*entry;
 };

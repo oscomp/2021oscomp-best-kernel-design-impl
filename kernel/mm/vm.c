@@ -142,7 +142,8 @@ static int __hash_page_idx(uint64 pa)
 }
 
 // Register a page for user, init it for later dup
-static inline void pagereg(uint64 pa, uint8 init)
+// static inline void pagereg(uint64 pa, uint8 init)
+void pagereg(uint64 pa, uint8 init)
 {
 	acquire(&page_ref_lock);
 	page_ref_table[__hash_page_idx(pa)] = init;
@@ -177,7 +178,8 @@ static inline int pagedup(uint64 pa)
 	return ref;
 }
 
-static inline int pageput(uint64 pa)
+// static inline int pageput(uint64 pa)
+int pageput(uint64 pa)
 {
 	acquire(&page_ref_lock);
 	int ref = --page_ref_table[__hash_page_idx(pa)];
@@ -954,13 +956,13 @@ static int handle_store_page_fault_cow(pte_t *ptep)
 	return 0;
 }
 
-static int handle_page_fault_lazy(uint64 badaddr)
+static int handle_page_fault_lazy(uint64 badaddr, struct seg *s)
 {
 	__debug_info("handle_page_fault_lazy", "badaddr=%p\n", badaddr);
 	struct proc *p = myproc();
 
 	uint64 pa = PGROUNDDOWN(badaddr);  // in uvmalloc(), oldsz will round up
-	if (uvmalloc(p->pagetable, pa, pa + PGSIZE, PTE_W|PTE_R|PTE_X) == 0) {
+	if (uvmalloc(p->pagetable, pa, pa + PGSIZE, s->flag) == 0) {
 		__debug_warn("handle_page_fault_lazy", "fail\n");
 		return -1;
 	}
@@ -984,6 +986,8 @@ static int handle_page_fault_loadelf(uint64 badaddr, struct seg *s)
 	sfence_vma();
 	return 0;
 }
+
+extern int handle_page_fault_mmap(int kind, uint64 badaddr, struct seg *s);
 
 /**
  * @param   kind      load-0 | store-1 | execute-2 | 
@@ -1042,7 +1046,10 @@ int handle_page_fault(int kind, uint64 badaddr)
 		return handle_page_fault_loadelf(badaddr, seg);
 	}
 	if (seg->type == HEAP || seg->type == STACK) {     // a lazy-alloction
-		return handle_page_fault_lazy(badaddr);
+		return handle_page_fault_lazy(badaddr, seg);
+	}
+	if (seg->type == MMAP) {
+		return handle_page_fault_mmap(kind, badaddr, seg);
 	}
 
 	return -1;

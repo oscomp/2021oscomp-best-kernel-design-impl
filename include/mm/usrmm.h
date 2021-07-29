@@ -13,7 +13,7 @@ struct seg{
 	uint64 addr;
 	uint64 sz;
 	struct seg *next;
-	struct file *mmap;
+	uint64 mmap;
 	uint64 f_off;
 	uint64 f_sz;
 };

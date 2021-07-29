@@ -574,9 +574,16 @@ sys_mmap(void)
 	if ((fd < 0 || f == NULL) && !(flags & MAP_ANONYMOUS)) {
 		return -EBADF;
 	} else if (flags & MAP_ANONYMOUS) {
+		if (off != 0)
+			return -EINVAL;
 		f = NULL;
 	} else if (f->type != FD_INODE) {
 		return -EPERM;
+	}
+
+	// Must provide one of them.
+	if (!(flags & (MAP_SHARED|MAP_PRIVATE))) {
+		return -EINVAL;
 	}
 
 	return do_mmap(start, len, prot, flags, f, off);
