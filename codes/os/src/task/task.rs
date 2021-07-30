@@ -107,8 +107,8 @@ impl TaskControlBlockInner {
     }
     pub fn print_cx(&self) {
         unsafe{ 
-            println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
-            println!("trap_cx = {:?}", *(self.trap_cx_ppn.0 as *const TrapContext) );
+            // println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
+            // println!("trap_cx = {:?}", *(self.trap_cx_ppn.0 as *const TrapContext) );
         }
     }
 

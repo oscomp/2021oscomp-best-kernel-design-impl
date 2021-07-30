@@ -79,7 +79,7 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::InstructionFault) |
         Trap::Exception(Exception::InstructionPageFault) |
         Trap::Exception(Exception::LoadFault) => {
-            println!{"pinLoadFault"}
+            // println!{"pinLoadFault"}
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
@@ -91,13 +91,13 @@ pub fn trap_handler() -> ! {
         }
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
-            println!{"pinLoadPageFault"}
-            println!(
-                "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-                scause.cause(),
-                stval,
-                current_trap_cx().sepc,
-            );
+            // println!{"pinLoadPageFault"}
+            // println!(
+            //     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+            //     scause.cause(),
+            //     stval,
+            //     current_trap_cx().sepc,
+            // );
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
