@@ -151,59 +151,6 @@ uint64 sys_sched_yield(void) {
 }
 
 uint64
-sys_sbrk(void)
-{
-	int n;
-	if(argint(0, &n) < 0)
-		return -1;
-	
-	struct proc *p = myproc();
-	uint64 addr = p->pbrk;
-
-	if (growproc(addr + n) < 0)
-		return -1;
-	// if (n < 0) {
-	// 	if (growproc(n) < 0)  // growproc takes care of p->sz
-	// 		return -1;
-	// } else {                // lazy page allocation
-	// 	uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
-	// 	if (addr + n > boundary - PGSIZE) {
-	// 		return -1;
-	// 	}
-	// 	heap->sz += n;
-	// }
-	return addr;
-}
-
-uint64
-sys_brk(void)
-{
-	uint64 addr;
-	if(argaddr(0, &addr) < 0)
-		return -1;
-	
-	struct proc *p = myproc();
-	if (addr == 0)
-		return p->pbrk;
-
-	uint64 old = p->pbrk;
-	if (growproc(addr) < 0)
-		return old;
-	// int n = addr - (heap->addr + heap->sz);
-	// if (n < 0) {
-	// 	if (growproc(n) < 0)  // growproc takes care of p->sz
-	// 		return -1;
-	// } else {                // lazy page allocation
-	// 	uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
-	// 	if (addr > boundary - PGSIZE) {
-	// 		return -1;
-	// 	}
-	// 	heap->sz += n;
-	// }
-	return addr;
-}
-
-uint64
 sys_sleep(void)
 {
 	int n;
@@ -306,29 +253,6 @@ uint64
 sys_getuid(void)
 {
 	return 0;
-}
-
-uint64
-sys_mprotect(void)
-{
-	uint64 addr, len;
-	int prot;
-
-	argaddr(0, &addr);
-	argaddr(1, &len);
-	argint(2, &prot);
-	if (addr % PGSIZE || (prot & ~PROT_ALL))
-		return -1;
-
-	prot = (prot << 1) & (PTE_X|PTE_W|PTE_R); // convert to PTE_attr
-	struct proc *p = myproc();
-	struct seg *s = partofseg(p->segment, addr, addr + len);
-	if (s == NULL ||
-		(s->type == MMAP && !(s->flag & PTE_W) && (prot & PTE_W))
-	)
-	return -1;
-
-	return uvmprotect(p->pagetable, addr, len, prot);
 }
 
 uint64 

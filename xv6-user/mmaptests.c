@@ -440,7 +440,7 @@ int run(void f(char *), char *s) {
         f(s);
         exit(0);
     }
-    printf("testing %s: ", s);
+    printf("test %s: ", s);
     wait(&xstatus);
     if(WEXITSTATUS(xstatus) != 0) 
         printf("FAILED\n", s);

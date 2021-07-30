@@ -230,7 +230,7 @@ walkaddr(pagetable_t pagetable, uint64 va)
 	pte_t *pte;
 	uint64 pa;
 
-	if(va >= MAXVA)
+	if (va >= MAXUVA)
 		return NULL;
 
 	pte = walk(pagetable, va, 0);
@@ -334,15 +334,19 @@ unmappages(pagetable_t pagetable, uint64 va, uint64 npages, int flag)
 
 	int do_free = flag & VM_FREE;
 	int usr = flag & VM_USER;
-	// int allowhole = flag & VM_HOLE;
-	int allowhole = 1;
 
 	uint64 end = va + npages * PGSIZE;
 	for (a = va; a < end; a += PGSIZE) {
 		if ((pte = walk(pagetable, a, 0)) == NULL || !(*pte & PTE_V)) {
-			if (allowhole) continue;  // it might be a lazy-allocated page which is not really allocated, but how could we verify that?
-			__debug_error("unmappages", "va=%p flag=%d\n", va, flag);
-			panic("unmappages: unmapped pte");
+			// if (allowhole) continue;  // it might be a lazy-allocated page which is not really allocated, but how could we verify that?
+			// __debug_error("unmappages", "va=%p flag=%d\n", va, flag);
+			// panic("unmappages: unmapped pte");
+			/**
+			 * At this stage, we introduce several kinds of lazy allocation
+			 * into xv6-k210, there are lots of so-call "hole" in the
+			 * pagetable. We just let them go...
+			 */
+			continue;
 		}
 		if(PTE_FLAGS(*pte) == PTE_V)
 			panic("unmappages: not a leaf");
@@ -410,14 +414,14 @@ uvmalloc(pagetable_t pagetable, uint64 start, uint64 end, int perm)
 	for(a = PGROUNDUP(start); a < end; a += PGSIZE){
 		mem = allocpage();
 		if (mem == NULL) {
-			uvmdealloc(pagetable, start, a, NONE);
+			uvmdealloc(pagetable, start, a);
 			return 0;
 		}
 		memset(mem, 0, PGSIZE);
 		pagereg((uint64)mem, 0);
 		if (mappages(pagetable, a, PGSIZE, (uint64)mem, perm|PTE_U) != 0) {
 			freepage(mem);
-			uvmdealloc(pagetable, start, a, NONE);
+			uvmdealloc(pagetable, start, a);
 			return 0;
 		}
 	}
@@ -437,16 +441,14 @@ uvmalloc(pagetable_t pagetable, uint64 start, uint64 end, int perm)
  * @return          param start if successful else 0
  */
 uint64
-uvmdealloc(pagetable_t pagetable, uint64 start, uint64 end, enum segtype segt)
+uvmdealloc(pagetable_t pagetable, uint64 start, uint64 end)
 {
 	if(start >= end)
 		return end;
 
-	// int heapflag = segt == HEAP ? VM_HOLE : 0;
-	int heapflag = VM_HOLE;
 	if (PGROUNDUP(start) < PGROUNDUP(end)) {
 		int npages = (PGROUNDUP(end) - PGROUNDUP(start)) / PGSIZE;
-		unmappages(pagetable, PGROUNDUP(start), npages, VM_FREE|VM_USER|heapflag);
+		unmappages(pagetable, PGROUNDUP(start), npages, VM_FREE|VM_USER);
 	}
 
 	return start;
@@ -539,18 +541,15 @@ uvmfree(pagetable_t pagetable)
  * @param     cow   whether to activate COW mechanism
  *                  only mapping shared pages without this, e.g. shared mmap pages
  */
-int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype segt, int cow)
+int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, int cow)
 {
 	pte_t *pte;
 	uint64 pa, i;
 	uint flags;
 
-	// int heapflag = segt == HEAP ? VM_HOLE : 0;
-	int heapflag = VM_HOLE;
 	for (i = start; i < end; i += PGSIZE) {
-		if((pte = walk(old, i, 0)) == NULL || !(*pte & PTE_V)) {
-			if (heapflag) continue;  // a lazy-allocation page, just ignore it, page-fault handler will handle it
-			panic("uvmcopy_cow: funny pte");	
+		if ((pte = walk(old, i, 0)) == NULL || !(*pte & PTE_V)) {
+			continue;
 		}
 		pa = PTE2PA(*pte);
 		if (cow && (*pte & PTE_W)) {
@@ -577,7 +576,7 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum seg
 	return 0;
 
  err:
-	unmappages(new, start, (i - start) / PGSIZE, VM_FREE|VM_USER|heapflag);
+	unmappages(new, start, (i - start) / PGSIZE, VM_FREE|VM_USER);
 	return -1;
 }
 
@@ -586,16 +585,16 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum seg
 /**
  * With usrmm, this func may be abandoned.
  */
-void
-uvmclear(pagetable_t pagetable, uint64 va)
-{
-	pte_t *pte;
+// void
+// uvmclear(pagetable_t pagetable, uint64 va)
+// {
+// 	pte_t *pte;
 	
-	pte = walk(pagetable, va, 0);
-	if(pte == NULL)
-		panic("uvmclear");
-	*pte &= ~PTE_U;
-}
+// 	pte = walk(pagetable, va, 0);
+// 	if (pte == NULL)
+// 		panic("uvmclear");
+// 	*pte &= ~PTE_U;
+// }
 
 /**
  * Caller must check legality via usrmm module before calling to this.
@@ -796,6 +795,7 @@ copyout2(uint64 dstva, char *src, uint64 len)
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
 // Return 0 on success, -1 on error.
+/*
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
@@ -817,6 +817,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 	}
 	return 0;
 }
+*/
 
 int
 copyin2(char *dst, uint64 srcva, uint64 len)
@@ -834,6 +835,7 @@ copyin2(char *dst, uint64 srcva, uint64 len)
 // Copy bytes to dst from virtual address srcva in a given page table,
 // until a '\0', or max.
 // Return 0 on success, -1 on error.
+/*
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
@@ -872,6 +874,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 		return -1;
 	}
 }
+*/
 
 int
 copyinstr2(char *dst, uint64 srcva, uint64 max)
@@ -1042,14 +1045,20 @@ int handle_page_fault(int kind, uint64 badaddr)
 				return -1;
 		}
 	}
-	if (seg->type == LOAD) {
-		return handle_page_fault_loadelf(badaddr, seg);
-	}
-	if (seg->type == HEAP || seg->type == STACK) {     // a lazy-alloction
-		return handle_page_fault_lazy(badaddr, seg);
-	}
-	if (seg->type == MMAP) {
-		return handle_page_fault_mmap(kind, badaddr, seg);
+
+	switch (seg->type) {
+		case LOAD:
+			return handle_page_fault_loadelf(badaddr, seg);
+
+		case HEAP:
+		case STACK:
+			return handle_page_fault_lazy(badaddr, seg);
+
+		case MMAP:
+			return handle_page_fault_mmap(kind, badaddr, seg);
+
+		default:
+			return -1;
 	}
 
 	return -1;

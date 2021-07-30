@@ -116,7 +116,7 @@ struct seg *partofseg(struct seg *head, uint64 start, uint64 end)
 
 void freeseg(pagetable_t pagetable, struct seg *p)
 {
-	uvmdealloc(pagetable, PGROUNDDOWN(p->addr), p->addr + p->sz, p->type);
+	uvmdealloc(pagetable, PGROUNDDOWN(p->addr), p->addr + p->sz);
 	p->sz = 0;
 }
 
@@ -128,7 +128,7 @@ struct seg *delseg(pagetable_t pagetable, struct seg *s)
 	if (s->type == MMAP) {
 		mmapdel(s, 1);
 	}
-	uvmdealloc(pagetable, PGROUNDDOWN(s->addr), s->addr + s->sz, s->type);
+	uvmdealloc(pagetable, PGROUNDDOWN(s->addr), s->addr + s->sz);
 	kfree(s);
 	return next;
 }
@@ -154,7 +154,7 @@ struct seg *copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2)
 		// If seg->mmap is NULL, it means the mmap is private.
 		int cow = (seg->type == MMAP && MMAP_SHARE(seg->mmap)) ? 0 : 1;
 		// Copy user memory from parent to child.
-		if (uvmcopy(pt, pt2, PGROUNDDOWN(seg->addr), seg->addr + seg->sz, seg->type, cow) < 0) 
+		if (uvmcopy(pt, pt2, PGROUNDDOWN(seg->addr), seg->addr + seg->sz, cow) < 0) 
 		{
 			__debug_warn("copysegs", "uvmcopy_cow fails\n");
 			__debug_warn("copysegs", "%p, %p, %d\n", 
@@ -182,7 +182,7 @@ bad:
 		tail = head->next;
 		if (head->type == MMAP)
 			mmapdel(head, 0);
-		uvmdealloc(pt2, PGROUNDDOWN(head->addr), head->addr + head->sz, head->type);
+		uvmdealloc(pt2, PGROUNDDOWN(head->addr), head->addr + head->sz);
 		kfree(head);
 		head = tail;
 	}

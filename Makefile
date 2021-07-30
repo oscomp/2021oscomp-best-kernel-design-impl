@@ -110,6 +110,7 @@ SRC	+= \
 	$K/sync/spinlock.c \
 	$K/syscall/syscall.c \
 	$K/syscall/sysfile.c \
+	$K/syscall/sysmem.c \
 	$K/syscall/sysproc.c \
 	$K/syscall/syssignal.c \
 	$K/syscall/systime.c \
@@ -180,6 +181,21 @@ ifeq ($(platform), k210)
 else 
 	$(QEMU) $(QEMUOPTS)
 endif 
+
+
+# try to generate a unique GDB port
+GDBPORT = $(shell expr `id -u` % 5000 + 25000)
+# QEMU's gdb stub command line changed in 0.11
+QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
+	then echo "-gdb tcp::$(GDBPORT)"; \
+	else echo "-s -p $(GDBPORT)"; fi)
+
+.gdbinit: debug/.gdbinit.tmpl-riscv
+	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
+
+qemu-gdb: $T/kernel .gdbinit fs.img
+	@echo "*** Now run 'gdb' in another window." 1>&2
+	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
 
 
 # Compile user programs

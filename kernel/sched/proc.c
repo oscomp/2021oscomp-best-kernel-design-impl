@@ -866,7 +866,7 @@ int growproc(uint64 newbrk)
 	}
 
 	if (newbrk < p->pbrk) { // only handle shrinking case, leave growing case for pg-fault
-		uvmdealloc(p->pagetable, newbrk, p->pbrk, HEAP);
+		uvmdealloc(p->pagetable, newbrk, p->pbrk);
 		sfence_vma();
 	}
 

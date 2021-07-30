@@ -899,7 +899,11 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 	struct proc *p = myproc();
 	if (mappages(p->pagetable, PGROUNDDOWN(badaddr), PGSIZE,
 				(uint64)pa, s->flag|PTE_U) < 0)
+	{
+		if (!share)
+			freepage(pa);	
 		return -ENOMEM;
+	}
 
 	sfence_vma();
 	return 0;
