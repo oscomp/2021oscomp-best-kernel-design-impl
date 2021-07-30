@@ -1,5 +1,5 @@
-#![feature(llvm_asm)]
-
+// #![feature(llvm_asm)]
+// #[macro_use]
 use super::TaskControlBlock;
 use alloc::sync::Arc;
 use core::{borrow::Borrow, cell::RefCell};
@@ -8,13 +8,16 @@ use super::{fetch_task, TaskStatus};
 use super::__switch;
 use crate::trap::TrapContext;
 use crate::task::manager::add_task;
+use crate::gdb_print;
+use crate::monitor::*;
 
 pub fn get_core_id() -> usize{
     let tp:usize;
     unsafe {
         llvm_asm!("mv $0, tp" : "=r"(tp));
     }
-    tp
+    //tp
+    0
 }
 
 pub struct Processor {
@@ -46,6 +49,7 @@ impl Processor {
             // True: Not first time to fetch a task 
             if let Some(current_task) = take_current_task(){
                 //println!("try lock");
+                gdb_print!(PROCESSOR_ENABLE,"[run:pid{}]",current_task.pid.0);
                 let mut current_task_inner = current_task.acquire_inner_lock();
                 //println!("get lock");
                 let task_cx_ptr2 = current_task_inner.get_task_cx_ptr2();
@@ -75,6 +79,7 @@ impl Processor {
                     }
                 }
                 else{
+                    print!("[no ready process]");
                     drop(current_task_inner);
                     //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
@@ -88,6 +93,7 @@ impl Processor {
             // False: First time to fetch a task
             } else {
                 // Keep fetching
+                gdb_print!(PROCESSOR_ENABLE,"[run:no current task]");
                 if let Some(task) = fetch_task() {
                     // acquire
                     let idle_task_cx_ptr2 = self.get_idle_task_cx_ptr2();
@@ -137,7 +143,7 @@ pub fn current_task() -> Option<Arc<TaskControlBlock>> {
 }
 
 pub fn current_user_token() -> usize {
-    let core_id: usize = get_core_id();
+    // let core_id: usize = get_core_id();
     let task = current_task().unwrap();
     let token = task.acquire_inner_lock().get_user_token();
     token

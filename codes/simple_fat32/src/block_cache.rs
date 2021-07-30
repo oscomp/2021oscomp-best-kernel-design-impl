@@ -88,7 +88,7 @@ impl Drop for BlockCache {
 // 5-7 DirEntry
 // 8-19 DATA
 
-const BLOCK_CACHE_SIZE: usize = 10;
+const BLOCK_CACHE_SIZE: usize = 20;
 //const DIRENT_CACHE_SIZE: usize = 4;
 pub struct BlockCacheManager {
     start_sec: usize,
@@ -190,9 +190,15 @@ pub fn get_block_cache(
     let phy_blk_id = DATA_BLOCK_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
+        if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
+        if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }
@@ -206,9 +212,15 @@ pub fn get_info_cache(
     let phy_blk_id = INFO_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
+        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
+        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }

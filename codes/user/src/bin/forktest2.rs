@@ -6,7 +6,7 @@ extern crate user_lib;
 
 use user_lib::{fork, wait, getpid, exit, sleep, get_time};
 
-static NUM: usize = 30;
+static NUM: usize = 10;
 
 #[no_mangle]
 pub fn main() -> i32 {

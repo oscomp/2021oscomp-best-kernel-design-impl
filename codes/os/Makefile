@@ -27,7 +27,7 @@ endif
 
 # Run K210
 K210-SERIALPORT	= /dev/ttyUSB0
-K210-BURNER	= ../tools/kflash.py/kflash.py
+K210-BURNER	= ../tools/kflash.py
 
 # Binutils
 OBJDUMP := rust-objdump --arch-name=riscv64
@@ -41,13 +41,13 @@ build: env $(KERNEL_BIN)
 
 env:
 	(rustup target list | grep "riscv64imac-unknown-none-elf (installed)") || rustup target add $(TARGET)
-	# cargo install cargo-binutils
+	cargo install cargo-binutils
 	rustup component add rust-src
 	rustup component add llvm-tools-preview
+
 #(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
 #cargo install cargo-binutils
 	
-# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 # dev/zero永远输出0
 sdcard: 
@@ -57,6 +57,7 @@ sdcard:
 
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
+	# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 $(APPS):
 
@@ -112,6 +113,15 @@ gdb:
 	file=$(U_FAT32),if=none,format=raw,id=x0 \
 	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=2 -S -s
 
+runsimple:
+	@qemu-system-riscv64 \
+		-machine virt \
+		-nographic \
+		-bios $(BOOTLOADER) \
+		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+		-drive file=$(U_FAT32),if=none,format=raw,id=x0 \
+        -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0\
+		-smp threads=2
 
 release: build
 	@cp $(BOOTLOADER) $(BOOTLOADER).copy

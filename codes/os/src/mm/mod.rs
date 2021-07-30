@@ -8,7 +8,7 @@ mod vma;
 use page_table::PTEFlags;
 use address::VPNRange;
 pub use address::{PhysAddr, VirtAddr, PhysPageNum, VirtPageNum, StepByOne};
-pub use frame_allocator::{FrameTracker, frame_alloc, frame_dealloc, frame_add_ref, enquire_refcount};
+pub use frame_allocator::{FrameTracker, frame_alloc, frame_dealloc,add_free, print_free_pages, frame_add_ref, enquire_refcount};
 pub use page_table::{
     PageTable,
     PageTableEntry,
@@ -16,11 +16,15 @@ pub use page_table::{
     translated_str,
     translated_ref,
     translated_refmut,
+    translated_ref_array,
+    translated_array_copy,
+    copy_from_user,
+    copy_to_user,
     UserBuffer,
     UserBufferIterator,
 };
 pub use vma::{MmapArea, MmapSpace};
-pub use memory_set::{MemorySet, KERNEL_SPACE, MapPermission, kernel_token};
+pub use memory_set::{MemorySet, KERNEL_SPACE, KERNEL_MMAP_AREA, KERNEL_TOKEN,  MapPermission, kernel_token};
 pub use memory_set::remap_test;
 
 pub fn init() {
@@ -31,4 +35,8 @@ pub fn init() {
 
 pub fn init_othercore(){
     KERNEL_SPACE.lock().activate();
+}
+
+pub trait Bytes {
+    fn as_bytes(&self)->&[u8];
 }

@@ -18,19 +18,51 @@ pub const PROT_GROWSUP: usize = 0x02000000;
 pub const MAP_FILE: usize = 0;
 pub const MAP_SHARED: usize = 0x01;
 pub const MAP_PRIVATE: usize = 0x02;
+pub const MAP_ANONYMOUS: usize = 0x20;
+pub const MAP_FIXED: usize = 0x10;
+
 pub const MAP_FAILED: isize = -1;
 
-pub const USER_STACK_SIZE: usize = 4096 * 2;
-pub const USER_HEAP_SIZE: usize = 4096 * 16;
-pub const KERNEL_STACK_SIZE: usize = 4096 * 2;
-pub const KERNEL_HEAP_SIZE: usize = 0x20_0000;
-pub const MEMORY_END: usize = 0x80800000;
-pub const PAGE_SIZE: usize = 0x1000;
+// Memory management
+pub const PAGE_SIZE: usize = 0x1000;//should not change
 pub const PAGE_SIZE_BITS: usize = 0xc;
+pub const USER_STACK_SIZE: usize = PAGE_SIZE * 20;
+pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 8;
+pub const KERNEL_STACK_SIZE: usize = PAGE_SIZE * 2;
+pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x80;
+pub const MEMORY_END: usize = 0x80800000;
 
 pub const MMAP_BASE: usize = 0x70000000;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+
+// Execution of programs
+pub const  AT_NULL      : usize = 0 ;    /* end of vector */
+pub const  AT_IGNORE    : usize = 1 ;    /* entry should be ignored */
+pub const  AT_EXECFD    : usize = 2 ;    /* file descriptor of program */
+pub const  AT_PHDR      : usize = 3 ;    /* program headers for program */
+pub const  AT_PHENT     : usize = 4 ;    /* size of program header entry */
+pub const  AT_PHNUM     : usize = 5 ;    /* number of program headers */
+pub const  AT_PAGESZ    : usize = 6 ;    /* system page size */
+pub const  AT_BASE      : usize = 7 ;    /* base address of interpreter */
+pub const  AT_FLAGS     : usize = 8 ;    /* flags */
+pub const  AT_ENTRY     : usize = 9 ;    /* entry point of program */
+pub const  AT_NOTELF    : usize = 10;    /* program is not ELF */
+pub const  AT_UID       : usize = 11;    /* real uid */
+pub const  AT_EUID      : usize = 12;    /* effective uid */
+pub const  AT_GID       : usize = 13;    /* real gid */
+pub const  AT_EGID      : usize = 14;    /* effective gid */
+pub const  AT_PLATFORM  : usize = 15;  /* string identifying CPU for optimizations */
+pub const  AT_HWCAP     : usize = 16;    /* arch dependent hints at CPU capabilities */
+pub const  AT_CLKTCK    : usize = 17;    /* frequency at which times() increments */
+/* AT_* values 18 through 22 are reserved */
+pub const AT_SECURE     : usize = 23;   /* secure mode boolean */
+pub const AT_BASE_PLATFORM : usize = 24;     /* string identifying real platform, may
+                                 * differ from AT_PLATFORM. */
+pub const AT_RANDOM     : usize = 25;    /* address of 16 random bytes */
+pub const AT_HWCAP2     : usize = 26;    /* extension of AT_HWCAP */
+
+pub const AT_EXECFN     : usize = 31;   /* filename of program */
 
 #[cfg(feature = "board_k210")]
 pub const CLOCK_FREQ: usize = 403000000 / 62;
@@ -41,6 +73,7 @@ pub const CLOCK_FREQ: usize = 12500000;
 #[cfg(feature = "board_qemu")]
 pub const MMIO: &[(usize, usize)] = &[
     (0x10001000, 0x1000),
+    (0x10000000, 0x1000),
 ];
 
 #[cfg(feature = "board_k210")]

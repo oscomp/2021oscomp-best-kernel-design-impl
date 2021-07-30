@@ -70,7 +70,7 @@ impl FAT32Manager {
     /* 打开现有的FAT32  */
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<RwLock<Self>>{
         // 读入分区偏移
-        println!("[fs]: Load FAT32");
+        println!("[fs] Load FAT32");
         let start_sector:u32 = get_info_cache(
             0, 
             Arc::clone(&block_device),
@@ -114,14 +114,14 @@ impl FAT32Manager {
         let fsinfo = FSInfo::new(ext_boot_sec.fat_info_sec());
         // 校验签名
         assert!(fsinfo.check_signature(Arc::clone(&block_device)),"Error loading fat32! Illegal signature");
-        println!("[fs]: first free cluster = {}", fsinfo.first_free_cluster(block_device.clone()) );
+        //println!("[fs]: first free cluster = {}", fsinfo.first_free_cluster(block_device.clone()) );
         
         let sectors_per_cluster = boot_sec.sectors_per_cluster as u32;
         let bytes_per_sector = boot_sec.bytes_per_sector as u32;
         let bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
 
-        println!("[fs]: bytes per sec = {}", bytes_per_sector);
-        println!("[fs]: bytes per cluster = {}", bytes_per_cluster);
+        //println!("[fs]: bytes per sec = {}", bytes_per_sector);
+        //println!("[fs]: bytes per cluster = {}", bytes_per_cluster);
 
         let fat_n_sec = ext_boot_sec.fat_size();
         let fat1_sector = boot_sec.first_fat_sector();
@@ -130,7 +130,7 @@ impl FAT32Manager {
 
         let fat = FAT::new(fat1_sector, fat2_sector, fat_n_sec, fat_n_entry);
         
-        println!("[fs]: chain of root dir: {:?}",fat.get_all_cluster_of(2, Arc::clone(&block_device)));
+        //println!("[fs]: chain of root dir: {:?}",fat.get_all_cluster_of(2, Arc::clone(&block_device)));
 
         // 保留扇区数+所有FAT表的扇区数
         let root_sec = boot_sec.table_count as u32 * fat_n_sec + boot_sec.reserved_sector_count as u32;
@@ -209,7 +209,7 @@ impl FAT32Manager {
             self.block_device.clone());
         // 写入分配的最后一个簇
         self.fsinfo.write_first_free_cluster(current_cluster, self.block_device.clone());
-        self.cache_write_back();
+        //self.cache_write_back();
         //println!("[fs]: after alloc, first free cluster = {}",self.fsinfo.first_free_cluster(self.block_device.clone()));
         Some(first_cluster)
     }

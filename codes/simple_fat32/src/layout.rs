@@ -470,6 +470,7 @@ impl ShortDirEntry{
         self.size = 0;
         self.name[0] = 0xE5;
         self.set_first_cluster(0);
+        //TODO:回收cluster?
     }
 
     /* 获取文件偏移量所在的簇、扇区和偏移 */

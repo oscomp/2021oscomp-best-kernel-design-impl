@@ -1,3 +1,4 @@
+use crate::monitor::SYSCALL_ENABLE;
 use crate::{drivers::BLOCK_DEVICE, println};
 use crate::color_text;
 use _core::usize;
@@ -5,10 +6,14 @@ use alloc::sync::Arc;
 use lazy_static::*;
 use bitflags::*;
 use alloc::vec::Vec;
+use alloc::string::String;
 use spin::Mutex;
-use super::{File, Dirent, Kstat, DT_DIR, DT_REG, DT_UNKNOWN};
+use super::{DT_DIR, DT_REG, DT_UNKNOWN, Dirent, File, Kstat, NewStat, finfo};
 use crate::mm::UserBuffer;
 use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
+//use crate::config::*;
+//use crate::gdb_println;
+
 
 #[derive(PartialEq,Copy,Clone,Debug)]
 pub enum DiskInodeType {
@@ -27,6 +32,7 @@ pub enum SeekWhence{
 pub struct OSInode {
     readable: bool,
     writable: bool,
+    //fd_cloexec: bool,
     inner: Mutex<OSInodeInner>,
 }
 
@@ -44,13 +50,51 @@ impl OSInode {
         Self {
             readable,
             writable,
+            //fd_cloexec:false,
             inner: Mutex::new(OSInodeInner {
                 offset: 0,
                 inode,
             }),
         }
     }
+
+    pub fn is_dir(&self)->bool{
+        let inner = self.inner.lock();
+        inner.inode.is_dir()
+    }
     
+    /* this func will not influence the file offset 
+    * @parm: if offset == -1, file offset will be used
+    */
+    pub fn read_vec(&self, offset:isize, len:usize)->Vec<u8>{
+        let mut inner = self.inner.lock();
+        let mut len = len;
+        let ori_off = inner.offset;
+        if offset >= 0 {
+            inner.offset = offset as usize;
+        }
+        let mut buffer = [0u8; 512];
+        let mut v: Vec<u8> = Vec::new();
+        loop {
+            let rlen = inner.inode.read_at(inner.offset, &mut buffer);
+            if rlen == 0 {
+                break;
+            }
+            inner.offset += rlen;
+            v.extend_from_slice(&buffer[..rlen.min(len)]);
+            if len > rlen {
+                len -= rlen;
+            } else {
+                break;
+            }
+        }
+        if offset >= 0 {
+            inner.offset = ori_off; 
+        }
+        v
+
+    }
+
     pub fn read_all(&self) -> Vec<u8> {
         let mut inner = self.inner.lock();
         let mut buffer = [0u8; 512];
@@ -64,6 +108,23 @@ impl OSInode {
             v.extend_from_slice(&buffer[..len]);
         }
         v
+    }
+
+    pub fn write_all(&self, str_vec:&Vec<u8>)->usize{
+        let mut inner = self.inner.lock();
+        let mut remain = str_vec.len();
+        let mut base = 0;
+        loop {
+            let len = remain.min(512);
+            inner.inode.write_at(inner.offset, &str_vec.as_slice()[base .. base + len]);
+            inner.offset += len;
+            base += len;
+            remain -= len;
+            if remain == 0{
+                break;
+            }
+        }
+        return base
     }
 
     pub fn find(&self, path:&str, flags:OpenFlags)->Option<Arc<OSInode>>{
@@ -82,9 +143,10 @@ impl OSInode {
         }
     }
 
-    pub fn getdirent(&self, dirent: &mut Dirent, offset:isize)->isize {
-        let inner = self.inner.lock();
-        if let Some((name, offset, first_clu,attri)) 
+    pub fn getdirent(&self, dirent: &mut Dirent /*, offset:isize*/)->isize {
+        let mut inner = self.inner.lock();
+        let offset = inner.offset as u32;
+        if let Some((name, off, first_clu,attri)) 
         = inner.inode.dirent_info(offset as usize){
             let mut d_type:u8 = 0;
             if attri & ATTRIBUTE_DIRECTORY != 0 {
@@ -97,11 +159,13 @@ impl OSInode {
             dirent.fill_info(
                 name.as_str(), 
                 first_clu as usize, 
-                offset as isize, 
+                (off - offset) as isize, 
                 name.len() as u16, 
                 d_type
             );
-            (name.len() + 8*4) as isize
+            inner.offset = off as usize; 
+            let len = (name.len() + 8*4) as isize;
+            len
         } else {
             -1
         }
@@ -110,11 +174,11 @@ impl OSInode {
     pub fn get_fstat(&self, kstat:&mut Kstat){
         let inner = self.inner.lock();
         let vfile = inner.inode.clone();
-        let (size, atime, mtime, ctime) = vfile.stat();
+        let (size, atime, mtime, ctime, ino) = vfile.stat();
         //println!("info = {:?}", (size, atime, mtime, ctime));
         kstat.fill_info(
             0, 
-            233, 
+            ino, 
             0, 
             1, 
             size, 
@@ -122,9 +186,37 @@ impl OSInode {
             mtime, 
             ctime
         );
-
     }
 
+    pub fn get_newstat(&self, stat:&mut NewStat){
+        let inner = self.inner.lock();
+        let vfile = inner.inode.clone();
+        let (size, atime, mtime, ctime, ino) = vfile.stat();
+        //println!("info = {:?}", (size, atime, mtime, ctime));
+        let st_mod:u32 = {
+            if vfile.is_dir() {
+                finfo::S_IFDIR | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
+            } else {
+                finfo::S_IFREG | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
+            }
+        };
+        stat.fill_info(
+            0, 
+            ino, 
+            st_mod, 
+            1, 
+            size, 
+            atime, 
+            mtime, 
+            ctime
+        );
+    }
+
+    pub fn get_size(&self)->usize{
+        let inner = self.inner.lock();
+        let (size, _, mt_me, _, _) = inner.inode.stat();
+        return size as usize
+    }
 
     pub fn create(&self, path:&str, type_: DiskInodeType)->Option<Arc<OSInode>>{
         let inner = self.inner.lock();
@@ -137,13 +229,9 @@ impl OSInode {
         let (readable, writable) = (true, true);
         if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // already exists, clear
-            inode.clear();
-            Some(Arc::new(OSInode::new(
-                readable,
-                writable,
-                inode,
-            )))
-        } else {
+            inode.remove();
+        }  
+        {
             // create file
             let name = pathv.pop().unwrap();
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
@@ -176,7 +264,24 @@ impl OSInode {
         let inner = self.inner.lock();
         inner.inode.remove()
     }
+
+    pub fn set_head_cluster(&self, cluster:u32) {
+        let inner = self.inner.lock();
+        let vfile = &inner.inode;
+        vfile.set_first_cluster(cluster);
+    }    
+
+    pub fn get_head_cluster(&self)->u32 {
+        let inner = self.inner.lock();
+        let vfile = &inner.inode;
+        vfile.first_cluster()
+    }
     
+    pub fn set_delete_bit(&self) {
+        let inner = self.inner.lock();
+        inner.inode.set_delete_bit();
+    }
+
     pub fn set_offset(& self, off:usize){
         let mut inner = self.inner.lock();
         inner.offset = off;
@@ -224,6 +329,32 @@ lazy_static! {
     pub static ref DIR_STACK: Vec<Arc<Inode>> = vec![ROOT_INODE.clone()];
 }
 */
+
+pub fn init_rootfs(){
+    println!("[fs] build rootfs ... start");
+    //let dir_etc = open("/","etc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //println!("[fs] build rootfs: creating /etc");
+    //let file = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //println!("[fs] build rootfs: creating /dev");
+    //let file = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //println!("[fs] build rootfs: creating userdir");
+    //let file_pswd = open("/etc","passwd", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    
+    println!("[fs] build rootfs: creating /proc");
+    let file = open("/","proc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    println!("[fs] build rootfs: init /proc");
+    //let file = open("/proc","0", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    //let file = open("/proc","1", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
+    let file = open("/proc","mounts", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    let meminfo = open("/proc","meminfo", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    let file = open("/","ls", OpenFlags::CREATE, DiskInodeType::File).unwrap();
+    //let mut meminfo_data = String::new();
+    //meminfo_data.push_str("MemTotal:    8192 kB\n");
+    //meminfo.write_all(&Vec::from(meminfo_data.as_str()));
+    println!("[fs] build rootfs ... finish");
+}
+
+
 pub fn list_apps() {
     println!("/**** APPS ****");
     for app in ROOT_INODE.ls_lite().unwrap() {
@@ -264,7 +395,7 @@ pub fn list_files(work_path: &str, path: &str){
         }
         
     }
-    println!("");
+    // println!("");
 }
 
 bitflags! {
@@ -274,7 +405,9 @@ bitflags! {
         const RDWR = 1 << 1;
         const CREATE = 1 << 6;
         const TRUNC = 1 << 10;
-        const DIRECTROY = 0x0200000;
+        const DIRECTROY = 0200000;
+        const LARGEFILE  = 0100000;
+        const CLOEXEC = 02000000;
     }
 }
 
@@ -311,26 +444,27 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
         }
     };
     let mut pathv:Vec<&str> = path.split('/').collect();
-    //println!("pathv = {:?}", pathv);
-    print!("\n");
+    //println!("[open] pathv = {:?}", pathv);
+    // print!("\n");
     // shell应当保证此处输入的path不为空
     let (readable, writable) = flags.read_write();
     if flags.contains(OpenFlags::CREATE) {
         if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // clear size
             //println!("clear size");
-            inode.clear();
-            Some(Arc::new(OSInode::new(
-                readable,
-                writable,
-                inode,
-            )))
-        } else {
+            inode.remove();
+            //Some(Arc::new(OSInode::new(
+            //    readable,
+            //    writable,
+            //    inode,
+            //)))
+        } 
+        {
             // create file
             //println!("start create");
             let name = pathv.pop().unwrap();
             //println!("name = {}", name);
-            print!("\n");
+            // print!("\n");
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
                 let attribute = {
                     match type_ {
@@ -338,10 +472,10 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                         DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
                     }
                 };
-                print!("\n");
+                // print!("\n");
                 temp_inode.create( name, attribute)
                 .map(|inode| {
-                    print!("\n");
+                    // print!("\n");
                     //println!("end create");
                     Arc::new(OSInode::new(
                         readable,

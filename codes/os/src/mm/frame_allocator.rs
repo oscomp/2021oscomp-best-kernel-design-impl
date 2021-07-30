@@ -6,7 +6,6 @@ use lazy_static::*;
 use core::fmt::{self, Debug, Formatter};
 use alloc::collections::BTreeMap;
 
-
 #[derive(Clone)]
 pub struct FrameTracker {
     pub ppn: PhysPageNum,
@@ -58,6 +57,15 @@ impl StackFrameAllocator {
         self.current = l.0;
         self.end = r.0;
         println!("last {} Physical Frames.", self.end - self.current);
+    }
+
+    pub fn add_free(&mut self, ppn: usize){
+        self.recycled.push(ppn);
+    }
+
+    pub fn print_free(&mut self){
+        let size = self.recycled.len() + self.end - self.current;
+        println!("Free memory: {} pages", size);
     }
 }
 impl FrameAllocator for StackFrameAllocator {
@@ -163,6 +171,13 @@ pub fn enquire_refcount(ppn: PhysPageNum) -> usize {
     FRAME_ALLOCATOR
         .lock()
         .enquire_ref(ppn)
+}
+pub fn add_free(ppn: usize){
+    FRAME_ALLOCATOR.lock().recycled.push(ppn);
+}
+
+pub fn print_free_pages(){
+    FRAME_ALLOCATOR.lock().print_free();
 }
 
 #[allow(unused)]

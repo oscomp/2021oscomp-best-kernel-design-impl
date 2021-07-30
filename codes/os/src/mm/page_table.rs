@@ -5,8 +5,10 @@ use super::{
     VirtPageNum,
     VirtAddr,
     PhysAddr,
-    StepByOne
+    StepByOne,
+    Bytes
 };
+use crate::task::current_user_token;
 use alloc::vec::Vec;
 use alloc::vec;
 use alloc::string::String;
@@ -76,7 +78,13 @@ impl PageTableEntry {
     pub fn set_bits(&mut self, ppn: PhysPageNum, flags: PTEFlags) {
         self.bits = ppn.0 << 10 | flags.bits as usize;
     }
+    // only X+W+R can be set
+    pub fn set_pte_flags(&mut self, flags: usize) {
+        self.bits = (self.bits & !(0b1110 as usize)) | ( flags & (0b1110 as usize));
+    }
+
 }
+
 
 pub struct PageTable {
     root_ppn: PhysPageNum,
@@ -136,6 +144,61 @@ impl PageTable {
         }
         result
     }
+    
+    // only X+W+R can be set
+    // return -1 if find no such pte
+    pub fn set_pte_flags(&mut self, vpn: VirtPageNum, flags: usize) -> isize{
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        for i in 0..3 {
+            let pte = &mut ppn.get_pte_array()[idxs[i]];
+            if i == 2 {
+                // if pte == None{
+                //     panic!("set_pte_flags: no such pte");
+                // }
+                // else{
+                    pte.set_pte_flags(flags);
+                // }
+                break;
+            }
+            if !pte.is_valid() {
+                return -1;
+            }
+            ppn = pte.ppn();
+        }
+        0
+    }
+
+    pub fn print_pagetable(&mut self){
+        let idxs = [0 as usize;3];
+        let mut ppns = [PhysPageNum(0);3];
+        ppns[0] = self.root_ppn;
+        for i in 0..512{
+            let pte = &mut ppns[0].get_pte_array()[i];
+            if !pte.is_valid(){
+                continue;
+            }
+            ppns[1] = pte.ppn();
+            for j in 0..512{
+                let pte = &mut ppns[1].get_pte_array()[j];
+                if !pte.is_valid(){
+                    continue;
+                }
+                ppns[2] = pte.ppn();
+                for k in 0..512{
+                    let pte = &mut ppns[2].get_pte_array()[k];
+                    if !pte.is_valid(){
+                        continue;
+                    }
+                    let va = ((((i<<9)+j)<<9)+k)<<12 ;
+                    let pa = pte.ppn().0 << 12 ;
+                    let flags = pte.flags();
+                    println!("va:0x{:X}  pa:0x{:X} flags:{:?}",va,pa,flags);
+                }
+            }
+        }
+    }
+    
     #[allow(unused)]
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).unwrap();
@@ -209,8 +272,6 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     v
 }
 
-
-
 /// Load a string from other address spaces into kernel space without an end `\0`.
 pub fn translated_str(token: usize, ptr: *const u8) -> String {
     let page_table = PageTable::from_token(token);
@@ -237,6 +298,82 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let va = ptr as usize;
     page_table.translate_va(VirtAddr::from(va)).unwrap().get_mut()
 }
+
+/* 获取用户数组内各元素的引用 */
+/* 目前并不能处理跨页结构体 */
+pub fn translated_ref_array<T>(token: usize, ptr: *mut T, len: usize) -> Vec<&'static T>{
+    let page_table = PageTable::from_token(token);
+    let mut ref_array:Vec<&'static T> = Vec::new();
+    let mut va = ptr as usize;
+    let step = core::mem::size_of::<T>();
+    for i in 0..len {
+        println!("[trans array] va = 0x{:X}", va);
+        ref_array.push( page_table.translate_va(VirtAddr::from(va)).unwrap().get_ref() );
+        va += step;
+    }
+    ref_array
+}
+
+/* 获取用户数组的一份拷贝 */
+pub fn translated_array_copy<T>(token: usize, ptr: *mut T, len: usize) -> Vec< T>
+    where T:Copy {
+    let page_table = PageTable::from_token(token);
+    let mut ref_array:Vec<T> = Vec::new();
+    let mut va = ptr as usize;
+    let step = core::mem::size_of::<T>();
+    //println!("step = {}, len = {}", step, len);
+    for _i in 0..len {
+        let u_buf = UserBuffer::new( translated_byte_buffer(token, va as *const u8, step) );
+        let mut bytes_vec:Vec<u8> = Vec::new();
+        u_buf.read_as_vec(&mut bytes_vec, step);
+        //println!("loop, va = 0x{:X}, vec = {:?}", va, bytes_vec);
+        unsafe{
+            ref_array.push(  *(bytes_vec.as_slice() as *const [u8] as *const u8 as usize as *const T) );
+        }
+        va += step;
+    }
+    ref_array
+}
+
+
+fn trans_to_bytes<T>(ptr: *const T)->&'static[u8]{
+    let size = core::mem::size_of::<T>();
+    unsafe {
+        core::slice::from_raw_parts(
+            ptr as usize as *const u8,
+            size,
+        )
+    }
+}
+
+fn trans_to_bytes_mut<T>(ptr: *mut T)->&'static mut [u8]{
+    let size = core::mem::size_of::<T>();
+    unsafe {
+        core::slice::from_raw_parts_mut(
+            ptr as usize as *mut u8,
+            size,
+        )
+    }
+}
+
+
+/* 从用户空间复制数据到指定地址 */
+pub fn copy_from_user<T>(dst: *mut T, src: usize, size: usize) {
+    let token = current_user_token();
+    // translated_ 实际上完成了地址合法检测
+    let buf = UserBuffer::new(translated_byte_buffer(token, src as *const u8, size));
+    let mut dst_bytes = trans_to_bytes_mut(dst);
+    buf.read(dst_bytes);
+}
+
+/* 从指定地址复制数据到用户空间 */
+pub fn copy_to_user<T>(dst: usize, src: *const T, size: usize) {
+    let token = current_user_token();
+    let mut buf = UserBuffer::new(translated_byte_buffer(token, dst as *const u8, size));
+    let src_bytes = trans_to_bytes(src);
+    buf.write(src_bytes);
+}
+
 
 pub struct UserBuffer {
     pub buffers: Vec<&'static mut [u8]>,
@@ -272,6 +409,22 @@ impl UserBuffer {
         return len;
     }
 
+    pub fn write_at(&mut self, offset:usize, char:u8)->isize{
+        if offset > self.len() {
+            return -1
+        }
+        let mut head = 0;
+        for b in self.buffers.iter_mut() {
+            if offset > head && offset < head + b.len() {
+                (**b)[offset - head] = char;
+                //b.as_mut_ptr()
+            } else {
+                head += b.len();
+            }
+        }
+        0
+    }
+
     // 将UserBuffer的数据读入一个Buffer，返回读取长度
     pub fn read(&self, buff:&mut [u8])->usize{
         let len = self.len().min(buff.len());
@@ -288,6 +441,25 @@ impl UserBuffer {
         }
         return len;
     }
+
+    // TODO: 把vlen去掉    
+    pub fn read_as_vec(&self, vec: &mut Vec<u8>, vlen:usize)->usize{
+        let len = self.len();
+        let mut current = 0;
+        for sub_buff in self.buffers.iter() {
+            let sblen = (*sub_buff).len();
+            for j in 0..sblen {
+                vec.push( (*sub_buff)[j] );
+                current += 1;
+                if current == len {
+                    return len;
+                }
+            }
+        }
+        return len;
+    }
+
+   
 }
 
 impl IntoIterator for UserBuffer {

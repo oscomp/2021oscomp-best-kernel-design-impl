@@ -19,6 +19,12 @@ pub struct PhysPageNum(pub usize);
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtPageNum(pub usize);
 
+// impl Default for PhysPageNum {
+//     fn default() -> PhysPageNum {
+//         PhysPageNum (0)
+//     }
+// }
+
 /// Debugging
 
 impl Debug for VirtAddr {

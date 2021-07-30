@@ -1,0 +1,5 @@
+If the CMD runs incorrectly, return value will put in result.txt
+Else nothing will put in result.txt
+
+TEST START
+TEST END

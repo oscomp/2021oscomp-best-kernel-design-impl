@@ -1,4 +1,6 @@
-pub const SIGCHILD:usize = 17;
+pub const SIGCHLD:usize = 17;
+pub const CLONE_CHILD_CLEARTID:usize = 0x00200000;
+pub const CLONE_CHILD_SETTID:usize = 0x01000000;
 
 pub struct utsname{
     sysname: [u8; 65],
