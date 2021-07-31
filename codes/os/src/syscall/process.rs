@@ -225,8 +225,11 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize) -> isi
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     //println!("[sys_exec]");
     let token = current_user_token();
+    // println!{"----------pin1"}
     let path = translated_str(token, path);
+    // println!{"----------pin2"}
     let mut args_vec: Vec<String> = Vec::new();
+    // println!{"----------pin3"}
     loop {
         let arg_str_ptr = *translated_ref(token, args);
         if arg_str_ptr == 0 {
@@ -290,7 +293,6 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
             return -1;
             // ---- release current PCB lock
             }
-        // println!{"acquiring lock......"};
         let waited = inner.children
             .iter()
             .enumerate()
@@ -299,16 +301,13 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
                 p.acquire_inner_lock().is_zombie() && (pid == -1 || pid as usize == p.getpid())
                 // ++++ release child PCB lock
             });
-        // println!{"drop lock......"};
         if let Some((idx,_)) = waited {
             let waited_child = inner.children.remove(idx);
             // confirm that child will be deallocated after being removed from children list
             assert_eq!(Arc::strong_count(&waited_child), 1);
             let found_pid = waited_child.getpid();
             // ++++ temporarily hold child lock
-            // println!{"acquiring lock......"};
             let exit_code = waited_child.acquire_inner_lock().exit_code;
-            // println!{"drop lock......"};
             let ret_status = exit_code << 8;
             if (wstatus as usize) != 0{
                 *translated_refmut(inner.memory_set.token(), wstatus) = ret_status;

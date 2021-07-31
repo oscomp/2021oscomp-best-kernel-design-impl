@@ -13,13 +13,18 @@ use riscv::register::{
     stval,
     sie,
 };
-use crate::{syscall::syscall, task::current_task};
+use crate::mm::{
+    VirtAddr,
+    VirtPageNum,
+};
+use crate::syscall::syscall;
 use crate::task::{
     exit_current_and_run_next,
     suspend_current_and_run_next,
     current_user_token,
     current_trap_cx,
     get_core_id,
+    current_task,
 };
 use crate::timer::set_next_trigger;
 use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
@@ -55,6 +60,7 @@ pub fn trap_handler() -> ! {
     let stval = stval::read();
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
+            // println!{"pinUserEnvCall"}
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
@@ -67,13 +73,13 @@ pub fn trap_handler() -> ! {
             //}
             cx = current_trap_cx();
             cx.x[10] = result as usize;
+            // println!{"cx written..."}
         }
         Trap::Exception(Exception::StoreFault) |
-        Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::InstructionFault) |
         Trap::Exception(Exception::InstructionPageFault) |
-        Trap::Exception(Exception::LoadFault) |
-        Trap::Exception(Exception::LoadPageFault) => {
+        Trap::Exception(Exception::LoadFault) => {
+            // println!{"pinLoadFault"}
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
@@ -83,7 +89,50 @@ pub fn trap_handler() -> ! {
             // page fault exit code
             exit_current_and_run_next(-2);
         }
+        Trap::Exception(Exception::StorePageFault) |
+        Trap::Exception(Exception::LoadPageFault) => {
+            // println!{"pinLoadPageFault"}
+            // println!(
+            //     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+            //     scause.cause(),
+            //     stval,
+            //     current_trap_cx().sepc,
+            // );
+            let va: VirtAddr = (stval as usize).into();
+            // The boundary decision
+            if va > TRAMPOLINE.into() {
+                panic!("VirtAddr out of range!");
+            }
+            let vpn: VirtPageNum = va.floor();
+            println!{"============================{:?}", vpn}
+            // Get the task inner of current
+            // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
+            // get the PageTableEntry that faults
+            let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
+            let former_ppn = pte.ppn();
+            println!{"PageTableEntry: {}", pte.bits};
+            // if the virtPage is a CoW
+            if pte.is_cow() {
+                // println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                // println!{"cow_alloc returned..."}
+                let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
+                // println!{"PageTableEntry: {}", pte.bits};
+            } else {
+                println!(
+                    "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                    scause.cause(),
+                    stval,
+                    current_trap_cx().sepc,
+                );
+                // page fault exit code
+                exit_current_and_run_next(-2);
+            }
+            println!{"Trap solved..."}
+        }
         Trap::Exception(Exception::IllegalInstruction) => {
+            // println!{"pinIllegalInstruction"}
             println!("[kernel] IllegalInstruction in application, core dumped.");
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
@@ -103,21 +152,30 @@ pub fn trap_handler() -> ! {
             panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
         }
     }
-    //println!("before trap_return");
+    // println!("before trap_return");
     trap_return();
 }
 
 #[no_mangle]
 pub fn trap_return() -> ! {
+    // println!("trap_return");
     set_user_trap_entry();
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
     let user_satp = current_user_token();
+    // println!("satp = {:X}", current_user_token());
+    //let task = current_task().unwrap();
+    //let inner = task.acquire_inner_lock();
+    //inner.print_cx();
+    //drop(inner);
+    //drop(task);
+    //println!{"{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
     extern "C" {
         fn __alltraps();
         fn __restore();
     }
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
+    // println!{"restore_va: {}", restore_va}
     unsafe {
         llvm_asm!("fence.i" :::: "volatile");
         llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp) :: "volatile");

@@ -247,10 +247,15 @@ impl ArgMachine{
     }
 
     // not clear path
+
     pub fn clear(&mut self){
+        // println!{"<<<<<<<<<<<<<<<<pin1"}
         self.args.clear();
+        // println!{"<<<<<<<<<<<<<<<<pin2"}
         self.argc = 0;
+        // println!{"<<<<<<<<<<<<<<<<pin3"}
         self.state = STATE_IDLE;
+        // println!{"<<<<<<<<<<<<<<<<pin4"}
         self.print_root();
     }
 
@@ -358,7 +363,7 @@ impl ArgMachine{
                     if pid == 0 {
                         // child process
                         if exec(programname, args_addr.as_slice()) == -1 {
-                            println!("Error when executing run_testsuites!");
+                            println!("Error when executing run_testsuites!1");
                             return false;
                         }
                         unreachable!();
@@ -370,10 +375,10 @@ impl ArgMachine{
             return false;
         }
         // Standard autorun
-        if self.args[0].clone().as_str() == "autorun\0" {
-            ArgMachine::auto_run_testsuites();
-            return false
-        }
+        // if self.args[0].clone().as_str() == "autorun\0" {
+        //     ArgMachine::auto_run_testsuites();
+        //     return false
+        // }
         // ls
         if self.args[0].clone().as_str() == "ls\0" {
             // println!("(into ls)");
@@ -712,11 +717,12 @@ pub fn main() -> i32 {
     //unlink("initproc\0");
     //unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    ArgMachine::auto_run_testsuites();
+    // ArgMachine::auto_run_testsuites();
     let mut line: String;
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();
     loop {
+        // println!{"<<<<<<<<<entering the loop of input"}
         let c = getchar();
         let is_exec = shellmachine.operate(c as char);
         if is_exec {
@@ -728,14 +734,18 @@ pub fn main() -> i32 {
                 arg_machine.clear();
                 continue;
             }
-            // println!("Input:{}",line);
+            println!("Input:{}",line);
             let (args_copy,input,output) = arg_machine.get_args();
-            
+            // println!{"args_copying..."}
             let mut args_addr: Vec<*const u8> = args_copy
             .iter()
             .map(|arg| arg.as_ptr())
             .collect();
+            // println!{"args_pushing..."}
+            // println!{"{:?}: {:?}", args_addr.as_ptr(), args_addr}
+            // args_addr.buf.reserve(1, 1);
             args_addr.push(0 as *const u8);
+            // println!{"pid forking..."}
             let pid = fork();
             if pid == 0 {
                 // input redirection : NOW CLOSED 
@@ -775,11 +785,15 @@ pub fn main() -> i32 {
                 unreachable!();
             } else {
                 let mut exit_code: i32 = 0;
+                // println!{"<<<<<<<<<waiting pid of exec"}
                 let exit_pid = waitpid(pid as usize, &mut exit_code);
+                // println!{"<<<<<<<<<back of the pid exec"}
                 assert_eq!(pid, exit_pid);
                 println!("Shell: Process {} exited with code {}", pid, exit_code);
                 shellmachine.clear();
+                // println!{"<<<<<<<<<end of the shell cleaning"}
                 arg_machine.clear();
+                // println!{"<<<<<<<<<end of the arg cleaning"}
             }
         }
     }

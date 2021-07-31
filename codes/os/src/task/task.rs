@@ -8,6 +8,8 @@ use crate::{console::print, mm::{
     //KERNEL_TOKEN,
     //PageTable,
     VirtAddr,
+    VirtPageNum,
+    PageTableEntry,
     translated_refmut,
     MmapArea,
     MapPermission,
@@ -82,6 +84,7 @@ impl TaskControlBlockInner {
         &self.task_cx_ptr as *const usize
     }
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
+        // println!{"trap_cx_ppn: {:X}", self.trap_cx_ppn.0}
         self.trap_cx_ppn.get_mut()
     }
     pub fn get_user_token(&self) -> usize {
@@ -104,13 +107,21 @@ impl TaskControlBlockInner {
     }
     pub fn print_cx(&self) {
         unsafe{ 
-            println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
-            println!("trap_cx = {:?}", *(self.trap_cx_ppn.0 as *const TrapContext) );
+            // println!("task_cx = {:?}", *(self.task_cx_ptr as *const TaskContext) );
+            // println!("trap_cx = {:?}", *(self.trap_cx_ppn.0 as *const TrapContext) );
         }
     }
 
     pub fn get_work_path(&self)->String{
         self.current_path.clone()
+    }
+    pub fn translate_vpn(&self, vpn: VirtPageNum) -> PageTableEntry {
+        self.memory_set.translate(vpn).unwrap()
+    }
+    pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
+        let ret = self.memory_set.cow_alloc(vpn, former_ppn);
+        println!{"finished cow_alloc!"}
+        ret
     }
 }
 
@@ -118,6 +129,7 @@ impl TaskControlBlockInner {
 
 impl TaskControlBlock {
     pub fn acquire_inner_lock(&self) -> MutexGuard<TaskControlBlockInner> {
+        // println!{"acquiring lock..."}
         self.inner.lock()
     }
     pub fn new(elf_data: &[u8]) -> Self {
@@ -321,6 +333,7 @@ impl TaskControlBlock {
 
 
         // **** hold current PCB lock
+        // println!{"--------------------pin15"}
         let mut inner = self.acquire_inner_lock();
         // substitute memory_set
         // QUES
@@ -360,9 +373,13 @@ impl TaskControlBlock {
     pub fn fork(self: &Arc<TaskControlBlock>, is_create_thread: bool) -> Arc<TaskControlBlock> {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();
+        // println!{"trap context of pid{}: {:X}", self.pid.0, parent_inner.trap_cx_ppn.0}
+        parent_inner.print_cx();
+        let user_heap_top = parent_inner.heap_start + USER_HEAP_SIZE;
         // copy user space(include trap context)
-        let memory_set = MemorySet::from_existed_user(
-            &parent_inner.memory_set
+        let memory_set = MemorySet::from_copy_on_write(
+            &mut parent_inner.memory_set,
+            user_heap_top,
         );
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
@@ -417,6 +434,7 @@ impl TaskControlBlock {
         // modify kernel_sp in trap_cx
         // **** acquire child PCB lock
         let trap_cx = task_control_block.acquire_inner_lock().get_trap_cx();
+        task_control_block.acquire_inner_lock().print_cx();
         // **** release child PCB lock
         trap_cx.kernel_sp = kernel_stack_top;
         // return

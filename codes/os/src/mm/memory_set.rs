@@ -1,6 +1,6 @@
 use super::{PageTable, PageTableEntry, PTEFlags};
 use super::{VirtPageNum, VirtAddr, PhysPageNum, PhysAddr};          
-use super::{FrameTracker, frame_alloc};
+use super::{FrameTracker, frame_alloc, frame_add_ref, enquire_refcount};
 use super::{VPNRange, StepByOne};
 use alloc::collections::BTreeMap;
 //use alloc::string::ToString;
@@ -12,7 +12,7 @@ use spin::Mutex;
 use crate::config::*;
 use crate::mm::MmapArea;
 use crate::monitor::*;
-use crate::task::AuxHeader;
+use crate::task::{AuxHeader,current_task};
 
 extern "C" {
     fn stext();
@@ -61,18 +61,29 @@ pub fn kernel_token() -> usize {
     KERNEL_SPACE.lock().token()
 }
 
-
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
 }
 
 impl MemorySet {
+    pub fn clone_areas(&self) -> Vec<MapArea> {
+        self.areas.clone()
+    }
     pub fn new_bare() -> Self {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
         }
+    }
+    pub fn set_cow(&mut self, vpn: VirtPageNum) {
+        self.page_table.set_cow(vpn);
+    }
+    pub fn reset_cow(&mut self, vpn: VirtPageNum) {
+        self.page_table.reset_cow(vpn);
+    }
+    pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
+        self.page_table.set_flags(vpn, flags);
     }
     pub fn token(&self) -> usize {
         self.page_table.token()
@@ -105,11 +116,17 @@ impl MemorySet {
             self.areas.remove(idx);
         }
     }
+    fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
+        self.page_table.remap_cow(vpn, ppn, former_ppn);
+    }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data, 0);
         }
+        self.areas.push(map_area);
+    }
+    fn push_mapped(&mut self, mut map_area: MapArea) {
         self.areas.push(map_area);
     }
 
@@ -291,6 +308,7 @@ impl MemorySet {
         //guard page
         user_heap_bottom += PAGE_SIZE;
         let user_heap_top: usize = user_heap_bottom + USER_HEAP_SIZE;
+        //maparea1: user_heap
         memory_set.push(MapArea::new(
             user_heap_bottom.into(),
             user_heap_top.into(),
@@ -298,7 +316,7 @@ impl MemorySet {
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
 
-        // map TrapContext
+        // maparea2: TrapContext
         memory_set.push(MapArea::new(
             TRAP_CONTEXT.into(),
             TRAMPOLINE.into(),
@@ -307,6 +325,7 @@ impl MemorySet {
         ), None);
 
         // map user stack with U flags
+        //maparea3: user_stack
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
         user_stack_top -= PAGE_SIZE;
@@ -338,6 +357,107 @@ impl MemorySet {
         }
         memory_set
     }
+
+    pub fn from_copy_on_write(user_space: &mut MemorySet, user_heap_top: usize) -> MemorySet {
+        // create a new memory_set
+        let mut memory_set = Self::new_bare();
+        // This part is not for Copy on Write.
+        // Including:   Trampoline
+        //              Trap_Context
+        //              User_Stack
+        memory_set.map_trampoline();
+        for area in user_space.areas.iter() {
+            let head_vpn = area.vpn_range.get_start();
+            let user_heap_top_addr: VirtAddr = user_heap_top.into();
+            if head_vpn < user_heap_top_addr.floor() {
+                //skipping the part using CoW
+                continue;
+            }
+            // println!{"mapping area with head {:?}", head_vpn}
+            let new_area = MapArea::from_another(area);
+            memory_set.push(new_area, None);
+            for vpn in area.vpn_range {
+                let src_ppn = user_space.translate(vpn).unwrap().ppn();
+                let dst_ppn = memory_set.translate(vpn).unwrap().ppn();
+                // println!{"mapping {:?} --- {:?}, src: {:?}", vpn, dst_ppn, src_ppn};
+                dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
+            }
+        }
+        println!{"CoW starting..."};
+        //This part is for copy on write
+        let mut parent_areas = &user_space.areas;
+        let page_table = &mut user_space.page_table;
+        for area in parent_areas.iter() {
+            let head_vpn = area.vpn_range.get_start();
+            let user_heap_top_addr: VirtAddr = user_heap_top.into();
+            if head_vpn > user_heap_top_addr.floor() {
+                //skipping the part using Coping to new ppn
+                continue;
+            }
+            let mut new_area = MapArea::from_another(area);
+            // map the former physical address
+            for vpn in area.vpn_range {
+                // println!{"mapping {:?}", vpn};
+                //change the map permission of both pagetable
+                // get the former flags and ppn
+                let pte = page_table.translate(vpn).unwrap();
+                // println!{"The content of PTE: {}", pte.bits};
+                let pte_flags = pte.flags() & !PTEFlags::W;
+                let src_ppn = pte.ppn();
+                frame_add_ref(src_ppn);
+                // change the flags of the src_pte
+                page_table.set_flags(vpn, pte_flags);
+                page_table.set_cow(vpn);
+                // map the cow page table to src_ppn
+                memory_set.page_table.map(vpn, src_ppn, pte_flags);
+                // println!{"mapping {:?} --- {:?}", vpn, src_ppn};
+                memory_set.set_cow(vpn);
+                // new_area.data_frames.insert(vpn, FrameTracker::new(src_ppn));
+                new_area.insert_tracker(vpn, src_ppn);
+            }
+            memory_set.push_mapped(new_area);
+        }
+        // println!{"returning..."};
+        memory_set
+    }
+
+    #[no_mangle]
+    pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
+        if enquire_refcount(former_ppn) == 1 {
+            self.page_table.reset_cow(vpn);
+            // let pte = self.page_table.translate(vpn).unwrap();
+            // println!{"The content of PTE: {}", pte.bits};
+            // let pte_flags = pte.flags() | PTEFlags::W;
+            // change the flags of the src_pte
+            self.page_table.set_flags(
+                vpn, 
+                self.page_table.translate(vpn).unwrap().flags() | PTEFlags::W
+            );
+            return 0
+        }
+        let frame = frame_alloc().unwrap();
+        let ppn = frame.ppn;
+        // let ppn = frame_alloc_raw().unwrap();
+        println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
+        self.remap_cow(vpn, ppn, former_ppn);
+        println!{"finishing remap!"}
+        for area in self.areas.iter_mut() {
+            let head_vpn = area.vpn_range.get_start();
+            let tail_vpn = area.vpn_range.get_end();
+            if vpn <= tail_vpn && vpn >= head_vpn {
+                println!{"find the MapArea to insert FrameTracker"}
+                area.data_frames.insert(vpn, frame);
+                // let tracker = area.data_frames.get_mut(&vpn).unwrap();
+                // tracker.ppn = ppn;
+                println!{"finished insert frame!"}
+                break;
+            }
+        }
+        // self.data_frames.insert(vpn, frame);
+        println!{"finishing cow_alloc!"}
+        0
+    }
+
     pub fn activate(&self) {
         let satp = self.page_table.token();
         unsafe {
@@ -391,6 +511,9 @@ impl MapArea {
             map_type,
             map_perm,
         }
+    }
+    pub fn insert_tracker(&mut self, vpn: VirtPageNum, ppn: PhysPageNum) {
+        self.data_frames.insert(vpn, FrameTracker::from_ppn(ppn));
     }
     pub fn from_another(another: &MapArea) -> Self {
         Self {

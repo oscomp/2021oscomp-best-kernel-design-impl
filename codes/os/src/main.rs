@@ -88,7 +88,7 @@ pub fn rust_main() -> ! {
     //println!("enter kernel");
         // println!("[core 2] Hello, world!");
     let core = id();
-    //println!("get id");
+    // println!("get id = {}", core);
     if core != 0 {
         println!("other core");
         loop{}

@@ -14,8 +14,11 @@ use user_lib::{
 #[no_mangle]
 fn main() -> i32 {
     if fork() == 0 {
+        println!{"fork == 0..."};
         exec("user_shell\0", &[0 as *const u8]);
+        println!{"exec shell finish..."}
     } else {
+        println!{"fork != 0..."};
         loop {
             let mut exit_code: i32 = 0;
             let pid = wait(&mut exit_code);

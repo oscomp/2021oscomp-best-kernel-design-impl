@@ -34,6 +34,7 @@ const SYSCALL_WAIT4: usize = 260;
 const SYSCALL_LS: usize = 500;
 const SYSCALL_SHUTDOWN: usize = 501;
 const SYSCALL_CLEAR: usize = 502;
+
 pub struct TimeVal{
     sec: u64,
     usec: u64,
@@ -107,7 +108,10 @@ pub fn sys_fork() -> isize {
 }
 
 pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
-    syscall(SYSCALL_EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0])
+    // println!{"calling exec1..."}
+    let ret = syscall(SYSCALL_EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0]);
+    // println!{"returned from os..."};
+    ret
 }
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
