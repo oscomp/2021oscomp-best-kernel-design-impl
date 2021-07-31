@@ -75,7 +75,6 @@ pub fn trap_handler() -> ! {
             cx.x[10] = result as usize;
             // println!{"cx written..."}
         }
-        Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::InstructionFault) |
         Trap::Exception(Exception::InstructionPageFault) |
         Trap::Exception(Exception::LoadFault) => {
@@ -89,6 +88,7 @@ pub fn trap_handler() -> ! {
             // page fault exit code
             exit_current_and_run_next(-2);
         }
+        Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
             // println!{"pinLoadPageFault"}
@@ -113,7 +113,8 @@ pub fn trap_handler() -> ! {
             // println!{"PageTableEntry: {}", pte.bits};
             // if the virtPage is a CoW
             if pte.is_cow() {
-                // println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                println!("cow addr = {:X}", stval);
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 // println!{"cow_alloc returned..."}

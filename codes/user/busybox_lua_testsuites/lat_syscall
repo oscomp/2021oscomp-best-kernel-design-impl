@@ -1,0 +1,1 @@
+/lmbench_all lat_syscall "$@"

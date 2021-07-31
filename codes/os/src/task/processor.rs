@@ -79,7 +79,7 @@ impl Processor {
                     }
                 }
                 else{
-                    print!("[no ready process]");
+                    //print!("[no ready process]");
                     drop(current_task_inner);
                     //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
