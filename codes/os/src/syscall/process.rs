@@ -168,7 +168,7 @@ pub fn sys_gettid() -> isize {
 
 pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
     let current_va = current_task().unwrap().grow_proc(grow_size) as isize;
-    gdb_println!(SYSCALL_ENABLE,"(sys_sbrk ret 0x{:X})",current_va);
+    // gdb_println!(SYSCALL_ENABLE,"(sys_sbrk ret 0x{:X})",current_va);
     current_va
 }
 

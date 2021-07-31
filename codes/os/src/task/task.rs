@@ -120,7 +120,7 @@ impl TaskControlBlockInner {
     }
     pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
         let ret = self.memory_set.cow_alloc(vpn, former_ppn);
-        println!{"finished cow_alloc!"}
+        // println!{"finished cow_alloc!"}
         ret
     }
 }

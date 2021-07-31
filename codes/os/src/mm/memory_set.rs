@@ -212,8 +212,8 @@ impl MemorySet {
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
-        let comment_sec = elf.find_section_by_name(".comment").unwrap();
-        println!(".comment offset: {}", comment_sec.offset());
+        // let comment_sec = elf.find_section_by_name(".comment").unwrap();
+        // println!(".comment offset: {}", comment_sec.offset());
         
 
         let magic = elf_header.pt1.magic;
@@ -282,25 +282,25 @@ impl MemorySet {
             }
         }
 
-        if comment_flag {
-            println!("map .comment");
-            let start_va: VirtAddr = (0).into();
-            let end_va: VirtAddr = (PAGE_SIZE).into();
-            let mut map_perm = MapPermission::U;            
-            map_perm |= MapPermission::R; 
+        // if comment_flag {
+        //     println!("map .comment");
+        //     let start_va: VirtAddr = (0).into();
+        //     let end_va: VirtAddr = (PAGE_SIZE).into();
+        //     let mut map_perm = MapPermission::U;            
+        //     map_perm |= MapPermission::R; 
 
-            let map_area = MapArea::new(
-                start_va,
-                end_va,
-                MapType::Framed,
-                map_perm,
-            );
+        //     let map_area = MapArea::new(
+        //         start_va,
+        //         end_va,
+        //         MapType::Framed,
+        //         map_perm,
+        //     );
             
-            memory_set.push( 
-                map_area,
-                Some(&elf.input[comment_sec.offset() as usize..(comment_sec.offset() + comment_sec.size().min(PAGE_SIZE as u64)) as usize])
-            );        
-        }
+        //     memory_set.push( 
+        //         map_area,
+        //         Some(&elf.input[comment_sec.offset() as usize..(comment_sec.offset() + comment_sec.size().min(PAGE_SIZE as u64)) as usize])
+        //     );        
+        // }
 
         //map user heap
         let max_end_va: VirtAddr = max_end_vpn.into();
@@ -383,7 +383,7 @@ impl MemorySet {
                 dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
             }
         }
-        println!{"CoW starting..."};
+        // println!{"CoW starting..."};
         //This part is for copy on write
         let mut parent_areas = &user_space.areas;
         let page_table = &mut user_space.page_table;
@@ -438,23 +438,23 @@ impl MemorySet {
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
         // let ppn = frame_alloc_raw().unwrap();
-        println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
+        // println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
         self.remap_cow(vpn, ppn, former_ppn);
-        println!{"finishing remap!"}
+        // println!{"finishing remap!"}
         for area in self.areas.iter_mut() {
             let head_vpn = area.vpn_range.get_start();
             let tail_vpn = area.vpn_range.get_end();
             if vpn <= tail_vpn && vpn >= head_vpn {
-                println!{"find the MapArea to insert FrameTracker"}
+                // println!{"find the MapArea to insert FrameTracker"}
                 area.data_frames.insert(vpn, frame);
                 // let tracker = area.data_frames.get_mut(&vpn).unwrap();
                 // tracker.ppn = ppn;
-                println!{"finished insert frame!"}
+                // println!{"finished insert frame!"}
                 break;
             }
         }
         // self.data_frames.insert(vpn, frame);
-        println!{"finishing cow_alloc!"}
+        // println!{"finishing cow_alloc!"}
         0
     }
 

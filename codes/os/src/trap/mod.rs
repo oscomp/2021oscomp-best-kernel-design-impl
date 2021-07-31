@@ -104,13 +104,13 @@ pub fn trap_handler() -> ! {
                 panic!("VirtAddr out of range!");
             }
             let vpn: VirtPageNum = va.floor();
-            println!{"============================{:?}", vpn}
+            // println!{"============================{:?}", vpn}
             // Get the task inner of current
             // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
             // get the PageTableEntry that faults
             let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
             let former_ppn = pte.ppn();
-            println!{"PageTableEntry: {}", pte.bits};
+            // println!{"PageTableEntry: {}", pte.bits};
             // if the virtPage is a CoW
             if pte.is_cow() {
                 // println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
@@ -129,7 +129,7 @@ pub fn trap_handler() -> ! {
                 // page fault exit code
                 exit_current_and_run_next(-2);
             }
-            println!{"Trap solved..."}
+            // println!{"Trap solved..."}
         }
         Trap::Exception(Exception::IllegalInstruction) => {
             // println!{"pinIllegalInstruction"}
