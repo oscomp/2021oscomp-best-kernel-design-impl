@@ -11,3 +11,6 @@
 [submodule "rv-csr-test"]
 	path = rv-csr-test
 	url = https://github.com/duskmoon314/rv-csr-test.git
+[submodule "rCore-N"]
+	path = rCore-N
+	url = https://github.com/duskmoon314/rCore-N.git
