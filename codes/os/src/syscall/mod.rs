@@ -64,7 +64,7 @@ use crate::sbi::shutdown;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
-        gdb_print!(SYSCALL_ENABLE,"syscall-({})\n",syscall_id);
+        //gdb_print!(SYSCALL_ENABLE,"syscall-({})\n",syscall_id);
     }
     
     match syscall_id {
