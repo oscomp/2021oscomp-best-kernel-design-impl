@@ -238,6 +238,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     }
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
+    let args_vec_copy = args_vec.clone();
     
     if let Some(app_inode) = open(inner.current_path.as_str(),path.as_str(), OpenFlags::RDONLY, DiskInodeType::File) {
         let len = app_inode.get_size();
@@ -267,6 +268,7 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         let mut inner = task.acquire_inner_lock();
         inner.fd_table[fd].take();
         //println!("[sys_exec] finish");
+        gdb_println!(SYSCALL_ENABLE, "sys_exec(path: {}, args: {:?}) = {}", path, args_vec_copy, argc);
         argc as isize
     } else {
         -1

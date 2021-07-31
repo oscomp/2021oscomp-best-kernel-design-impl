@@ -10,7 +10,9 @@ use crate::{fs::{/*OSInode,*/
         TaskControlBlockInner,
     },
     gdb_println,
-    monitor::*
+    monitor::*,
+    gdb_print,
+    // gdb_println,
 };
 use crate::task::{current_user_token, current_task/* , print_core_info*/};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
@@ -820,7 +822,28 @@ pub fn sys_sendfile(out_fd:isize, in_fd:isize, offset_ptr: *mut usize, count: us
     }
 }
 
-
+// This syscall is not complete at all, only /read proc/self/exe
+pub fn sys_readlinkat(dirfd: isize, pathname: *const u8, buf: *mut u8, bufsiz: usize) -> isize{
+    if dirfd == AT_FDCWD{
+        let task = current_task().unwrap();
+        let token = current_user_token();
+        let path = translated_str(token, pathname);
+        if path.as_str() != "/proc/self/exe" {
+            panic!("sys_readlinkat: pathname not support");
+        }
+        let mut userbuf = UserBuffer::new(translated_byte_buffer(token, buf, bufsiz));
+        let procinfo = "/lmbench_all\0";
+        let buff = procinfo.as_bytes();
+        userbuf.write(buff);
+        let len = procinfo.len()-1;
+        gdb_println!(SYSCALL_ENABLE, "sys_readlinkat(dirfd = {}, pathname = {}, *buf = 0x{:X}, bufsiz = {}) = {}", dirfd, path, buf as usize, bufsiz, len);
+        return len as isize;
+    }
+    else{
+        panic!("sys_readlinkat: fd not support");
+    }
+    0
+}
 
 fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockInner>, oflags: OpenFlags) -> Option<FileClass>{
     let type_ = {

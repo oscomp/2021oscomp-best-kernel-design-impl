@@ -195,8 +195,9 @@ impl MemorySet {
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
-        //let sec = elf.find_section_by_name(".text").unwrap();
-        //println!("sec: {}", sec.offset());
+        let comment_sec = elf.find_section_by_name(".comment").unwrap();
+        println!(".comment offset: {}", comment_sec.offset());
+        
 
         let magic = elf_header.pt1.magic;
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
@@ -219,11 +220,20 @@ impl MemorySet {
         auxv.push(AuxHeader{aux_type: AT_PLATFORM, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_HWCAP, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_CLKTCK, value: 100 as usize});
+
+        // denotes if .comment should be mapped
+        let mut comment_flag = true;
+
         for ph in elf.program_iter(){
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
                 let start_va: VirtAddr = (ph.virtual_addr() as usize).into();
                 let end_va: VirtAddr = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
                 let offset = start_va.0 - start_va.floor().0 * PAGE_SIZE;
+
+                if start_va.0 == 0{
+                    comment_flag = false;
+                } 
+
                 //println!("[elf] ph={:?}", ph.to_string());
                 //println!("[elf] start_va = 0x{:X}; end_va = 0x{:X}, offset = 0x{:X}", ph.virtual_addr() as usize, ph.virtual_addr() + ph.mem_size(), offset);
                 let mut map_perm = MapPermission::U;
@@ -253,6 +263,26 @@ impl MemorySet {
                     );
                 }
             }
+        }
+
+        if comment_flag {
+            println!("map .comment");
+            let start_va: VirtAddr = (0).into();
+            let end_va: VirtAddr = (PAGE_SIZE).into();
+            let mut map_perm = MapPermission::U;            
+            map_perm |= MapPermission::R; 
+
+            let map_area = MapArea::new(
+                start_va,
+                end_va,
+                MapType::Framed,
+                map_perm,
+            );
+            
+            memory_set.push( 
+                map_area,
+                Some(&elf.input[comment_sec.offset() as usize..(comment_sec.offset() + comment_sec.size().min(PAGE_SIZE as u64)) as usize])
+            );        
         }
 
         //map user heap

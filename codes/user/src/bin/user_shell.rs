@@ -397,8 +397,52 @@ impl ArgMachine{
         open("result.txt\0", OpenFlags::CREATE);
 
     }
-
+    
     pub fn auto_run_testsuites( ){
+        // ArgMachine::auto_run_busybox();
+        ArgMachine::auto_run_lmbench();
+
+    }
+
+    pub fn auto_run_lmbench(){
+        println!("!!!!!!!!!AUTORUN!!!!!!!!!");
+        let mut testsuits :Vec<&str>= Vec::new();
+        testsuits.push("lmbench_all lat_syscall -P 1 null");
+
+        for programname_op in testsuits.iter() {
+            let mut exit_code = 0;
+            let exec_str = String::new() +programname_op;
+            let args: Vec<&str> = exec_str.as_str().split(' ').into_iter().collect();
+            let args_string: Vec<String> = args.iter().map(
+                |str|{
+                    let mut string = String::new();
+                    string.push_str(str);
+                    string.push('\0');
+                    string
+                }
+            )
+            .collect();
+
+            let mut args_addr: Vec<*const u8> = Vec::new();
+            for i in 0..args.len() {
+                args_addr.push(args_string[i].as_ptr() as usize as *const u8);
+            }
+            args_addr.push(0 as *const u8 );
+            let pid = fork();
+            if pid == 0 {
+                if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
+                    println!("Error when executing autorun_testsuites!");
+                    shutdown();
+                }
+                unreachable!();
+            } else {
+                waitpid(pid as usize, &mut exit_code);
+            }
+        }
+        shutdown();
+    }
+
+    pub fn auto_run_busybox( ){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
         // testsuits.push("sh\0");
