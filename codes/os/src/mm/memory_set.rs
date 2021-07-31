@@ -220,10 +220,10 @@ impl MemorySet {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         let mut max_end_vpn = VirtPageNum(0);
+        let mut head_va = 0; // top va of ELF which points to ELF header
         // push ELF related auxv
-        let ph_head_addr = (elf.find_section_by_name(".text").unwrap().address() as usize )- (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
+        // let ph_head_addr = (elf.find_section_by_name(".text").unwrap().address() as usize )- (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
         // let ph_head_addr = (elf.header.pt2.entry_point() as usize) - (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
-        auxv.push(AuxHeader{aux_type: AT_PHDR, value: ph_head_addr as usize});
         auxv.push(AuxHeader{aux_type: AT_PHENT, value: elf.header.pt2.ph_entry_size() as usize});// ELF64 header 64bytes
         auxv.push(AuxHeader{aux_type: AT_PHNUM, value: ph_count as usize});
         auxv.push(AuxHeader{aux_type: AT_PAGESZ, value: PAGE_SIZE as usize});
@@ -237,6 +237,7 @@ impl MemorySet {
         auxv.push(AuxHeader{aux_type: AT_PLATFORM, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_HWCAP, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_CLKTCK, value: 100 as usize});
+        auxv.push(AuxHeader{aux_type: AT_SECURE, value: 0 as usize});
 
         // denotes if .comment should be mapped
         let mut comment_flag = true;
@@ -268,6 +269,7 @@ impl MemorySet {
                 max_end_vpn = map_area.vpn_range.get_end();
                 
                 if offset == 0 {
+                    head_va = start_va.into();
                     memory_set.push( 
                         map_area,
                         Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize])
@@ -281,6 +283,11 @@ impl MemorySet {
                 }
             }
         }
+
+        // Get ph_head addr for auxv
+        let ph_head_addr = head_va + elf.header.pt2.ph_offset() as usize;
+        auxv.push(AuxHeader{aux_type: AT_PHDR, value: ph_head_addr as usize});
+
 
         // if comment_flag {
         //     println!("map .comment");

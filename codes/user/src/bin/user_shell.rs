@@ -412,6 +412,7 @@ impl ArgMachine{
     pub fn auto_run_lmbench(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
         let mut testsuits :Vec<&str>= Vec::new();
+        // testsuits.push("lmbench_all");
         testsuits.push("lmbench_all lat_syscall -P 1 null");
 
         for programname_op in testsuits.iter() {

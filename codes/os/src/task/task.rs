@@ -289,6 +289,7 @@ impl TaskControlBlock {
         ////////////// rand bytes ///////////////////
         user_sp -= 16;
         p = user_sp;
+        auxv.push(AuxHeader{aux_type: AT_RANDOM, value: user_sp});
         for i in 0..0xf {
             *translated_refmut(memory_set.token(), p as *mut u8) = i as u8;
             p += 1;
@@ -304,7 +305,7 @@ impl TaskControlBlock {
         let auxv_base = user_sp;
         // println!("[auxv]: base 0x{:X}", auxv_base);
         for i in 0..auxv.len() {
-            // println!("[auxv]: {:?}", auxv[i]);
+            println!("[auxv]: {:?}", auxv[i]);
             let addr = user_sp + core::mem::size_of::<AuxHeader>() * i;
             *translated_refmut(memory_set.token(), addr as *mut usize) = auxv[i].aux_type ;
             *translated_refmut(memory_set.token(), (addr + core::mem::size_of::<usize>()) as *mut usize) = auxv[i].value ;
