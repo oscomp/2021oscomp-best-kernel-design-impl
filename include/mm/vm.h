@@ -68,4 +68,7 @@ void            vmprint(pagetable_t pagetable);
 int             handle_page_fault(int type, uint64 badaddr);
 uint64          kern_pgfault_escape(uint64 badaddr);
 
+extern int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
+extern int either_copyin(void *dst, int user_src, uint64 src, uint64 len);
+
 #endif 

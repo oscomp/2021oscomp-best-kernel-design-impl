@@ -85,6 +85,10 @@ usertrap(void)
 
 	struct proc *p = myproc();
 
+	uint64 timestamp = readtime();
+	p->proc_tms.ikstmp = timestamp;
+	p->proc_tms.utime += timestamp - p->proc_tms.okstmp;
+
 	// save user program counter.
 	p->trapframe->epc = r_sepc();
 
@@ -105,6 +109,7 @@ usertrap(void)
 	else if (0 == handle_intr(cause)) {
 		// handle interrupt 
 		if (NULL != get_runnable())	{
+			p->ivswtch += 1;
 			__debug_info("usertrap", "yield()\n");
 			// if a new proc is woke up by intr, run it first 
 			yield();
@@ -138,6 +143,10 @@ usertrapret(void) {
 	// kerneltrap() to usertrap(), so turn off interrupts until
 	// we're back in user space, where usertrap() is correct.
 	intr_off();
+
+	uint64 timestamp = readtime();
+	p->proc_tms.okstmp = timestamp;
+	p->proc_tms.stime += timestamp - p->proc_tms.ikstmp;
 
 	// send syscalls, interrupts, and exceptions to trampoline.S
 	w_stvec(TRAMPOLINE + (uservec - trampoline));

@@ -202,6 +202,8 @@ static struct proc *allocproc(void) {
 	p->proc_tms.stime = 0;
 	p->proc_tms.cutime = 0;
 	p->proc_tms.cstime = 0;
+	p->vswtch = 0;
+	p->ivswtch = 0;
 
 	// allocate a page trapframe 
 	p->trapframe = (struct trapframe*)allocpage();
@@ -548,20 +550,20 @@ void proc_tick(void) {
 					__insert_runnable(PRIORITY_TIMEOUT, p);
 				}
 			}
-			else {
-				p->proc_tms.utime += 1;
-			}
-			p->proc_tms.stime += 1;
+			// else {
+			// 	p->proc_tms.utime += 1;
+			// }
+			// p->proc_tms.stime += 1;
 			p = next;
 		}
 	} 
 
 	// sleep 
-	struct proc *tmp = proc_sleep;
-	while (NULL != tmp) {
-		tmp->proc_tms.stime += 1;
-		tmp = tmp->next;
-	}
+	// struct proc *tmp = proc_sleep;
+	// while (NULL != tmp) {
+	// 	tmp->proc_tms.stime += 1;
+	// 	tmp = tmp->next;
+	// }
 
 	__leave_proc_cs 
 }
@@ -648,6 +650,7 @@ void sleep(void *chan, struct spinlock *lk) {
 		release(lk);
 	}
 
+	p->vswtch += 1;
 	p->chan = chan;
 	__remove(p);	// remove p from runnable 
 	__insert_sleep(p);
@@ -733,9 +736,13 @@ void sched(void) {
 	if (intr_get()) 
 		panic("sched interruptible\n");
 
+	p->proc_tms.stime += readtime() - p->proc_tms.ikstmp;
+
 	intena = mycpu()->intena;
 	swtch(&p->context, &mycpu()->context);
 	mycpu()->intena = intena;
+
+	p->proc_tms.ikstmp = readtime();
 }
 
 void cpuinit(void) {
@@ -772,6 +779,7 @@ void forkret(void) {
 		myproc()->cwd = namei("/home");
 	}
 
+	myproc()->proc_tms.ikstmp = readtime();
 	usertrapret();
 }
 

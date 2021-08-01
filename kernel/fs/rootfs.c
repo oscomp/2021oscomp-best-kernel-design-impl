@@ -8,6 +8,7 @@
 #include "param.h"
 #include "fs/fs.h"
 #include "mm/kmalloc.h"
+#include "mm/vm.h"
 #include "printf.h"
 #include "utils/string.h"
 #include "utils/debug.h"
@@ -75,6 +76,37 @@ int root_file_readdir(struct inode *dp, struct dirent *dent, uint off)
 }
 
 
+int zero_read(struct inode *ip, int usr, uint64 dst, uint off, uint n)
+{
+	if (n == 0)
+		return 0;
+
+	uint const bufsz = 512;
+	char *buf = kmalloc(bufsz);
+
+	if (buf == NULL)
+		return 0;
+	memset(buf, 0, bufsz);
+
+	uint tot, m = bufsz;
+	for (tot = 0; tot < n; tot += m, dst += m) {
+		if (n - tot < m)
+			m = n - tot;
+		if (either_copyout(usr, dst, buf, m) < 0)
+			break;
+	}
+	kfree(buf);
+
+	return tot;
+}
+
+
+int zero_write(struct inode *ip, int usr, uint64 dst, uint off, uint n)
+{
+	return n;
+}
+
+
 static struct dentry *de_rootfs_cache(struct dentry *parent, char *name)
 {
 	struct dentry *de;
@@ -111,6 +143,13 @@ struct inode_op rootfs_inode_op = {
 	.rename = dummy_rename,
 };
 
+struct file_op zero_op = {
+	.read = zero_read,
+	.write = zero_write,
+	.readdir = dummy_file_readdir,
+	.readv = dummy_file_rw_vec,
+	.writev = dummy_file_rw_vec,
+};
 
 static struct dentry *de_root_generate(struct dentry *parent,
 			char *name, int inum, int mode, int devnum)
@@ -169,7 +208,7 @@ void rootfs_init()
 	if ((rootfs.root = de_root_generate(NULL, "/", inum++, S_IFDIR, 0)) == NULL)
 		panic("rootfs_init 1");
 
-	struct dentry *dev, *home, *con, *proc, *vda, *mount;
+	struct dentry *dev, *home, *con, *proc, *vda, *mount, *zero;
 	if ((dev = de_root_generate(rootfs.root, "dev", inum++, S_IFDIR, 0)) == NULL)
 		panic("rootfs_init: /dev");
 	if ((home = de_root_generate(rootfs.root, "home", inum++, S_IFDIR, 0)) == NULL)
@@ -178,6 +217,8 @@ void rootfs_init()
 		panic("rootfs_init: /dev/console");
 	if ((vda = de_root_generate(dev, "vda2", inum++, S_IFBLK, ROOTDEV)) == NULL)
 		panic("rootfs_init: /dev/vda2");
+	if ((zero = de_root_generate(dev, "zero", inum++, S_IFCHR, 3)) == NULL)
+		panic("rootfs_init: /dev/zero");
 	if ((proc = de_root_generate(rootfs.root, "proc", inum++, S_IFDIR, 0)) == NULL)
 		panic("rootfs_init: /proc");
 	if ((mount = de_root_generate(proc, "mounts", inum++, S_IFREG, 0)) == NULL)
@@ -187,6 +228,8 @@ void rootfs_init()
 
 	extern struct file_op console_op;
 	con->inode->fop = &console_op;
+
+	zero->inode->fop = &zero_op;
 
 	extern struct file_op mountinfo_fop;
 	mount->inode->fop = &mountinfo_fop;

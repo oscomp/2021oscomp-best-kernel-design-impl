@@ -63,7 +63,7 @@ uint64 sys_clock_settime(void) {
 	if (argint(0, &clockid) < 0) {
 		return -EINVAL;
 	}
-	if (argaddr(0, &tp) < 0) {
+	if (argaddr(1, &tp) < 0) {
 		return -EINVAL;
 	}
 
@@ -72,9 +72,11 @@ uint64 sys_clock_settime(void) {
 	}
 
 	struct timespec cpu_clock;
-	uint64 tmp_ticks = r_time();
-	cpu_clock.sec = tmp_ticks / CLK_FREQ;
-	cpu_clock.nsec = 0;
+	// uint64 tmp_ticks = r_time();
+	// cpu_clock.sec = tmp_ticks / CLK_FREQ;
+	// cpu_clock.nsec = 0;
+	uint64 tmp_ticks = readtime();
+	convert_to_timespec(tmp_ticks, &cpu_clock);
 
 	if (tp && copyin2((char*)&cpu_clock, tp, sizeof(struct timespec)) < 0) {
 		return -EFAULT;
@@ -90,7 +92,7 @@ uint64 sys_clock_gettime(void) {
 	if (argint(0, &clockid) < 0) {
 		return -EINVAL;
 	}
-	if (argaddr(0, &tp) < 0) {
+	if (argaddr(1, &tp) < 0) {
 		return -EINVAL;
 	}
 

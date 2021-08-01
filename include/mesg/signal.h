@@ -39,7 +39,7 @@ struct sigaction {
 	} __sigaction_handler;
 	__sigset_t sa_mask;	// signals to be blocked during handling 
 	int sa_flags;
-	void (*sa_restorer)(void);
+	// void (*sa_restorer)(void);	// this field is not used on risc-v
 };
 
 typedef struct {

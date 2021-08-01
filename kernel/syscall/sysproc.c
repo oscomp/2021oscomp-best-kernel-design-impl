@@ -18,6 +18,8 @@
 #include "printf.h"
 #include "utils/string.h"
 #include "utils/debug.h"
+#include "resource.h"
+#include "errno.h"
 
 extern int execve(char *path, char **argv, char **envp);
 
@@ -146,6 +148,7 @@ uint64 sys_wait4(void) {
 
 // yield has no arg
 uint64 sys_sched_yield(void) {
+	myproc()->vswtch += 1;
 	yield();
 	return 0;
 }
@@ -259,5 +262,42 @@ uint64
 sys_prlimit64(void) {
 	// for now it's not very necessary to implement this syscall 
 	// may be implemented later 
+	return 0;
+}
+
+uint64
+sys_getrusage(void)
+{
+	int who;
+	uint64 addr;
+	struct rusage r;
+	struct proc *p = myproc();
+
+	if (argint(0, &who) < 0 || argaddr(1, &addr) < 0)
+		return -1;
+
+	memset(&r, 0, sizeof(r));
+	switch (who)
+	{
+		case RUSAGE_SELF:
+		case RUSAGE_THREAD:
+			convert_to_timeval(p->proc_tms.utime, &r.ru_utime);
+			convert_to_timeval(p->proc_tms.stime, &r.ru_stime);
+			r.ru_nvcsw = p->vswtch;
+			r.ru_nivcsw = p->ivswtch;
+			__debug_info("sys_getrusage", "{u: %ds %dus | s: %ds %dus}, nvcsw=%d, nivcsw=%d\n", 
+						r.ru_utime.sec, r.ru_utime.usec, r.ru_stime.sec, r.ru_stime.usec, p->vswtch, p->ivswtch);
+			break;
+		case RUSAGE_CHILDREN:
+			convert_to_timeval(p->proc_tms.cutime, &r.ru_utime);
+			convert_to_timeval(p->proc_tms.cstime, &r.ru_stime);
+			break;
+		default:
+			return -EINVAL;
+	}
+
+	if (copyout2(addr, (char *)&r, sizeof(r)) < 0)
+		return -EFAULT;
+
 	return 0;
 }

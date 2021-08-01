@@ -274,6 +274,14 @@ r_time()
 	return x;
 }
 
+#include "memlayout.h"
+static inline uint64 readtime()
+{
+	uint64 x;
+	x = *(uint64 *)CLINT_MTIME;
+	return x;
+}
+
 // enable device interrupts
 static inline void
 intr_on()
