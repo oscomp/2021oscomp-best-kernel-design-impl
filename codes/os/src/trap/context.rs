@@ -13,6 +13,7 @@ pub struct TrapContext {
 
 impl TrapContext {
     pub fn set_sp(&mut self, sp: usize) { self.x[2] = sp; }
+    pub fn get_sp(& self)->usize { self.x[2] }
     pub fn app_init_context(
         entry: usize,
         sp: usize,

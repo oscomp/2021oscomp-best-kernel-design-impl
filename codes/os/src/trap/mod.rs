@@ -67,10 +67,10 @@ pub fn trap_handler() -> ! {
             // get system call return value
             let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]]);
             // cx is changed during sys_exec, so we have to call it again
-            //let syscall_id = cx.x[17];
-            //if syscall_id != 64 && syscall_id != 63{
-            //    println!("syscall-({}): return{}",syscall_id, result);
-            //}
+            let syscall_id = cx.x[17];
+            if syscall_id != 64 && syscall_id != 63{
+                println!("syscall-({}): return{}",syscall_id, result);
+            }
             cx = current_trap_cx();
             cx.x[10] = result as usize;
             // println!{"cx written..."}
@@ -171,6 +171,12 @@ pub fn trap_return() -> ! {
     //drop(inner);
     //drop(task);
     //println!{"{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+    let trap_cx = current_task().unwrap().acquire_inner_lock().get_trap_cx();
+    if trap_cx.get_sp() == 0{
+        println!("[trap_ret] sp = 0");
+    }
+    println!("[trap_ret] sepc = {:X}", trap_cx.sepc);
+
     extern "C" {
         fn __alltraps();
         fn __restore();

@@ -27,7 +27,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use core::fmt::{self, Debug, Formatter};
 use spin::{Mutex, MutexGuard};
-use crate::fs::{ FileDiscripter, Stdin, Stdout, FileClass};
+use crate::fs::{ FileDescripter, Stdin, Stdout, FileClass};
 
 pub struct AuxHeader{
     pub aux_type: usize,
@@ -55,7 +55,7 @@ pub struct TaskControlBlock {
     inner: Mutex<TaskControlBlockInner>,
 }
 
-pub type FdTable =  Vec<Option<FileDiscripter>>;
+pub type FdTable =  Vec<Option<FileDescripter>>;
 pub struct TaskControlBlockInner {
     pub address: ProcAddress,
     pub trap_cx_ppn: PhysPageNum,
@@ -165,17 +165,17 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: vec![
                     // 0 -> stdin
-                    Some( FileDiscripter::new(
+                    Some( FileDescripter::new(
                         false,
                         FileClass::Abstr(Arc::new(Stdin)) 
                     )),
                     // 1 -> stdout
-                    Some( FileDiscripter::new(
+                    Some( FileDescripter::new(
                         false,
                         FileClass::Abstr(Arc::new(Stdout)) 
                     )),
                     // 2 -> stderr
-                    Some( FileDiscripter::new(
+                    Some( FileDescripter::new(
                         false,
                         FileClass::Abstr(Arc::new(Stdout)) 
                     )),

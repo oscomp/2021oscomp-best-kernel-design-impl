@@ -10,12 +10,12 @@ use crate::mm::UserBuffer;
 use alloc::sync::Arc; 
 
 #[derive(Clone)]
-pub struct FileDiscripter{
+pub struct FileDescripter{
     cloexec: bool,
     pub fclass: FileClass,
 }
 
-impl FileDiscripter {
+impl FileDescripter {
     pub fn new(cloexec:bool, fclass:FileClass)->Self{
         Self{
             cloexec,
@@ -47,7 +47,7 @@ pub trait File : Send + Sync {
 }
 
 pub use mount::MNT_TABLE;
-pub use finfo::{Dirent, Kstat, NewStat, DT_DIR, DT_REG, DT_UNKNOWN, *};
+pub use finfo::{Dirent, Kstat, NewStat, FdSet,  DT_DIR, DT_REG, DT_UNKNOWN, *};
 pub use iovec::{IoVec, IoVecs};
 pub use pipe::{Pipe, make_pipe};
 pub use dev_fs::*;

@@ -1,20 +1,11 @@
-use core::usize;
+use core::{ usize};
+use core::mem::size_of;
 
-use crate::{fs::{/*OSInode,*/
-        Kstat, NewStat, FileClass, 
-        File, Dirent, MNT_TABLE, IoVec, IoVecs, TTY,
-        FileDiscripter
-    }, 
-    mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str}, task::{
+use crate::{fs::{Dirent, FdSet, File, FileClass, FileDescripter, IoVec, IoVecs, Kstat, MNT_TABLE, NewStat, TTY}, gdb_print, gdb_println, mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str}, monitor::*, task::{
         FdTable,
         TaskControlBlockInner,
-    },
-    gdb_println,
-    monitor::*,
-    gdb_print,
-    // gdb_println,
-};
-use crate::task::{current_user_token, current_task/* , print_core_info*/};
+    }};
+use crate::task::{current_user_token, current_task, suspend_current_and_run_next/* , print_core_info*/};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -121,14 +112,14 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     // 只是测试用的临时处理
     if path.contains("/dev") {
         let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some( FileDiscripter::new(
+        inner.fd_table[fd] = Some( FileDescripter::new(
             false,
             FileClass::Abstr(TTY.clone())));
         return fd as isize
     }
     //if path.contains("|") {
     //    let fd = inner.alloc_fd();
-    //    inner.fd_table[fd] = Some( FileDiscripter::new(
+    //    inner.fd_table[fd] = Some( FileDescripter::new(
     //        false,
     //        FileClass::Abstr(  )
     //    ));
@@ -146,7 +137,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             DiskInodeType::File
         ) {
             let fd = inner.alloc_fd();
-            inner.fd_table[fd] = Some( FileDiscripter::new(
+            inner.fd_table[fd] = Some( FileDescripter::new(
                 oflags.contains(OpenFlags::CLOEXEC),
                 FileClass::File(inode)
             ));
@@ -168,7 +159,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                     if oflags.contains(OpenFlags::CREATE){ 
                         if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
                             let fd = inner.alloc_fd();
-                            inner.fd_table[fd] = Some( FileDiscripter::new(
+                            inner.fd_table[fd] = Some( FileDescripter::new(
                                 oflags.contains(OpenFlags::CLOEXEC),
                                 FileClass::File(tar_f)
                             ));
@@ -180,7 +171,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                     // 正常打开文件
                     if let Some(tar_f) = f.find(path.as_str(), oflags){
                         let fd = inner.alloc_fd();
-                        inner.fd_table[fd] = Some( FileDiscripter::new(
+                        inner.fd_table[fd] = Some( FileDescripter::new(
                             oflags.contains(OpenFlags::CLOEXEC),
                             FileClass::File(tar_f)
                         ));
@@ -217,12 +208,12 @@ pub fn sys_pipe(pipe: *mut u32) -> isize {
     let mut inner = task.acquire_inner_lock();
     let (pipe_read, pipe_write) = make_pipe();
     let read_fd = inner.alloc_fd();
-    inner.fd_table[read_fd] = Some( FileDiscripter::new(
+    inner.fd_table[read_fd] = Some( FileDescripter::new(
         false,
         FileClass::Abstr(pipe_read)
     ));
     let write_fd = inner.alloc_fd();
-    inner.fd_table[write_fd] = Some( FileDiscripter::new(
+    inner.fd_table[write_fd] = Some( FileDescripter::new(
         false,
         FileClass::Abstr(pipe_write)
     ));
@@ -399,7 +390,7 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
-    let mut buf_vec = translated_byte_buffer(token, buf, core::mem::size_of::<Kstat>());
+    let mut buf_vec = translated_byte_buffer(token, buf, size_of::<Kstat>());
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut kstat = Kstat::empty();
@@ -429,7 +420,10 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
                     userbuf.write(kstat.as_bytes());
                     return 0
                 },
-                _ => return -1,
+                _ => {
+                    userbuf.write(Kstat::new_abstract().as_bytes());
+                    return 0 //warning
+                },
             }
         } else {
             return -1
@@ -441,7 +435,7 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
-    let mut buf_vec = translated_byte_buffer(token, buf, core::mem::size_of::<NewStat>());
+    let mut buf_vec = translated_byte_buffer(token, buf, size_of::<NewStat>());
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut stat = NewStat::empty();
@@ -842,7 +836,7 @@ pub fn sys_readlinkat(dirfd: isize, pathname: *const u8, buf: *mut u8, bufsiz: u
     else{
         panic!("sys_readlinkat: fd not support");
     }
-    0
+    
 }
 
 fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockInner>, oflags: OpenFlags) -> Option<FileClass>{
@@ -893,4 +887,155 @@ fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockIn
             return None
         }
     }
+}
+
+
+/*
+* return the number of fd contained in the three returned descriptor sets
+* *fds will be cleared of all file descriptors except for those that are ready.
+*/
+pub fn sys_pselect(
+    nfds:usize, 
+    readfds:*mut u8, writefds:*mut u8, exceptfds:*mut u8,
+    timeout:*mut usize
+)->isize{
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let inner = task.acquire_inner_lock();
+    let fd_table = &inner.fd_table;
+
+    let mut r_ready_count = 0;
+    let mut w_ready_count = 0;
+    let mut e_ready_count = 0;
+
+    let mut timer = 0;
+    unsafe {
+        let sec = translated_ref(token, timeout);
+        let usec = translated_ref(token, timeout.add(1));
+        timer = (sec*1000 + usec)/100;
+    }
+    
+    let mut time_up = false;
+    let mut r_has_nready = false;
+    let mut w_has_nready = false;
+    let mut r_all_ready = false;
+    let mut w_all_ready = false;
+
+    while !time_up {
+        /* handle read fd set */
+        if readfds as usize != 0 && !r_all_ready{
+            let ubuf_rfds = UserBuffer::new(
+                translated_byte_buffer(token, readfds, size_of::<FdSet>())
+            );
+            let rfd_set = FdSet::new();
+            ubuf_rfds.read(rfd_set.as_bytes_mut());
+            let rfd_vec = rfd_set.get_fd_vec();
+
+            if rfd_vec[ rfd_vec.len() - 1 ] >= nfds {
+                return -1; // invalid fd
+            }
+
+            for i in 0..rfd_vec.len() {
+                let fd = rfd_vec[i];
+                if fd == 1024 {continue;}
+                if fd > fd_table.len() || fd_table[fd].is_none(){
+                    return -1; // invalid fd
+                }
+                let fdescript = &fd_table[fd].unwrap();
+                match fdescript.fclass {
+                    FileClass::Abstr(file)=>{
+                        if file.readable(){
+                            r_ready_count += 1;
+                            rfd_set.set_fd(fd); 
+                            // marked for being ready
+                            rfd_vec[i] == 1024;  
+                        } else {
+                            rfd_set.clear_fd(fd);
+                            r_has_nready = true;
+                        }
+                    },
+                    FileClass::File(file)=>{
+                        if file.readable(){
+                            r_ready_count += 1;
+                            rfd_set.set_fd(fd);
+                            rfd_vec[i] == 1024;
+                        } else {
+                            rfd_set.clear_fd(fd);
+                            r_has_nready = true;
+                        }
+                    }
+                }
+            }
+            if !r_has_nready {
+                r_all_ready = true;
+                ubuf_rfds.write(rfd_set.as_bytes());
+            }
+        }
+
+        /* handle write fd set */
+        if writefds as usize != 0 && !w_all_ready {
+            let ubuf_wfds = UserBuffer::new(
+                translated_byte_buffer(token, writefds, size_of::<FdSet>())
+            );
+            let wfd_set = FdSet::new();
+            ubuf_wfds.read(wfd_set.as_bytes_mut());
+            let wfd_vec = wfd_set.get_fd_vec();
+
+            if wfd_vec[ wfd_vec.len() - 1 ] >= nfds {
+                return -1; // invalid fd
+            }
+
+            for i in 0..wfd_vec.len() {
+                let fd = wfd_vec[i];
+                if fd == 1024 { continue;}
+                if fd > fd_table.len() || fd_table[fd].is_none(){
+                    return -1; // invalid fd
+                }
+                let fdescript = &fd_table[fd].unwrap();
+                match fdescript.fclass {
+                    FileClass::Abstr(file)=>{
+                        if file.writable(){
+                            w_ready_count += 1;
+                            wfd_set.set_fd(fd);
+                            wfd_vec[i] == 1024;
+                        } else {
+                            wfd_set.clear_fd(fd);
+                            w_has_nready = true;
+                        }
+                    },
+                    FileClass::File(file)=>{
+                        if file.writable(){
+                            w_ready_count += 1;
+                            wfd_set.set_fd(fd);
+                            wfd_vec[i] == 1024;
+                        } else {
+                            wfd_set.clear_fd(fd);
+                            w_has_nready = true;
+                        }
+                    }
+                }
+            }
+            if !w_has_nready { 
+                w_all_ready = true;
+                ubuf_wfds.write(wfd_set.as_bytes()); 
+            }
+        }    
+
+        /* Cannot handle exceptfds for now */
+        
+        // if there are some fds not ready, just wait until time up
+        if r_has_nready || w_has_nready {
+            r_has_nready = false;
+            w_has_nready = false;
+            timer -= 1;
+            if timer > 0 {
+                suspend_current_and_run_next();
+            } else {
+                time_up = true;
+            }
+        } else {
+            break;
+        }
+    }
+    return r_ready_count + w_ready_count + e_ready_count
 }
