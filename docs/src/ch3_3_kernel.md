@@ -1,3 +1,7 @@
+# 操作系统
+
+我们选择基于 [TianhuaTao/uCore-SMP](https://github.com/TianhuaTao/uCore-SMP/tree/label-riscv) 和 rCore，加入用户态中断和标签的支持，完成软硬件的协同。
+
 # 操作系统：标签化 uCore-SMP
 
 uCore-SMP 在设计时目标平台为 QEMU ，将其移植到 FPGA 平台主要需要解决如下问题：内存布局、时钟周期、页表项属性和硬盘外设。移植完成后，还需添加对标签系统的支持。代码仓库位于 https://github.com/TianhuaTao/uCore-SMP/tree/label-riscv 。
