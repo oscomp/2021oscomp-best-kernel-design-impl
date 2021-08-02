@@ -91,44 +91,42 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
-            // println!{"pinLoadPageFault"}
-            // println!(
-            //     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-            //     scause.cause(),
-            //     stval,
-            //     current_trap_cx().sepc,
-            // );
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
                 panic!("VirtAddr out of range!");
             }
             let vpn: VirtPageNum = va.floor();
+            let heap_base = current_task().unwrap().acquire_inner_lock().heap_start;
+            let heap_pt = current_task().unwrap().acquire_inner_lock().heap_pt;
+            // println!{"The base of the user heap: {:X}", heap};
             // println!{"============================{:?}", vpn}
-            // Get the task inner of current
-            // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
-            // get the PageTableEntry that faults
-            let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
-            // println!{"PageTableEntry: {}", pte.bits};
-            // if the virtPage is a CoW
-            if pte.is_some() && pte.unwrap().is_cow() {
-                let former_ppn = pte.unwrap().ppn();
-                //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                println!("cow addr = {:X}", stval);
-                current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
-                // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                // println!{"cow_alloc returned..."}
-                // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
-                // println!{"PageTableEntry: {}", pte.bits};
+            if va.0 >= heap_base && va.0 <= heap_pt {
+                current_task().unwrap().acquire_inner_lock().lazy_alloc(vpn);
             } else {
-                println!(
-                    "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-                    scause.cause(),
-                    stval,
-                    current_trap_cx().sepc,
-                );
-                // page fault exit code
-                exit_current_and_run_next(-2);
+                // get the PageTableEntry that faults
+                let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
+                // println!{"PageTableEntry: {}", pte.bits};
+                // if the virtPage is a CoW
+                if pte.is_some() && pte.unwrap().is_cow() {
+                    let former_ppn = pte.unwrap().ppn();
+                    //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                    println!("cow addr = {:X}", stval);
+                    current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                    // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                    // println!{"cow_alloc returned..."}
+                    // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
+                    // println!{"PageTableEntry: {}", pte.bits};
+                } else {
+                    println!(
+                        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                        scause.cause(),
+                        stval,
+                        current_trap_cx().sepc,
+                    );
+                    // page fault exit code
+                    exit_current_and_run_next(-2);
+                }
             }
             // println!{"Trap solved..."}
         }
