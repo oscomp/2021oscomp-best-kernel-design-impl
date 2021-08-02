@@ -501,6 +501,28 @@ pub struct MapArea {
     map_perm: MapPermission,
 }
 
+pub struct ChunkArea {
+    vpn_table: Vec<VirtPageNum>,
+    data_frames: BTreeMap<VirtPageNum, FrameTracker>,
+    map_type: MapType,
+    map_perm: MapPermission,
+}
+
+impl ChunkArea {
+    pub fn new(
+        map_type: MapType,
+        map_perm: MapPermission
+    ) -> Self {
+        Self {
+            vpn_table: Vec::new(),
+            data_frames: BTreeMap::new(),
+            map_type,
+            map_perm,
+        }
+    }
+    
+}
+
 impl MapArea {
     pub fn new(
         start_va: VirtAddr,
