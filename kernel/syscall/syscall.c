@@ -183,6 +183,7 @@ extern uint64 sys_clock_settime(void);
 extern uint64 sys_clock_gettime(void);
 extern uint64 sys_statfs(void);
 extern uint64 sys_getrusage(void);
+extern uint64 sys_setitimer(void);
 
 static uint64 (*syscalls[])(void) = {
 	[SYS_fork]			sys_fork,
@@ -252,6 +253,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_clock_gettime] sys_clock_gettime, 
 	[SYS_statfs]		sys_statfs,
 	[SYS_getrusage]		sys_getrusage,
+	[SYS_setitimer]		sys_setitimer,
 };
 
 static char *sysnames[] = {
@@ -322,6 +324,7 @@ static char *sysnames[] = {
 	[SYS_clock_settime]	"clock_settime", 
 	[SYS_statfs]		"statfs",
 	[SYS_getrusage]		"getrusage",
+	[SYS_setitimer]		"setitimer",
 };
 
 void

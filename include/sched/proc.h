@@ -12,6 +12,7 @@
 #include "hal/riscv.h"
 #include "mesg/signal.h"
 #include "sync/spinlock.h"
+#include "time.h"
 
 // Saved registers for kernel context switches.
 struct context {
@@ -64,6 +65,7 @@ struct proc {
 	int timer;				// timer 
 	enum procstate state;	// process state 
 	void *chan;				// the reason this proc is sleeping for 
+	uint64 sleep_expire;	// wake up time for sleeping
 
 	// times for process performance 
 	struct tms proc_tms;

@@ -4,31 +4,30 @@
 #include "sync/spinlock.h"
 #include "param.h"
 #include "types.h"
+#include "fs/poll.h"
 
-// struct file中已经添加成员mmap_ph_addr，但是还未考虑初始化其为NULL
+typedef enum {
+	FD_NONE,
+	FD_PIPE,
+	FD_INODE,
+	FD_DEVICE,
+} file_type_e;
+
+struct poll_table;
+
 struct file {
-	struct spinlock lock;
-	enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
-	int ref; // reference count
-	char readable;
-	char writable;
-	struct pipe *pipe; // FD_PIPE
-	struct inode *ip;
-	uint off;          // FD_ENTRY
-	short major;       // FD_DEVICE
+	struct spinlock	lock;
+	file_type_e		type;
+	int				ref;		// reference count
+	char			readable;
+	char			writable;
+	short			major;		// FD_DEVICE
+	uint			off;		// FD_ENTRY
+	struct pipe		*pipe;		// FD_PIPE
+	struct inode	*ip;
+	uint32 (*poll)(struct file *, struct poll_table *);
 };
 
-// #define major(dev)  ((dev) >> 16 & 0xFFFF)
-// #define minor(dev)  ((dev) & 0xFFFF)
-// #define	mkdev(m,n)  ((uint)((m)<<16| (n)))
-
-// map major device number to device functions.
-// struct devsw {
-//   int (*read)(int, uint64, int);
-//   int (*write)(int, uint64, int);
-// };
-
-// extern struct devsw devsw[];
 
 struct fdtable {
 	uint16 basefd;

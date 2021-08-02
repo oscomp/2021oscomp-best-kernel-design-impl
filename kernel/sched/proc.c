@@ -191,6 +191,7 @@ static struct proc *allocproc(void) {
 	initlock(&p->lk, "p->lk");
 
 	p->chan = NULL;
+	p->sleep_expire = 0;
 	p->killed = 0;
 	p->pid = allocpid();
 
@@ -539,8 +540,9 @@ void proc_tick(void) {
 	__enter_proc_cs 
 
 	// runnable 
+	struct proc *p;
 	for (int i = PRIORITY_IRQ; i < PRIORITY_NUMBER; i ++) {
-		struct proc *p = proc_runnable[i];
+		p = proc_runnable[i];
 		while (NULL != p) {
 			struct proc *next = p->next;
 			if (RUNNING != p->state) {
@@ -559,11 +561,17 @@ void proc_tick(void) {
 	} 
 
 	// sleep 
-	// struct proc *tmp = proc_sleep;
-	// while (NULL != tmp) {
-	// 	tmp->proc_tms.stime += 1;
-	// 	tmp = tmp->next;
-	// }
+	uint64 now = readtime();
+	p = proc_sleep;
+	while (NULL != p) {
+		struct proc *tmp = p->next;
+		if (p->sleep_expire && now >= p->sleep_expire) {
+			p->sleep_expire = 0;
+			__remove(p);
+			__insert_runnable(PRIORITY_TIMEOUT, p);
+		}
+		p = tmp;
+	}
 
 	__leave_proc_cs 
 }

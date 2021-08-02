@@ -14,6 +14,12 @@ struct timeval {
 	uint64 usec;		/* microseconds or milliseconds? */
 };
 
+struct itimeval {
+	struct timeval interval;
+	struct timeval value;
+};
+
+
 #define CLOCK_REALTIME 		0
 
 /**

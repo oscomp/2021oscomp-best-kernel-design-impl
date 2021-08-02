@@ -666,6 +666,66 @@ sys_fcntl(void)
 }
 
 uint64
+sys_pselect(void)
+{
+	int nfds;
+	uint64 urfds, uwfds, uexfds;
+	uint64 utoaddr, usmaddr;
+	
+	argint(0, &nfds);
+	argaddr(1, &urfds);
+	argaddr(2, &uwfds);
+	argaddr(3, &uexfds);
+	argaddr(4, &utoaddr);
+	argaddr(5, &usmaddr);
+	
+	if (nfds <= 0 || nfds > FDSET_SIZE)
+		return -EINVAL;
+	if (!(urfds || uwfds || uexfds))
+		return -EINVAL;
+
+	struct fdset rfds, wfds, exfds;
+	struct timespec timeout;
+	__sigset_t sigmask;
+
+	if (urfds && copyin2((char *)&rfds, urfds, sizeof(struct fdset)) < 0)
+		return -EFAULT;
+	if (uwfds && copyin2((char *)&wfds, uwfds, sizeof(struct fdset)) < 0)
+		return -EFAULT;
+	if (uexfds && copyin2((char *)&exfds, uexfds, sizeof(struct fdset)) < 0)
+		return -EFAULT;
+	if (utoaddr && copyin2((char *)&timeout, utoaddr, sizeof(timeout)) < 0)
+		return -EFAULT;
+	if (usmaddr && copyin2((char *)&sigmask, usmaddr, sizeof(sigmask)) < 0)
+		return -EFAULT;
+
+	struct proc *p = myproc();
+	if (p->tmask) {
+		printf(") ...\n");
+	}
+
+	int ret = pselect(nfds,
+				urfds ? &rfds: NULL,
+				uwfds ? &wfds: NULL,
+				uexfds ? &exfds: NULL,
+				utoaddr ? &timeout : NULL,
+				usmaddr ? &sigmask : NULL
+			);
+
+	if (urfds)
+		copyout2(urfds, (char *)&rfds, sizeof(struct fdset));
+	if (uwfds)
+		copyout2(uwfds, (char *)&wfds, sizeof(struct fdset));
+	if (uexfds)
+		copyout2(uexfds, (char *)&exfds, sizeof(struct fdset));
+
+	if (p->tmask) {
+		printf("pid %d: return from pselect(", p->pid);
+	}
+	return ret;
+}
+
+uint64
 sys_ppoll(void)
 {
 	uint64 addr;
@@ -675,23 +735,35 @@ sys_ppoll(void)
 	if (argaddr(0, &addr) < 0 || argint(1, (int*)&nfds) < 0 || argaddr(2, &timeoutaddr) < 0 || argaddr(3, &sigmaskaddr) < 0)
 		return -1;
 
-	if (timeoutaddr || sigmaskaddr) {
-		__debug_error("sys_ppoll", "not supported yet!\n");
-		return -1;
-	}
-	if (nfds < 0) return -1;
+	// if (timeoutaddr || sigmaskaddr) {
+	// 	__debug_error("sys_ppoll", "not supported yet!\n");
+	// 	return -1;
+	// }
+	if (nfds == 0)
+		return -EINVAL;
 
 	struct pollfd *pfds = kmalloc(nfds * sizeof(struct pollfd));
-	if (pfds == NULL) return -1;
+	if (pfds == NULL)
+		return -ENOMEM;
 
 	for (int i = 0; i < nfds; i++) {
 		if (copyin2((char *)(pfds + i), addr + i * sizeof(struct pollfd), sizeof(struct pollfd)) < 0) {
 			kfree(pfds);
-			return -1;
+			return -EFAULT;
 		}
 	}
+	
+	struct timespec timeout;
+	__sigset_t sigmask;
+	if (timeoutaddr && copyin2((char *)&timeout, timeoutaddr, sizeof(timeout)) < 0)
+		return -EFAULT;
+	if (sigmaskaddr && copyin2((char *)&sigmask, sigmaskaddr, sizeof(sigmask)) < 0)
+		return -EFAULT;
 
-	int ret = do_ppoll(pfds, nfds); // should accept more arguments
+	int ret = ppoll(pfds, nfds,
+					timeoutaddr ? &timeout : NULL,
+					sigmaskaddr ? &sigmask : NULL);
+
 	copyout2(addr, (char *)pfds, sizeof(struct pollfd) * nfds);
 	kfree(pfds);
 	return ret;

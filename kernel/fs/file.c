@@ -25,24 +25,6 @@
 #include "utils/debug.h"
 #include "errno.h"
 
-// struct devsw devsw[NDEV];
-// struct {
-//   struct spinlock lock;
-//   struct file file[NFILE];
-// } ftable;
-
-// void
-// fileinit(void)
-// {
-//   initlock(&ftable.lock, "ftable");
-//   struct file *f;
-//   for(f = ftable.file; f < ftable.file + NFILE; f++){
-//     memset(f, 0, sizeof(struct file));
-//   }
-//   #ifdef DEBUG
-//   printf("fileinit\n");
-//   #endif
-// }
 
 // Allocate a file structure.
 struct file*
@@ -56,24 +38,9 @@ filealloc(void)
 	initlock(&f->lock, "f->lock");
 	f->type = FD_NONE;
 	f->ref = 1;
+	f->poll = NULL;
 	return f;
 }
-// struct file*
-// filealloc(void)
-// {
-//   struct file *f;
-
-//   acquire(&ftable.lock);
-//   for(f = ftable.file; f < ftable.file + NFILE; f++){
-//     if(f->ref == 0){
-//       f->ref = 1;
-//       release(&ftable.lock);
-//       return f;
-//     }
-//   }
-//   release(&ftable.lock);
-//   return NULL;
-// }
 
 // Increment ref count for file f.
 struct file*

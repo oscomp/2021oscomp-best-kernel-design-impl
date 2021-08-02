@@ -107,3 +107,38 @@ uint64 sys_clock_gettime(void) {
 
 	return 0;
 }
+
+uint64 sys_setitimer(void)
+{
+	int which;
+	uint64 newptr;
+	uint64 oldptr;
+	struct itimeval newval;
+	// struct proc *p;
+
+	argint(0, &which);
+	argaddr(1, &newptr);
+	argaddr(2, &oldptr);
+
+	if (which != CLOCK_REALTIME)
+		return -EINVAL;
+
+	if (copyin2((char*)&newval, newptr, sizeof(struct itimeval)) < 0)
+		return -EFAULT;	
+
+	// p = myproc();
+	// if (oldptr && copyout2(oldptr, (char*)&p->alarmtimer, sizeof(struct itimeval)) < 0)
+	// 	return -EFAULT;
+
+	__debug_info("sys_setitimer", "new={%ds|%dus, %ds|%dus}\n",
+				newval.interval.sec, newval.interval.usec, newval.value.sec, newval.value.usec);
+
+	// __debug_info("sys_setitimer", "new={%ds|%dus, %ds|%dus}, old={%ds|%dus, %ds|%dus}\n",
+	// 			newval.interval.sec, newval.interval.usec, newval.value.sec, newval.value.usec,
+	// 			p->alarmtimer.interval.sec, p->alarmtimer.interval.usec,
+	// 			p->alarmtimer.value.sec, p->alarmtimer.value.usec);
+
+	// p->alarmtimer = newval;
+
+	return 0;
+}

@@ -43,6 +43,7 @@
 #define SYS_exit			93
 #define SYS_exit_group		94
 #define SYS_nanosleep		101
+#define SYS_setitimer       103
 #define SYS_clock_settime 	112
 #define SYS_clock_gettime	113
 #define SYS_syslog 			116
