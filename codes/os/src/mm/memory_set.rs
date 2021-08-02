@@ -371,8 +371,9 @@ impl MemorySet {
         }
         for vpn in user_space.chunks.vpn_table.iter() {
             let vpn_copy: VirtPageNum = vpn.0.into();
-            memory_set.chunks.vpn_table.push(vpn_copy);
-            memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
+            // memory_set.chunks.vpn_table.push(vpn_copy);
+            // memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
+            memory_set.push_chunk(vpn_copy);
             let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
             let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
             dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
@@ -441,8 +442,9 @@ impl MemorySet {
         }
         for vpn in user_space.chunks.vpn_table.iter() {
             let vpn_copy: VirtPageNum = vpn.0.into();
-            memory_set.chunks.vpn_table.push(vpn_copy);
-            memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
+            // memory_set.chunks.vpn_table.push(vpn_copy);
+            // memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
+            memory_set.push_chunk(vpn_copy);
             let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
             let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
             dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
@@ -490,8 +492,9 @@ impl MemorySet {
 
     pub fn lazy_alloc (&mut self, vpn: VirtPageNum) -> usize {
         println!{"performing lazy alloc on {:?}", vpn}
-        self.chunks.vpn_table.push(vpn);
-        self.chunks.map_one(&mut self.page_table, vpn);
+        self.push_chunk(vpn);
+        // self.chunks.vpn_table.push(vpn);
+        // self.chunks.map_one(&mut self.page_table, vpn);
         0
     }
 
