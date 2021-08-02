@@ -130,17 +130,21 @@ int8 fat32_read_test(const char *filename)
         return 0;
     }
     // no length or deleted
-    if (p->length == 0) {
-        // printk_port("<cause 1>\n");
-        p = get_next_dentry(p, root_buf, &root_clus, &root_sec); 
-        return 1;
-    }
+    // if (p->length == 0) {
+    //     // printk_port("<cause 1>\n");
+    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec); 
+    //     return 1;
+    // }
     // not rw-able
-    if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
-        // printk_port("<cause 2>\n");
-        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-        return 1;
-    }
+    // if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
+    //     // printk_port("<cause 2>\n");
+    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
+    //     return 1;
+    // }
+    printk_port("%s\n", p->filename);
+    printk_port("length:%d\n", p->length);
+    p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
+    return 1;
 
     if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
         !memcmp(p->filename, "RUN", 3)){
