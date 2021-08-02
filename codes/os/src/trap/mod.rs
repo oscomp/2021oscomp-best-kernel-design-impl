@@ -134,9 +134,11 @@ pub fn trap_handler() -> ! {
         }
         Trap::Exception(Exception::IllegalInstruction) => {
             // println!{"pinIllegalInstruction"}
-            println!("[kernel] IllegalInstruction in application, core dumped.");
+            println!("[kernel] IllegalInstruction in application, continue.");
+            //let mut cx = current_trap_cx();
+            //cx.sepc += 4;
             println!(
-                "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                "         {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
                 stval,
                 current_trap_cx().sepc,
@@ -175,7 +177,7 @@ pub fn trap_return() -> ! {
     if trap_cx.get_sp() == 0{
         println!("[trap_ret] sp = 0");
     }
-    println!("[trap_ret] sepc = {:X}", trap_cx.sepc);
+    //println!("[trap_ret] sepc = {:X}", trap_cx.sepc);
 
     extern "C" {
         fn __alltraps();

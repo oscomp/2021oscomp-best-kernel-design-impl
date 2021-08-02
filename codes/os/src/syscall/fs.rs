@@ -924,12 +924,12 @@ pub fn sys_pselect(
     while !time_up {
         /* handle read fd set */
         if readfds as usize != 0 && !r_all_ready{
-            let ubuf_rfds = UserBuffer::new(
+            let mut ubuf_rfds = UserBuffer::new(
                 translated_byte_buffer(token, readfds, size_of::<FdSet>())
             );
-            let rfd_set = FdSet::new();
+            let mut rfd_set = FdSet::new();
             ubuf_rfds.read(rfd_set.as_bytes_mut());
-            let rfd_vec = rfd_set.get_fd_vec();
+            let mut rfd_vec = rfd_set.get_fd_vec();
 
             if rfd_vec[ rfd_vec.len() - 1 ] >= nfds {
                 return -1; // invalid fd
@@ -941,8 +941,8 @@ pub fn sys_pselect(
                 if fd > fd_table.len() || fd_table[fd].is_none(){
                     return -1; // invalid fd
                 }
-                let fdescript = &fd_table[fd].unwrap();
-                match fdescript.fclass {
+                let fdescript = fd_table[fd].as_ref().unwrap();
+                match &fdescript.fclass {
                     FileClass::Abstr(file)=>{
                         if file.readable(){
                             r_ready_count += 1;
@@ -974,12 +974,12 @@ pub fn sys_pselect(
 
         /* handle write fd set */
         if writefds as usize != 0 && !w_all_ready {
-            let ubuf_wfds = UserBuffer::new(
+            let mut ubuf_wfds = UserBuffer::new(
                 translated_byte_buffer(token, writefds, size_of::<FdSet>())
             );
-            let wfd_set = FdSet::new();
+            let mut wfd_set = FdSet::new();
             ubuf_wfds.read(wfd_set.as_bytes_mut());
-            let wfd_vec = wfd_set.get_fd_vec();
+            let mut wfd_vec = wfd_set.get_fd_vec();
 
             if wfd_vec[ wfd_vec.len() - 1 ] >= nfds {
                 return -1; // invalid fd
@@ -991,8 +991,8 @@ pub fn sys_pselect(
                 if fd > fd_table.len() || fd_table[fd].is_none(){
                     return -1; // invalid fd
                 }
-                let fdescript = &fd_table[fd].unwrap();
-                match fdescript.fclass {
+                let fdescript = fd_table[fd].as_ref().unwrap();
+                match &fdescript.fclass {
                     FileClass::Abstr(file)=>{
                         if file.writable(){
                             w_ready_count += 1;

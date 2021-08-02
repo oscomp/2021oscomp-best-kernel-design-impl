@@ -398,7 +398,7 @@ impl FdSet {
     pub fn get_fd_vec(&self)->Vec<usize>{
         let mut fd_v = Vec::new();
         for i in 0..16 {
-            let tmp = self.fd_list[i];
+            let mut tmp = self.fd_list[i];
             for off in 0..64 {
                 let fd_bit = tmp & 1;
                 if fd_bit == 1{
