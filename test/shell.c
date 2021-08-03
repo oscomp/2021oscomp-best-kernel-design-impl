@@ -23,9 +23,9 @@ int main()
     // argv[2] = str3;
     // argv[3] = NULL;
 
-    // sys_exec(argv[0], argv, NULL);
-    while(sys_test(NULL))
-        ;
+    sys_exec(argv[0], argv, NULL);
+    // while(sys_test(NULL))
+    //     ;
 
     #else
 
