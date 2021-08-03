@@ -349,6 +349,7 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
 /* prepare pcb stack for ready process */
 /* kernel_stack is kernel_stack_top, user_stack is user_stack_top */
 /* prepare USER content, SWITCH content and ARGV & ENVP & AUX_VEC */
+/* argv, envp, aux_vec cound be NULL, called at special point */
 void init_pcb_stack(
     ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, unsigned char* argv[], unsigned char *envp[],
     aux_elem_t *aux_vec, pcb_t *pcb)
@@ -385,16 +386,16 @@ void init_pcb_stack(
         (switchto_context_t *)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     switch_to_reg->regs[0] = &ret_from_exception;
 
-    /* get aux_vec first */
-    /* this var is increasing */
-    uint64_t user_stack_kva = get_kva_of(user_stack, pgdir);
-    /* now is prepare stack: argv, envp and aux */
+    /* 注意，user_stack并未分配页面 */
+    uint64_t user_stack_kva = get_kva_of(user_stack - NORMAL_PAGE_SIZE, pgdir) + NORMAL_PAGE_SIZE;
+
     unsigned char *filename = NULL;
     char backupname[10]; strcpy(backupname,"name");
     if (argv)
         filename = argv[0];
     else
         filename = backupname;
+    /* 返回的sp作为用户栈指针 */
     pcb->user_sp = copy_above_user_stack(user_stack_kva, argv, envp, aux_vec, filename);   
-    assert(USER_STACK_ADDR - pcb->user_sp <= NORMAL_PAGE_SIZE);
+    assert(USER_STACK_ADDR - pcb->user_sp < NORMAL_PAGE_SIZE);
 }
