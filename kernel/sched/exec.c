@@ -114,7 +114,8 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             aux_elem_t aux_vec[MAX_AUX_ARG+1];
             /* init_aux_vec(&aux_vec) */
             set_aux_vec(&aux_vec, &pcb_underinit->elf);
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
+            // init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
+            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, NULL, NULL, NULL, pcb_underinit);
 
             // add to ready_queue
             list_del(&pcb_underinit->list);

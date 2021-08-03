@@ -36,12 +36,13 @@ uintptr_t load_elf(
     sh_entry_size  = ehdr->e_shentsize;
 
     uint64_t first_load_p_vaddr = 0;
+    uint8_t is_first = 1;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
-            printk_port("p_vaddr:%lx, p_offset:%lx\n", phdr->p_vaddr, phdr->p_offset);
-            printk_port("filesz: %lx, memsz: %lx\n", phdr->p_filesz, phdr->p_memsz);
-            if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
+            // printk_port("p_vaddr:%lx, p_offset:%lx\n", phdr->p_vaddr, phdr->p_offset);
+            // printk_port("filesz: %lx, memsz: %lx\n", phdr->p_filesz, phdr->p_memsz);
+            if (is_first) { first_load_p_vaddr = phdr->p_vaddr; is_first = 0; }
             for (i = 0; i < phdr->p_memsz; ) {
                 uintptr_t offset_in_page = (phdr->p_vaddr + i) % NORMAL_PAGE_SIZE; // offset in this page
                 uint64_t copy_bytes; // how many bytes are copied
@@ -50,14 +51,13 @@ uintptr_t load_elf(
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = MIN(phdr->p_filesz - i, NORMAL_PAGE_SIZE - offset_in_page);
-                    printk_port("page offset:%lx\n", offset_in_page);
-                    printk_port("copy_bytes: %lx\n", copy_bytes);
+                    // printk_port("page offset:%lx\n", offset_in_page);
+                    // printk_port("copy_bytes: %lx\n", copy_bytes);
                     memcpy(
                         bytes_of_page + offset_in_page,
                         elf_binary + phdr->p_offset + i,
                         copy_bytes);
                     if (offset_in_page + copy_bytes < NORMAL_PAGE_SIZE) {
-                        sbi_console_putchar('8');
                         for (int j =
                                  offset_in_page + copy_bytes;
                              j < NORMAL_PAGE_SIZE; ++j) {
@@ -65,13 +65,12 @@ uintptr_t load_elf(
                         }
                     }
                 } else {
-                    sbi_console_putchar('9');
                     unsigned char *bytes_of_page =
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
-                    printk_port("page offset:%lx\n", offset_in_page);
-                    printk_port("copy_bytes: %lx\n", copy_bytes);
+                    // printk_port("page offset:%lx\n", offset_in_page);
+                    // printk_port("copy_bytes: %lx\n", copy_bytes);
                     for (int j = offset_in_page;
                          j < NORMAL_PAGE_SIZE;
                          ++j) {
