@@ -44,12 +44,12 @@ static void init_pcb()
     clear_pgdir(pgdir);
     alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
     alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-    uint64_t edata;
-    uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper, &edata);
-    pcb_underinit->edata = edata;
+
+    uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper, &pcb_underinit->elf);
+    pcb_underinit->edata = pcb_underinit->elf.edata;
     shell_pgdir = pgdir;
 
-    init_pcb_stack(pgdir, kernel_stack, user_stack, test_shell, NULL, pcb_underinit);
+    init_pcb_stack(pgdir, kernel_stack, user_stack, test_shell, NULL, NULL, NULL, pcb_underinit);
     list_add_tail(&pcb_underinit->list,&ready_queue);
 
     /* init pcb */
@@ -118,6 +118,11 @@ static void init_syscall(void)
     syscall[SYS_umount2] = &fat32_umount;
     syscall[SYS_mmap] = &fat32_mmap;
     syscall[SYS_munmap] = &fat32_munmap;
+
+    syscall[SYS_getuid] = &do_getuid;
+    syscall[SYS_geteuid] = &do_geteuid;
+    syscall[SYS_getgid] = &do_getgid;
+    syscall[SYS_getegid] = &do_getegid;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~
@@ -159,7 +164,7 @@ int main()
     ioremap(GPIOHS, 0x1000);
     ioremap(GPIO, 0x1000);
     ioremap(SPI_SLAVE, 0x1000);
-    ioremap(GPIOHS, 0x1000);
+    // ioremap(GPIOHS, 0x1000);
     ioremap(SPI0, 0x1000);
     ioremap(SPI1, 0x1000);
     ioremap(SPI2, 0x1000);

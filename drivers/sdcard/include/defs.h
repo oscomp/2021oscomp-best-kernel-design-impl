@@ -154,9 +154,9 @@ int             holdingsleep(struct sleeplock*);
 void            initsleeplock(struct sleeplock*, char*);
 
 // string.c
-int             memcmp(const void*, const void*, uint);
-void*           memmove(void*, const void*, uint);
-void*           memset(void*, int, uint);
+void            memset(void *dest, uint8_t val, uint32_t len);
+void            memmove(uint8_t *dest, const uint8_t *src, uint32_t len);
+int             memcmp(const void *ptr1, const void *ptr2, size_t num);
 char*           safestrcpy(char*, const char*, int);
 int             strlen(const char*);
 int             strncmp(const char*, const char*, uint);

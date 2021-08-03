@@ -6,6 +6,18 @@
 #include <../../drivers/sdcard/include/sdcard.h>
 #include <os/sched.h>
 
+#ifndef max
+#define max(x,y) (((x) > (y)) ? (x) : (y))
+#endif
+
+#ifndef min
+#define min(x,y) (((x) > (y)) ? (y) : (x))
+#endif
+
+#define BUFSIZE (min(NORMAL_PAGE_SIZE, CLUSTER_SIZE))
+#define READ_BUF_CNT (BUFSIZE/SECTOR_SIZE)
+
+
 typedef struct fat{
     uint32_t  first_data_sec;
     uint32_t  data_sec_cnt;

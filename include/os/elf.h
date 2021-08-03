@@ -158,6 +158,14 @@ typedef struct elf64_phdr
     Elf64_Xword p_align;  /* Segment alignment, file & memory */
 } Elf64_Phdr;
 
+typedef struct ELF_info{
+    uint64_t phoff;
+    uint64_t phent;
+    uint64_t phnum;
+    uint64_t entry;
+    uint64_t edata;
+} ELF_info_t;
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 static inline int is_elf_format(unsigned char *binary)
@@ -180,7 +188,7 @@ static inline int is_elf_format(unsigned char *binary)
 static inline uintptr_t load_elf(
     unsigned char elf_binary[], unsigned length, uintptr_t pgdir,
     uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask),
-    uint64_t *edata)
+    ELF_info_t *elf)
 {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)elf_binary;
     Elf64_Phdr *phdr = NULL;
@@ -208,36 +216,47 @@ static inline uintptr_t load_elf(
     sh_entry_count = ehdr->e_shnum;
     sh_entry_size  = ehdr->e_shentsize;
 
+    uint64_t first_load_p_vaddr = 0;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
 
-        if (phdr->p_type == PT_LOAD) {
-            for (i = 0; i < phdr->p_memsz; i += NORMAL_PAGE_SIZE) {
+        if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
+            if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
+            for (i = 0; i < phdr->p_memsz; ) {
+                uintptr_t offset_in_page = (phdr->p_vaddr + i) % NORMAL_PAGE_SIZE; // offset in this page
+                uint64_t copy_bytes; // how many bytes are copied
                 if (i < phdr->p_filesz) {
+                    // sbi_console_putchar('7');
                     unsigned char *bytes_of_page =
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
+                    copy_bytes = MIN(phdr->p_filesz - i, NORMAL_PAGE_SIZE - offset_in_page);
                     memcpy(
-                        bytes_of_page,
+                        bytes_of_page + offset_in_page,
                         elf_binary + phdr->p_offset + i,
-                        MIN(phdr->p_filesz - i, NORMAL_PAGE_SIZE));
-                    if (phdr->p_filesz - i < NORMAL_PAGE_SIZE) {
+                        copy_bytes);
+                    if (offset_in_page + copy_bytes < NORMAL_PAGE_SIZE) {
+                        // sbi_console_putchar('8');
                         for (int j =
-                                 phdr->p_filesz % NORMAL_PAGE_SIZE;
+                                 offset_in_page + copy_bytes;
                              j < NORMAL_PAGE_SIZE; ++j) {
                             bytes_of_page[j] = 0;
                         }
+                        copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
                     }
                 } else {
-                    long *bytes_of_page =
-                        (long *)prepare_page_for_va(
+                    // sbi_console_putchar('9');
+                    unsigned char *bytes_of_page =
+                        (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
-                    for (int j = 0;
-                         j < NORMAL_PAGE_SIZE / sizeof(long);
+                    copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
+                    for (int j = offset_in_page;
+                         j < NORMAL_PAGE_SIZE;
                          ++j) {
                         bytes_of_page[j] = 0;
                     }
                 }
+                i += copy_bytes;
             }
         }
 
@@ -252,7 +271,14 @@ static inline uintptr_t load_elf(
     }
     /* for brk */
     shdr = ptr_sh_table - sh_entry_size; // last data
-    *edata = shdr->sh_addr + shdr->sh_size;
+
+    /* set elf info */
+    elf->phoff = first_load_p_vaddr + ehdr->e_phoff;
+    elf->phent = ehdr->e_phentsize;
+    elf->phnum = ehdr->e_phnum;
+    elf->entry = ehdr->e_entry;
+    elf->edata = shdr->sh_addr + shdr->sh_size;
+
     return ehdr->e_entry;
 }
 

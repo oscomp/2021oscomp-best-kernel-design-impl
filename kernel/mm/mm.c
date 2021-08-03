@@ -11,7 +11,7 @@
 ptr_t memCurr = FREEMEM;
 // ptr_t memTop = KERNEL_END;
 unsigned int start_block_id = 1024;
-static ptr_t memalloc = 0xffffffff80600000lu;
+static ptr_t memalloc = KERNEL_END;
 
 static LIST_HEAD(freePageList);
 static LIST_HEAD(shmPageList);
@@ -22,7 +22,7 @@ LIST_HEAD(availableSwapSpace);
 static uint64_t swap_page();
 static uint64_t find_swap_page_kva(uint64_t pgdir);
 
-#define NUM_REC 1024
+#define NUM_REC ((KERNEL_END - FREEMEM) / NORMAL_PAGE_SIZE)
 list_node_t pageRecyc[NUM_REC];
 
 void init_recyc()
@@ -59,6 +59,7 @@ ptr_t allocPage()
 uint64_t swap_page()
 {
     uint64_t page_basekva = find_swap_page_kva(current_running->pgdir);
+    assert(page_basekva);
     unsigned int block_id;
     uint64_t mem_address = kva2pa(page_basekva);
     if (!list_empty(&availableSwapSpace)){
@@ -79,24 +80,23 @@ uint64_t swap_page()
 }
 
 /* NRU */
-/* no replace exec */
 static uint64_t find_swap_page_kva(uint64_t pgdir)
 {
     for (int i = 0; i < NUM_USER_PTE_ENTRY; ++i)
     {
         PTE *ptr1 = pgdir + i*sizeof(PTE);
-        if (get_attribute(*ptr1,_PAGE_PRESENT)&&get_attribute(*ptr1,_PAGE_USER)){
+        if (get_attribute(*ptr1,_PAGE_PRESENT) && get_attribute(*ptr1,_PAGE_USER)){
             for (int j = 0; j < NUM_PTE_ENTRY ; ++j)
             {
                 PTE *ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT) + j*sizeof(PTE);
-                if (get_attribute(*ptr2,_PAGE_PRESENT)&&get_attribute(*ptr2,_PAGE_USER)){
+                if (get_attribute(*ptr2,_PAGE_PRESENT) && get_attribute(*ptr2,_PAGE_USER)){
                     for (int k = 0; k < NUM_PTE_ENTRY; ++k)
                     {
                         PTE *ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
-                        if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
-                            continue;
-                        if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)
-                                &&!get_attribute(*ptr3,_PAGE_ACCESSED)&&!get_attribute(*ptr3,_PAGE_DIRTY)){
+                        // if (get_attribute(*ptr3,_PAGE_SHARE) || get_attribute(*ptr3,_PAGE_EXEC))
+                        //     continue;
+                        if (get_attribute(*ptr3,_PAGE_PRESENT) && get_attribute(*ptr3,_PAGE_USER)
+                                && !get_attribute(*ptr3,_PAGE_ACCESSED) && !get_attribute(*ptr3,_PAGE_DIRTY)){
                             clear_attribute(ptr3,_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY);
                             set_attribute(ptr3,_PAGE_SWAP);
                             return pa2kva(get_pfn(*ptr3) << NORMAL_PAGE_SHIFT);
@@ -118,8 +118,8 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
                     for (int k = 0; k < NUM_PTE_ENTRY; ++k)
                     {
                         PTE *ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
-                        if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
-                            continue;
+                        // if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
+                        //     continue;
                         if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)
                                 &&!get_attribute(*ptr3,_PAGE_ACCESSED)&&get_attribute(*ptr3,_PAGE_DIRTY)){
                             clear_attribute(ptr3,_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY);
@@ -142,8 +142,8 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
                     for (int k = 0; k < NUM_PTE_ENTRY; ++k)
                     {
                         PTE *ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
-                        if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
-                            continue;
+                        // if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
+                        //     continue;
                         if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)
                                 &&get_attribute(*ptr3,_PAGE_ACCESSED)&&!get_attribute(*ptr3,_PAGE_DIRTY)){
                             clear_attribute(ptr3,_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY);
@@ -166,8 +166,8 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
                     for (int k = 0; k < NUM_PTE_ENTRY; ++k)
                     {
                         PTE *ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
-                        if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
-                            continue;
+                        // if (get_attribute(*ptr3,_PAGE_SHARE)||get_attribute(*ptr3,_PAGE_EXEC))
+                        //     continue;
                         if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)
                                 &&get_attribute(*ptr3,_PAGE_ACCESSED)&&get_attribute(*ptr3,_PAGE_DIRTY)){
                             clear_attribute(ptr3,_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_DIRTY);
@@ -212,6 +212,7 @@ void freePage(ptr_t baseAddr)
 
 void *kmalloc(size_t size)
 {
+    printk_port("dangerous alloc\n");
     memalloc -= size;
     memalloc -= 64 - (size%64);
     return memalloc;
@@ -423,14 +424,26 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
 
 /* modify data top addr */
 /* success return 0, fail return -1*/
-uint64_t do_brk(uintptr_t ptr)
+int64_t do_brk(uintptr_t ptr)
 {
-    if (ptr > USER_STACK_ADDR - NORMAL_PAGE_SIZE) return -1; // larger than stack
-    else if (!ptr) return current_running->edata; // probe edata
+    printk_port("ptr is %lx\n", ptr);
+    printk_port("current is %lx\n", current_running->edata);
+    if (ptr > USER_STACK_ADDR - NORMAL_PAGE_SIZE){
+        printk_port("brk arg0 too large\n");
+        return -1; // larger than stack
+    }
+    else if (!ptr){
+        alloc_page_helper(current_running->edata, current_running->pgdir,
+            _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+        printk_port("1:%lx\n",get_kva_of(current_running->edata, current_running->pgdir));
+        return current_running->edata; // probe edata
+    }
     else if (ptr < current_running->edata) return -1; // cannot be smaller than current addr
     else{
         current_running->edata = ptr;
-        return ptr;
+        alloc_page_helper(ptr, current_running->pgdir, _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+        printk_port("2:%lx\n",get_kva_of(current_running->edata, current_running->pgdir));
+        return current_running->edata;
     }
 }
 

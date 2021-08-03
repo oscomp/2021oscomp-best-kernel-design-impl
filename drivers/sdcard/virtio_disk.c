@@ -19,8 +19,7 @@
 #include "virtio.h"
 #include "assert.h"
 #include "pgtable.h"
-#include "os/sched.h"
-
+#include <os/sched.h>
 
 // the address of virtio mmio register r.
 #define R(r) ((volatile uint32 *)(VIRTIO0 + (r)))

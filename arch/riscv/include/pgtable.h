@@ -18,7 +18,7 @@
 #define LARGE_PAGE_SIZE (1lu << LARGE_PAGE_SHIFT)
 
 #define START_ENTRYPOINT 0xffffffff80000000lu
-#define KERNEL_ENTRYPOINT 0xffffffff80400000lu
+#define KERNEL_ENTRYPOINT 0xffffffff80300000lu
 #define KERNEL_END 0xffffffff80600000lu
 
 #ifdef K210
@@ -27,7 +27,7 @@
 #define BOOT_KERNEL 0x80200000lu
 #endif
 
-#define BOOT_KERNEL_END 0x80400000lu
+#define BOOT_KERNEL_END 0x80300000lu
 /*
  * Flush entire local TLB.  'sfence.vma' implicitly fences with the instruction
  * cache as well, so a 'fence.i' is not necessary.
@@ -81,7 +81,7 @@ static inline void set_satp(
 //     __asm__ __volatile__("fence\nfence.i\nsfence.vm\nfence\nfence.i\ncsrw satp, %0\nfence\nfence.i\nsfence.vm\nfence\nfence.i" : : "rK"(__v) : "memory");
 // }
 
-#define PGDIR_PA 0x80300000lu  // use bootblock's page as PGDIR
+#define PGDIR_PA 0x802fd000lu  // LEVEL 1 PGDIR
 
 /*
  * PTE format:

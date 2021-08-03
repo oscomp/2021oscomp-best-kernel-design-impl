@@ -9,11 +9,12 @@
 #define PAGE_SIZE 4096 // 4K
 #define BLOCK_SIZE 512
 #define BLOCKS_PER_PAGE (PAGE_SIZE/BLOCK_SIZE)
-#define INIT_KERNEL_STACK 0xffffffff80500000lu
+#define INIT_KERNEL_STACK 0xffffffff80400000lu
 #define FREEMEM (INIT_KERNEL_STACK+4*PAGE_SIZE)
 #define USER_STACK_ADDR 0xf00010000lu
+#define USER_PILE_ADDR 0x20000000lu
 #define FREEMEM_TOP KERNEL_END
-#define MEM_FOR_PROC 0xffffffff80200000lu
+#define MEM_FOR_PROC 0xffffffff80150000lu
 
 /* Rounding; only works for n = power of two */
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
@@ -49,7 +50,7 @@ uintptr_t directmap(uintptr_t kva, uintptr_t pgdir);
 void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base);
 
 uint64_t do_mmap(uint64_t start,uint32_t len, uint8 prot, uint8 flags,uint32_t fd,uint32_t off);
-uint64_t do_brk(uintptr_t ptr);
+int64_t do_brk(uintptr_t ptr);
 
 void *kalloc(void);
 void kfree(void *p);

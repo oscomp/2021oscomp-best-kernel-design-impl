@@ -8,12 +8,6 @@
 #include <user_programs.h>
 #include <os/sched.h>
 
-#define max(x,y) (((x) > (y)) ? (x) : (y))
-#define min(x,y) (((x) > (y)) ? (y) : (x))
-
-#define BUFSIZE (min(NORMAL_PAGE_SIZE, CLUSTER_SIZE))
-#define READ_BUF_CNT (BUFSIZE/SECTOR_SIZE)
-
 fat_t fat;
 uchar root_buf[NORMAL_PAGE_SIZE];
 uchar filebuf[NORMAL_PAGE_SIZE];
@@ -21,9 +15,6 @@ ientry_t cwd_first_clus;
 ientry_t cwd_clus, root_clus, root_first_clus;
 isec_t cwd_sec, root_sec;
 pipe_t pipes[NUM_PIPE];
-
-uchar stdout_buf[NORMAL_PAGE_SIZE];
-uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 uint8_t fat32_init()
 {
@@ -97,13 +88,6 @@ void init_inode()
     */ 
 int8 fat32_read_test(const char *filename)
 {
-    // dentry_t *pp = buf;
-    // while (!is_zero_dentry(pp)){
-    //     printk_port("ffname: %s\n", pp->filename);
-    //     pp = get_next_dentry(pp, buf, &root_clus, &root_sec);
-    // }
-    // while(1);
-
     /* busy */
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
     {
@@ -201,13 +185,13 @@ int8 fat32_read_test(const char *filename)
 
             alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
             alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            uint64_t edata;
-            uint64_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper,&edata);
-            pcb_underinit->edata = edata;            
+
+            uint64_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper,&pcb_underinit->elf);
+            pcb_underinit->edata = pcb_underinit->elf.edata;            
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
 
             // prepare stack
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, NULL, pcb_underinit);
+            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, NULL, NULL, NULL, pcb_underinit);
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
@@ -629,103 +613,6 @@ int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
     if (!list_empty(&pipes[pip_num].wait_list))
         do_unblock(pipes[pip_num].wait_list.next);
     return count; // write count
-}
-
-/* success : read count */
-int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
-{
-    uint8_t fd_index = get_fd_index(fd, current_running);
-    if (fd_index < 0 || !current_running->fd[fd_index].used)
-        return -1;
-
-    if (current_running->fd[fd_index].piped == FD_PIPED)
-        return pipe_read(buf, current_running->fd[fd_index].pip_num, count);
-    // printk_port("fd: %d, length: %d\n", fd_index, current_running->fd[fd_index].length);
-    size_t mycount = 0;
-    size_t realcount = min(count, current_running->fd[fd_index].length);
-    // printk_port("realcount: %d\n", realcount);
-    uchar *buff = kalloc();
-    ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
-    isec_t now_sec = first_sec_of_clus(now_clus);
-
-    while (mycount < realcount){
-        size_t readsize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
-        sd_read(buff, now_sec);
-        memcpy(buf, buff, readsize);
-        buf += readsize;
-        mycount += readsize;
-        current_running->fd[fd_index].pos += readsize;
-        if (mycount % CLUSTER_SIZE == 0){
-            now_clus = get_next_cluster(now_clus);
-            now_sec = first_sec_of_clus(now_clus);
-        }
-        else
-            now_sec += READ_BUF_CNT ; // readsize / BUFSIZE == READ_BUF_CNT until last read
-    }
-
-    kfree(buff);
-
-    return realcount;
-}
-
-/* write count bytes from buff to file in fd */
-/* return count: success
-          -1: fail
-        */
-int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
-{
-    uint8 fd_index = get_fd_index(fd, current_running);
-    if (fd_index < 0) return -1;
-
-    // if (count == 0) return 0;
-    if (current_running->fd[fd_index].dev == STDOUT){        
-        // for (uint i = 0; i < count; ++i){
-        //     sbi_console_putchar(*(buff + i));
-        // }
-        // printk_port("\npid %d is writing\n", current_running->pid);
-        memcpy(stdout_buf, buff, count);
-        stdout_buf[count] = 0;
-        printk_port(stdout_buf);
-        return count;
-    }
-    else{
-        if (current_running->fd[fd_index].piped == FD_PIPED)
-            return pipe_write(buff, current_running->fd[fd_index].pip_num, count);
-
-        size_t mycount = 0;
-        size_t realcount = count; // write as many as possible
-        uchar *tempbuff = kalloc();
-        ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
-        ientry_t old_clus = now_clus;
-        isec_t now_sec = first_sec_of_clus(now_clus);
-
-        while (mycount < realcount){
-            size_t writesize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
-            sd_read(tempbuff,now_sec);
-            memcpy(tempbuff + current_running->fd[fd_index].pos, buff, writesize);
-            sd_write(tempbuff,now_sec);
-            buff += writesize;
-            mycount += writesize;
-            if (mycount % CLUSTER_SIZE == 0){
-                old_clus = now_clus;
-                now_clus = get_next_cluster(now_clus);
-                if (now_clus == 0x0fffffffu){
-                    // new clus should be assigned
-                    now_clus = search_empty_clus(tempbuff);
-                    write_fat_table(old_clus, now_clus, tempbuff);
-                }
-                now_sec = first_sec_of_clus(now_clus);
-            }
-            else
-                now_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
-        }
-        current_running->fd[fd_index].pos += realcount;
-        current_running->fd[fd_index].length = max(current_running->fd[fd_index].pos, current_running->fd[fd_index].length);
-
-        kfree(tempbuff);
-
-        return realcount;
-    }
 }
 
 uchar unicode2char(uint16_t unich)

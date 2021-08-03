@@ -24,7 +24,7 @@ void sys_move_cursor(int x, int y);
 void sys_exit();
 
 void sys_testdisk();
-pid_t sys_exec(const char* file_name, int argc, char* argv[], spawn_mode_t mode);
+int8_t sys_exec(const char* file_name, char* argv[], char *const envp[]);
 
 int8_t sys_test(const char* filename);
 

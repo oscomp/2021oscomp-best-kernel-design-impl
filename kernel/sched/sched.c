@@ -132,100 +132,6 @@ void do_scheduler(void)
     switch_to(previous_running,current_running);
 }
 
-/* default setup pcb */
-void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
-{
-    pcb_underinit->preempt_count = 0; 
-    pcb_underinit->list.ptr = pcb_underinit; 
-    pcb_underinit->pid = process_id++; 
-    pcb_underinit->type = type; 
-    init_list_head(&pcb_underinit->wait_list);
-    pcb_underinit->status = TASK_READY; 
-    pcb_underinit->priority = DEFAULT_PRIORITY; 
-    pcb_underinit->temp_priority = pcb_underinit->priority; 
-    pcb_underinit->mode = DEFAULT_MODE; 
-    pcb_underinit->spawn_num = 0;
-    pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
-    pcb_underinit->mask = 0xf; 
-    pcb_underinit->parent.parent = NULL;
-
-    /* file descriptors */
-    // number, piped
-    for (int i = 0; i < NUM_FD; ++i){
-        pcb_underinit->fd[i].fd_num = i;
-        pcb_underinit->fd[i].piped = FD_UNPIPED;
-    }
-    // open stdin , stdout and stderr
-    pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
-    pcb_underinit->fd[1].dev = STDOUT; pcb_underinit->fd[1].used = FD_USED; pcb_underinit->fd[1].flags = O_WRONLY;
-    pcb_underinit->fd[2].dev = STDERR; pcb_underinit->fd[2].used = FD_USED; pcb_underinit->fd[2].flags = O_WRONLY;
-    for (int i = 3; i < NUM_FD; ++i)
-        pcb_underinit->fd[i].used = FD_UNUSED; // remember to set up other props when use it
-
-    // systime
-    pcb_underinit->stime = 0;
-    pcb_underinit->utime = 0;
-}
-
-/* prepare pcb stack for ready process */
-/* prepare USER content, SWITCH content and ARGC&ARGV */
-void init_pcb_stack(
-    ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, unsigned char* argv[],
-    pcb_t *pcb)
-{
-    regs_context_t *pt_regs =
-        (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
-    
-    reg_t gp, ra;
-    
-    gp = __global_pointer$;
-    ra = entry_point;
-
-    pcb->kernel_sp = (reg_t)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
-    pcb->user_sp = (reg_t)user_stack;
-    set_stack_base(pcb, kernel_stack, user_stack);
-    pcb->pgdir = pgdir;
-
-    reg_t *regs = pt_regs->regs;    
-    regs[3] = gp;  //gp
-    regs[4] = pcb; //tp
-    // regs[10] = argc; //a0=argc
-    // regs[11]= (ptr_t)argv; //a1=argv
-    pt_regs->sstatus = SR_SUM; //enable supervisor-mode userpage access
-
-#ifdef K210
-    pt_regs->sstatus = 0; //enable supervisor-mode userpage access for K210
-#endif
-
-    pt_regs->sepc = ra;
-    unsigned mode = SATP_MODE_SV39, asid = pcb->pid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;
-    pt_regs->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
-    
-    switchto_context_t *switch_to_reg = 
-        (switchto_context_t *)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
-    switch_to_reg->regs[0] = &ret_from_exception;
-
-    uint64_t argc = 0;
-    uint64_t user_stack_kva = get_kva_of(user_stack, pgdir);
-
-    if (argv)
-        while (argv[argc]) argc++;
-
-    memcpy(user_stack_kva, &argc, 8);
-
-    if (argc){
-        unsigned char **pointers = user_stack_kva + 8; // point to argv[i] in i-th iteration
-        unsigned char *strings = user_stack_kva + 8 + argc*sizeof(unsigned char *) + 1; // + 1 for NULL
-        uint64_t write_to_stack = user_stack - NORMAL_PAGE_SIZE + 8 + argc*sizeof(unsigned char*) + 1; // virtual addr for user
-        for (int i = 0; i < argc; ++i)
-        {
-            memcpy(strings,argv[i],strlen(argv[i])+1);
-            pointers[i] = write_to_stack;
-            strings += (strlen(argv[i])+1); write_to_stack += (strlen(argv[i])+1);
-        }
-        pointers[argc] = 0;
-    }
-}
 
 /* copy context */
 /* kernel_stack and user_stack are stack top addr */
@@ -397,52 +303,6 @@ void do_exit(int32_t exit_status)
     do_scheduler();
 }
 
-/* execvc a process */
-/* success: no return value */
-/* fail: return -1 */
-int8 do_exec(const char* file_name, char* argv[], char *const envp)
-{
-    for (int i = 1; i < NUM_MAX_TASK; ++i)
-        if (pcb[i].status == TASK_EXITED)
-        {
-            // init pcb
-            pcb_t *pcb_underinit = &pcb[i];
-            ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
-            ptr_t user_stack = USER_STACK_ADDR;
-
-            init_pcb_default(pcb_underinit, USER_PROCESS);
-
-            // get file
-            unsigned char *_elf_binary = NULL;
-            uint64 length;
-            int32 fd;
-
-            if ((fd = fat32_open(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
-                return -1;
-            }
-            length = current_running->fd[fd].length;
-            _elf_binary = (char *)allocproc();
-            fat32_read(fd, _elf_binary, length);
-
-            uintptr_t pgdir = allocPage();
-            clear_pgdir(pgdir);
-            alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            uint64_t edata;
-            uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper, &edata);
-            pcb_underinit->edata = edata;
-            share_pgtable(pgdir,pa2kva(PGDIR_PA));
-
-            // prepare stack(give argc and argv)(argv = user_stack - NORMAL_PAGE_SIZE)
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, pcb_underinit);
-            // add to ready_queue
-            list_del(&pcb_underinit->list);
-            list_add_tail(&pcb_underinit->list,&ready_queue);
-
-            return pcb[i].pid; // no need but do
-        }
-    return -1;
-}
 
 pid_t do_getpid()
 {
@@ -455,6 +315,31 @@ pid_t do_getppid()
         return 1;
     return current_running->parent.parent->pid;
 }
+
+/* return 0 */
+pid_t do_getuid()
+{
+    return 0;
+}
+
+/* return 0 */
+pid_t do_geteuid()
+{
+    return 0;
+}
+
+/* return 0 */
+pid_t do_getgid()
+{
+    return 0;
+}
+
+/* return 0 */
+pid_t do_getegid()
+{
+    return 0;
+}
+
 
 
 

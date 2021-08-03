@@ -1,6 +1,6 @@
 #ifndef __MEMLAYOUT_H
 #define __MEMLAYOUT_H
-
+#include <pgtable.h>
 // Physical memory layout
 
 // k210 peripherals
@@ -91,7 +91,7 @@
 // from physical address 0x80200000 to PHYSTOP.
 #define KERNBASE 0xffffffff80020000
 // #define PHYSTOP (KERNBASE + 128*1024*1024)
-#define PHYSTOP 0xffffffff80600000
+#define PHYSTOP KERNEL_END
 
 // map the trampoline page to the highest address,
 // in both user and kernel space.

@@ -8,6 +8,7 @@
 #include <os/mm.h>
 #include <os/smp.h>
 #include <os/time.h>
+#include <os/elf.h>
 
 #define NUM_MAX_TASK 16
 
@@ -171,9 +172,12 @@ typedef struct pcb
     /* file descriptor */
     fd_t fd[NUM_FD];
 
+    /* elf info */
+    struct ELF_info elf;
+
     /* edata */
     uint64_t edata;
-} pcb_t;
+}__attribute__((aligned(64))) pcb_t;
 
 #define DEFAULT_PRIORITY 1
 #define WEXITSTATUS(status,exit_status) (*((uint16_t *)status) = ((exit_status) << 8) & 0xff00)
@@ -184,6 +188,31 @@ typedef struct task_info
     ptr_t entry_point;
     task_type_t type;
 } task_info_t;
+
+/* aux vector */
+#define MAX_AUX_ARG 0x30
+
+#define AT_PHDR 3
+#define AT_PHENT  4
+#define AT_PHNUM  5
+#define AT_PAGESZ  6
+#define AT_BASE  7
+#define AT_FLAGS  8
+#define AT_ENTRY  9
+#define AT_UID   11
+#define AT_EUID  12
+#define AT_GID   13
+#define AT_EGID 14
+#define AT_HWCAP  16
+#define AT_CLKTCK  17
+#define AT_SECURE 23
+#define AT_RANDOM 25
+#define AT_EXECFN  31
+typedef struct aux_elem
+{
+    uint64_t id;
+    uint64_t val;
+}aux_elem_t;
 
 /* ready queue to run */
 extern list_head ready_queue;
@@ -205,7 +234,8 @@ extern const ptr_t pid0_stack2;
 extern void __global_pointer$();
 
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type);
-void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,unsigned char *argv[],pcb_t *pcb);
+void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,unsigned char *argv[], 
+    unsigned char *envp[], aux_elem_t *aux_vec, pcb_t *pcb);
 extern void ret_from_exception();
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
@@ -222,6 +252,11 @@ int do_waitpid(pid_t pid);
 void do_process_show();
 pid_t do_getpid();
 pid_t do_getppid();
+pid_t do_getuid();
+pid_t do_geteuid();
+pid_t do_getgid();
+pid_t do_getegid();
+
 int do_taskset(uint32_t pid,uint32_t mask);
 
 void do_exit();
@@ -230,7 +265,7 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
 pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
 
 uint8_t do_nanosleep(struct timespec *sleep_time);
-int8 do_exec(const char* file_name, char* argv[], char *const envp);
+int8 do_exec(const char* file_name, char* argv[], char *const envp[]);
 
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;

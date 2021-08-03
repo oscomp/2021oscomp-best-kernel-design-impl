@@ -28,6 +28,7 @@
 #define SYS_getdents64 61
 #define SYS_read 63
 #define SYS_write 64
+#define SYS_writev 66
 
 #define SYS_fstat 80
 
@@ -41,6 +42,10 @@
 #define SYS_gettimeofday 169
 #define SYS_getpid 172
 #define SYS_getppid 173
+#define SYS_getuid 174
+#define SYS_geteuid 175
+#define SYS_getgid 176
+#define SYS_getegid 177
 
 #define SYS_brk 214
 #define SYS_munmap 215

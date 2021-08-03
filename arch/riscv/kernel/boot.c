@@ -1,5 +1,4 @@
 /* RISC-V kernel boot stage */
-#include <context.h>
 #include <pgtable.h>
 #include <sbi.h>
 #include <os/elf.h>
@@ -95,10 +94,10 @@ int boot_kernel(unsigned long mhartid, uintptr_t riscv_dtb)
     if (mhartid == 0) {
         setup_vm();
         // load kernel
-        uint64_t edata;
+        ELF_info_t elf;
         start_kernel =
                 (kernel_entry_t)load_elf(_elf_main, _length_main,
-                                         PGDIR_PA, directmap, &edata);
+                                         PGDIR_PA, directmap, &elf);
     } else {
         // TODO: what should we do for other cores?
         while (1) sbi_console_putchar('6');

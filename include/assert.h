@@ -17,4 +17,9 @@ static inline void _panic(const char* file_name,int lineno, const char* func_nam
         }                                            \
     }
 
+#define debug() \
+    { \
+        printk_port("TRACE:%s in %s:%d\n",__FUNCTION__,__FILE__,__LINE__); \
+    }
+
 #endif /* ASSERT_H */

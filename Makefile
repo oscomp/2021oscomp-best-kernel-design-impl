@@ -13,7 +13,7 @@ USER_CFLAGS = -O0 -w -nostdlib -T user_riscv.lds -Wall -mcmodel=medany -Itest -I
 
 BOOTLOADER_ENTRYPOINT = 0x80000000
 START_ENTRYPOINT = 0x80020000
-KERNEL_ENTRYPOINT = 0xffffffff80400000
+KERNEL_ENTRYPOINT = 0xffffffff80300000
 START_QEMU_ENTRY = 0x80200000
 
 ARCH = riscv
@@ -33,11 +33,11 @@ SRC_DRIVER	= ./drivers/screen.c
 SRC_INIT 	= ./init/main.c
 SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
-SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c
+SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c ./kernel/sched/exec.c
 SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
-SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c
+SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c
 SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
@@ -67,7 +67,7 @@ K210_SERIALPORT	= /dev/ttyUSB0
 
 .PHONY:all
 
-all: elf k210 qemu asm# floppy
+all: elf k210 asm# floppy
 
 k210: payload createimage image
 

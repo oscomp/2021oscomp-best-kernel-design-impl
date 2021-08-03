@@ -27,3 +27,9 @@ int8_t sys_test(const char* filename)
 {
     return invoke_syscall(SYSCALL_TEST, filename, IGNORE, IGNORE, IGNORE, IGNORE);
 }
+
+int8_t sys_exec(const char* file_name, char* argv[], char *const envp[])
+{
+    return invoke_syscall(SYS_execve, file_name, argv, envp, IGNORE, IGNORE);
+}
+
