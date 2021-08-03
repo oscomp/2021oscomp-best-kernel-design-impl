@@ -60,6 +60,14 @@ static void get_random_bytes(unsigned char *random, size_t size)
         random[i] = 2*c + i;
 }
 
+static uint64_t get_argc_from_argv(char *argv[])
+{
+    uint64_t argc = 0;
+    if (argv)
+        while (argv[argc]) argc++;
+    return argc;
+}
+
 /* copy things to user stack */
 /* argv, envp, aux_vec could be NULL */
 static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], unsigned char *envp[],
@@ -68,9 +76,7 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
     uintptr_t sp_uva = USER_STACK_ADDR;
     uintptr_t start_sp_kva = sp_kva;
     // 1. copy argc
-    uint64_t argc = 0;
-    if (argv)
-        while (argv[argc]) argc++;
+    uint64_t argc = get_argc_from_argv(argv);
     // printk_port("argc is %d\n", argc);
     memcpy(sp_kva, &argc, sizeof(uint64_t));
     sp_kva += sizeof(uint64_t);
@@ -105,20 +111,20 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
         sp_kva += 2 * sizeof(uintptr_t);
     }
     aux_elem_t *last_mem_aux_vec = mem_aux_vec;
-    // // 5. random pad
-    // for (uint i = 0; i < 3; ++i)
-    //     *(char*)(sp_kva + i) = 0; // magic
-    // sp_kva += 3;
-    // unsigned char random[16];
-    // get_random_bytes(random, 16);
-    // memcpy(sp_kva, random, 16);
-    // while (mem_aux_vec->id != AT_RANDOM && mem_aux_vec >= start_mem_aux_vec)
-    //     mem_aux_vec--;
-    // if (mem_aux_vec->id == AT_RANDOM && mem_aux_vec >= start_mem_aux_vec){
-    //     mem_aux_vec->val = (uint64_t)sp_kva - (uint64_t)start_sp_kva + sp_uva;
-    //     sp_kva += 16;
-    // }
-    // mem_aux_vec = last_mem_aux_vec;
+    // 5. random pad
+    for (uint i = 0; i < 3; ++i)
+        *(char*)(sp_kva + i) = 0; // magic
+    sp_kva += 3;
+    unsigned char random[16];
+    get_random_bytes(random, 16);
+    memcpy(sp_kva, random, 16);
+    while (mem_aux_vec->id != AT_RANDOM && mem_aux_vec >= start_mem_aux_vec)
+        mem_aux_vec--;
+    if (mem_aux_vec->id == AT_RANDOM && mem_aux_vec >= start_mem_aux_vec){
+        mem_aux_vec->val = (uint64_t)sp_kva - (uint64_t)start_sp_kva + sp_uva;
+        sp_kva += 16;
+    }
+    mem_aux_vec = last_mem_aux_vec;
     // 6. copy argv strings
     if (argv){        
         for (uint i = 0; i < argc; ++i){
@@ -185,7 +191,7 @@ void init_pcb_stack(
     reg_t *regs = pt_regs->regs;    
     regs[3] = gp;  //gp
     regs[4] = pcb; //tp
-    // regs[10] = argc; //a0=argc
+    regs[10] = get_argc_from_argv(argv); //a0=argc
     // regs[11]= (ptr_t)argv; //a1=argv
     pt_regs->sstatus = SR_SUM; //enable supervisor-mode userpage access
 
@@ -212,5 +218,5 @@ void init_pcb_stack(
     else
         filename = backupname;
     uint64_t user_stack_kva_ret = copy_above_user_stack(user_stack_kva, argv, envp, aux_vec, filename);
-    assert(user_stack_kva_ret - user_stack_kva <= NORMAL_PAGE_SIZE);
+    // assert(user_stack_kva_ret - user_stack_kva <= NORMAL_PAGE_SIZE);
 }

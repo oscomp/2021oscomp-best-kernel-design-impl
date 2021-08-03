@@ -63,7 +63,7 @@ static void set_aux_vec(aux_elem_t *aux_vec, ELF_info_t *elf)
     NEW_AUX_ENT(AT_GID, 0);                         // 0x0d
     NEW_AUX_ENT(AT_EGID, 0);                        // 0x0e
     NEW_AUX_ENT(AT_SECURE, 0);                      // 0x17
-    // NEW_AUX_ENT(AT_RANDOM, 0);                      // 0x19
+    NEW_AUX_ENT(AT_RANDOM, 0);                      // 0x19
     NEW_AUX_ENT(AT_EXECFN, 0);                      // 0x1f
     NEW_AUX_ENT(0, 0);
 #undef NEW_AUX_ENT

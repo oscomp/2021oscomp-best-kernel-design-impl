@@ -52,21 +52,21 @@ uintptr_t load_elf(
     uint64_t first_load_p_vaddr = 0;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
-        // if (phdr->p_type >= 0 && phdr->p_type <= 9)
-        //     sbi_console_putchar('0' + phdr->p_type);
-        // if (phdr->p_type == PT_GNU_STACK && phdr->p_memsz > 0)
-        //     sbi_console_putchar('a');
-        // else if (phdr->p_type == PT_GNU_RELRO)
-        //     sbi_console_putchar('b');
-        // else
-        //     sbi_console_putchar('c');
+        if (phdr->p_type >= 0 && phdr->p_type <= 9)
+            sbi_console_putchar('d' + phdr->p_type);
+        else if (phdr->p_type == PT_GNU_STACK)
+            sbi_console_putchar('a');
+        else if (phdr->p_type == PT_GNU_RELRO)
+            sbi_console_putchar('b');
+        else
+            sbi_console_putchar('c');
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
             if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
             for (i = 0; i < phdr->p_memsz; ) {
                 uintptr_t offset_in_page = (phdr->p_vaddr + i) % NORMAL_PAGE_SIZE; // offset in this page
                 uint64_t copy_bytes; // how many bytes are copied
                 if (i < phdr->p_filesz) {
-                    // sbi_console_putchar('7');
+                    sbi_console_putchar('7');
                     unsigned char *bytes_of_page =
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
@@ -76,7 +76,7 @@ uintptr_t load_elf(
                         elf_binary + phdr->p_offset + i,
                         copy_bytes);
                     if (offset_in_page + copy_bytes < NORMAL_PAGE_SIZE) {
-                        // sbi_console_putchar('8');
+                        sbi_console_putchar('8');
                         for (int j =
                                  offset_in_page + copy_bytes;
                              j < NORMAL_PAGE_SIZE; ++j) {
@@ -85,7 +85,7 @@ uintptr_t load_elf(
                         copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
                     }
                 } else {
-                    // sbi_console_putchar('9');
+                    sbi_console_putchar('9');
                     unsigned char *bytes_of_page =
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
