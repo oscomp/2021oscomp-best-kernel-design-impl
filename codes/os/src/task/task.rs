@@ -464,6 +464,14 @@ impl TaskControlBlock {
         self.tgid
     }
 
+    pub fn lazy_mmap(&self, stval: usize) {
+        let mut inner = self.acquire_inner_lock();
+        let fd_table = inner.fd_table.clone();
+        let token = inner.get_user_token();
+        inner.memory_set.lazy_mmap(stval.into());
+        inner.mmap_area.lazy_map_page(stval, fd_table, token);
+    }
+
     pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: isize, off: usize) -> usize {
         // gdb_println!(SYSCALL_ENABLE,"[mmap](0x{:X},{},{},0x{:X},{},{})",start, len, prot, flags, fd, off);
         
@@ -493,14 +501,18 @@ impl TaskControlBlock {
             return start;
         }
         else{ // "Start" va not mapped
-            println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
+            // println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
             // println!("[insert_mmap_area]: flags 0x{:X}",flags);
             // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
+            // println!{"pin1"}
             inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
-            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token)
+            // println!{"pin2"}
+            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            // println!{"pin3"}
+            va_top.0
         }
     }
 
@@ -522,7 +534,7 @@ impl TaskControlBlock {
         let va_top = kma_lock.get_mmap_top();
         let end_va = VirtAddr::from(va_top.0 + len);
         println!("vatop = 0x{:X}, end_va = 0x{:X}", va_top.0, end_va.0);
-        ks_lock.insert_mmap_area(va_top, end_va,  MapPermission::W | MapPermission::R );
+        ks_lock.insert_kernel_mmap_area(va_top, end_va,  MapPermission::W | MapPermission::R );
         // let page_table = PageTable::from_token(KERNEL_TOKEN.token());
         // println!("pte = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().bits);
         //println!("ppn = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().ppn().0);
@@ -532,7 +544,7 @@ impl TaskControlBlock {
         //    *(MMAP_BASE as *mut usize) = 5;
         //}
     
-        kma_lock.push(va_top.into(), len, prot, flags, fd, off, fd_table, token)
+        kma_lock.push_kernel(va_top.into(), len, prot, flags, fd, off, fd_table, token)
     }
 
     pub fn kmunmap(&self, start: usize, len: usize) -> isize {

@@ -29,7 +29,7 @@ bitflags! {
 pub struct MmapArea {
     pub mmap_start: VirtAddr,
     pub mmap_top: VirtAddr,
-    pub mmap_set: Vec<Arc<MmapSpace>>,
+    pub mmap_set: Vec<MmapSpace>,
 }
 
 impl MmapArea {
@@ -57,6 +57,25 @@ impl MmapArea {
         }
     }
 
+    pub fn push_kernel(&mut self, start: usize, len: usize, prot: usize, flags: usize,
+        fd: isize, offset: usize, fd_table: FdTable, token: usize) -> usize {
+
+        let start_addr = start.into();
+
+        let mut mmap_space = MmapSpace::new(start_addr, len, prot, flags, 0, fd, offset);
+        mmap_space.map_file(start_addr, len, offset, fd_table, token);
+        // println!{"The start addr is {:X}", start_addr.0};
+
+        self.mmap_set.push(mmap_space);
+
+        // update mmap_top
+        if self.mmap_top == start_addr{
+            self.mmap_top = (start_addr.0 + len).into();
+        }
+
+        start_addr.0
+    }
+
     pub fn push(&mut self, start: usize, len: usize, prot: usize, flags: usize,
                 fd: isize, offset: usize, fd_table: FdTable, token: usize) -> usize {
         
@@ -66,7 +85,7 @@ impl MmapArea {
         // mmap_space.map_file(start_addr, len, offset, fd_table, token);
         // println!{"The start addr is {:X}", start_addr.0};
 
-        self.mmap_set.push(Arc::new(mmap_space));
+        self.mmap_set.push(mmap_space);
 
         // update mmap_top
         if self.mmap_top == start_addr{

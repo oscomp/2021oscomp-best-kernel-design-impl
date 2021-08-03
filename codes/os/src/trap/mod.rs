@@ -112,7 +112,13 @@ pub fn trap_handler() -> ! {
             let heap_pt = current_task().unwrap().acquire_inner_lock().heap_pt;
             // println!{"The base of the user heap: {:X}", heap};
             // println!{"============================{:?}", vpn}
-            if va.0 >= heap_base && va.0 <= heap_pt {
+            let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
+            let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
+            println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
+            if va >= mmap_start && va < mmap_end {
+                println!{"where is the lazy_mmap_page!!!!!!!!"}
+                exit_current_and_run_next(-2);
+            } else if va.0 >= heap_base && va.0 <= heap_pt {
                 current_task().unwrap().acquire_inner_lock().lazy_alloc(vpn);
             } else {
                 // get the PageTableEntry that faults
