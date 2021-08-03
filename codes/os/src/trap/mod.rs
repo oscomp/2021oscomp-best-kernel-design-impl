@@ -16,6 +16,7 @@ use riscv::register::{
 use crate::mm::{
     VirtAddr,
     VirtPageNum,
+    print_free_pages,
 };
 use crate::syscall::syscall;
 use crate::task::{
@@ -79,7 +80,7 @@ pub fn trap_handler() -> ! {
             // cx is changed during sys_exec, so we have to call it again
             let syscall_id = cx.x[17];
             if syscall_id != 64 && syscall_id != 63{
-                println!("syscall-({}): return{}",syscall_id, result);
+                println!("syscall-({}) = 0x{:X}  ",syscall_id, result);
             }
             cx = current_trap_cx();
             cx.x[10] = result as usize;
@@ -125,6 +126,7 @@ pub fn trap_handler() -> ! {
                 let former_ppn = pte.unwrap().ppn();
                 //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 println!("cow addr = {:X}", stval);
+                print_free_pages();
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 // println!{"cow_alloc returned..."}

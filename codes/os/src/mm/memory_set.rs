@@ -1,6 +1,6 @@
 use super::{PageTable, PageTableEntry, PTEFlags};
 use super::{VirtPageNum, VirtAddr, PhysPageNum, PhysAddr};          
-use super::{FrameTracker, frame_alloc, frame_add_ref, enquire_refcount};
+use super::{FrameTracker, frame_alloc, frame_add_ref, enquire_refcount, print_free_pages};
 use super::{VPNRange, StepByOne};
 use alloc::collections::BTreeMap;
 //use alloc::string::ToString;
@@ -545,6 +545,7 @@ impl MapArea {
                     self.data_frames.insert(vpn, frame);
                 }
                 else{
+                    print_free_pages();
                     panic!("No more memory!");
                 }
             }

@@ -26,6 +26,7 @@ const SYSCALL_UTIMENSAT:usize = 88;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_SET_TID_ADDRESS: usize = 96;
 const SYSCALL_NANOSLEEP: usize = 101;
+const SYSCALL_CLOCK_GETTIME: usize = 113;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_TIMES: usize = 153;
 const SYSCALL_UNAME: usize = 160;
@@ -66,7 +67,7 @@ use crate::sbi::shutdown;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
-        gdb_print!(SYSCALL_ENABLE,"syscall-({})\n",syscall_id);
+        // gdb_print!(SYSCALL_ENABLE,"syscall-({})",syscall_id);
     }
 
     
@@ -108,11 +109,12 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_SET_TID_ADDRESS => sys_set_tid_address(args[0] as usize),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_NANOSLEEP => sys_sleep(args[0] as *mut u64, args[1] as *mut u64),
+        SYSCALL_CLOCK_GETTIME => sys_clock_get_time(args[0] as usize, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_TIMES => sys_times(args[0] as *mut i64),
         SYSCALL_UNAME => sys_uname(args[0] as *mut u8),
         SYSCALL_GETRUSAGE => sys_getrusage(args[0] as isize, args[1] as *mut u8),
-        SYSCALL_GET_TIME_OF_DAY => sys_get_time(args[0] as *mut u64),
+        SYSCALL_GET_TIME_OF_DAY => sys_get_time_of_day(args[0] as *mut u64),
         SYSCALL_SBRK => sys_sbrk(args[0] as isize, args[1] as usize),
         SYSCALL_BRK => sys_brk(args[0]),
 
@@ -124,7 +126,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETEGID => sys_getegid(),
         SYSCALL_GETTID => sys_gettid(),
 
-        SYSCALL_CLONE => sys_fork(args[0] as usize, args[1] as  usize, args[2] as  usize, args[3] as  usize),
+        SYSCALL_CLONE => sys_fork(args[0] as usize, args[1] as  usize, args[2] as  usize, args[3] as  usize, args[4] as usize),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
         SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
         SYSCALL_RENAMEAT2 => sys_renameat2(

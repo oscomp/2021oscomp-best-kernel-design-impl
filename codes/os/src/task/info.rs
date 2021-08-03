@@ -1,7 +1,14 @@
+use core::fmt::{self, Debug, Formatter};
+use bitflags::*;
+
 // sys_clone
-pub const SIGCHLD:usize = 17;
-pub const CLONE_CHILD_CLEARTID:usize = 0x00200000;
-pub const CLONE_CHILD_SETTID:usize = 0x01000000;
+bitflags!{
+    pub struct CloneFlags: usize{
+        const SIGCHLD = 17;
+        const CLONE_CHILD_CLEARTID = 0x00200000;
+        const CLONE_CHILD_SETTID = 0x01000000;
+    }
+}
 // sys_getrusage
 pub const RUSAGE_SELF:isize = 0; /* The calling process.  */
 pub const RUSAGE_CHILDREN:isize = -1; /* All of its terminated child processes.  */
@@ -42,6 +49,8 @@ pub struct RUsage{
     ru_nvcsw   :isize  ,      // NOT IMPLEMENTED /* voluntary context switches */
     ru_nivcsw  :isize  ,      // NOT IMPLEMENTED /* involuntary context switches */
 }
+
+
 
 impl utsname{
     pub fn new() -> Self{
@@ -138,4 +147,16 @@ impl RUsage{
         }
     }
 
+}
+
+impl Debug for TimeVal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("( sec:{}, usec:{})", self.sec, self.usec))
+    }
+}
+
+impl Debug for RUsage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("( ru_utime:{:?}, ru_stime:{:?})", self.ru_utime, self.ru_stime))
+    }
 }

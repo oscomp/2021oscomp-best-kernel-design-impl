@@ -314,7 +314,7 @@ impl TaskControlBlock {
         let auxv_base = user_sp;
         // println!("[auxv]: base 0x{:X}", auxv_base);
         for i in 0..auxv.len() {
-            println!("[auxv]: {:?}", auxv[i]);
+            // println!("[auxv]: {:?}", auxv[i]);
             let addr = user_sp + core::mem::size_of::<AuxHeader>() * i;
             *translated_refmut(memory_set.token(), addr as *mut usize) = auxv[i].aux_type ;
             *translated_refmut(memory_set.token(), (addr + core::mem::size_of::<usize>()) as *mut usize) = auxv[i].value ;

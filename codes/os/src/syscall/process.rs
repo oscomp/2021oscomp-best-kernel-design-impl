@@ -10,7 +10,7 @@ use crate::mm::{
     PageTable,
 };
 use crate::fs::{DiskInodeType, FileClass, FileDescripter, OpenFlags, open};
-use crate::config::PAGE_SIZE;
+use crate::config::{PAGE_SIZE, CLOCK_FREQ};
 use crate::gdb_print;
 use crate::gdb_println;
 use crate::monitor::*;
@@ -50,15 +50,17 @@ pub fn sys_times(time: *mut i64) -> isize {
     0
 }
 
-pub fn sys_get_time(time: *mut u64) -> isize {
+pub fn sys_get_time_of_day(time: *mut u64) -> isize {
     // pub struct TimeVal{
     //     sec: u64,
     //     usec: u64,
     // }
     let token = current_user_token();
-    let sec = get_time_us() as u64;
-    *translated_refmut(token, time) = get_time_s() as u64;
-    *translated_refmut(token, unsafe { time.add(1) }) = get_time_us() as u64;
+    let ticks = get_time();
+    let sec = (ticks/CLOCK_FREQ) as u64;
+    let usec = ((ticks%CLOCK_FREQ) * (USEC_PER_SEC / CLOCK_FREQ)) as u64;
+    *translated_refmut(token, time) = sec ;
+    *translated_refmut(token, unsafe { time.add(1) }) = usec;
     0
 
 }
@@ -66,13 +68,16 @@ pub fn sys_get_time(time: *mut u64) -> isize {
 
 pub fn sys_getrusage(who: isize, usage: *mut u8) -> isize {
     if who != RUSAGE_SELF {
-        println!("sys_getrusage: \"who\" not supported!");
+        panic!("sys_getrusage: \"who\" not supported!");
         return -1;
     }
     let task = current_task().unwrap();
     let token = current_user_token();
     let mut userbuf = UserBuffer::new(translated_byte_buffer(token, usage, core::mem::size_of::<RUsage>()));
-    userbuf.write(task.acquire_inner_lock().rusage.as_bytes());
+    let rusage = &task.acquire_inner_lock().rusage;
+    userbuf.write(rusage.as_bytes());
+    gdb_println!(SYSCALL_ENABLE, "sys_getrusage(who: {}, usage: {:?}) = {}", who, rusage, 0);
+    // crate::sbi::shutdown();
     0
 }
 
@@ -119,6 +124,26 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
             return 0;
         }
     }
+    0
+}
+
+
+pub fn sys_clock_get_time(clk_id: usize, tp: *mut u64) -> isize{
+    // struct timespec {
+    //     time_t   tv_sec;        /* seconds */
+    //     long     tv_nsec;       /* nanoseconds */
+    // };
+    if tp as usize == 0 {// point is null
+        return 0;
+    }
+    
+    let token = current_user_token();
+    let ticks = get_time();
+    let sec = (ticks/CLOCK_FREQ) as u64;
+    let nsec = ((ticks%CLOCK_FREQ) * (NSEC_PER_SEC / CLOCK_FREQ))  as u64;
+    *translated_refmut(token, tp) = sec ;
+    *translated_refmut(token, unsafe { tp.add(1) }) = nsec;
+    gdb_println!(SYSCALL_ENABLE, "sys_get_time(clk_id: {}, tp: (sec: {}, nsec: {}) = {}", clk_id, sec, nsec, 0);
     0
 }
 
@@ -191,19 +216,21 @@ pub fn sys_brk(brk_addr: usize) -> isize{
 //long clone(unsigned long flags, void *child_stack,
 //    int *ptid, int *ctid,
 //    unsigned long newtls);
-pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize) -> isize {
-    gdb_print!(FORK_ENABLE,"[fork]");
+pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls: usize) -> isize {
+    print_free_pages();
     let current_task = current_task().unwrap();
     let new_task = current_task.fork(false);
     let tid = new_task.getpid();
-    if flags == CLONE_CHILD_SETTID{
+    let flags = CloneFlags::from_bits(flags).unwrap();
+    gdb_print!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, "?");
+    if flags.contains(CloneFlags::CLONE_CHILD_SETTID) && ctid != 0{
         new_task.acquire_inner_lock().address.set_child_tid = ctid; 
         *translated_refmut(new_task.acquire_inner_lock().get_user_token(), ctid as *mut i32) = tid  as i32;
     }
-    else if flags == CLONE_CHILD_CLEARTID{
+    if flags.contains(CloneFlags::CLONE_CHILD_CLEARTID) && ctid != 0{
         new_task.acquire_inner_lock().address.clear_child_tid = ctid;
     }
-    else if flags != SIGCHLD{
+    if !flags.contains(CloneFlags::SIGCHLD){
         panic!("sys_fork: FLAG not supported!");
         return -1;
     }
@@ -221,6 +248,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize) -> isi
     trap_cx.x[10] = 0;
     // add new task to scheduler
     add_task(new_task);
+    print_free_pages();
     new_pid as isize
 }
 
