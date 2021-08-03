@@ -51,6 +51,7 @@ uintptr_t load_elf(
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = MIN(phdr->p_filesz - i, NORMAL_PAGE_SIZE - offset_in_page);
+                    printk_port("bytes_of_page:%lx\n", bytes_of_page);
                     printk_port("page offset:%lx\n", offset_in_page);
                     printk_port("copy_bytes: %lx\n", copy_bytes);
                     memcpy(
@@ -58,6 +59,10 @@ uintptr_t load_elf(
                         elf_binary + phdr->p_offset + i,
                         copy_bytes);
                     if (offset_in_page + copy_bytes < NORMAL_PAGE_SIZE) {
+                        printk_port("extra pad\n");
+                        printk_port("bytes_of_page:%lx\n", bytes_of_page);
+                        printk_port("page offset:%lx\n", offset_in_page);
+                        printk_port("copy_bytes: %lx\n", copy_bytes);
                         for (int j =
                                  offset_in_page + copy_bytes;
                              j < NORMAL_PAGE_SIZE; ++j) {
@@ -69,6 +74,7 @@ uintptr_t load_elf(
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
+                    printk_port("bytes_of_page:%lx\n", bytes_of_page);
                     printk_port("page offset:%lx\n", offset_in_page);
                     printk_port("copy_bytes: %lx\n", copy_bytes);
                     for (int j = offset_in_page;

@@ -28,7 +28,7 @@ static const char *fixed_envp[] = {"SHELL=ash",
                      "SHLVL=2",
                      "JOURNAL_STREAM=8:9265",
                      "PATH=/",
-                     "OLDPWD=/root",
+                     "OLDPWD=/",
                      "_=busybox",
                      0};
 
