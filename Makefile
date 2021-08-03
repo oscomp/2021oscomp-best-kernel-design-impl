@@ -108,7 +108,7 @@ asm:
 	cd ./txt
 	${OBJDUMP} -d main > txt/kernel.txt
 	${OBJDUMP} -d head > txt/head.txt
-	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
+# 	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
 	for testelf in $(TEST_ELF); do ${OBJDUMP} -d ./test/$$testelf > txt/$${testelf/.elf/.txt}; done
 
 qemu_head: createimage ${SRC_HEAD}
