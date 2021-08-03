@@ -34,16 +34,13 @@ uintptr_t load_elf(
     ph_entry_size  = ehdr->e_phentsize;
     sh_entry_count = ehdr->e_shnum;
     sh_entry_size  = ehdr->e_shentsize;
-    printk_port("type: %lx\n", ehdr->e_type);
-    printk_port("machine: %lx\n", ehdr->e_machine);
-    printk_port("version: %lx\n", ehdr->e_version);
 
     uint64_t first_load_p_vaddr = 0;
     uint8_t is_first = 1;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
-            // printk_port("p_vaddr:%lx, p_offset:%lx\n", phdr->p_vaddr, phdr->p_offset);
+            printk_port("p_vaddr:%lx, p_offset:%lx\n", phdr->p_vaddr, phdr->p_offset);
             // printk_port("filesz: %lx, memsz: %lx\n", phdr->p_filesz, phdr->p_memsz);
             if (is_first) { first_load_p_vaddr = phdr->p_vaddr; is_first = 0; }
             for (i = 0; i < phdr->p_memsz; ) {
