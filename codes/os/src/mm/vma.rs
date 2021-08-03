@@ -1,4 +1,5 @@
 use super::{VirtAddr, UserBuffer, translated_byte_buffer};
+use crate::config::PAGE_SIZE;
 use crate::fs::{File, FileClass};
 use crate::task::FdTable;
 use alloc::sync::{Arc};
@@ -45,13 +46,24 @@ impl MmapArea {
 
     pub fn get_mmap_top(&mut self) -> VirtAddr { self.mmap_top }
 
+    pub fn lazy_map_page(&mut self, stval: usize, fd_table: FdTable, token: usize) {
+        for mmap_space in self.mmap_set.iter_mut() {
+            if stval >= mmap_space.oaddr.0 && stval < mmap_space.oaddr.0 + mmap_space.length {
+                // let va: VirtAddr = stval.into();
+                let page_start: VirtAddr = (stval & !(PAGE_SIZE - 1)).into();
+                mmap_space.lazy_map_page(page_start, fd_table, token);
+                return 
+            }
+        }
+    }
+
     pub fn push(&mut self, start: usize, len: usize, prot: usize, flags: usize,
                 fd: isize, offset: usize, fd_table: FdTable, token: usize) -> usize {
         
         let start_addr = start.into();
 
-        let mut mmap_space = MmapSpace::new(start_addr, len, prot, flags, 0, fd);
-        mmap_space.map_file(start_addr, len, offset, fd_table, token);
+        let mut mmap_space = MmapSpace::new(start_addr, len, prot, flags, 0, fd, offset);
+        // mmap_space.map_file(start_addr, len, offset, fd_table, token);
         // println!{"The start addr is {:X}", start_addr.0};
 
         self.mmap_set.push(Arc::new(mmap_space));
@@ -88,6 +100,7 @@ pub struct MmapSpace {
     pub prot: usize,
     pub flags: usize,
     pub fd: isize,
+    pub offset: usize,
 }
 
 impl MmapSpace{
@@ -97,9 +110,15 @@ impl MmapSpace{
         prot: usize,
         flags: usize,
         valid: usize,
-        fd: isize
+        fd: isize,
+        offset: usize,
     ) -> Self {
-        Self {oaddr, length, prot, flags, valid, fd}
+        Self {oaddr, length, prot, flags, valid, fd, offset}
+    }
+
+    pub fn lazy_map_page(&mut self, page_start: VirtAddr, fd_table: FdTable, token: usize) {
+        let offset: usize = self.offset + self.oaddr.0 - page_start.0;
+        self.map_file(page_start, PAGE_SIZE, offset, fd_table, token);
     }
 
     pub fn map_file(&mut self, va_start: VirtAddr, len: usize, offset: usize, fd_table: FdTable, token: usize) -> isize {

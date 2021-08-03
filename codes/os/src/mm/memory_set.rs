@@ -98,6 +98,7 @@ impl MemorySet {
         ), None);
     }
     pub fn insert_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) {
+        println!{"insert mmap_area: {:X} {:X}", start_va.0, end_va.0}
         self.push_mmap(MapArea::new(
             start_va,
             end_va,
@@ -106,6 +107,7 @@ impl MemorySet {
         ), None);
     }
     fn push_mmap(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+        // println!{"1"}
         map_area.map(&mut self.page_table);
         self.areas.push(map_area);
     }
@@ -120,6 +122,7 @@ impl MemorySet {
         self.page_table.remap_cow(vpn, ppn, former_ppn);
     }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+        println!{"2"}
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data, 0);
@@ -131,6 +134,7 @@ impl MemorySet {
     }
 
     fn push_with_offset(&mut self, mut map_area: MapArea, offset: usize, data: Option<&[u8]>){
+        println!{"3"}
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data, offset);
@@ -534,6 +538,7 @@ impl MapArea {
 
     // Alloc and map one page
     pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+        // println!{"map one!!!"}
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {

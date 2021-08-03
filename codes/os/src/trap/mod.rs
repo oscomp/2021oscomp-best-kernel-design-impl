@@ -128,6 +128,7 @@ pub fn trap_handler() -> ! {
                 println!("cow addr = {:X}", stval);
                 print_free_pages();
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                print_free_pages();
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 // println!{"cow_alloc returned..."}
                 // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);

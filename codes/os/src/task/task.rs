@@ -490,7 +490,7 @@ impl TaskControlBlock {
             return start;
         }
         else{ // "Start" va not mapped
-            // println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
+            println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
             // println!("[insert_mmap_area]: flags 0x{:X}",flags);
             // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
@@ -518,7 +518,7 @@ impl TaskControlBlock {
         let token = ks_lock.token();
         let va_top = kma_lock.get_mmap_top();
         let end_va = VirtAddr::from(va_top.0 + len);
-        // println!("vatop = 0x{:X}, end_va = 0x{:X}", va_top.0, end_va.0);
+        println!("vatop = 0x{:X}, end_va = 0x{:X}", va_top.0, end_va.0);
         ks_lock.insert_mmap_area(va_top, end_va,  MapPermission::W | MapPermission::R );
         // let page_table = PageTable::from_token(KERNEL_TOKEN.token());
         // println!("pte = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().bits);

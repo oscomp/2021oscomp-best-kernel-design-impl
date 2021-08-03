@@ -193,7 +193,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    print_free_pages();
+    // print_free_pages();
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
     if fd >= inner.fd_table.len() {
@@ -1044,6 +1044,6 @@ pub fn sys_pselect(
             break;
         }
     }
-    print_free_pages();
+    // print_free_pages();
     return r_ready_count + w_ready_count + e_ready_count
 }
