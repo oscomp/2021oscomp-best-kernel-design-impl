@@ -119,7 +119,6 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
-            printk_port("finish\n");
 
             return pcb[i].pid; // no need but do
         }
