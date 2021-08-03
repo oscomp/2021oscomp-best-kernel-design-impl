@@ -129,6 +129,7 @@ void do_scheduler(void)
     vt100_move_cursor(current_running->cursor_x,
                       current_running->cursor_y);
     #endif
+    printk_port("entry is %lx\n", current_running->elf.entry);
     switch_to(previous_running,current_running);
 }
 
