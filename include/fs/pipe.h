@@ -3,7 +3,7 @@
 
 #include "types.h"
 #include "fs/file.h"
-#include "fs/poll.h"
+#include "sync/waitqueue.h"
 #include "sync/spinlock.h"
 #include "sync/sleeplock.h"
 
@@ -11,8 +11,6 @@
 
 struct pipe {
 	struct spinlock		lock;
-	struct sleeplock	wlock;
-	struct sleeplock	rlock;
 	struct wait_queue	wqueue;
 	struct wait_queue	rqueue;
 	uint	nread;			// number of bytes read

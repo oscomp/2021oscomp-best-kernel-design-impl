@@ -171,7 +171,7 @@ brelse(struct buf *b)
 	b->refcnt--;
 	if (b->refcnt == 0) {
 		// no one is waiting for it.
-		dlist_del_no_fix(&b->lru);
+		dlist_del(&b->lru);
 		dlist_add_after(&lru_head, &b->lru);
 
 		// available buf for someone who's in sleep-wait

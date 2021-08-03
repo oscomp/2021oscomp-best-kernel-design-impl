@@ -18,6 +18,21 @@
 #include "errno.h"
 #include "fs/poll.h"
 
+
+/**
+ * The wait_node is on stack, which is accessed via va.
+ * If we want other process to wake us up, we need to
+ * transplant va to pa. (In fact, it's still va, but it's
+ * equal to pa since we use direct-mapping.
+ */
+static inline struct wait_node *waitinit(struct wait_node *onstacknode)
+{
+	struct wait_node *pwait;
+	pwait = (struct wait_node *)kwalkaddr(myproc()->pagetable, (uint64)onstacknode);
+	pwait->chan = pwait;
+	return pwait;
+}
+
 static uint32 pipepoll(struct file *, struct poll_table *);
 
 int
@@ -39,8 +54,6 @@ pipealloc(struct file **pf0, struct file **pf1)
 	pi->nread = 0;
 
 	initlock(&pi->lock, "pipe");
-	initsleeplock(&pi->wlock, "pipewriter");
-	initsleeplock(&pi->rlock, "pipereader");
 	wait_queue_init(&pi->wqueue, "pipewritequeue");
 	wait_queue_init(&pi->rqueue, "pipereadqueue");
 
@@ -74,27 +87,50 @@ pipealloc(struct file **pf0, struct file **pf1)
 #define PIPE_READER	0
 #define PIPE_WRITER	1
 
+static void pipelock(struct pipe *pi, struct wait_node *wait, int who)
+{
+	struct wait_queue *q;
+	q = (who == PIPE_READER) ? &pi->rqueue : &pi->wqueue;
+
+	acquire(&q->lock);
+	wait_queue_add(q, wait);	// stay in line
+
+	// whether we are the first arrival
+	while (!wait_queue_is_first(q, wait)) {
+		sleep(wait->chan, &q->lock);
+	}
+	release(&q->lock);
+}
+
+static void pipeunlock(struct pipe *pi, struct wait_node *wait, int who)
+{
+	struct wait_queue *q;
+	q = (who == PIPE_READER) ? &pi->rqueue : &pi->wqueue;
+
+	acquire(&q->lock);
+	if (wait_queue_empty(q))
+		panic("pipeunlock: empty queue");
+
+	if (wait != wait_queue_next(q))
+		panic("pipeunlock: not next");
+	
+	wait_queue_del(wait);			// walk out the queue
+	if (!wait_queue_empty(q)) {		// wake up the next one
+		wait = wait_queue_next(q);
+		wakeup(wait->chan);
+	}
+	release(&q->lock);
+}
+
 static void pipewakeup(struct pipe *pi, int who)
 {
 	struct wait_queue *queue;
-	struct d_list *l;
-	void *chan;
 
-	if (who == PIPE_READER) {
-		chan = &pi->nread;
-		queue = &pi->rqueue;
-	} else if (who == PIPE_WRITER) {
-		chan = &pi->nwrite;
-		queue = &pi->wqueue;
-	} else
-		panic("pipewakeup");
-
-	wakeup(chan);
+	queue = (who == PIPE_READER) ? &pi->rqueue : &pi->wqueue;
 	acquire(&queue->lock);
-	for (l = queue->head.next; l != &queue->head; l = l->next) {
-		struct poll_wait_node *pwn = dlist_entry(l, struct poll_wait_node, node);
-		wakeup(pwn->chan);
-		__debug_info("pipewakeup", "pwn=%p, chan=%p\n", pwn, pwn->chan);
+	if (!wait_queue_empty(queue)) {
+		struct wait_node *wno = wait_queue_next(queue);
+		wakeup(wno->chan);
 	}
 	release(&queue->lock);
 }
@@ -104,6 +140,7 @@ static void pipewakeup(struct pipe *pi, int who)
 void
 pipeclose(struct pipe *pi, int writable)
 {
+	acquire(&pi->lock);
 	if (writable) {
 		pi->writeopen = 0;
 		pipewakeup(pi, PIPE_READER);
@@ -111,22 +148,28 @@ pipeclose(struct pipe *pi, int writable)
 		pi->readopen = 0;
 		pipewakeup(pi, PIPE_WRITER);
 	}
-	if (pi->readopen == 0 && pi->writeopen == 0)
+	if (pi->readopen == 0 && pi->writeopen == 0) {
+		release(&pi->lock);
 		kfree(pi);
+	} else
+		release(&pi->lock);
 }
 
 static int pipewritable(struct pipe *pi)
 {
 	struct proc *pr = myproc();
+	struct wait_queue *wq = &pi->wqueue;
+	struct wait_node *wait;
 	int m;
 	while ((m = pi->nwrite - pi->nread) == PIPESIZE) {		// pipe is full
 		if (pi->readopen == 0 || pr->killed) {
 			return -1;
 		}
 		pipewakeup(pi, PIPE_READER);
-		acquire(&pi->lock);		// Hold the lock for sleep().
-		sleep(&pi->nwrite, &pi->lock);
-		release(&pi->lock);
+		acquire(&wq->lock);
+		wait = wait_queue_next(wq);
+		sleep(wait->chan, &wq->lock);
+		release(&wq->lock);
 	}
 	return m;
 }
@@ -134,6 +177,8 @@ static int pipewritable(struct pipe *pi)
 static int pipereadable(struct pipe *pi)
 {
 	struct proc *pr = myproc();
+	struct wait_queue *rq = &pi->rqueue;
+	struct wait_node *wait;
 	int m;
 	// __debug_info("pipereadable", "nr/nw=%d/%d, r=%d, w=%d\n",
 	// 			pi->nread, pi->nwrite, pi->readopen, pi->writeopen);
@@ -141,9 +186,10 @@ static int pipereadable(struct pipe *pi)
 		if (pr->killed) {
 			return -1;
 		}
-		acquire(&pi->lock);
-		sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
-		release(&pi->lock);
+		acquire(&rq->lock);
+		wait = wait_queue_next(rq);
+		sleep(wait->chan, &rq->lock);
+		release(&rq->lock);
 	}
 	return m;
 }
@@ -153,14 +199,12 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 {
 	int i, m;
 	char *const pipebound = pi->data + PIPESIZE;
+	struct wait_node wait, *pwait;
 
-	acquiresleep(&pi->wlock);	// block other writers
-	// acquire(&pi->lock);			// avoid races between writers and readers
+	pwait = waitinit(&wait);
+	pipelock(pi, pwait, PIPE_WRITER);		// block other writers
 	for (i = 0; i < n;) {
 		if ((m = pipewritable(pi)) < 0) {
-			// release(&pi->lock);
-			// releasesleep(&pi->wlock);
-			// return -1;
 			i = -EPIPE;
 			goto out;
 		}
@@ -171,18 +215,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 			char *paddr = pi->data + pi->nwrite % PIPESIZE;
 			int count = (pipebound - paddr < m) ? pipebound - paddr : m;
 
-			/**
-			 * This might lead to a page fault due to lazy-elf-load,
-			 * which requests a file reading and then schedules.
-			 * Must let go the spinlock, then re-acquire it after
-			 * copying done. Since we use wlock to block other writers,
-			 * it's OK to release the spinlock.
-			 */
-			// release(&pi->lock);
-			int res = copyin2(paddr, addr + i, count);
-			// acquire(&pi->lock);
-
-			if (res < 0)
+			if (copyin2(paddr, addr + i, count) < 0)
 				break;
 			i += count;
 			pi->nwrite += count;
@@ -193,8 +226,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 	}
 	pipewakeup(pi, PIPE_READER);
 out:
-	// release(&pi->lock);
-	releasesleep(&pi->wlock);
+	pipeunlock(pi, pwait, PIPE_WRITER);
 	// __debug_info("pipewrite", "written %d/%d\n", i, n);
 	return i;
 }
@@ -204,12 +236,12 @@ piperead(struct pipe *pi, uint64 addr, int n)
 {
 	int i = -1, m;
 	char *const pipebound = pi->data + PIPESIZE;
+	struct wait_node wait, *pwait;
 
-	acquiresleep(&pi->rlock);	// block other readers
-	// acquire(&pi->lock);
+	pwait = waitinit(&wait);
+	pipelock(pi, pwait, PIPE_READER);	// block other readers
+
 	if ((m = pipereadable(pi)) < 0) {
-		// release(&pi->lock);
-		// return -1;
 		goto out;
 	}
 	if (m > n)
@@ -217,24 +249,15 @@ piperead(struct pipe *pi, uint64 addr, int n)
 	for (i = 0; i < m;) {
 		char *paddr = pi->data + pi->nread % PIPESIZE;
 		int count = (pipebound - paddr < m - i) ? pipebound - paddr : m - i;
-		int res;
 
-		/**
-		 * The very same problem as described in pipewrite().
-		 */
-		// release(&pi->lock);
-		res = copyout2(addr + i, paddr, count);
-		// acquire(&pi->lock);
-
-		if (res < 0)
+		if (copyout2(addr + i, paddr, count) < 0)
 			break;
 		pi->nread += count;
 		i += count;
 	}
 	pipewakeup(pi, PIPE_WRITER);
 out:
-	// release(&pi->lock);
-	releasesleep(&pi->rlock);
+	pipeunlock(pi, pwait, PIPE_READER);
 	// __debug_info("piperead", "read %d\n", i);
 	return i;
 }
@@ -243,9 +266,11 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 {
 	int ret = 0;
 	char *const pipebound = pi->data + PIPESIZE;
+	struct wait_node wait, *pwait;
 
-	acquiresleep(&pi->wlock);	// block other writers
-	// acquire(&pi->lock);
+	pwait = waitinit(&wait);
+	pipelock(pi, pwait, PIPE_WRITER);	// block other writers
+
 	for (int i = 0; i < count; i++) {
 		uint64 n = ioarr[i].iov_len;
 		int j;
@@ -259,13 +284,8 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 			while (m > 0) {							// pipe is a loop in a buf
 				char *paddr = pi->data + pi->nwrite % PIPESIZE;
 				int cnt = (pipebound - paddr < m) ? pipebound - paddr : m;
-				int res;
 
-				// release(&pi->lock);
-				res = copyin2(paddr, (uint64)ioarr[i].iov_base + j, cnt);
-				// acquire(&pi->lock);
-
-				if (res < 0)
+				if (copyin2(paddr, (uint64)ioarr[i].iov_base + j, cnt) < 0)
 					goto out1;
 				m -= cnt;
 				j += cnt;
@@ -277,8 +297,7 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 out1:
 	pipewakeup(pi, PIPE_READER);
 out2:
-	// release(&pi->lock);
-	releasesleep(&pi->wlock);
+	pipeunlock(pi, pwait, PIPE_WRITER);
 	return ret;
 }
 
@@ -286,9 +305,11 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 {
 	int ndata, ret = 0;
 	char *const pipebound = pi->data + PIPESIZE;
+	struct wait_node wait, *pwait;
 
-	acquiresleep(&pi->rlock);	// block other readers
-	// acquire(&pi->lock);
+	pwait = waitinit(&wait);
+	pipelock(pi, pwait, PIPE_READER);	// block other readers
+
 	if ((ndata = pipereadable(pi)) < 0) {
 		ret = -EPIPE;
 		goto out2;
@@ -300,13 +321,8 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 		for (j = 0; j < m;) {
 			char *paddr = pi->data + pi->nread % PIPESIZE;
 			int cnt = (pipebound - paddr < m - j) ? pipebound - paddr : m - j;
-			int res;
 
-			// release(&pi->lock);
-			res = copyout2((uint64)ioarr[i].iov_base + j, paddr, cnt);
-			// acquire(&pi->lock);
-
-			if (res < 0)
+			if (copyout2((uint64)ioarr[i].iov_base + j, paddr, cnt) < 0)
 				goto out1;
 			pi->nread += cnt;
 			j += cnt;
@@ -317,8 +333,7 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 out1:
 	pipewakeup(pi, PIPE_WRITER);
 out2:
-	// release(&pi->lock);
-	releasesleep(&pi->rlock);
+	pipeunlock(pi, pwait, PIPE_READER);
 	return ret;
 }
 
