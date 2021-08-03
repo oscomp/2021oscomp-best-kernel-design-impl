@@ -1,20 +1,6 @@
 #include <os/elf.h>
 #include <stdio.h>
 
-static inline int is_elf_format(unsigned char *binary)
-{
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)binary;
-
-    if (ehdr->e_ident[0] == EI_MAG0 &&
-        ehdr->e_ident[1] == EI_MAG1 &&
-        ehdr->e_ident[2] == EI_MAG2 &&
-        ehdr->e_ident[3] == EI_MAG3) {
-        return 0;
-    }
-
-    return 1;
-}
-
 /* prepare_page_for_kva should return a kernel virtual address */
 /* return entry point va of this elf */
 /* modify *edata as end of all data */
@@ -52,31 +38,23 @@ uintptr_t load_elf(
     uint64_t first_load_p_vaddr = 0;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
-        if (phdr->p_type >= 0 && phdr->p_type <= 9)
-            sbi_console_putchar('d' + phdr->p_type);
-        else if (phdr->p_type == PT_GNU_STACK)
-            sbi_console_putchar('a');
-        else if (phdr->p_type == PT_GNU_RELRO)
-            sbi_console_putchar('b');
-        else
-            sbi_console_putchar('c');
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
+            printk_port("filesz: %lx\n, memsz: %lx\n", phdr->p_filesz, phdr->p_memsz);
             if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
             for (i = 0; i < phdr->p_memsz; ) {
                 uintptr_t offset_in_page = (phdr->p_vaddr + i) % NORMAL_PAGE_SIZE; // offset in this page
                 uint64_t copy_bytes; // how many bytes are copied
                 if (i < phdr->p_filesz) {
-                    sbi_console_putchar('7');
                     unsigned char *bytes_of_page =
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = MIN(phdr->p_filesz - i, NORMAL_PAGE_SIZE - offset_in_page);
+                    printk_port("copy_bytes: %lx\n", copy_bytes);
                     memcpy(
                         bytes_of_page + offset_in_page,
                         elf_binary + phdr->p_offset + i,
                         copy_bytes);
                     if (offset_in_page + copy_bytes < NORMAL_PAGE_SIZE) {
-                        sbi_console_putchar('8');
                         for (int j =
                                  offset_in_page + copy_bytes;
                              j < NORMAL_PAGE_SIZE; ++j) {
@@ -90,6 +68,7 @@ uintptr_t load_elf(
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
+                    printk_port("copy_bytes: %lx\n", copy_bytes);
                     for (int j = offset_in_page;
                          j < NORMAL_PAGE_SIZE;
                          ++j) {

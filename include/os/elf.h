@@ -177,4 +177,18 @@ uintptr_t load_elf(unsigned char elf_binary[], unsigned length, uintptr_t pgdir,
     uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask),
     ELF_info_t *elf);
 
+static inline int is_elf_format(unsigned char *binary)
+{
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)binary;
+
+    if (ehdr->e_ident[0] == EI_MAG0 &&
+        ehdr->e_ident[1] == EI_MAG1 &&
+        ehdr->e_ident[2] == EI_MAG2 &&
+        ehdr->e_ident[3] == EI_MAG3) {
+        return 0;
+    }
+
+    return 1;
+}
+
 #endif  // _ELF_H

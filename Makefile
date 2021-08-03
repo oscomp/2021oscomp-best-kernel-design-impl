@@ -23,7 +23,7 @@ CFLAGS += -Iarch/$(ARCH)/include
 USER_CFLAGS += -Iarch/$(ARCH)/include
 USER_LDFLAGS = $(ARCH_DIR)/crt0.o
 
-SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c ./kernel/elf/elf.c
+SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
 SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S $(ARCH_DIR)/sbi/common.c
 SRC_SCREEN	= ./drivers/screen.c
 SRC_SDCARD	= ${ARCH_SD}/sdcard.c ${ARCH_SD}/fpioa.c ${ARCH_SD}/gpiohs.c ${ARCH_SD}/spi.c ${ARCH_SD}/utils.c \
