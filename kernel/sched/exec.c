@@ -115,11 +115,12 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             /* init_aux_vec(&aux_vec) */
             set_aux_vec(&aux_vec, &pcb_underinit->elf);
             // init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, NULL, NULL, NULL, pcb_underinit);
+            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
 
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
+            while(1) printk_port("6\n");
 
             return pcb[i].pid; // no need but do
         }
