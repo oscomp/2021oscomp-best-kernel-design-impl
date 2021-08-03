@@ -398,7 +398,7 @@ impl MemorySet {
         for area in parent_areas.iter() {
             let head_vpn = area.vpn_range.get_start();
             let user_heap_top_addr: VirtAddr = user_heap_top.into();
-            if head_vpn > user_heap_top_addr.floor() {
+            if head_vpn >= user_heap_top_addr.floor() {
                 //skipping the part using Coping to new ppn
                 continue;
             }
@@ -418,7 +418,7 @@ impl MemorySet {
                 page_table.set_cow(vpn);
                 // map the cow page table to src_ppn
                 memory_set.page_table.map(vpn, src_ppn, pte_flags);
-                // println!{"mapping {:?} --- {:?}", vpn, src_ppn};
+                println!{"mapping {:?} --- {:?}", vpn, src_ppn};
                 memory_set.set_cow(vpn);
                 // new_area.data_frames.insert(vpn, FrameTracker::new(src_ppn));
                 new_area.insert_tracker(vpn, src_ppn);

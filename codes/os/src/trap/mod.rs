@@ -126,7 +126,7 @@ pub fn trap_handler() -> ! {
                 let former_ppn = pte.unwrap().ppn();
                 //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 println!("cow addr = {:X}", stval);
-                print_free_pages();
+                // print_free_pages();
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 // println!{"cow_alloc returned..."}
