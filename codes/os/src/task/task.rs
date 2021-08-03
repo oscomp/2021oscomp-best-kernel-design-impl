@@ -27,7 +27,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use core::fmt::{self, Debug, Formatter};
 use spin::{Mutex, MutexGuard};
-use crate::fs::{ FileDiscripter, Stdin, Stdout, FileClass};
+use crate::fs::{ FileDescripter, Stdin, Stdout, FileClass};
 
 pub struct AuxHeader{
     pub aux_type: usize,
@@ -55,7 +55,7 @@ pub struct TaskControlBlock {
     inner: Mutex<TaskControlBlockInner>,
 }
 
-pub type FdTable =  Vec<Option<FileDiscripter>>;
+pub type FdTable =  Vec<Option<FileDescripter>>;
 pub struct TaskControlBlockInner {
     // task
     pub trap_cx_ppn: PhysPageNum,
@@ -123,6 +123,9 @@ impl TaskControlBlockInner {
     pub fn translate_vpn(&self, vpn: VirtPageNum) -> PageTableEntry {
         self.memory_set.translate(vpn).unwrap()
     }
+    pub fn enquire_vpn(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
+        self.memory_set.translate(vpn)
+    }
     pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
         let ret = self.memory_set.cow_alloc(vpn, former_ppn);
         // println!{"finished cow_alloc!"}
@@ -171,17 +174,17 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: vec![
                     // 0 -> stdin
-                    Some( FileDiscripter::new(
+                    Some( FileDescripter::new(
                         false,
                         FileClass::Abstr(Arc::new(Stdin)) 
                     )),
                     // 1 -> stdout
-                    Some( FileDiscripter::new(
+                    Some( FileDescripter::new(
                         false,
                         FileClass::Abstr(Arc::new(Stdout)) 
                     )),
                     // 2 -> stderr
-                    Some( FileDiscripter::new(
+                    Some( FileDescripter::new(
                         false,
                         FileClass::Abstr(Arc::new(Stdout)) 
                     )),
@@ -377,6 +380,7 @@ impl TaskControlBlock {
         // gdb_println!(EXEC_ENABLE,"[exec] finish");
         // **** release current PCB lock
     }
+    
     pub fn fork(self: &Arc<TaskControlBlock>, is_create_thread: bool) -> Arc<TaskControlBlock> {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();

@@ -77,10 +77,10 @@ pub fn trap_handler() -> ! {
             // get system call return value
             let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]]);
             // cx is changed during sys_exec, so we have to call it again
-            //let syscall_id = cx.x[17];
-            //if syscall_id != 64 && syscall_id != 63{
-            //    println!("syscall-({}): return{}",syscall_id, result);
-            //}
+            let syscall_id = cx.x[17];
+            if syscall_id != 64 && syscall_id != 63{
+                println!("syscall-({}): return{}",syscall_id, result);
+            }
             cx = current_trap_cx();
             cx.x[10] = result as usize;
             // println!{"cx written..."}
@@ -118,17 +118,17 @@ pub fn trap_handler() -> ! {
             // Get the task inner of current
             // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
             // get the PageTableEntry that faults
-            let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
-            let former_ppn = pte.ppn();
+            let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
             // println!{"PageTableEntry: {}", pte.bits};
             // if the virtPage is a CoW
-            if pte.is_cow() {
+            if pte.is_some() && pte.unwrap().is_cow() {
+                let former_ppn = pte.unwrap().ppn();
                 //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 println!("cow addr = {:X}", stval);
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 // println!{"cow_alloc returned..."}
-                let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(va.floor());
+                // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
                 // println!{"PageTableEntry: {}", pte.bits};
             } else {
                 println!(
@@ -144,9 +144,11 @@ pub fn trap_handler() -> ! {
         }
         Trap::Exception(Exception::IllegalInstruction) => {
             // println!{"pinIllegalInstruction"}
-            println!("[kernel] IllegalInstruction in application, core dumped.");
+            println!("[kernel] IllegalInstruction in application, continue.");
+            //let mut cx = current_trap_cx();
+            //cx.sepc += 4;
             println!(
-                "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                "         {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
                 stval,
                 current_trap_cx().sepc,
@@ -187,6 +189,12 @@ pub fn trap_return() -> ! {
     //drop(inner);
     //drop(task);
     //println!{"{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+    let trap_cx = current_task().unwrap().acquire_inner_lock().get_trap_cx();
+    if trap_cx.get_sp() == 0{
+        println!("[trap_ret] sp = 0");
+    }
+    //println!("[trap_ret] sepc = {:X}", trap_cx.sepc);
+
     extern "C" {
         fn __alltraps();
         fn __restore();

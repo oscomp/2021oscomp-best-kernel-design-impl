@@ -238,6 +238,7 @@ impl MemorySet {
         auxv.push(AuxHeader{aux_type: AT_HWCAP, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_CLKTCK, value: 100 as usize});
         auxv.push(AuxHeader{aux_type: AT_SECURE, value: 0 as usize});
+        auxv.push(AuxHeader{aux_type: AT_NOTELF, value: 0x112d as usize});
 
         // denotes if .comment should be mapped
         let mut comment_flag = true;

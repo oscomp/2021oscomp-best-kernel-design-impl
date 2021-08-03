@@ -37,6 +37,3 @@ pub fn init_othercore(){
     KERNEL_SPACE.lock().activate();
 }
 
-pub trait Bytes {
-    fn as_bytes(&self)->&[u8];
-}
