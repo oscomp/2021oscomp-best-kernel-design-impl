@@ -1005,3 +1005,12 @@ sys_statfs(void)
 	
 	return 0;
 }
+
+
+uint64
+sys_sync(void)
+{
+	extern void	bsync(void);
+	bsync();
+	return 0;
+}

@@ -134,12 +134,12 @@ fileread(struct file *f, uint64 addr, int n)
 		case FD_INODE:
 				ilock(ip);
 				r = ip->fop->read(ip, 1, addr, f->off, n);
-				iunlock(ip);
 				if (r > 0) {
 					acquire(&f->lock);
 					f->off += r;
 					release(&f->lock);
 				}
+				iunlock(ip);
 				break;
 		default:
 			panic("fileread");
@@ -170,7 +170,6 @@ filewrite(struct file *f, uint64 addr, int n)
 	} else if(f->type == FD_INODE){
 		ilock(ip);
 		ret = ip->fop->write(ip, 1, addr, f->off, n);
-		iunlock(ip);
 		if (ret == n) {
 			acquire(&f->lock);
 			f->off += n;
@@ -178,6 +177,7 @@ filewrite(struct file *f, uint64 addr, int n)
 		} else {
 			ret = -1;
 		}
+		iunlock(ip);
 	} else {
 		panic("filewrite");
 	}
@@ -254,12 +254,12 @@ int filereadv(struct file *f, struct iovec ioarr[], int count)
 			// 	return -EPERM;
 			ilock(ip);
 			r = ip->fop->readv(ip, ioarr, count, f->off);
-			iunlock(ip);
 			if (r > 0) {
 				acquire(&f->lock);
 				f->off += r;
 				release(&f->lock);
 			}
+			iunlock(ip);
 			break;
 		default:
 			panic("filereadv");
@@ -287,12 +287,12 @@ int filewritev(struct file *f, struct iovec ioarr[], int count)
 			// 	return -EPERM;
 			ilock(ip);
 			ret = ip->fop->writev(ip, ioarr, count, f->off);
-			iunlock(ip);
 			if (ret > 0) {
 				acquire(&f->lock);
 				f->off += ret;
 				release(&f->lock);
 			}
+			iunlock(ip);
 			break;
 		default:
 			panic("filewritev");

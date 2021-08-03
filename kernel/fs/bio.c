@@ -29,38 +29,36 @@
 #include "sync/spinlock.h"
 #include "sync/sleeplock.h"
 #include "utils/debug.h"
+#include "sched/proc.h"
 
 // #define BCACHE_TABLE_SIZE 233
 #define BCACHE_TABLE_SIZE 47
 #define __hash_idx(idx) ((idx) % BCACHE_TABLE_SIZE)
 
-// struct {
 static struct spinlock bcachelock;
-static struct buf head;
-static struct buf *bcache[BCACHE_TABLE_SIZE];
+static struct d_list lru_head;
+static list_node_t *bcache[BCACHE_TABLE_SIZE];
 static struct buf bufs[BNUM];
-// } bcache;
+int nwait = 0;
 
 void
 binit(void)
 {
 	initlock(&bcachelock, "bcache");
-	for (int i = 0; i < BCACHE_TABLE_SIZE; i++) {
+	dlist_init(&lru_head);
+	nwait = 0;
+	for (int i = 0; i < BCACHE_TABLE_SIZE; i++)
 		bcache[i] = NULL;
-	}
-	head.next = &head;
-	head.prev = &head;
+
 	for (struct buf *b = bufs; b < bufs + BNUM; b++) {
 		b->refcnt = 0;
 		b->sectorno = ~0;
 		b->dev = ~0;
 		b->hash.pprev = NULL;
 		b->hash.next = NULL;
+		b->dirty = 0;
 
-		b->next = head.next;
-		b->prev = &head;
-		head.next->prev = b;
-		head.next = b;
+		dlist_add_before(&lru_head, &b->lru);
 		initsleeplock(&b->lock, "buffer");
 	}
 }
@@ -68,7 +66,7 @@ binit(void)
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
 // In either case, return locked buffer.
-static struct buf*
+struct buf*
 bget(uint dev, uint sectorno)
 {
 	struct buf *b;
@@ -76,16 +74,15 @@ bget(uint dev, uint sectorno)
 
 	__debug_info("bget", "search secno=%d, idx=%d\n", sectorno, idx);
 	acquire(&bcachelock);
+
 	// Is the block already cached?
-	for (b = bcache[idx]; b != NULL; b = list_next(struct buf, b)) {
+	for (list_node_t *l = bcache[idx]; l != NULL; l = l->next) {
+		b = container_of(l, struct buf, hash);
 		if (b->dev == dev && b->sectorno == sectorno) {
-			list_remove(b);
-			if (bcache[idx]) {
-				bcache[idx]->hash.pprev = &b->hash.next;
+			if (l != bcache[idx]) {		// not the first node
+				_list_remove(l);		// move it to the head
+				_list_push_front(&bcache[idx], l);
 			}
-			b->hash.next = (list_node_t *)bcache[idx];
-			b->hash.pprev = (list_node_t **)&bcache[idx];
-			bcache[idx] = b;
 			b->refcnt++;
 			release(&bcachelock);
 			acquiresleep(&b->lock);
@@ -97,26 +94,35 @@ bget(uint dev, uint sectorno)
 	// Not cached.
 	// Recycle the least recently used (LRU) unused buffer.
 	__debug_info("bget", "not buffered, secno=%d\n", sectorno);
-	for (b = head.prev; b != &head; b = b->prev){
+rescan:
+	for (struct d_list *dl = lru_head.prev; dl != &lru_head; dl = dlist_prev(dl)) {
+		b = container_of(dl, struct buf, lru);
 		if (b->refcnt == 0) {
+			uint oldsec = b->sectorno;
 			b->dev = dev;
 			b->sectorno = sectorno;
 			b->valid = 0;
 			b->refcnt = 1;
-			if (b->hash.pprev) {
-				list_remove(b);
+
+			if (b->hash.pprev) {			// we were in a hash list
+				_list_remove(&b->hash);
 			}
-			if (bcache[idx]) {
-				bcache[idx]->hash.pprev = &b->hash.next;
-			}
-			b->hash.next = (list_node_t *)bcache[idx];
-			b->hash.pprev = (list_node_t **)&bcache[idx];
-			bcache[idx] = b;
+			_list_push_front(&bcache[idx], &b->hash);
+
 			release(&bcachelock);
 			acquiresleep(&b->lock);
+			if (b->dirty) {					// ah oh, we got a dirty one...
+				disk_write(b, oldsec);		// write to its original sector
+				b->dirty = 0;
+			}
 			return b;
 		}
 	}
+	nwait++;
+	sleep(&nwait, &bcachelock);
+	nwait--;
+	goto rescan;
+
 	panic("bget: no buffers");
 }
 
@@ -138,10 +144,17 @@ bread(uint dev, uint sectorno) {
 
 // Write b's contents to disk.  Must be locked.
 void 
-bwrite(struct buf *b) {
+bwrite(struct buf *b, int through)
+{
 	if(!holdingsleep(&b->lock))
 		panic("bwrite");
-	disk_write(b);
+	if (through == BWRITE_THROUGH) {
+		disk_write(b, b->sectorno);
+		b->dirty = 0;
+	} else
+		b->dirty = 1;
+
+	b->valid = 1;
 }
 
 // Release a locked buffer.
@@ -158,14 +171,52 @@ brelse(struct buf *b)
 	b->refcnt--;
 	if (b->refcnt == 0) {
 		// no one is waiting for it.
-		b->next->prev = b->prev;
-		b->prev->next = b->next;
-		b->next = head.next;
-		b->prev = &head;
-		head.next->prev = b;
-		head.next = b;
+		dlist_del_no_fix(&b->lru);
+		dlist_add_after(&lru_head, &b->lru);
+
+		// available buf for someone who's in sleep-wait
+		if (nwait > 0)
+			wakeup(&nwait);
 	}
 	
+	release(&bcachelock);
+}
+
+void bsync(void)
+{
+	struct buf *b;
+
+	acquire(&bcachelock);
+	for (b = bufs; b < bufs + BNUM; b++) {
+		
+		/**
+		 * Pin a ref here in case of the eviction in bget().
+		 * If a buf's refcnt is 0, it might be evicted and got
+		 * its sectorno field changed in bget(), which will
+		 * make our next step wrong.
+		 */
+		b->refcnt++;
+		release(&bcachelock);
+		
+		/**
+		 * We are good if under the protection of the sleeping lock.
+		 * We can safely read the fields we want. If the buf is busy,
+		 * ignore it.
+		 */
+		if (trysleeplock(&b->lock) == 0) {
+			if (b->dirty) {
+				if (!b->valid)
+					panic("bsync: dirty but not valid buf");
+
+				disk_write(b, b->sectorno);
+				b->dirty = 0;
+			}
+			releasesleep(&b->lock);
+		}
+
+		acquire(&bcachelock);
+		b->refcnt--;
+	}
 	release(&bcachelock);
 }
 
@@ -174,10 +225,11 @@ void bprint()
 	acquire(&bcachelock);
 	printf("\nbuf cache:\n");
 	for (int i = 0; i < BCACHE_TABLE_SIZE; i++) {
-		struct buf *b = bcache[i];
-		if (b == NULL) { continue; }
+		list_node_t *l = bcache[i];
+		if (l == NULL) { continue; }
 		printf(__INFO("%d")" ", i);
-		for (; b != NULL; b = list_next(struct buf, b)) {
+		for (; l != NULL; l = l->next) {
+			struct buf *b = container_of(l, struct buf, hash);
 			printf("%d ", b->sectorno);
 		}
 		printf("\n");

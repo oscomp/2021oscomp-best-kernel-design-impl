@@ -177,9 +177,9 @@ alloc3_desc(int *idx)
 }
 
 void
-virtio_disk_rw(struct buf *b, int write)
+virtio_disk_rw(struct buf *b, uint sector, int write)
 {
-  uint64 sector = b->sectorno;
+  // uint64 sector = b->sectorno;
 
   acquire(&disk.vdisk_lock);
 

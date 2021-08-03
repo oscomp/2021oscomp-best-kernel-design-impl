@@ -252,7 +252,8 @@ UPROGS=\
 	$U/_mount\
 	$U/_umount\
 	$U/_dup3\
-	$U/_mmaptests
+	$U/_mmaptests\
+	$U/_sync
 
 user: $(UPROGS)
 

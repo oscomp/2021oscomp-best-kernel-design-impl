@@ -166,12 +166,17 @@ int disk_write_block(struct superblock *sb, int usr, char *src, uint64 sectorno,
 	struct buf *b = bread(sb->devnum, sectorno);
 	int ret = either_copyin(b->data + off, usr, (uint64)src, len);
 	
-	if (ret < 0) { // fail to write
-		b->valid = 0;  // invalidate the buf
-	} else {
+	// if (ret < 0) { // fail to write
+	// 	b->valid = 0;  // invalidate the buf
+	// } else {
+	// 	ret = len;
+	// 	bwrite(b, BWRITE_BACK);
+	// }
+
+	if (ret == 0)
 		ret = len;
-		bwrite(b);
-	}
+
+	bwrite(b, BWRITE_BACK);
 	brelse(b);
 
 	return ret;
@@ -196,9 +201,9 @@ int disk_clear_block(struct superblock *sb, uint64 sectorno, uint64 sectorcnt)
 {
 	struct buf *b;
 	while (sectorcnt--) {
-		b = bread(sb->devnum, sectorno++);
+		b = bget(sb->devnum, sectorno++);	// we don't care about the original data
 		memset(b->data, 0, BSIZE);
-		bwrite(b);
+		bwrite(b, BWRITE_BACK);
 		brelse(b);
 	}
 	return 0;

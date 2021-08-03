@@ -78,7 +78,7 @@ struct UsedArea {
 };
 
 void            virtio_disk_init(void);
-void            virtio_disk_rw(struct buf *b, int write);
+void            virtio_disk_rw(struct buf *b, uint sector, int write);
 void            virtio_disk_intr(void);
 
 #endif
