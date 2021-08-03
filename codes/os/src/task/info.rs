@@ -14,6 +14,12 @@ pub struct utsname{
 impl utsname{
     pub fn new() -> Self{
         Self{
+            //sysname: utsname::str2u8("UltraOS"),
+            //nodename: utsname::str2u8("UltraOS"),
+            //release: utsname::str2u8("5.10.0-7-riscv64"),
+            //version: utsname::str2u8("1.1"),
+            //machine: utsname::str2u8("RISC-V64"),
+            //domainname: utsname::str2u8("UltraTEAM/UltraOS"),
             sysname: utsname::str2u8("UltraOS"),
             nodename: utsname::str2u8("UltraOS"),
             release: utsname::str2u8("5.10.0-7-riscv64"),

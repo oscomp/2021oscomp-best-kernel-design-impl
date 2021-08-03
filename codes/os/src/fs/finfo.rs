@@ -160,7 +160,7 @@ impl Kstat {
 
     pub fn new_abstract()->Self{
         Self{
-            st_dev  :5,
+            st_dev  :5,//5
             st_ino  :1,
             st_mode :0100777,
             st_nlink:1,

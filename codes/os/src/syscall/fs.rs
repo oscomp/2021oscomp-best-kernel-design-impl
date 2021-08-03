@@ -948,7 +948,7 @@ pub fn sys_pselect(
                             r_ready_count += 1;
                             rfd_set.set_fd(fd); 
                             // marked for being ready
-                            rfd_vec[i] == 1024;  
+                            rfd_vec[i] = 1024;  
                         } else {
                             rfd_set.clear_fd(fd);
                             r_has_nready = true;
@@ -958,7 +958,7 @@ pub fn sys_pselect(
                         if file.readable(){
                             r_ready_count += 1;
                             rfd_set.set_fd(fd);
-                            rfd_vec[i] == 1024;
+                            rfd_vec[i] = 1024;
                         } else {
                             rfd_set.clear_fd(fd);
                             r_has_nready = true;
@@ -997,7 +997,7 @@ pub fn sys_pselect(
                         if file.writable(){
                             w_ready_count += 1;
                             wfd_set.set_fd(fd);
-                            wfd_vec[i] == 1024;
+                            wfd_vec[i] = 1024;
                         } else {
                             wfd_set.clear_fd(fd);
                             w_has_nready = true;
@@ -1007,7 +1007,7 @@ pub fn sys_pselect(
                         if file.writable(){
                             w_ready_count += 1;
                             wfd_set.set_fd(fd);
-                            wfd_vec[i] == 1024;
+                            wfd_vec[i] = 1024;
                         } else {
                             wfd_set.clear_fd(fd);
                             w_has_nready = true;
