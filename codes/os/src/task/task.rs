@@ -131,6 +131,9 @@ impl TaskControlBlockInner {
         // println!{"finished cow_alloc!"}
         ret
     }
+    pub fn lazy_alloc(&mut self, vpn: VirtPageNum) -> usize {
+        self.memory_set.lazy_alloc(vpn)
+    }
 }
 
 
