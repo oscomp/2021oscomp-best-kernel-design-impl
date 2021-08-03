@@ -7,6 +7,8 @@
 #include "mesg/signal.h"
 #include "fs/file.h"
 #include "utils/dlist.h"
+#include "sync/waitqueue.h"
+
 
 #define POLLIN      0x0001
 #define POLLPRI     0x0002
@@ -36,37 +38,6 @@ struct fdset {
 };
 
 
-/**
- * Structures that are used in implementation.
- */
-
-struct wait_queue {
-	struct spinlock lock;
-	struct d_list head;
-};
-
-static inline void wait_queue_init(struct wait_queue *wq, char *str)
-{
-	initlock(&wq->lock, str);
-	dlist_init(&wq->head);
-}
-
-static inline void wait_queue_add(struct wait_queue *wq, struct d_list *node)
-{
-	acquire(&wq->lock);
-	dlist_add_before(&wq->head, node);
-	release(&wq->lock);
-}
-
-static inline void wait_queue_del(struct wait_queue *wq, struct d_list *node)
-{
-	acquire(&wq->lock);
-	dlist_del(node);
-	release(&wq->lock);
-}
-
-
-
 struct poll_table;
 struct file;
 
@@ -84,9 +55,8 @@ struct poll_table {
 
 // The files use this to wake process up.
 struct poll_wait_node {
-	void *chan;
 	struct wait_queue *queue;
-	struct d_list node;
+	struct wait_node node;
 };
 
 #define ON_STACK_PWN_NUM	24
@@ -94,7 +64,6 @@ struct poll_wait_node {
 // Main struct in poll/select. All poll_wait_nodes are got from here.
 struct poll_wait_queue {
 	struct poll_table pt;
-	void *chan;
 	uint64 error;
 	int index;
 	struct poll_wait_node nodes[ON_STACK_PWN_NUM];

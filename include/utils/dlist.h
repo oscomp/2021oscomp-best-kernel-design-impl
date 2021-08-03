@@ -35,6 +35,10 @@ static inline void dlist_init(struct d_list *node) {
 	node->prev = node->next = node;
 }
 
+static inline int dlist_empty(struct d_list *head) {
+	return head->next == head;
+}
+
 static inline void dlist_add_after(struct d_list *afterme, struct d_list *node) {
 	__dlist_insert(node, afterme, afterme->next);
 }
@@ -44,12 +48,6 @@ static inline void dlist_add_before(struct d_list *beforeme, struct d_list *node
 }
 
 static inline void dlist_del(struct d_list *node) {
-	__dlist_link(node->prev, node->next);
-	__dlist_link(node, node);
-}
-
-// Doesn't relink the deleted node itself.
-static inline void dlist_del_no_fix(struct d_list *node) {
 	__dlist_link(node->prev, node->next);
 }
 

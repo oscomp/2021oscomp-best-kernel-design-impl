@@ -24,26 +24,18 @@ static void __poll_func(struct file *f, struct wait_queue *wq, struct poll_table
 		return;
 
 	pwn = &pwq->nodes[pwq->index++];
-	pwn->chan = pwq->chan;
+	pwn->node.chan = pwq;
 	pwn->queue = wq;
-
-	// Since the node is on stack, if we want other process to get us, we should use pa.
-	uint64 pa = kwalkaddr(myproc()->pagetable, (uint64)&pwn->node);
-	wait_queue_add(wq, (struct d_list *)pa);
+	wait_queue_add_locked(wq, &pwn->node);
 }
 
 
 static void poll_init(struct poll_wait_queue *pwq)
 {
-	struct proc *p = myproc();
 	pwq->pt.func = __poll_func;
 	pwq->pt.key = 0;
 	pwq->error = 0;
 	pwq->index = 0;
-
-	// pwq is on stack, whose va equals to all other poll/select callers.
-	// Add pid to distinguish from others.
-	pwq->chan = pwq + p->pid;
 }
 
 
@@ -51,7 +43,14 @@ static void poll_end(struct poll_wait_queue *pwq)
 {
 	for (int i = 0; i < pwq->index; i++) {
 		struct poll_wait_node *pwn = pwq->nodes + i;
-		wait_queue_del(pwn->queue, &pwn->node);
+		struct wait_queue *wq = pwn->queue;
+		acquire(&wq->lock);
+		wait_queue_del(&pwn->node);
+		if (!wait_queue_empty(wq)) {
+			struct wait_node *node = wait_queue_next(wq);
+			wakeup(node->chan);
+		}
+		release(&wq->lock);
 	}
 }
 
@@ -73,7 +72,7 @@ static int poll_sched_timeout(struct poll_wait_queue *pwq, uint64 expire)
 	acquire(&p->lk);	// Hold this for sleep().
 	
 	p->sleep_expire = expire;
-	sleep(pwq->chan, &p->lk);
+	sleep(pwq, &p->lk);
 	
 	// Check whether we are waken up by timeout.
 	// If so, this field will be set to zero.
@@ -83,7 +82,7 @@ static int poll_sched_timeout(struct poll_wait_queue *pwq, uint64 expire)
 		p->sleep_expire = 0;
 	release(&p->lk);
 
-	__debug_info("poll_sched_timeout", "chan=%p, ret=%d\n", pwq->chan, ret);
+	__debug_info("poll_sched_timeout", "pwq=%p, ret=%d\n", pwq, ret);
 
 	return ret;
 }
@@ -131,7 +130,9 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 	struct fdset rfds, wfds, exfds;
 	uint64 expire;
 	struct poll_wait_queue wait;
+	struct poll_wait_queue *pwait;
 	int immediate = 0;
+	
 	
 	__debug_info("pselect", "timeout={%ds, %dns}\n", 
 				timeout ? timeout->sec : -1, timeout ? timeout->nsec : -1);
@@ -146,9 +147,12 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 		expire = 0;					// infinity
 
 	fdset_work_init(&rfds, &wfds, &exfds, readfds, writefds, exceptfds);
-	poll_init(&wait);
+
+	// Since the node is on stack, if we want other process to get us, we should use pa.
+	pwait = (struct poll_wait_queue *)kwalkaddr(myproc()->pagetable, (uint64)&wait);
+	poll_init(pwait);
 	if (immediate)
-		wait.pt.func = NULL;		// we won't be inserted into any queue in later poll()s
+		pwait->pt.func = NULL;		// we won't be inserted into any queue in later poll()s
 
 	int ret = 0;
 	for (;;)
@@ -181,29 +185,29 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 				
 				__debug_info("pselect", "fd=%d\n", i);
 				
-				wait.pt.key = POLLEX_SET;
+				pwait->pt.key = POLLEX_SET;
 				if (r & bit)
-					wait.pt.key |= POLLIN_SET;
+					pwait->pt.key |= POLLIN_SET;
 				if (w & bit)
-					wait.pt.key |= POLLOUT_SET;
+					pwait->pt.key |= POLLOUT_SET;
 
-				uint32 mask = file_poll(fp, &wait.pt);
+				uint32 mask = file_poll(fp, &pwait->pt);
 				__debug_info("pselect", "mask=%d\n", mask);
 
 				if ((mask & POLLIN_SET) && (r & bit)) {
 					rres |= bit;
 					ret++;
-					wait.pt.func = NULL;
+					pwait->pt.func = NULL;
 				}
 				if ((mask & POLLOUT_SET) && (w & bit)) {
 					wres |= bit;
 					ret++;
-					wait.pt.func = NULL;
+					pwait->pt.func = NULL;
 				}
 				if ((mask & POLLEX_SET) && (ex & bit)) {
 					exres |= bit;
 					ret++;
-					wait.pt.func = NULL;
+					pwait->pt.func = NULL;
 				}
 			}
 			if (readfds)
@@ -213,21 +217,21 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 			if (exceptfds)
 				exceptfds->fd_bits[idx] = exres;
 		}
-		wait.pt.func = NULL;		// only need to be called once for each file
+		pwait->pt.func = NULL;		// only need to be called once for each file
 
 		if (ret > 0 || immediate)	// got results or don't sleep-wait
 			break;
-		if (wait.error) {
-			ret = wait.error;
+		if (pwait->error) {
+			ret = pwait->error;
 			break;
 		}
 
 		// at this point, maybe we are already waken up by some
-		if (poll_sched_timeout(&wait, expire))
+		if (poll_sched_timeout(pwait, expire))
 			immediate = 1;
 	}
 
-	poll_end(&wait);
+	poll_end(pwait);
 
 	__debug_info("pselect", "return %d\n", ret);
 	return ret;
