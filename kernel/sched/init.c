@@ -255,7 +255,7 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
     }
 
     assert(size < NORMAL_PAGE_SIZE);
-    // printk_port("size is %lx\n", size);
+    printk_port("size is %lx\n", size);
     sp_kva -= size;
     uintptr_t start_sp_kva = sp_kva;
     uintptr_t sp_uva = USER_STACK_ADDR - size;
@@ -340,7 +340,7 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
             temp[i] = 0;
         sp_kva += 16 - sp_kva % 16;
     }
-    // printk_port("final sp is %lx, usp is %lx\n", sp_kva, sp_uva);
+    printk_port("final sp is %lx, usp is %lx\n", sp_kva, sp_uva);
     // for (uint64_t i = start_sp_kva; i < sp_kva; i += 8)
     //     printk_port("%lx:%lx\n", i, *((uint64_t *)i));
     return sp_uva; //user sp
@@ -396,6 +396,7 @@ void init_pcb_stack(
     else
         filename = backupname;
     /* 返回的sp作为用户栈指针 */
-    pcb->user_sp = copy_above_user_stack(user_stack_kva, argv, envp, aux_vec, filename);   
+    pcb->user_sp = copy_above_user_stack(user_stack_kva, argv, envp, aux_vec, filename); 
+    printk_port("sp is at %lx, %lx\n", pcb->user_sp, get_kva_of(pcb->user_sp, pcb->pgdir)); 
     assert(USER_STACK_ADDR - pcb->user_sp < NORMAL_PAGE_SIZE);
 }
