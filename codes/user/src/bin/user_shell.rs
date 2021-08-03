@@ -7,7 +7,6 @@ extern crate alloc;
 
 #[macro_use]
 extern crate user_lib;
-// # define LEFT_KEY ''
 
 const LF: u8 = 0x0au8;
 const CR: u8 = 0x0du8;

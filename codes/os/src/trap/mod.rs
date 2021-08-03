@@ -25,6 +25,10 @@ use crate::task::{
     current_trap_cx,
     get_core_id,
     current_task,
+    update_user_clock, 
+    update_kernel_clock, 
+    get_user_runtime_usec, 
+    get_kernel_runtime_usec
 };
 use crate::timer::set_next_trigger;
 use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
@@ -56,6 +60,12 @@ pub fn enable_timer_interrupt() {
 #[no_mangle]
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
+
+    // update RUsage of process
+    let ru_utime = get_user_runtime_usec();
+    current_task().unwrap().acquire_inner_lock().rusage.add_utime(ru_utime);
+    update_kernel_clock();
+
     let scause = scause::read();
     let stval = stval::read();
     match scause.cause() {
@@ -160,6 +170,12 @@ pub fn trap_handler() -> ! {
 #[no_mangle]
 pub fn trap_return() -> ! {
     // println!("trap_return");
+
+    // update RUsage of process
+    update_user_clock();
+    let ru_stime = get_kernel_runtime_usec();
+    current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
+
     set_user_trap_entry();
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;

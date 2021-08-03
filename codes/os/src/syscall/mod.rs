@@ -28,6 +28,7 @@ const SYSCALL_NANOSLEEP: usize = 101;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_TIMES: usize = 153;
 const SYSCALL_UNAME: usize = 160;
+const SYSCALL_GETRUSAGE: usize = 165;
 const SYSCALL_GET_TIME_OF_DAY: usize = 169;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_GETPPID: usize = 173;
@@ -66,6 +67,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
         //gdb_print!(SYSCALL_ENABLE,"syscall-({})\n",syscall_id);
     }
+
     
     match syscall_id {
         SYSCALL_GETCWD=> sys_getcwd(args[0] as *mut u8, args[1] as usize),
@@ -85,7 +87,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         //SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
         SYSCALL_OPENAT=> sys_open_at(args[0] as isize, args[1] as *const u8, args[2] as u32, args[3] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
-        SYSCALL_PIPE => sys_pipe(args[0] as *mut u32),
+        SYSCALL_PIPE => sys_pipe(args[0] as *mut u32, args[1] as usize),
         
         SYSCALL_GETDENTS64 => sys_getdents64(args[0] as isize, args[1] as *mut u8, args[2] as usize),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
@@ -103,6 +105,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_TIMES => sys_times(args[0] as *mut i64),
         SYSCALL_UNAME => sys_uname(args[0] as *mut u8),
+        SYSCALL_GETRUSAGE => sys_getrusage(args[0] as isize, args[1] as *mut u8),
         SYSCALL_GET_TIME_OF_DAY => sys_get_time(args[0] as *mut u64),
         SYSCALL_SBRK => sys_sbrk(args[0] as isize, args[1] as usize),
         SYSCALL_BRK => sys_brk(args[0]),

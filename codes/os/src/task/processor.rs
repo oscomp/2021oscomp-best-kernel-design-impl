@@ -1,11 +1,12 @@
 // #![feature(llvm_asm)]
 // #[macro_use]
-use super::TaskControlBlock;
+use super::{TaskControlBlock, RUsage};
 use alloc::sync::Arc;
 use core::{borrow::Borrow, cell::RefCell};
 use lazy_static::*;
 use super::{fetch_task, TaskStatus};
 use super::__switch;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use crate::task::manager::add_task;
 use crate::gdb_print;
@@ -29,6 +30,8 @@ unsafe impl Sync for Processor {}
 struct ProcessorInner {
     current: Option<Arc<TaskControlBlock>>,
     idle_task_cx_ptr: usize,
+    user_clock: usize,  /* Timer usec when last enter into the user program */
+    kernel_clock: usize, /* Timer usec when user program traps into the kernel*/
 }
 
 impl Processor {
@@ -37,9 +40,30 @@ impl Processor {
             inner: RefCell::new(ProcessorInner {
                 current: None,
                 idle_task_cx_ptr: 0,
+                user_clock: 0,  
+                kernel_clock: 0,
             }),
         }
     }
+
+    // when trap return to user program, use this func to update user clock
+    pub fn update_user_clock(& self){
+        self.inner.borrow_mut().user_clock = get_time_us();
+    }
+    
+    // when trap into kernel, use this func to update kernel clock
+    pub fn update_kernel_clock(& self){
+        self.inner.borrow_mut().kernel_clock = get_time_us();
+    }
+
+    pub fn get_user_clock(& self) -> usize{
+        return self.inner.borrow().user_clock;
+    }
+
+    pub fn get_kernel_clock(& self) -> usize{
+        return self.inner.borrow().kernel_clock;
+    }
+
     fn get_idle_task_cx_ptr2(&self) -> *const usize {
         let inner = self.inner.borrow();
         &inner.idle_task_cx_ptr as *const usize
@@ -57,6 +81,7 @@ impl Processor {
                 // True: switch
                 // False: return to current task, don't switch
                 if let Some(task) = fetch_task() {
+
                     let mut task_inner = task.acquire_inner_lock();
                     let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
                     task_inner.task_status = TaskStatus::Running;
@@ -64,10 +89,15 @@ impl Processor {
                     // release
                     self.inner.borrow_mut().current = Some(task);
                     ////////// current task  /////////
+                    // update RUsage of process
+                    update_kernel_clock();
+                    let ru_stime = get_kernel_runtime_usec();
+                    current_task_inner.rusage.add_stime(ru_stime);
                     // Change status to Ready
                     current_task_inner.task_status = TaskStatus::Ready;
                     drop(current_task_inner);
                     //println!("drop lock1");
+                    
                     // push back to ready queue.
                     add_task(current_task);
                     ////////// current task  /////////
@@ -83,6 +113,7 @@ impl Processor {
                     drop(current_task_inner);
                     //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
+
                     unsafe {
                         __switch(
                             idle_task_cx_ptr2,
@@ -156,6 +187,30 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 pub fn print_core_info(){
     println!( "[core{}] pid = {}", 0, PROCESSOR_LIST[0].current().unwrap().getpid() );
     println!( "[core{}] pid = {}", 1, PROCESSOR_LIST[1].current().unwrap().getpid() );
+}
+
+// when trap return to user program, use this func to update user clock
+pub fn update_user_clock(){
+    let core_id: usize = get_core_id();
+    PROCESSOR_LIST[core_id].update_user_clock();
+}
+
+// when trap into kernel, use this func to update kernel clock
+pub fn update_kernel_clock(){
+    let core_id: usize = get_core_id();
+    PROCESSOR_LIST[core_id].update_kernel_clock();
+}
+
+// when trap into kernel, use this func to get time spent in user (it is duration not accurate time)
+pub fn get_user_runtime_usec() -> usize{
+    let core_id: usize = get_core_id();
+    return get_time_us() - PROCESSOR_LIST[core_id].get_user_clock();
+}
+
+// when trap return to user program, use this func to get time spent in kernel (it is duration not accurate time)
+pub fn get_kernel_runtime_usec() -> usize{
+    let core_id: usize = get_core_id();
+    return get_time_us() - PROCESSOR_LIST[core_id].get_kernel_clock();
 }
 
 pub fn schedule(switched_task_cx_ptr2: *const usize) {

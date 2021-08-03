@@ -211,7 +211,10 @@ pub fn sys_close(fd: usize) -> isize {
     0
 }
 
-pub fn sys_pipe(pipe: *mut u32) -> isize {
+pub fn sys_pipe(pipe: *mut u32, flags: usize) -> isize {
+    if flags != 0{
+        println!("[sys_pipe]: flags not support");
+    }
     let task = current_task().unwrap();
     let token = current_user_token();
     let mut inner = task.acquire_inner_lock();

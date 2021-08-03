@@ -29,7 +29,11 @@ pub use processor::{
     take_current_task,
     schedule,
     get_core_id,
-    print_core_info
+    print_core_info,
+    update_user_clock,
+    update_kernel_clock, 
+    get_user_runtime_usec, 
+    get_kernel_runtime_usec,
 };
 pub use manager::add_task;
 pub use pid::{PidHandle, pid_alloc, KernelStack};

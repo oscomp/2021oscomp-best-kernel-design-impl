@@ -20,7 +20,7 @@ use crate::config::*;
 use crate::gdb_println;
 use crate::monitor::*;
 use super::TaskContext;
-use super::{PidHandle, pid_alloc, KernelStack};
+use super::{PidHandle, pid_alloc, KernelStack, RUsage};
 use alloc::sync::{Weak, Arc};
 use alloc::vec;
 use alloc::vec::Vec;
@@ -57,20 +57,25 @@ pub struct TaskControlBlock {
 
 pub type FdTable =  Vec<Option<FileDiscripter>>;
 pub struct TaskControlBlockInner {
-    pub address: ProcAddress,
+    // task
     pub trap_cx_ppn: PhysPageNum,
-    pub base_size: usize,
-    pub heap_start: usize,
-    pub heap_pt: usize,
     pub task_cx_ptr: usize,
     pub task_status: TaskStatus,
-    pub memory_set: MemorySet,
     pub parent: Option<Weak<TaskControlBlock>>,
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
+    // memory
+    pub memory_set: MemorySet,
+    pub base_size: usize,
+    pub heap_start: usize,
+    pub heap_pt: usize,
+    pub mmap_area: MmapArea,
+    // file
     pub fd_table: FdTable,
     pub current_path: String,
-    pub mmap_area: MmapArea,
+    // info
+    pub address: ProcAddress,
+    pub rusage:RUsage,
 }
 
 impl ProcAddress {
@@ -152,6 +157,7 @@ impl TaskControlBlock {
             kernel_stack,
             inner: Mutex::new(TaskControlBlockInner {
                 address: ProcAddress::new(),
+                rusage: RUsage::new(),
                 trap_cx_ppn,
                 base_size: user_sp,
                 heap_start: user_heap,
@@ -415,6 +421,7 @@ impl TaskControlBlock {
             kernel_stack,
             inner: Mutex::new(TaskControlBlockInner {
                 address: ProcAddress::new(),
+                rusage: RUsage::new(),
                 trap_cx_ppn,
                 base_size: parent_inner.base_size,
                 heap_start: parent_inner.heap_start,

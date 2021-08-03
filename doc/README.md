@@ -13,5 +13,5 @@
 - fs_kernel.md：UltraOS文件系统对内核提供的服务以及系统调用支持。
 - MultiCore.md：UltraOS为支持多核运行所作出的努力和思考，以及遇到的问题和解决方案。
 - Shell.md：UltraOS用户程序Shell支持。
-- **UltraOS文档.pdf（重要）**：UltraOS的设计需求、理念、架构、特点、展望等全方位详细文档。
+- **UltraOS文档.pdf（重要）**：UltraOS的设计需求、理念、架构、特点、展望等全方位详细文档。（为06.20版本，已经过期，仅供参考）
 - UserSupportThinking.md：UltraOS对于用户态支持所作的努力和思考。

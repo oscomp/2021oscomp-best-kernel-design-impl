@@ -1,15 +1,4 @@
-use crate::task::{
-    suspend_current_and_run_next,
-    exit_current_and_run_next,
-    current_task,
-    current_user_token,
-    add_task,
-    TaskControlBlock,
-    utsname,
-    SIGCHLD,
-    CLONE_CHILD_CLEARTID,
-    CLONE_CHILD_SETTID,
-};
+use crate::task::*;
 use crate::timer::*;
 use crate::mm::{
     UserBuffer,
@@ -72,6 +61,19 @@ pub fn sys_get_time(time: *mut u64) -> isize {
     *translated_refmut(token, unsafe { time.add(1) }) = get_time_us() as u64;
     0
 
+}
+
+
+pub fn sys_getrusage(who: isize, usage: *mut u8) -> isize {
+    if who != RUSAGE_SELF {
+        println!("sys_getrusage: \"who\" not supported!");
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let mut userbuf = UserBuffer::new(translated_byte_buffer(token, usage, core::mem::size_of::<RUsage>()));
+    userbuf.write(task.acquire_inner_lock().rusage.as_bytes());
+    0
 }
 
 pub fn sys_uname(buf: *mut u8) -> isize {
