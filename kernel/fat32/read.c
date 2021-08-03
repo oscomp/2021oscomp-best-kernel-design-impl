@@ -15,9 +15,10 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     uint8_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
-
+    // 如果是管道，就读取管道输出
     if (current_running->fd[fd_index].piped == FD_PIPED)
         return pipe_read(buf, current_running->fd[fd_index].pip_num, count);
+
     size_t mycount = 0;
     size_t realcount = min(count, current_running->fd[fd_index].length);
     uchar *buff = kalloc();
@@ -25,9 +26,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     isec_t now_sec = first_sec_of_clus(now_clus);
 
     while (mycount < realcount){
-        printk_port("mycount is %d, realcount is %d\n", mycount, realcount);
-        printk_port("now_clus is %ld, now_sec is %ld\n", now_clus, now_sec);
-        size_t readsize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
+        size_t readsize = min(BUFSIZE, realcount - mycount);
         sd_read(buff, now_sec);
         memcpy(buf, buff, readsize);
         buf += readsize;

@@ -201,6 +201,7 @@ void freePage(ptr_t baseAddr)
     if (clear){
         // printk_port("sizeof : %d\n", sizeof(list_node_t));
         list_node_t *tmp = freePagebackupList.next;
+        assert(tmp != &freePagebackupList);
         // printk_port("addr: %lx\n", tmp);
         tmp->ptr = baseAddr;
         list_del(tmp);
