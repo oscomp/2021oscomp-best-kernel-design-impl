@@ -105,20 +105,20 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
         sp_kva += 2 * sizeof(uintptr_t);
     }
     aux_elem_t *last_mem_aux_vec = mem_aux_vec;
-    // 5. random pad
-    for (uint i = 0; i < 3; ++i)
-        *(char*)(sp_kva + i) = 0; // magic
-    sp_kva += 3;
-    unsigned char random[16];
-    get_random_bytes(random, 16);
-    memcpy(sp_kva, random, 16);
-    while (mem_aux_vec->id != AT_RANDOM && mem_aux_vec >= start_mem_aux_vec)
-        mem_aux_vec--;
-    if (mem_aux_vec->id == AT_RANDOM && mem_aux_vec >= start_mem_aux_vec){
-        mem_aux_vec->val = (uint64_t)sp_kva - (uint64_t)start_sp_kva + sp_uva;
-        sp_kva += 16;
-    }
-    mem_aux_vec = last_mem_aux_vec;
+    // // 5. random pad
+    // for (uint i = 0; i < 3; ++i)
+    //     *(char*)(sp_kva + i) = 0; // magic
+    // sp_kva += 3;
+    // unsigned char random[16];
+    // get_random_bytes(random, 16);
+    // memcpy(sp_kva, random, 16);
+    // while (mem_aux_vec->id != AT_RANDOM && mem_aux_vec >= start_mem_aux_vec)
+    //     mem_aux_vec--;
+    // if (mem_aux_vec->id == AT_RANDOM && mem_aux_vec >= start_mem_aux_vec){
+    //     mem_aux_vec->val = (uint64_t)sp_kva - (uint64_t)start_sp_kva + sp_uva;
+    //     sp_kva += 16;
+    // }
+    // mem_aux_vec = last_mem_aux_vec;
     // 6. copy argv strings
     if (argv){        
         for (uint i = 0; i < argc; ++i){

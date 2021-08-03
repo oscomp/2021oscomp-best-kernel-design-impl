@@ -36,7 +36,6 @@ void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause, uint
 {
     /* user time count */
     user_time_count();
-    printk_port("scause is %lx\n", cause);
     // call corresponding handler by the value of `cause`
     int is_interrupt = (cause >> (SXLEN - 1));
     is_interrupt = !(is_interrupt == 0);
