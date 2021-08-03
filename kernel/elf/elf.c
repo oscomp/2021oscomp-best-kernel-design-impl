@@ -52,7 +52,8 @@ uintptr_t load_elf(
     uint64_t first_load_p_vaddr = 0;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
-        printk_port("p_type is %lx\n", phdr->p_type);
+        if (phdr->p_type >= 0 && phdr->p_type <= 9)
+            sbi_console_putchar('0' + phdr->p_type);
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
             if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
             for (i = 0; i < phdr->p_memsz; ) {
