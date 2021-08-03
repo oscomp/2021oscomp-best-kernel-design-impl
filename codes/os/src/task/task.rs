@@ -389,7 +389,8 @@ impl TaskControlBlock {
         let mut parent_inner = self.acquire_inner_lock();
         // println!{"trap context of pid{}: {:X}", self.pid.0, parent_inner.trap_cx_ppn.0}
         parent_inner.print_cx();
-        let user_heap_top = parent_inner.heap_start + USER_HEAP_SIZE;
+        // let user_heap_top = parent_inner.heap_start + USER_HEAP_SIZE;
+        let user_heap_top = parent_inner.heap_start;
         // copy user space(include trap context)
         let memory_set = MemorySet::from_copy_on_write(
             &mut parent_inner.memory_set,

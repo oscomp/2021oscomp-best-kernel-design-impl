@@ -440,7 +440,7 @@ impl MemorySet {
         for area in parent_areas.iter() {
             let head_vpn = area.vpn_range.get_start();
             let user_heap_top_addr: VirtAddr = user_heap_top.into();
-            if head_vpn > user_heap_top_addr.floor() {
+            if head_vpn >= user_heap_top_addr.floor() {
                 //skipping the part using Coping to new ppn
                 continue;
             }
