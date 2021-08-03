@@ -1259,6 +1259,8 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
             filename[name_cnt++] = 0;
         }
 
+        // printk_port("filename is %s\n", filename);
+        // printk_port("name is %s\n", name);
         if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
             if (pos){
                 pos->sec = now_sec;

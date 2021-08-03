@@ -23,7 +23,7 @@ CFLAGS += -Iarch/$(ARCH)/include
 USER_CFLAGS += -Iarch/$(ARCH)/include
 USER_LDFLAGS = $(ARCH_DIR)/crt0.o
 
-SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
+SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c ./kernel/elf/elf.c
 SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S $(ARCH_DIR)/sbi/common.c
 SRC_SCREEN	= ./drivers/screen.c
 SRC_SDCARD	= ${ARCH_SD}/sdcard.c ${ARCH_SD}/fpioa.c ${ARCH_SD}/gpiohs.c ${ARCH_SD}/spi.c ${ARCH_SD}/utils.c \
@@ -37,6 +37,7 @@ SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c .
 SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
+SRC_ELF 	= ./kernel/elf/elf.c
 SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c
 SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
@@ -54,7 +55,7 @@ TEST_ELF	= shell.elf
 # 			write.elf yield.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_SDCARD} ${SRC_FAT32} ${SRC_UNAME}
+				${SRC_SDCARD} ${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c
@@ -63,7 +64,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./riscv.lds
 
-K210_SERIALPORT	= /dev/ttyUSB0
+K210_SERIALPORT	= /dev/ttyUSB1
 
 .PHONY:all
 

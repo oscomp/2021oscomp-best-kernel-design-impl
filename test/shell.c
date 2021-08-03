@@ -9,7 +9,7 @@ int main()
     #ifdef K210
     /* for K210 do all test */
     char *argv[4], *envp[4];
-    char str1[20] = "./busybox1";
+    char str1[20] = "./busybox";
     // char str2[20] = "sh";
     // char str3[20] = "busybox_testcode.sh";
     char str2[20] = "echo";
@@ -22,7 +22,7 @@ int main()
     // argv[1] = str2; 
     // argv[2] = str3;
     // argv[3] = NULL;
-    sys_exec("./busybox", argv, NULL);
+    sys_exec(argv[0], argv, NULL);
 
     #else
 

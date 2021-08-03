@@ -95,6 +95,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
                 printk_port("%lx\n%lx\n", kva2pa(_elf_binary + length), PGDIR_PA);
                 assert(0);
             }
+            // printk_port("length: %d\n", length);
             fat32_read(fd, _elf_binary, length);
 
             uintptr_t pgdir = allocPage();
