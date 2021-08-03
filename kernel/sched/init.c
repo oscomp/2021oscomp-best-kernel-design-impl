@@ -144,10 +144,8 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
     while (mem_aux_vec->id != AT_EXECFN && mem_aux_vec >= start_mem_aux_vec)
         mem_aux_vec--;
     if (mem_aux_vec->id == AT_EXECFN && mem_aux_vec >= start_mem_aux_vec){
-        printk_port("filename: %s %lx %d\n", filename, filename, strlen(filename));
-        printk_port("sp:%lx\n", sp_kva);
         memcpy(sp_kva, filename, strlen(filename) + 1);
-        printk_port("filename: %s\n", sp_kva);
+        // printk_port("filename: %s\n", sp_kva);
         mem_aux_vec->val = (uint64_t)sp_kva - (uint64_t)start_sp_kva + sp_uva;
         sp_kva += strlen(filename) + 1;
     }
@@ -159,8 +157,8 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
         sp_kva += 16 - sp_kva % 16;
     }
     // printk_port("final sp is %lx\n", sp_kva);
-    for (uint64_t i = start_sp_kva; i < sp_kva; i += 8)
-        printk_port("%lx:%lx\n", i, *((uint64_t *)i));
+    // for (uint64_t i = start_sp_kva; i < sp_kva; i += 8)
+    //     printk_port("%lx:%lx\n", i, *((uint64_t *)i));
     return sp_kva;
 }
 

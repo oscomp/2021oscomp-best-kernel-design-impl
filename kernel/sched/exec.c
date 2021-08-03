@@ -104,9 +104,9 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 
             uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper, &pcb_underinit->elf);
             pcb_underinit->edata = USER_PILE_ADDR;
-            printk_port("test_elf is %lx\n", test_elf);
-            printk_port("edata is %lx, and real edata is %lx\n", pcb_underinit->edata, pcb_underinit->elf.edata);
-            printk_port("phoff is %lx\n", pcb_underinit->elf.phoff);
+            // printk_port("test_elf is %lx\n", test_elf);
+            // printk_port("edata is %lx, and real edata is %lx\n", pcb_underinit->edata, pcb_underinit->elf.edata);
+            // printk_port("phoff is %lx\n", pcb_underinit->elf.phoff);
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
 
             // prepare stack(argv,envp,aux)
