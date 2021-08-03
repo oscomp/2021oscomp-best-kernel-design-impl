@@ -39,7 +39,8 @@ uintptr_t load_elf(
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
-            printk_port("filesz: %lx\n, memsz: %lx\n", phdr->p_filesz, phdr->p_memsz);
+            printk_port("p_vaddr:%lx, p_offsetL%lx\n", phdr->p_vaddr, phdr->p_offset);
+            printk_port("filesz: %lx, memsz: %lx\n", phdr->p_filesz, phdr->p_memsz);
             if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
             for (i = 0; i < phdr->p_memsz; ) {
                 uintptr_t offset_in_page = (phdr->p_vaddr + i) % NORMAL_PAGE_SIZE; // offset in this page
@@ -68,6 +69,7 @@ uintptr_t load_elf(
                         (unsigned char *)prepare_page_for_va(
                             (uintptr_t)(phdr->p_vaddr + i), pgdir, _PAGE_EXEC|_PAGE_READ|_PAGE_WRITE);
                     copy_bytes = NORMAL_PAGE_SIZE - offset_in_page;
+                    printk_port("page offset:%lx\n", offset_in_page);
                     printk_port("copy_bytes: %lx\n", copy_bytes);
                     for (int j = offset_in_page;
                          j < NORMAL_PAGE_SIZE;
