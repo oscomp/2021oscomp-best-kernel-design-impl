@@ -6,7 +6,7 @@ Disassembly of section .text:
 
 0000000080020000 <_start>:
     80020000:	0007b197          	auipc	gp,0x7b
-    80020004:	75818193          	addi	gp,gp,1880 # 8009b758 <__global_pointer$>
+    80020004:	70818193          	addi	gp,gp,1800 # 8009b708 <__global_pointer$>
     80020008:	0ff0000f          	fence
     8002000c:	0000100f          	fence.i
     80020010:	10401073          	csrw	sie,zero
@@ -15,9 +15,9 @@ Disassembly of section .text:
     8002001a:	1002b073          	csrc	sstatus,t0
     8002001e:	e905                	bnez	a0,8002004e <secondary>
     80020020:	0007c697          	auipc	a3,0x7c
-    80020024:	f2c68693          	addi	a3,a3,-212 # 8009bf4c <_edata>
+    80020024:	edc68693          	addi	a3,a3,-292 # 8009befc <_edata>
     80020028:	0007c717          	auipc	a4,0x7c
-    8002002c:	f3070713          	addi	a4,a4,-208 # 8009bf58 <__BSS_END__>
+    8002002c:	ee070713          	addi	a4,a4,-288 # 8009bf08 <__BSS_END__>
     80020030:	00e6d763          	bge	a3,a4,8002003e <clear_bss_done>
 
 0000000080020034 <clear_bss>:
@@ -227,12 +227,12 @@ Disassembly of section .text:
     80020226:	e422                	sd	s0,8(sp)
     80020228:	0800                	addi	s0,sp,16
     8002022a:	0007c797          	auipc	a5,0x7c
-    8002022e:	d1678793          	addi	a5,a5,-746 # 8009bf40 <pagetop>
+    8002022e:	cc678793          	addi	a5,a5,-826 # 8009bef0 <pagetop>
     80020232:	6398                	ld	a4,0(a5)
     80020234:	6785                	lui	a5,0x1
     80020236:	973e                	add	a4,a4,a5
     80020238:	0007c797          	auipc	a5,0x7c
-    8002023c:	d0878793          	addi	a5,a5,-760 # 8009bf40 <pagetop>
+    8002023c:	cb878793          	addi	a5,a5,-840 # 8009bef0 <pagetop>
     80020240:	e398                	sd	a4,0(a5)
     80020242:	0001                	nop
     80020244:	853e                	mv	a0,a5
@@ -308,12 +308,12 @@ Disassembly of section .text:
     80020312:	efa1                	bnez	a5,8002036a <map_page+0xb2>
     80020314:	f11ff0ef          	jal	ra,80020224 <alloc_page>
     80020318:	0007c797          	auipc	a5,0x7c
-    8002031c:	c2878793          	addi	a5,a5,-984 # 8009bf40 <pagetop>
+    8002031c:	bd878793          	addi	a5,a5,-1064 # 8009bef0 <pagetop>
     80020320:	639c                	ld	a5,0(a5)
     80020322:	853e                	mv	a0,a5
     80020324:	e5bff0ef          	jal	ra,8002017e <clear_pgdir>
     80020328:	0007c797          	auipc	a5,0x7c
-    8002032c:	c1878793          	addi	a5,a5,-1000 # 8009bf40 <pagetop>
+    8002032c:	bc878793          	addi	a5,a5,-1080 # 8009bef0 <pagetop>
     80020330:	639c                	ld	a5,0(a5)
     80020332:	83b1                	srli	a5,a5,0xc
     80020334:	fcf43423          	sd	a5,-56(s0)
@@ -326,7 +326,7 @@ Disassembly of section .text:
     80020350:	fd043783          	ld	a5,-48(s0)
     80020354:	00379713          	slli	a4,a5,0x3
     80020358:	0007c797          	auipc	a5,0x7c
-    8002035c:	be878793          	addi	a5,a5,-1048 # 8009bf40 <pagetop>
+    8002035c:	b9878793          	addi	a5,a5,-1128 # 8009bef0 <pagetop>
     80020360:	639c                	ld	a5,0(a5)
     80020362:	97ba                	add	a5,a5,a4
     80020364:	fef43423          	sd	a5,-24(s0)
@@ -703,7 +703,7 @@ Disassembly of section .text:
     800207d2:	e3b9                	bnez	a5,80020818 <boot_kernel+0x5a>
     800207d4:	c01ff0ef          	jal	ra,800203d4 <setup_vm>
     800207d8:	0007b797          	auipc	a5,0x7b
-    800207dc:	77078793          	addi	a5,a5,1904 # 8009bf48 <_length_main>
+    800207dc:	72078793          	addi	a5,a5,1824 # 8009bef8 <_length_main>
     800207e0:	438c                	lw	a1,0(a5)
     800207e2:	fc840793          	addi	a5,s0,-56
     800207e6:	873e                	mv	a4,a5
@@ -718,14 +718,14 @@ Disassembly of section .text:
     80020808:	87aa                	mv	a5,a0
     8002080a:	873e                	mv	a4,a5
     8002080c:	0007b797          	auipc	a5,0x7b
-    80020810:	74478793          	addi	a5,a5,1860 # 8009bf50 <start_kernel>
+    80020810:	6f478793          	addi	a5,a5,1780 # 8009bf00 <start_kernel>
     80020814:	e398                	sd	a4,0(a5)
     80020816:	a031                	j	80020822 <boot_kernel+0x64>
     80020818:	03600513          	li	a0,54
     8002081c:	84dff0ef          	jal	ra,80020068 <sbi_console_putchar>
     80020820:	bfe5                	j	80020818 <boot_kernel+0x5a>
     80020822:	0007b797          	auipc	a5,0x7b
-    80020826:	72e78793          	addi	a5,a5,1838 # 8009bf50 <start_kernel>
+    80020826:	6de78793          	addi	a5,a5,1758 # 8009bf00 <start_kernel>
     8002082a:	639c                	ld	a5,0(a5)
     8002082c:	fb043583          	ld	a1,-80(s0)
     80020830:	fb843503          	ld	a0,-72(s0)

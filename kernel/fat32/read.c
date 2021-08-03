@@ -25,6 +25,8 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     isec_t now_sec = first_sec_of_clus(now_clus);
 
     while (mycount < realcount){
+        printk_port("mycount is %d, realcount is %d\n", mycount, realcount);
+        printk_port("now_clus is %ld, now_sec is %ld\n", now_clus, now_sec);
         size_t readsize = (mycount + BUFSIZE <= realcount) ? BUFSIZE : realcount - mycount;
         sd_read(buff, now_sec);
         memcpy(buf, buff, readsize);
