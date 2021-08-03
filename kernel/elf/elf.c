@@ -54,6 +54,12 @@ uintptr_t load_elf(
         phdr = (Elf64_Phdr *)ptr_ph_table;
         if (phdr->p_type >= 0 && phdr->p_type <= 9)
             sbi_console_putchar('0' + phdr->p_type);
+        else if (phdr->p_type == PT_GNU_STACK)
+            sbi_console_putchar('a');
+        else if (phdr->p_type == PT_GNU_RELRO)
+            sbi_console_putchar('b');
+        else
+            sbi_console_putchar('c');
         if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
             if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
             for (i = 0; i < phdr->p_memsz; ) {
