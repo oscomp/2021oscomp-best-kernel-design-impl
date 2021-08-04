@@ -42,6 +42,7 @@ main(unsigned long hartid, unsigned long dtb_pa)
 
 		consoleinit();
 		printfinit();   // init a lock for printf 
+		print_logo();
 		__debug_info("main", "hart %d enter main()...\n", hartid);
 		kpminit();       // physical page allocator
 		kvminit();       // create kernel page table
@@ -50,7 +51,6 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		// timerinit();     // init a lock for timer
 		trapinithart();  // install kernel trap vector, including interrupt handler
 		procinit();
-		print_logo();
 		plicinit();
 		plicinithart();
 		#ifndef QEMU
