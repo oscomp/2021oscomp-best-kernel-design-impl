@@ -171,6 +171,7 @@ extern uint64 sys_rt_sigprocmask(void);
 extern uint64 sys_rt_sigreturn(void);
 extern uint64 sys_fstatat(void);
 extern uint64 sys_fcntl(void);
+extern uint64 sys_pselect(void);
 extern uint64 sys_ppoll(void);
 extern uint64 sys_faccessat(void);
 extern uint64 sys_lseek(void);
@@ -181,7 +182,8 @@ extern uint64 sys_adjtimex(void);
 extern uint64 sys_clock_settime(void);
 extern uint64 sys_clock_gettime(void);
 extern uint64 sys_statfs(void);
-
+extern uint64 sys_getrusage(void);
+extern uint64 sys_setitimer(void);
 
 static uint64 (*syscalls[])(void) = {
 	[SYS_fork]			sys_fork,
@@ -240,6 +242,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_ioctl]			sys_ioctl,
 	[SYS_fstatat]		sys_fstatat,
 	[SYS_fcntl]			sys_fcntl,
+	[SYS_pselect6]		sys_pselect,
 	[SYS_ppoll]			sys_ppoll,
 	[SYS_faccessat]		sys_faccessat,
 	[SYS_lseek]			sys_lseek,
@@ -249,6 +252,8 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_clock_settime] sys_clock_settime, 
 	[SYS_clock_gettime] sys_clock_gettime, 
 	[SYS_statfs]		sys_statfs,
+	[SYS_getrusage]		sys_getrusage,
+	[SYS_setitimer]		sys_setitimer,
 };
 
 static char *sysnames[] = {
@@ -308,6 +313,7 @@ static char *sysnames[] = {
 	[SYS_ioctl]			"ioctl",
 	[SYS_fstatat]		"fstatat",
 	[SYS_fcntl]			"fcntl",
+	[SYS_pselect6]		"pselect",
 	[SYS_ppoll]			"ppoll",
 	[SYS_faccessat]		"faccessat",
 	[SYS_lseek]			"lseek",
@@ -317,6 +323,8 @@ static char *sysnames[] = {
 	[SYS_clock_gettime]	"clock_gettime", 
 	[SYS_clock_settime]	"clock_settime", 
 	[SYS_statfs]		"statfs",
+	[SYS_getrusage]		"getrusage",
+	[SYS_setitimer]		"setitimer",
 };
 
 void
@@ -355,6 +363,7 @@ sys_test_proc(void) {
 }
 
 #include "fs/buf.h"
+#include "timer.h"
 
 uint64
 sys_sysinfo(void)
@@ -366,12 +375,10 @@ sys_sysinfo(void)
 		return -1;
 	}
 
-	extern uint64 ticks;
-
 	struct sysinfo info;
 	memset(&info, 0, sizeof(info));
 
-	info.uptime = ticks;
+	info.uptime = readtime() / CLK_FREQ;
 	info.totalram = PHYSTOP - RUSTSBI_BASE;
 	info.freeram = idlepages() << PGSHIFT;
 	info.bufferram = BSIZE * BNUM;

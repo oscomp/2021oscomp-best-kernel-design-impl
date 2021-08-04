@@ -32,7 +32,8 @@
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
-static int
+// static 
+int
 argfd(int n, int *pfd, struct file **pf)
 {
 	int fd;
@@ -203,7 +204,7 @@ sys_openat(void)
 		return -ENAMETOOLONG;
 
 	if(omode & O_CREATE){
-		ip = create(dp, path, fmode & (~I_MODE_DIR));
+		ip = create(dp, path, (fmode & ~S_IFMT) | S_IFREG);
 		if(ip == NULL){
 			return -1;
 		}
@@ -213,12 +214,12 @@ sys_openat(void)
 			return -ENOENT;
 		}
 		ilock(ip);
-		if ((ip->mode & I_MODE_DIR) && (omode & (O_WRONLY|O_RDWR))) {
+		if (S_ISDIR(ip->mode) && (omode & (O_WRONLY|O_RDWR))) {
 			iunlockput(ip);
 			__debug_warn("sys_openat", "illegel mode 0x%x\n", omode);
 			return -EISDIR;
 		}
-		if ((omode & O_DIRECTORY) && !(ip->mode & I_MODE_DIR)) {
+		if ((omode & O_DIRECTORY) && !S_ISDIR(ip->mode)) {
 			iunlockput(ip);
 			__debug_warn("sys_openat", "o_dir\n");
 			return -ENOTDIR;
@@ -233,11 +234,13 @@ sys_openat(void)
 		return -ENOMEM;
 	}
 
-	if (!(ip->mode & I_MODE_DIR) && (omode & O_TRUNC) && (omode & (O_WRONLY|O_RDWR))) {
+	__debug_info("sys_openat", "[%s] ip->mode=0x%x\n", path, ip->mode);
+
+	if (!S_ISDIR(ip->mode) && (omode & O_TRUNC) && (omode & (O_WRONLY|O_RDWR))) {
 		ip->op->truncate(ip);
 	}
 
-	if (ip->dev) {
+	if (!S_ISREG(ip->mode) && !S_ISDIR(ip->mode)) {
 		f->type = FD_DEVICE;
 	} else {
 		f->type = FD_INODE;
@@ -273,7 +276,7 @@ sys_mkdirat(void)
 		return -ENAMETOOLONG;
 	}
 	__debug_info("mkdirat", "create dir %s\n", path);
-	if ((ip = create(dp, path, mode | I_MODE_DIR)) == NULL) {
+	if ((ip = create(dp, path, (mode & ~S_IFMT) | S_IFDIR)) == NULL) {
 		__debug_warn("mkdirat", "create fail\n");
 		return -1;
 	}
@@ -291,7 +294,7 @@ sys_chdir(void)
 	if(argstr(0, path, MAXPATH) < 0 || (ip = namei(path)) == NULL){
 		return -1;
 	}
-	if (!(ip->mode & I_MODE_DIR)) {
+	if (!S_ISDIR(ip->mode)) {
 		iput(ip);
 		return -1;
 	}
@@ -388,7 +391,7 @@ sys_unlinkat(void)
 		dp = myproc()->cwd;
 	} else {
 		dp = f->ip;
-		if (!(dp->mode & I_MODE_DIR)) {
+		if (!S_ISDIR(dp->mode)) {
 			return -ENOTDIR;
 		}
 	}
@@ -410,16 +413,17 @@ sys_unlinkat(void)
 		__debug_warn("sys_unlinkat", "can namei %s\n", path);
 		return -1;
 	}
-	if ((ip->mode & I_MODE_DIR) && mode != AT_REMOVEDIR) {
+	int isdir = S_ISDIR(ip->mode);
+	if (isdir && mode != AT_REMOVEDIR) {
 		iput(ip);
 		__debug_warn("sys_unlinkat", "illegel mode 0x%x against 0x%x\n", mode, ip->mode);
 		return -EISDIR;
-	} else if (!(ip->mode & I_MODE_DIR) && mode == AT_REMOVEDIR) {
+	} else if (!isdir && mode == AT_REMOVEDIR) {
 		iput(ip);
 		return -ENOTDIR;
 	}
 	ilock(ip);
-	if ((ip->mode & I_MODE_DIR) && isdirempty(ip) != 1) {
+	if (isdir && isdirempty(ip) != 1) {
 		iunlockput(ip);
 		__debug_warn("sys_unlinkat", "dir isn't empty\n");
 		return -1;
@@ -452,7 +456,7 @@ sys_renameat(void)
 	} else
 		ip2 = f2->ip;
 
-	if (!(ip1->mode & ip2->mode & I_MODE_DIR))
+	if (!S_ISDIR(ip1->mode) || !S_ISDIR(ip2->mode))
 		return -ENOTDIR;
 
 	if (argstr(1, name1, MAXPATH) < 0 || argstr(3, name2, MAXPATH) < 0 || argint(4, &flags))
@@ -548,51 +552,6 @@ sys_umount(void)
 	// we shouldn't unlock it, or put it.
 
 	return 0;
-}
-
-uint64
-sys_mmap(void)
-{
-	uint64 start, len;
-	int prot, flags, fd;
-	int64 off;
-	struct file *f = NULL;
-
-	argaddr(0, &start);
-	argaddr(1, &len);
-	argint(2, &prot);
-	argint(3, &flags);
-	argfd(4, &fd, &f);
-	argaddr(5, (uint64*)&off);
-	
-	if (off % PGSIZE || len == 0)
-		return -EINVAL;
-	
-	if ((fd < 0 || f == NULL) && !(flags & MAP_ANONYMOUS)) {
-		return -EBADF;
-	} else if (flags & MAP_ANONYMOUS) {
-		f = NULL;
-	} else if (f->type != FD_INODE) {
-		return -EPERM;
-	}
-
-	return do_mmap(start, len, prot, flags, f, off);
-}
-
-uint64
-sys_munmap(void)
-{
-	uint64 start, len;
-	if (argaddr(0, &start) < 0 || argaddr(1, &len) < 0) {
-		return -1;
-	}
-
-	if (start % PGSIZE || len == 0) {
-		__debug_info("sys_munmap", "start=%p not aligned\n", start);
-		return -EINVAL;
-	}
-
-	return do_munmap(start, len);
 }
 
 uint64
@@ -707,6 +666,66 @@ sys_fcntl(void)
 }
 
 uint64
+sys_pselect(void)
+{
+	int nfds;
+	uint64 urfds, uwfds, uexfds;
+	uint64 utoaddr, usmaddr;
+	
+	argint(0, &nfds);
+	argaddr(1, &urfds);
+	argaddr(2, &uwfds);
+	argaddr(3, &uexfds);
+	argaddr(4, &utoaddr);
+	argaddr(5, &usmaddr);
+	
+	if (nfds <= 0 || nfds > FDSET_SIZE)
+		return -EINVAL;
+	if (!(urfds || uwfds || uexfds))
+		return -EINVAL;
+
+	struct fdset rfds, wfds, exfds;
+	struct timespec timeout;
+	__sigset_t sigmask;
+
+	if (urfds && copyin2((char *)&rfds, urfds, sizeof(struct fdset)) < 0)
+		return -EFAULT;
+	if (uwfds && copyin2((char *)&wfds, uwfds, sizeof(struct fdset)) < 0)
+		return -EFAULT;
+	if (uexfds && copyin2((char *)&exfds, uexfds, sizeof(struct fdset)) < 0)
+		return -EFAULT;
+	if (utoaddr && copyin2((char *)&timeout, utoaddr, sizeof(timeout)) < 0)
+		return -EFAULT;
+	if (usmaddr && copyin2((char *)&sigmask, usmaddr, sizeof(sigmask)) < 0)
+		return -EFAULT;
+
+	struct proc *p = myproc();
+	if (p->tmask) {
+		printf(") ...\n");
+	}
+
+	int ret = pselect(nfds,
+				urfds ? &rfds: NULL,
+				uwfds ? &wfds: NULL,
+				uexfds ? &exfds: NULL,
+				utoaddr ? &timeout : NULL,
+				usmaddr ? &sigmask : NULL
+			);
+
+	if (urfds)
+		copyout2(urfds, (char *)&rfds, sizeof(struct fdset));
+	if (uwfds)
+		copyout2(uwfds, (char *)&wfds, sizeof(struct fdset));
+	if (uexfds)
+		copyout2(uexfds, (char *)&exfds, sizeof(struct fdset));
+
+	if (p->tmask) {
+		printf("pid %d: return from pselect(", p->pid);
+	}
+	return ret;
+}
+
+uint64
 sys_ppoll(void)
 {
 	uint64 addr;
@@ -716,23 +735,35 @@ sys_ppoll(void)
 	if (argaddr(0, &addr) < 0 || argint(1, (int*)&nfds) < 0 || argaddr(2, &timeoutaddr) < 0 || argaddr(3, &sigmaskaddr) < 0)
 		return -1;
 
-	if (timeoutaddr || sigmaskaddr) {
-		__debug_error("sys_ppoll", "not supported yet!\n");
-		return -1;
-	}
-	if (nfds < 0) return -1;
+	// if (timeoutaddr || sigmaskaddr) {
+	// 	__debug_error("sys_ppoll", "not supported yet!\n");
+	// 	return -1;
+	// }
+	if (nfds == 0)
+		return -EINVAL;
 
 	struct pollfd *pfds = kmalloc(nfds * sizeof(struct pollfd));
-	if (pfds == NULL) return -1;
+	if (pfds == NULL)
+		return -ENOMEM;
 
 	for (int i = 0; i < nfds; i++) {
 		if (copyin2((char *)(pfds + i), addr + i * sizeof(struct pollfd), sizeof(struct pollfd)) < 0) {
 			kfree(pfds);
-			return -1;
+			return -EFAULT;
 		}
 	}
+	
+	struct timespec timeout;
+	__sigset_t sigmask;
+	if (timeoutaddr && copyin2((char *)&timeout, timeoutaddr, sizeof(timeout)) < 0)
+		return -EFAULT;
+	if (sigmaskaddr && copyin2((char *)&sigmask, sigmaskaddr, sizeof(sigmask)) < 0)
+		return -EFAULT;
 
-	int ret = do_ppoll(pfds, nfds); // should accept more arguments
+	int ret = ppoll(pfds, nfds,
+					timeoutaddr ? &timeout : NULL,
+					sigmaskaddr ? &sigmask : NULL);
+
 	copyout2(addr, (char *)pfds, sizeof(struct pollfd) * nfds);
 	kfree(pfds);
 	return ret;

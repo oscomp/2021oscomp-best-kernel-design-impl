@@ -274,6 +274,14 @@ r_time()
 	return x;
 }
 
+#include "memlayout.h"
+static inline uint64 readtime()
+{
+	uint64 x;
+	x = *(uint64 *)CLINT_MTIME;
+	return x;
+}
+
 // enable device interrupts
 static inline void
 intr_on()
@@ -345,10 +353,10 @@ sfence_vma()
 	#ifdef QEMU
 	asm volatile("sfence.vma");
 	#else
-	asm volatile("fence");
-	asm volatile("fence.i");
+	// asm volatile("fence");
+	// asm volatile("fence.i");
 	asm volatile(".word 0x10400073");
-	asm volatile("fence");
+	// asm volatile("fence");
 	asm volatile("fence.i");
 	#endif
 }

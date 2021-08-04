@@ -1,5 +1,57 @@
 #include "user.h"
 
+int
+countfree()
+{
+    int fds[2];
+    if (pipe(fds) < 0) {
+        printf("pipe() failed in countfree()\n");
+        exit(1);
+    }
+    int pid = fork();
+    if (pid < 0) {
+        printf("fork failed in countfree()\n");
+        exit(1);
+    }
+    if (pid == 0) {
+        close(fds[0]);
+        while (1) {
+            uint64 a = (uint64) sbrk(4096);
+            if (a == 0xffffffffffffffff)
+                break;
+
+            // modify the memory to make sure it's really allocated.
+            *(char *)(a + 4096 - 1) = 1;
+
+            // report back one more page.
+            if (write(fds[1], "x", 1) != 1) {
+                printf("write() failed in countfree()\n");
+                exit(1);
+            }
+        }
+        exit(0);
+    }
+
+    close(fds[1]);
+    int n = 0;
+    while (1) {
+        char c;
+        int cc = read(fds[0], &c, 1);
+        if (cc < 0) {
+            printf("read() failed in countfree()\n");
+            exit(1);
+        }
+        if (cc == 0)
+            break;
+        n += 1;
+    }
+
+    close(fds[0]);
+    wait((int*)0);
+    return n;
+}
+
+
 char *openmmap(char *file, uint64 *len)
 {
     int fd;
@@ -16,7 +68,7 @@ char *openmmap(char *file, uint64 *len)
     *len = stat.size;
     start = mmap(NULL, stat.size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
-    if (start == MAP_FAILED) {
+    if ((int64)start < 0) {
         return NULL;
     }
     return start;
@@ -83,13 +135,25 @@ void outoflen(char *testname)
         exit(1);
     }
     if (fstat(fd, &stat) < 0) {
-        fprintf(2, "stat fd %d fail\n", fd);
+        fprintf(2, "fs/stat fd %d fail\n", fd);
         exit(1);
     }
     char *addr;
-    addr = mmap(NULL, stat.size + 1, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if ((int64)addr > 0) {
-        fprintf(2, "mmap out of len success!\n");
+    unsigned len = stat.size + 4096;
+    addr = mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    if ((int64)addr < 0) {
+        fprintf(2, "mmap out of file size fail!\n");
+        exit(1);
+    }
+    if (fork() == 0) {
+        int data = addr[len];
+        printf("get %d\n", data);
+        exit(0);
+    }
+    int xstatus;
+    wait(&xstatus);
+    if (WEXITSTATUS(xstatus) != (char)-1) {
+        fprintf(2, "access mmap page out of file size success!\n");
         exit(1);
     }
     exit(0);
@@ -126,7 +190,7 @@ void sharedrw(char *testname)
         while (count-- && start[0] != ch) {
             sleep(3);
         }
-        printf("get %c\n", start[0]);
+        // printf("get %c\n", start[0]);
         munmap(start, len);
     }
     exit(0);
@@ -142,12 +206,12 @@ void wrongprot(char *testname)
     }
     char *addr;
     addr = mmap(NULL, 1, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if (addr != MAP_FAILED) {
+    if ((int64)addr >= 0) {
         fprintf(2, "writable-map on read-only fd success!\n");
         exit(1);
     }
     addr = mmap(NULL, 1, PROT_READ, MAP_SHARED, fd, 0);
-    if (addr == MAP_FAILED) {
+    if ((int64)addr < 0) {
         fprintf(2, "mmap fail\n");
         exit(1);
     }
@@ -164,12 +228,210 @@ void wrongprot(char *testname)
     exit(0);
 }
 
+void anonsharedrw(char *testname)
+{
+    int pid, i;
+    char *addr;
+    addr = mmap(NULL, 0x2000, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    if ((int64)addr < 0) {
+        fprintf(2, "mmap fail\n");
+        exit(1);
+    }
+    pid = fork();
+    if (pid < 0) {
+        fprintf(2, "%s: fork fail!\n", testname);
+        exit(1);
+    }
+    if (pid == 0) {
+        /**
+         * The child writes to the second page, where the parent
+         * did not touch (not mapped). Then the child exit()s,
+         * to see if the page still remains to let the parent read.
+         */
+        for (i = 0; i < 128; i++)
+            addr[i + 0x1000] = i;
+        
+        sleep(5);
+        for (i = 0; i < 128; i++)
+            if (addr[i] != i) {
+                fprintf(2, "can't read what the parent wrote!\n");
+                exit(1);
+            }
+        
+        munmap(addr, 0x2000);   // to see if this affect the parent
+        exit(0);
+    } else {
+        for (i = 0; i < 128; i++)
+            addr[i] = i;
+        wait(NULL);
+        for (i = 0; i < 128; i++)
+            if (addr[i + 0x1000] != i) {
+                fprintf(2, "can't read what the child wrote!\n");
+                exit(1);
+            }
+    }
+}
+
+void shareprivate(char *testname)
+{
+    int pid, fd, i;
+    char *addr, ch;
+
+    fd = open("README", O_RDWR);
+    if (fd < 0) {
+        fprintf(2, "%s: can't open file\n", testname);
+        exit(1);
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        fprintf(2, "%s: fork fail!\n", testname);
+        exit(1);
+    }
+
+    if (pid == 0) {
+        pid = fork();
+        if (pid < 0) {
+            fprintf(2, "%s: fork fail!\n", testname);
+            exit(1);
+        }
+
+        addr = mmap(NULL, 0x1000, PROT_WRITE|PROT_READ, MAP_SHARED, fd, 0);
+        if ((int64)addr < 0) {
+            fprintf(2, "mmap fail\n");
+            exit(1);
+        }
+
+        if (pid == 0) {
+            i = 0;
+            ch = '0';
+        } else {
+            i = 1;
+            ch = '1';
+        }
+        for (; i < 0x1000; i += 2)      // write data
+            addr[i] = ch;
+
+        sleep(10);
+
+        for (i = 0; i < 0x1000; i++) {  // check what all the procs wrote
+            if (addr[i] != (i % 2) + '0') {
+                fprintf(2, "%s: read wrong data\n", testname);
+                exit(1);
+            }
+        }
+        munmap(addr, 0x1000);
+        if (pid > 0)
+            wait(NULL);
+    } else {
+        // to see if we can steal some data from the shared mapping (we should)
+        addr = mmap(NULL, 0x1000, PROT_WRITE|PROT_READ, MAP_PRIVATE, fd, 0);
+        if ((int64)addr < 0) {
+            fprintf(2, "mmap fail\n");
+            exit(1);
+        }
+        sleep(5);
+        for (i = 0; i < 0x1000; i++) {
+            if (addr[i] != (i % 2) + '0') {
+                fprintf(2, "%s: can't read the right data\n", testname);
+                exit(1);
+            }
+        }
+        // now see if we can mess up the shared mapping (we shouldn't)
+        for (i = 0; i < 0x1000; i++)
+            addr[i] = 'x';
+
+        wait(NULL);
+
+        // now the children's work should be carried to the file, try reading
+        i = read(fd, addr, 0x1000);
+        if (i < 0) {
+            fprintf(2, "%s: can't read from file\n", testname);
+            exit(1);
+        }
+        for (i-- ; i >= 0; i--) {
+            if (addr[i] != (i % 2) + '0') {
+                fprintf(2, "%s: can't read the right data from file\n", testname);
+                exit(1);
+            }
+        }
+    }
+    close(fd);
+    exit(0);
+}
+
+void ruinheap(char *testname)
+{
+    char *brkpoint, *addr, *old;
+    old = brk(NULL);
+
+    addr = mmap(old, 0x1000, PROT_NONE, MAP_ANONYMOUS|MAP_PRIVATE|MAP_FIXED, -1, 0);
+    if ((int64)addr < 0) {
+        fprintf(2, "%s: mmap fail\n", testname);
+        exit(1);
+    }
+    if (addr != old) {
+        fprintf(2, "%s: mmap not fixed! %p against %p\n", testname, addr, old);
+        exit(1);
+    }
+
+    // this shall fail
+    brkpoint = brk(old + 0x1000);
+    if (brkpoint != old) {
+        fprintf(2, "%s: brk success! break the mmap region!\n", testname);
+        exit(1);
+    }
+    
+    int pid = fork();
+    if (pid < 0) {
+        fprintf(2, "%s: fork fail\n", testname);
+        exit(1);
+    }
+    if (pid == 0) {
+        printf("%s: read PROT_NONE mmap success! get %d\n", testname, addr[0]);
+        exit(0);
+    }
+    int status;
+    wait(&status);
+    if (WEXITSTATUS(status) == 0) {
+        fprintf(2, "%s: the child survived\n", testname);
+        exit(1);
+    }
+
+    // take away the obstacle
+    munmap(addr, 0x1000);
+    addr = old + 0x1000;
+    brkpoint = brk(addr);
+    if (brkpoint != addr) {
+        fprintf(2, "%s: brk fail!\n", testname);
+        exit(1);
+    }
+    old[0] = 0; // can we survive?
+
+    addr = mmap(old, 0x2000, PROT_NONE, MAP_ANONYMOUS|MAP_PRIVATE|MAP_FIXED, -1, 0);
+    if ((int64)addr < 0) {
+        fprintf(2, "%s: mmap fail\n", testname);
+        exit(1);
+    }
+    if (addr != old) {
+        fprintf(2, "%s: mmap not fixed! %p against %p\n", testname, addr, old);
+        exit(1);
+    }
+
+    if (brk(brkpoint - 0x1000) != brkpoint ||
+        brk(brkpoint + 0x2000) != brkpoint)
+    {
+        fprintf(2, "%s: heap is still alive!!\n", testname);
+        exit(1);
+    }
+    exit(0);
+}
+
 
 int run(void f(char *), char *s) {
     int pid;
     int xstatus;
 
-    printf("testing %s\n", s);
     if ((pid = fork()) < 0) {
         printf("runtest: fork error\n");
         exit(1);
@@ -178,11 +440,12 @@ int run(void f(char *), char *s) {
         f(s);
         exit(0);
     }
+    printf("test %s: ", s);
     wait(&xstatus);
     if(WEXITSTATUS(xstatus) != 0) 
-        printf("test %s: FAILED\n", s);
+        printf("FAILED\n", s);
     else
-        printf("test %s: OK\n", s);
+        printf("OK\n", s);
 
     return WEXITSTATUS(xstatus) == 0;
 }
@@ -202,19 +465,30 @@ int main(int argc, char *argv[]){
         { outoflen, "outoflen" },
         { wrongprot, "wrongprot" },
         { sharedrw, "sharedrw" },
+        { anonsharedrw, "anonsharedrw" },
+        { shareprivate, "shareprivate" },
+        { ruinheap, "ruinheap" },
         { 0, 0 },
     };
 
-      int fail = 0;
+    printf("mmaptests starting\n");
+    int free0 = countfree();
+    int free1 = 0;
+    int fail = 0;
     for (struct test *t = tests; t->s != 0; t++) {
-        if((testname == 0) || strcmp(t->s, testname) == 0) {
-            if(!run(t->f, t->s))
+        if ((testname == 0) || strcmp(t->s, testname) == 0) {
+            if (!run(t->f, t->s))
                 fail = 1;
         }
     }
-    if(!fail)
-        printf("ALL TESTS PASSED\n");
-    else
+    if (fail) {
         printf("SOME TESTS FAILED\n");
+        exit(1);
+    } else if ((free1 = countfree()) < free0) {
+        printf("FAILED -- lost some free pages %d (out of %d)\n", free1, free0);
+        exit(1);
+    } else {
+        printf("ALL TESTS PASSED\n");
+    }
     exit(0);
 }

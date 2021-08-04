@@ -30,7 +30,8 @@
 #include "sync/sleeplock.h"
 #include "utils/debug.h"
 
-#define BCACHE_TABLE_SIZE 233
+// #define BCACHE_TABLE_SIZE 233
+#define BCACHE_TABLE_SIZE 47
 #define __hash_idx(idx) ((idx) % BCACHE_TABLE_SIZE)
 
 // struct {

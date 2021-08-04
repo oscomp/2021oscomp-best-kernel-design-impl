@@ -18,6 +18,8 @@
 #include "printf.h"
 #include "utils/string.h"
 #include "utils/debug.h"
+#include "resource.h"
+#include "errno.h"
 
 extern int execve(char *path, char **argv, char **envp);
 
@@ -146,59 +148,8 @@ uint64 sys_wait4(void) {
 
 // yield has no arg
 uint64 sys_sched_yield(void) {
+	myproc()->vswtch += 1;
 	yield();
-	return 0;
-}
-
-uint64
-sys_sbrk(void)
-{
-	int n;
-	if(argint(0, &n) < 0)
-		return -1;
-	
-	struct proc *p = myproc();
-	struct seg *heap = getseg(p->segment, HEAP);
-	uint64 addr = heap->addr + heap->sz;
-	if (n < 0) {
-		if (growproc(n) < 0)  // growproc takes care of p->sz
-			return -1;
-	} else {                // lazy page allocation
-		uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
-		if (addr + n > boundary - PGSIZE) {
-			return -1;
-		}
-		heap->sz += n;
-	}
-	return addr;
-}
-
-uint64
-sys_brk(void)
-{
-	uint64 addr;
-	if(argaddr(0, &addr) < 0)
-		return -1;
-	
-	struct proc *p = myproc();
-	struct seg *heap = getseg(p->segment, HEAP);
-	if (addr == 0) {
-		return heap->addr + heap->sz;
-	} else if (addr < heap->addr) {
-		return -1;
-	}
-	int n = addr - (heap->addr + heap->sz);
-	if (n < 0) {
-		if (growproc(n) < 0)  // growproc takes care of p->sz
-			return -1;
-	} else {                // lazy page allocation
-		uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
-		if (addr > boundary - PGSIZE) {
-			return -1;
-		}
-		heap->sz += n;
-	}
-	return heap->addr + heap->sz;
 	return 0;
 }
 
@@ -307,32 +258,46 @@ sys_getuid(void)
 	return 0;
 }
 
-uint64
-sys_mprotect(void)
-{
-	uint64 addr, len;
-	int prot;
-
-	argaddr(0, &addr);
-	argaddr(1, &len);
-	argint(2, &prot);
-	if (addr % PGSIZE || (prot & ~PROT_ALL))
-		return -1;
-
-	prot = (prot << 1) & (PTE_X|PTE_W|PTE_R); // convert to PTE_attr
-	struct proc *p = myproc();
-	struct seg *s = partofseg(p->segment, addr, addr + len);
-	if (s == NULL ||
-		(s->type == MMAP && !(s->flag & PTE_W) && (prot & PTE_W))
-	)
-	return -1;
-
-	return uvmprotect(p->pagetable, addr, len, prot);
-}
-
 uint64 
 sys_prlimit64(void) {
 	// for now it's not very necessary to implement this syscall 
 	// may be implemented later 
+	return 0;
+}
+
+uint64
+sys_getrusage(void)
+{
+	int who;
+	uint64 addr;
+	struct rusage r;
+	struct proc *p = myproc();
+
+	if (argint(0, &who) < 0 || argaddr(1, &addr) < 0)
+		return -1;
+
+	memset(&r, 0, sizeof(r));
+	switch (who)
+	{
+		case RUSAGE_SELF:
+		case RUSAGE_THREAD:
+			convert_to_timeval(p->proc_tms.utime, &r.ru_utime);
+			convert_to_timeval(p->proc_tms.stime, &r.ru_stime);
+			r.ru_nvcsw = p->vswtch;
+			r.ru_nivcsw = p->ivswtch;
+			__debug_info("sys_getrusage", "{u: %ds %dus | s: %ds %dus}, nvcsw=%d, nivcsw=%d\n", 
+						r.ru_utime.sec, r.ru_utime.usec, r.ru_stime.sec, r.ru_stime.usec, p->vswtch, p->ivswtch);
+			break;
+		case RUSAGE_CHILDREN:
+			convert_to_timeval(p->proc_tms.cutime, &r.ru_utime);
+			convert_to_timeval(p->proc_tms.cstime, &r.ru_stime);
+			break;
+		default:
+			return -EINVAL;
+	}
+
+	if (copyout2(addr, (char *)&r, sizeof(r)) < 0)
+		return -EFAULT;
+
 	return 0;
 }

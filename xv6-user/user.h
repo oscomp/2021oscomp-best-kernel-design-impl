@@ -1,7 +1,7 @@
-#include "kernel/include/types.h"
-#include "kernel/include/stat.h"
-#include "kernel/include/fcntl.h"
-#include "kernel/include/sysinfo.h"
+#include "types.h"
+#include "fs/stat.h"
+#include "fs/fcntl.h"
+#include "sysinfo.h"
 
 // struct stat;
 struct rtcdate;
@@ -19,7 +19,8 @@ struct sysinfo;
 #define MAP_FILE 0
 #define MAP_SHARED 0x01
 #define MAP_PRIVATE 0X02
-#define MAP_FAILED ((void *) -1)
+#define MAP_FIXED 0x10
+#define MAP_ANONYMOUS 0x20
 
 // system calls
 int fork(void);
@@ -55,6 +56,7 @@ static inline int dup2(int oldfd, int newfd) {
 }
 int getpid(void);
 char* sbrk(int size);
+char* brk(void *target);
 int sleep(int ticks);
 int uptime(void);
 int test_proc(int);

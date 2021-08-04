@@ -2,8 +2,8 @@
 // tests for copy-on-write fork() assignment.
 //
 
-#include "kernel/include/memlayout.h"
-#include "xv6-user/user.h"
+#include "memlayout.h"
+#include "user.h"
 
 // allocate more than half of physical memory,
 // then fork. this will fail in the default

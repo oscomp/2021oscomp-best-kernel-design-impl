@@ -87,12 +87,17 @@ SRC	+= \
 	$K/timer.c \
 	$K/uname.c \
 	$K/fs/bio.c \
-	$K/fs/driver_fs.c \
-	$K/fs/fat32.c \
+	$K/fs/blkdev.c \
+	$K/fs/fat32/cluster.c \
+	$K/fs/fat32/dirent.c \
+	$K/fs/fat32/fat.c \
+	$K/fs/fat32/fat32.c \
 	$K/fs/file.c \
 	$K/fs/fs.c \
+	$K/fs/mount.c \
 	$K/fs/pipe.c \
 	$K/fs/poll.c \
+	$K/fs/rootfs.c \
 	$K/mesg/signal.c \
 	$K/mm/kmalloc.c \
 	$K/mm/mmap.c \
@@ -105,6 +110,7 @@ SRC	+= \
 	$K/sync/spinlock.c \
 	$K/syscall/syscall.c \
 	$K/syscall/sysfile.c \
+	$K/syscall/sysmem.c \
 	$K/syscall/sysproc.c \
 	$K/syscall/syssignal.c \
 	$K/syscall/systime.c \
@@ -113,6 +119,7 @@ SRC	+= \
 	$K/trap/trampoline.S \
 	$K/trap/trap.c \
 	$K/utils/list.c \
+	$K/utils/rbtree.c \
 	$K/utils/string.c \
 	$K/hal/plic.c \
 	$K/hal/disk.c
@@ -176,16 +183,106 @@ else
 endif 
 
 
+# try to generate a unique GDB port
+GDBPORT = $(shell expr `id -u` % 5000 + 25000)
+# QEMU's gdb stub command line changed in 0.11
+QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
+	then echo "-gdb tcp::$(GDBPORT)"; \
+	else echo "-s -p $(GDBPORT)"; fi)
+
+.gdbinit: debug/.gdbinit.tmpl-riscv
+	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
+
+qemu-gdb: $T/kernel .gdbinit fs.img
+	@echo "*** Now run 'gdb' in another window." 1>&2
+	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+
+
+# Compile user programs
+ulinker = ./linker/user.ld
+
+$U/initcode: $U/initcode.S
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/initcode.S -o $U/initcode.o
+	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/initcode.out $U/initcode.o
+	$(OBJCOPY) -S -O binary $U/initcode.out $U/initcode
+	$(OBJDUMP) -S $U/initcode.o > $U/initcode.asm
+
+ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o $U/crt.o
+
+_%: %.o $(ULIB)
+	$(LD) $(LDFLAGS) -T $(ulinker) -e _start -o $@ $^
+	$(OBJDUMP) -S $@ > $*.asm
+
+$U/usys.o : $U/usys.pl
+	@perl $U/usys.pl > $U/usys.S
+	$(CC) $(CFLAGS) -c -o $U/usys.o $U/usys.S
+
+
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
 
-.PHONY: clean run all
+UPROGS=\
+	$U/_init\
+	$U/_sh\
+	$U/_cat\
+	$U/_echo\
+	$U/_grep\
+	$U/_ls\
+	$U/_kill\
+	$U/_mkdir\
+	$U/_xargs\
+	$U/_sleep\
+	$U/_find\
+	$U/_rm\
+	$U/_rmdir\
+	$U/_wc\
+	$U/_info\
+	$U/_usertests\
+	$U/_strace\
+	$U/_mv\
+	$U/_test\
+	$U/_grind\
+	$U/_forktest\
+	$U/_stressfs\
+	$U/_cowtest\
+	$U/_lazytests\
+	$U/_mount\
+	$U/_umount\
+	$U/_dup3\
+	$U/_mmaptests
+
+user: $(UPROGS)
+
+dst=/mnt
+
+# Make fs image
+fs:
+	@if [ ! -f "fs.img" ]; then \
+		echo "making fs image..."; \
+		dd if=/dev/zero of=fs.img bs=512k count=512; \
+		mkfs.vfat -F 32 fs.img; fi
+	@sudo mount fs.img $(dst)
+	@make sdcard dst=$(dst)
+	@sudo umount $(dst)
+
+# Write sdcard mounted at $(dst)
+sdcard: user
+	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
+	@for file in $$( ls $U/_* ); do \
+		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
+	@sudo cp $U/_init $(dst)/init
+	@sudo cp $U/_sh $(dst)/sh
+	@sudo cp $U/shrc $(dst)/shrc
+	@sudo cp $U/_echo $(dst)/echo
+	@sudo cp README $(dst)/README
+
+.PHONY: clean run all fs sdcard user
 
 clean: 
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \
 		target \
 		k210.bin \
-		$U/*.d $U/*.o
+		$U/*.d $U/*.o $U/*.asm $U/usys.S $U/_*

@@ -1,10 +1,13 @@
 #ifndef __STAT_H
 #define __STAT_H
 
+#include "types.h"
+
 #define T_DIR     1   // Directory
 #define T_FILE    2   // File
 #define T_DEVICE  3   // Device
 
+#define S_IFMT				0170000
 #define S_IFSOCK			0140000		// socket
 #define S_IFLNK				0120000		// symbolic link
 #define S_IFREG				0100000		// regular file
@@ -13,6 +16,14 @@
 #define S_IFCHR				0020000		// character device
 #define S_IFIFO				0010000		// FIFO
 #define ST_MODE_DIR			S_IFDIR
+
+#define S_ISLNK(m)			(((m) & S_IFMT) == S_IFLNK)
+#define S_ISREG(m)			(((m) & S_IFMT) == S_IFREG)
+#define S_ISDIR(m)			(((m) & S_IFMT) == S_IFDIR)
+#define S_ISCHR(m)			(((m) & S_IFMT) == S_IFCHR)
+#define S_ISBLK(m)			(((m) & S_IFMT) == S_IFBLK)
+#define S_ISFIFO(m)			(((m) & S_IFMT) == S_IFIFO)
+#define S_ISSOCK(m)			(((m) & S_IFMT) == S_IFSOCK)
 
 #define DIRENT_MAX_NAME 255
 

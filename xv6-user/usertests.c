@@ -1,11 +1,11 @@
-#include "kernel/include/param.h"
-#include "kernel/include/types.h"
-#include "kernel/include/stat.h"
-#include "xv6-user/user.h"
-#include "kernel/include/fcntl.h"
-#include "kernel/include/syscall.h"
-#include "kernel/include/memlayout.h"
-#include "kernel/include/riscv.h"
+#include "param.h"
+#include "types.h"
+#include "fs/stat.h"
+#include "user.h"
+#include "fs/fcntl.h"
+#include "syscall.h"
+#include "memlayout.h"
+#include "hal/riscv.h"
 
 //
 // Tests xv6 system calls.  usertests without arguments runs them all
@@ -158,8 +158,8 @@ copyinstr2(char *s)
 
   char *args[] = { "xx", 0 };
   ret = exec(b, args);
-  if(ret != -1){
-    printf("exec(%s) returned %d, not -1\n", b, fd);
+  if(ret >= 0){
+    printf("exec(%s) returned %d, not negative\n", b, fd);
     exit(1);
   }
 
@@ -175,8 +175,8 @@ copyinstr2(char *s)
     big[PGSIZE] = '\0';
     char *args2[] = { big, big, big, 0 };
     ret = exec("echo", args2);
-    if(ret != -1){
-      printf("exec(echo, BIG) returned %d, not -1\n", fd);
+    if(ret >= 0){
+      printf("exec(echo, BIG) returned %d, not negative\n", fd);
       exit(1);
     }
     exit(47); // OK

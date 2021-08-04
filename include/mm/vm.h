@@ -40,9 +40,9 @@ void            uvminit(pagetable_t, uchar *, uint);
 pagetable_t     uvmcreate(void);
 // int             uvmcopy(pagetable_t, pagetable_t, pagetable_t, uint64);
 // int             uvmcopy_cow(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype);
-int             uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, enum segtype, int cow);
+int             uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, int cow);
 uint64          uvmalloc(pagetable_t, uint64 start, uint64 end, int perm);
-uint64          uvmdealloc(pagetable_t, uint64, uint64, enum segtype);
+uint64          uvmdealloc(pagetable_t, uint64, uint64);
 int             uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot);
 void            uvmclear(pagetable_t, uint64);
 void            uvmfree(pagetable_t pt);
@@ -52,6 +52,8 @@ uint64          walkaddr(pagetable_t, uint64);
 uint64          kwalkaddr(pagetable_t pagetable, uint64 va);
 uint64          kvmpa(uint64);
 
+void            pagereg(uint64 pa, uint8 init);
+int             pageput(uint64 pa);
 int             mappages(pagetable_t pt, uint64 va, uint64 size, uint64 pa, int perm);
 void            unmappages(pagetable_t pt, uint64 va, uint64 npages, int flag);
 
@@ -65,5 +67,8 @@ void            vmprint(pagetable_t pagetable);
 
 int             handle_page_fault(int type, uint64 badaddr);
 uint64          kern_pgfault_escape(uint64 badaddr);
+
+extern int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
+extern int either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 
 #endif 

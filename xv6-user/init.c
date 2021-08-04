@@ -1,10 +1,10 @@
 // init: The initial user-level program
 
-#include "kernel/include/types.h"
-#include "kernel/include/stat.h"
-#include "kernel/include/file.h"
-#include "kernel/include/fcntl.h"
-#include "xv6-user/user.h"
+#include "types.h"
+#include "fs/stat.h"
+#include "fs/file.h"
+#include "fs/fcntl.h"
+#include "user.h"
 
 char *argv[] = { "sh", 0 };
 

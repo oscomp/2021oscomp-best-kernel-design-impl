@@ -7,3 +7,6 @@
 *.o 
 *.example*
 *.back*
+xv6-user/usys.S
+xv6-user/*.asm
+xv6-user/_*

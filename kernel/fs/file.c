@@ -25,24 +25,6 @@
 #include "utils/debug.h"
 #include "errno.h"
 
-// struct devsw devsw[NDEV];
-// struct {
-//   struct spinlock lock;
-//   struct file file[NFILE];
-// } ftable;
-
-// void
-// fileinit(void)
-// {
-//   initlock(&ftable.lock, "ftable");
-//   struct file *f;
-//   for(f = ftable.file; f < ftable.file + NFILE; f++){
-//     memset(f, 0, sizeof(struct file));
-//   }
-//   #ifdef DEBUG
-//   printf("fileinit\n");
-//   #endif
-// }
 
 // Allocate a file structure.
 struct file*
@@ -56,24 +38,9 @@ filealloc(void)
 	initlock(&f->lock, "f->lock");
 	f->type = FD_NONE;
 	f->ref = 1;
+	f->poll = NULL;
 	return f;
 }
-// struct file*
-// filealloc(void)
-// {
-//   struct file *f;
-
-//   acquire(&ftable.lock);
-//   for(f = ftable.file; f < ftable.file + NFILE; f++){
-//     if(f->ref == 0){
-//       f->ref = 1;
-//       release(&ftable.lock);
-//       return f;
-//     }
-//   }
-//   release(&ftable.lock);
-//   return NULL;
-// }
 
 // Increment ref count for file f.
 struct file*
@@ -160,7 +127,9 @@ fileread(struct file *f, uint64 addr, int n)
 				// if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
 				//   return -1;
 				// r = devsw[f->major].read(1, addr, n);
+				ilock(ip);
 				r = ip->fop->read(ip, 1, addr, 0, n);
+				iunlock(ip);
 				break;
 		case FD_INODE:
 				ilock(ip);
@@ -189,15 +158,16 @@ filewrite(struct file *f, uint64 addr, int n)
 	if(f->writable == 0)
 		return -1;
 
+	struct inode *ip = f->ip;
+	// __debug_info("filewrite", "addr=%p, n=%d\n", addr, n);
 	if(f->type == FD_PIPE){
 		ret = pipewrite(f->pipe, addr, n);
 	} else if(f->type == FD_DEVICE){
 		// if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
 		//   return -1;
 		// ret = devsw[f->major].write(1, addr, n);
-		ret = f->ip->fop->write(f->ip, 1, addr, 0, n);
+		ret = ip->fop->write(ip, 1, addr, 0, n);
 	} else if(f->type == FD_INODE){
-		struct inode *ip = f->ip;
 		ilock(ip);
 		ret = ip->fop->write(ip, 1, addr, f->off, n);
 		iunlock(ip);
@@ -212,6 +182,7 @@ filewrite(struct file *f, uint64 addr, int n)
 		panic("filewrite");
 	}
 
+	// __debug_info("filewrite", "ret=%d\n", ret);
 	return ret;
 }
 
@@ -220,15 +191,15 @@ filewrite(struct file *f, uint64 addr, int n)
 int
 filereaddir(struct file *f, uint64 addr, uint64 n)
 {
-	// struct proc *p = myproc();
+	__debug_info("filereaddir", "f->type=%d, f->readable=%d\n", f->type, f->readable);
 	if (f->type != FD_INODE || f->readable == 0)
 		return -1;
 
 	struct dirent dent;
 	struct inode *ip = f->ip;
 
-	if(!(ip->mode & I_MODE_DIR))
-		return -1;
+	if(!S_ISDIR(ip->mode))
+		return -ENOTDIR;
 
 	int ret;
 	uint off = f->off;
@@ -240,7 +211,7 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 			break;
 
 		if(copyout2(addr, (char *)&dent, dent.reclen) < 0) {
-			ret = -1;
+			ret = -EFAULT;
 			break;	
 		}
 
@@ -256,7 +227,7 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 	release(&f->lock);
 
 	if (ret < 0)
-		return -1;
+		return -ret;
 	return addr - old;
 }
 
@@ -274,11 +245,13 @@ int filereadv(struct file *f, struct iovec ioarr[], int count)
 			r = pipereadv(f->pipe, ioarr, count);
 			break;
 		case FD_DEVICE:
+			ilock(ip);
 			r = ip->fop->readv(ip, ioarr, count, 0);
+			iunlock(ip);
 			break;
 		case FD_INODE:
-			if (!ip->fop->readv)
-				return -EPERM;
+			// if (!ip->fop->readv)
+			// 	return -EPERM;
 			ilock(ip);
 			r = ip->fop->readv(ip, ioarr, count, f->off);
 			iunlock(ip);
@@ -310,8 +283,8 @@ int filewritev(struct file *f, struct iovec ioarr[], int count)
 			ret = ip->fop->writev(ip, ioarr, count, 0);
 			break;
 		case FD_INODE:
-			if (!ip->fop->writev)
-				return -EPERM;
+			// if (!ip->fop->writev)
+			// 	return -EPERM;
 			ilock(ip);
 			ret = ip->fop->writev(ip, ioarr, count, f->off);
 			iunlock(ip);
@@ -344,9 +317,9 @@ int copyfdtable(struct fdtable *fdt1, struct fdtable *fdt2)
 		fd->exec_close = fdt1->exec_close;
 		for (int i = 0; i < NOFILE; i++) {
 			if (fdt1->arr[i]) {
-				fdt2->arr[i] = filedup(fdt1->arr[i]);
+				fd->arr[i] = filedup(fdt1->arr[i]);
 			} else {
-				fdt2->arr[i] = NULL;
+				fd->arr[i] = NULL;
 			}
 		}
 		fdt1 = fdt1->next;

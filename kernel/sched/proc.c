@@ -191,6 +191,7 @@ static struct proc *allocproc(void) {
 	initlock(&p->lk, "p->lk");
 
 	p->chan = NULL;
+	p->sleep_expire = 0;
 	p->killed = 0;
 	p->pid = allocpid();
 
@@ -202,6 +203,8 @@ static struct proc *allocproc(void) {
 	p->proc_tms.stime = 0;
 	p->proc_tms.cutime = 0;
 	p->proc_tms.cstime = 0;
+	p->vswtch = 0;
+	p->ivswtch = 0;
 
 	// allocate a page trapframe 
 	p->trapframe = (struct trapframe*)allocpage();
@@ -249,6 +252,7 @@ int fork_cow(void) {
 		freeproc(np);
 		return -1;
 	}
+	np->pbrk = p->pbrk;
 
 	// filesystem 
 	if (copyfdtable(&p->fds, &np->fds) < 0) {
@@ -320,6 +324,7 @@ int clone(uint64 flag, uint64 stack) {
 		freeproc(np);
 		return -1;
 	}
+	np->pbrk = p->pbrk;
 
 	// these parts may be improved later 
 	// filesystem 
@@ -535,8 +540,9 @@ void proc_tick(void) {
 	__enter_proc_cs 
 
 	// runnable 
+	struct proc *p;
 	for (int i = PRIORITY_IRQ; i < PRIORITY_NUMBER; i ++) {
-		struct proc *p = proc_runnable[i];
+		p = proc_runnable[i];
 		while (NULL != p) {
 			struct proc *next = p->next;
 			if (RUNNING != p->state) {
@@ -546,19 +552,25 @@ void proc_tick(void) {
 					__insert_runnable(PRIORITY_TIMEOUT, p);
 				}
 			}
-			else {
-				p->proc_tms.utime += 1;
-			}
-			p->proc_tms.stime += 1;
+			// else {
+			// 	p->proc_tms.utime += 1;
+			// }
+			// p->proc_tms.stime += 1;
 			p = next;
 		}
 	} 
 
 	// sleep 
-	struct proc *tmp = proc_sleep;
-	while (NULL != tmp) {
-		tmp->proc_tms.stime += 1;
-		tmp = tmp->next;
+	uint64 now = readtime();
+	p = proc_sleep;
+	while (NULL != p) {
+		struct proc *tmp = p->next;
+		if (p->sleep_expire && now >= p->sleep_expire) {
+			p->sleep_expire = 0;
+			__remove(p);
+			__insert_runnable(PRIORITY_TIMEOUT, p);
+		}
+		p = tmp;
 	}
 
 	__leave_proc_cs 
@@ -646,6 +658,7 @@ void sleep(void *chan, struct spinlock *lk) {
 		release(lk);
 	}
 
+	p->vswtch += 1;
 	p->chan = chan;
 	__remove(p);	// remove p from runnable 
 	__insert_sleep(p);
@@ -731,9 +744,13 @@ void sched(void) {
 	if (intr_get()) 
 		panic("sched interruptible\n");
 
+	p->proc_tms.stime += readtime() - p->proc_tms.ikstmp;
+
 	intena = mycpu()->intena;
 	swtch(&p->context, &mycpu()->context);
 	mycpu()->intena = intena;
+
+	p->proc_tms.ikstmp = readtime();
 }
 
 void cpuinit(void) {
@@ -770,6 +787,7 @@ void forkret(void) {
 		myproc()->cwd = namei("/home");
 	}
 
+	myproc()->proc_tms.ikstmp = readtime();
 	usertrapret();
 }
 
@@ -843,30 +861,35 @@ void userinit(void) {
 
 // Grow or shrink user memory by n bytes. 
 // Return 0 on success, -1 on failure 
-int growproc(int n) {
-  struct proc *p = myproc();
+int growproc(uint64 newbrk)
+{
+	struct proc *p = myproc();
+	struct seg *heap = getseg(p->segment, HEAP);
 
-  struct seg *heap = getseg(p->segment, HEAP);
-  uint64 boundary = heap->next == NULL ? MAXUVA : heap->next->addr;
+	while (heap && p->pbrk != heap->addr + heap->sz)
+		heap = getseg(heap->next, HEAP);
 
-  uint64 oldva = heap->addr + heap->sz;
-  uint64 newva = oldva + n;
-
-  if(n > 0){
-    if (newva > boundary - PGSIZE ||
-        uvmalloc(p->pagetable, oldva, newva, PTE_W|PTE_R) == 0) {
-      return -1;
-    }
-  } else if(n < 0){
-	if (newva < heap->addr || newva > oldva) {
-	  newva = heap->addr;
+	if (!heap)	
+	 	heap = locateseg(p->segment, p->pbrk - 1);
+	if (!heap || heap->type != HEAP || newbrk < heap->addr) { // mmap or munmap ruined this
+		return -1;
 	}
 
-	uvmdealloc(p->pagetable, newva, oldva, HEAP);
-	sfence_vma();
-  }
-  heap->sz += n;
-  return 0;
+	uint64 boundary = heap->next == NULL ?
+						MAXUVA : PGROUNDDOWN(heap->next->addr) - PGSIZE;
+	if (newbrk > boundary) {
+		return -1;
+	}
+
+	if (newbrk < p->pbrk) { // only handle shrinking case, leave growing case for pg-fault
+		uvmdealloc(p->pagetable, newbrk, p->pbrk);
+		sfence_vma();
+	}
+
+	int64 diff = newbrk - p->pbrk;
+	heap->sz += diff;
+	p->pbrk = newbrk;
+	return 0;
 }
 
 // Copy to either a user address, or kernel address,

@@ -63,7 +63,7 @@ uint64 sys_clock_settime(void) {
 	if (argint(0, &clockid) < 0) {
 		return -EINVAL;
 	}
-	if (argaddr(0, &tp) < 0) {
+	if (argaddr(1, &tp) < 0) {
 		return -EINVAL;
 	}
 
@@ -72,9 +72,11 @@ uint64 sys_clock_settime(void) {
 	}
 
 	struct timespec cpu_clock;
-	uint64 tmp_ticks = r_time();
-	cpu_clock.sec = tmp_ticks / CLK_FREQ;
-	cpu_clock.nsec = 0;
+	// uint64 tmp_ticks = r_time();
+	// cpu_clock.sec = tmp_ticks / CLK_FREQ;
+	// cpu_clock.nsec = 0;
+	uint64 tmp_ticks = readtime();
+	convert_to_timespec(tmp_ticks, &cpu_clock);
 
 	if (tp && copyin2((char*)&cpu_clock, tp, sizeof(struct timespec)) < 0) {
 		return -EFAULT;
@@ -90,7 +92,7 @@ uint64 sys_clock_gettime(void) {
 	if (argint(0, &clockid) < 0) {
 		return -EINVAL;
 	}
-	if (argaddr(0, &tp) < 0) {
+	if (argaddr(1, &tp) < 0) {
 		return -EINVAL;
 	}
 
@@ -102,6 +104,41 @@ uint64 sys_clock_gettime(void) {
 	if (tp && copyout2(tp, (char*)&cpu_clock, sizeof(struct timespec)) < 0) {
 		return EFAULT;
 	}
+
+	return 0;
+}
+
+uint64 sys_setitimer(void)
+{
+	int which;
+	uint64 newptr;
+	uint64 oldptr;
+	struct itimeval newval;
+	// struct proc *p;
+
+	argint(0, &which);
+	argaddr(1, &newptr);
+	argaddr(2, &oldptr);
+
+	if (which != CLOCK_REALTIME)
+		return -EINVAL;
+
+	if (copyin2((char*)&newval, newptr, sizeof(struct itimeval)) < 0)
+		return -EFAULT;	
+
+	// p = myproc();
+	// if (oldptr && copyout2(oldptr, (char*)&p->alarmtimer, sizeof(struct itimeval)) < 0)
+	// 	return -EFAULT;
+
+	__debug_info("sys_setitimer", "new={%ds|%dus, %ds|%dus}\n",
+				newval.interval.sec, newval.interval.usec, newval.value.sec, newval.value.usec);
+
+	// __debug_info("sys_setitimer", "new={%ds|%dus, %ds|%dus}, old={%ds|%dus, %ds|%dus}\n",
+	// 			newval.interval.sec, newval.interval.usec, newval.value.sec, newval.value.usec,
+	// 			p->alarmtimer.interval.sec, p->alarmtimer.interval.usec,
+	// 			p->alarmtimer.value.sec, p->alarmtimer.value.usec);
+
+	// p->alarmtimer = newval;
 
 	return 0;
 }

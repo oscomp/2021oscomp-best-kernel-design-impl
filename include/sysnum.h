@@ -34,6 +34,7 @@
 #define SYS_write			64
 #define SYS_readv			65
 #define SYS_writev			66
+#define SYS_pselect6		72
 #define SYS_ppoll			73
 #define SYS_readlinkat		78
 #define SYS_fstatat			79
@@ -42,6 +43,7 @@
 #define SYS_exit			93
 #define SYS_exit_group		94
 #define SYS_nanosleep		101
+#define SYS_setitimer       103
 #define SYS_clock_settime 	112
 #define SYS_clock_gettime	113
 #define SYS_syslog 			116
@@ -52,6 +54,7 @@
 #define SYS_rt_sigreturn	139
 #define SYS_times			153
 #define SYS_uname			160
+#define SYS_getrusage		165
 #define SYS_gettimeofday	169
 #define SYS_adjtimex		171
 #define SYS_getpid			172

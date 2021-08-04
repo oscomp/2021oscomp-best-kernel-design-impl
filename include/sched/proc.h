@@ -12,6 +12,7 @@
 #include "hal/riscv.h"
 #include "mesg/signal.h"
 #include "sync/spinlock.h"
+#include "time.h"
 
 // Saved registers for kernel context switches.
 struct context {
@@ -43,6 +44,8 @@ struct tms {
 	uint64 stime;		// system time 
 	uint64 cutime;		// user time of children 
 	uint64 cstime;		// system time of children 
+	uint64 ikstmp;		// the last moment when entering kernel
+	uint64 okstmp;		// the last moment when leaving kernel
 };
 
 // Process Control Block 
@@ -62,9 +65,12 @@ struct proc {
 	int timer;				// timer 
 	enum procstate state;	// process state 
 	void *chan;				// the reason this proc is sleeping for 
+	uint64 sleep_expire;	// wake up time for sleeping
 
 	// times for process performance 
 	struct tms proc_tms;
+	int64 vswtch;			// voluntary context switches
+	int64 ivswtch;			// involuntary context switches
 
 	// parenting
 	// these fields can only be operated by proc itself 
@@ -79,6 +85,7 @@ struct proc {
 	pagetable_t pagetable;			// user pagetable 
 	struct trapframe *trapframe;	// data page for trampoline.S 
 	struct seg *segment;			// first seg list node 
+	uint64 pbrk;					// program break
 
 	// file system 
 	struct fdtable fds;				// Open files
@@ -151,7 +158,7 @@ void sched(void);
 
 /* Grow or shrink user memory by `n` bytes. 
 	Return 0 on success, -1 on failure. */
-int growproc(int n);
+int growproc(uint64 newbrk);
 
 /* Create a user pagetable for a given process, 
 	with no user memory, but with trampoline pages. */
