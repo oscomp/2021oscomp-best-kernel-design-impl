@@ -485,6 +485,16 @@ uint32 spi_set_clk_rate(spi_device_num_t spi_num, uint32 spi_clk);
  */
 // void spi_handle_data_dma(spi_device_num_t spi_num, spi_chip_select_t chip_select, spi_data_t data, plic_interrupt_t *cb);
 
+void spi_receive_data_no_cmd_dma(dmac_channel_number_t dma_receive_channel_num,
+								spi_device_num_t spi_num, spi_chip_select_t chip_select,
+								uint8 *rx_buff, uint64 rx_len);
+
+
+void spi_send_data_no_cmd_dma(dmac_channel_number_t channel_num,
+							spi_device_num_t spi_num, spi_chip_select_t chip_select,
+							uint8 const *tx_buff, uint64 tx_len);
+
+
 #ifdef __cplusplus
 }
 #endif

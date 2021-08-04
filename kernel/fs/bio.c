@@ -128,15 +128,16 @@ rescan:
 
 // Return a locked buf with the contents of the indicated block.
 struct buf* 
-bread(uint dev, uint sectorno) {
+bread(uint dev, uint sectorno)
+{
 	struct buf *b;
 
 	b = bget(dev, sectorno);
-	__debug_info("bread", "get buffer\n");
+	// __debug_info("bread", "get buffer\n");
 	if (!b->valid) {
 		__debug_info("bread", "start reading sno %d\n", sectorno);
 		disk_read(b);
-		__debug_info("bread", "done sno %d\n", sectorno);
+		// __debug_info("bread", "done sno %d\n", sectorno);
 		b->valid = 1;
 	}
 	return b;
@@ -148,6 +149,8 @@ bwrite(struct buf *b, int through)
 {
 	if(!holdingsleep(&b->lock))
 		panic("bwrite");
+
+	__debug_info("bwrite", "sectorno %d\n", b->sectorno);
 	if (through == BWRITE_THROUGH) {
 		disk_write(b, b->sectorno);
 		b->dirty = 0;

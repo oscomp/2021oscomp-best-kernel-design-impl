@@ -495,7 +495,7 @@ struct fat32_entry *fat_lookup_dir_ent(struct inode *dir, char *filename, uint *
 			if (poff) {
 				*poff = off;
 			}
-			ep->ent_cnt = entcnt;
+			ep->ent_cnt = count;
 			return ep;
 		}
 		off += count << 5;

@@ -18,7 +18,7 @@ volatile spi_t *const spi[4] = {
 };
 
 /* Since sdcard module keeps a lock, we don't need to keep another one at present. */
-#define SPI_BUF_SIZE (2048)
+#define SPI_BUF_SIZE (16)
 static uint8 __attribute__ ((aligned (sizeof(uint32)))) __spi_buf[SPI_BUF_SIZE];
 static void *spi_buf = (void*)__spi_buf;
 
@@ -332,7 +332,7 @@ static spi_frame_format_t spi_get_frame_format(spi_device_num_t spi_num)
 	volatile spi_t *spi_adapter = spi[spi_num];
 	return ((spi_adapter->ctrlr0 >> frf_offset) & 0x3);
 }
-
+/*
 void spi_receive_data_normal_dma(dmac_channel_number_t dma_send_channel_num,
 								 dmac_channel_number_t dma_receive_channel_num,
 								 spi_device_num_t spi_num, spi_chip_select_t chip_select, const void *cmd_buff,
@@ -399,7 +399,9 @@ void spi_send_data_normal_dma(dmac_channel_number_t channel_num, spi_device_num_
 				buf[i] = ((uint8 *)tx_buff)[i];
 			break;
 	}
-	spi_handle->dmacr = 0x2; /*enable dma transmit*/
+*/
+//	spi_handle->dmacr = 0x2; /*enable dma transmit*/
+/*
 	spi_handle->ssienr = 0x01;
 
 	sysctl_dma_select((sysctl_dma_channel_t)channel_num, SYSCTL_DMA_SELECT_SSI0_TX_REQ + spi_num * 2);
@@ -569,4 +571,56 @@ void spi_send_data_standard_dma(dmac_channel_number_t channel_num, spi_device_nu
 	spi_send_data_normal_dma(channel_num, spi_num, chip_select, buf, v_send_len, SPI_TRANS_INT);
 
 	// freepage((void *)buf);
+}
+*/
+
+void spi_receive_data_no_cmd_dma(dmac_channel_number_t dma_receive_channel_num,
+								spi_device_num_t spi_num, spi_chip_select_t chip_select,
+								uint8 *rx_buff, uint64 rx_len)
+{
+	volatile spi_t *spi_handle = spi[spi_num];
+
+	spi_set_tmod(spi_num, SPI_TMOD_RECV);
+
+	spi_handle->ctrlr1 = (uint32)(rx_len - 1);
+	spi_handle->dmacr = 0x3;
+	spi_handle->ssienr = 0x01;
+
+	sysctl_dma_select((sysctl_dma_channel_t)dma_receive_channel_num, SYSCTL_DMA_SELECT_SSI0_RX_REQ + spi_num * 2);
+	
+	dmac_set_single_mode(dma_receive_channel_num, (void *)(&spi_handle->dr[0]), rx_buff,
+						DMAC_ADDR_NOCHANGE, DMAC_ADDR_INCREMENT,
+						DMAC_MSIZE_1, DMAC_TRANS_WIDTH_32, rx_len);
+
+	if (spi_get_frame_format(spi_num) == SPI_FF_STANDARD)
+		spi[spi_num]->dr[0] = 0xffffffff;
+
+	spi_handle->ser = 1U << chip_select;
+	dmac_wait_done(dma_receive_channel_num);
+
+	spi_handle->ser = 0x00;
+	spi_handle->ssienr = 0x00;
+}
+
+void spi_send_data_no_cmd_dma(dmac_channel_number_t channel_num,
+							spi_device_num_t spi_num, spi_chip_select_t chip_select,
+							uint8 const *tx_buff, uint64 tx_len)
+{
+	volatile spi_t *spi_handle = spi[spi_num];
+
+	spi_set_tmod(spi_num, SPI_TMOD_TRANS);
+	spi_handle->dmacr = 0x2;
+	spi_handle->ssienr = 0x01;
+
+	sysctl_dma_select((sysctl_dma_channel_t)channel_num, SYSCTL_DMA_SELECT_SSI0_TX_REQ + spi_num * 2);
+	dmac_set_single_mode(channel_num, tx_buff, (void *)(&spi_handle->dr[0]), DMAC_ADDR_INCREMENT, DMAC_ADDR_NOCHANGE,
+						 DMAC_MSIZE_4, DMAC_TRANS_WIDTH_32, tx_len);
+	spi_handle->ser = 1U << chip_select;
+	dmac_wait_done(channel_num);
+
+	while((spi_handle->sr & 0x05) != 0x04)
+		;
+	spi_handle->ser = 0x00;
+	spi_handle->ssienr = 0x00;
+
 }
