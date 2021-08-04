@@ -221,6 +221,7 @@ static inline uint32_t is_execfn(aux_elem_t *aux_vec)
 //     return sp_kva;
 // }
 
+#define STACK_ALIGN 64
 /* copy things to user stack */
 /* argv, envp, aux_vec could be NULL, filename must not be NULL */
 /* return user_sp */
@@ -250,8 +251,8 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
         for (uint i = 0; i < envc; ++i)
             size += strlen(envp[i]) + 1;
     size += (strlen(filename) + 1) * is_execfn(aux_vec);
-    if (size % 16){
-        size += 16 - size % 16;
+    if (size % STACK_ALIGN){
+        size += STACK_ALIGN - size % STACK_ALIGN;
     }
 
     assert(size < NORMAL_PAGE_SIZE);
@@ -334,11 +335,11 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
         sp_kva += strlen(filename) + 1;
     }
     // 9. padding
-    if (sp_kva % 16){
+    if (sp_kva % STACK_ALIGN){
         unsigned char *temp = (unsigned char *)sp_kva;
-        for (uint i = 0; i < 16 - sp_kva % 16; ++i)
+        for (uint i = 0; i < STACK_ALIGN - sp_kva % STACK_ALIGN; ++i)
             temp[i] = 0;
-        sp_kva += 16 - sp_kva % 16;
+        sp_kva += STACK_ALIGN - sp_kva % STACK_ALIGN;
     }
     printk_port("final sp is %lx, usp is %lx\n", sp_kva, sp_uva);
     // for (uint64_t i = start_sp_kva; i < sp_kva; i += 8)

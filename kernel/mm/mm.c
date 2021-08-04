@@ -50,7 +50,7 @@ ptr_t allocPage()
     }
     else
         assert(0);
-    // printk_port("ret: %lx\n",ret);
+    printk_port("alloc: %lx\n",ret);
     return ret;
 }
 
@@ -188,6 +188,7 @@ void freePage(ptr_t baseAddr)
     uint8_t clear = 1;
     for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
     {
+        assert(0);
         shm_page_node_t *temp = i->ptr;
         if (temp->page_basekva == baseAddr){
             if (temp->totalnum > 1){
@@ -202,7 +203,7 @@ void freePage(ptr_t baseAddr)
         // printk_port("sizeof : %d\n", sizeof(list_node_t));
         list_node_t *tmp = freePagebackupList.next;
         assert(tmp != &freePagebackupList);
-        // printk_port("addr: %lx\n", tmp);
+        printk_port("free: %lx\n", baseAddr);
         tmp->ptr = baseAddr;
         list_del(tmp);
         list_add_tail(tmp,&freePageList);

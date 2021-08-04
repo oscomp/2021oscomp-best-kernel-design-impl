@@ -86,9 +86,11 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             uint64 length;
             int32 fd;
 
+            debug();
             if ((fd = fat32_open(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
                 return -1;
             }
+            debug();
             length = current_running->fd[fd].length;
             _elf_binary = (char *)allocproc();
             if ((uintptr_t)(_elf_binary + length) > (uintptr_t)pa2kva(PGDIR_PA)){
