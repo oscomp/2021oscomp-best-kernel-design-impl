@@ -90,8 +90,8 @@ impl Processor {
                     self.inner.borrow_mut().current = Some(task);
                     ////////// current task  /////////
                     // update RUsage of process
-                    update_kernel_clock();
                     let ru_stime = get_kernel_runtime_usec();
+                    update_kernel_clock();
                     current_task_inner.rusage.add_stime(ru_stime);
                     // Change status to Ready
                     current_task_inner.task_status = TaskStatus::Ready;

@@ -5,7 +5,7 @@ use crate::mm::{
     UserBuffer,
 };
 use crate::task::suspend_current_and_run_next;
-
+use crate::monitor::*;
 pub struct Pipe {
     readable: bool,
     writable: bool,
@@ -44,6 +44,7 @@ pub struct PipeRingBuffer {
     tail: usize,
     status: RingBufferStatus,
     write_end: Option<Weak<Pipe>>,
+    count:usize,
 }
 
 impl PipeRingBuffer {
@@ -54,6 +55,7 @@ impl PipeRingBuffer {
             tail: 0,
             status: RingBufferStatus::EMPTY,
             write_end: None,
+            count:0,
         }
     }
     pub fn set_write_end(&mut self, write_end: &Arc<Pipe>) {
@@ -113,10 +115,12 @@ pub fn make_pipe() -> (Arc<Pipe>, Arc<Pipe>) {
     (read_end, write_end)
 }
 
+
+
 impl File for Pipe {
     fn readable(&self) -> bool { self.readable }
     fn writable(&self) -> bool { self.writable }
-    fn read(&self, buf: UserBuffer) -> usize {
+    fn read(& self, buf: UserBuffer) -> usize {
         assert_eq!(self.readable(), true);
         let mut buf_iter = buf.into_iter();
         let mut read_size = 0usize;
@@ -127,19 +131,25 @@ impl File for Pipe {
                 if ring_buffer.all_write_ends_closed() {
                     return read_size;  //return后就ring_buffer释放了，锁自然释放
                 }
+                gdb_print!(SYSCALL_ENABLE,"[pipe] try read");
                 drop(ring_buffer);
                 suspend_current_and_run_next();
                 continue;
             }
             // read at most loop_read bytes
-            for _ in 0..loop_read {
+            for i in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
                     unsafe { *byte_ref = ring_buffer.read_byte(); }
                     read_size += 1;
+                    //panic!("[pipe] read");
                 } else {
+                    //panic!("[pipe] read");
+                    ring_buffer.count += 1; 
                     return read_size;
                 }
             }
+            ring_buffer.count += 1; 
+            return read_size;
         }
     }
     fn write(&self, buf: UserBuffer) -> usize {
@@ -151,11 +161,12 @@ impl File for Pipe {
             let loop_write = ring_buffer.available_write();
             if loop_write == 0 {
                 drop(ring_buffer);
+                gdb_print!(SYSCALL_ENABLE,"[pipe] try write");
                 suspend_current_and_run_next();
                 continue;
             }
             // write at most loop_write bytes
-            for _ in 0..loop_write {
+            for i in 0..loop_write {
                 if let Some(byte_ref) = buf_iter.next() {
                     ring_buffer.write_byte(unsafe { *byte_ref });
                     write_size += 1;
@@ -165,4 +176,18 @@ impl File for Pipe {
             }
         }
     }
+
+
+    fn r_ready(&self) ->bool {
+        let ring_buffer = self.buffer.lock();
+        let loop_read = ring_buffer.available_read();
+        loop_read > 0
+    }
+
+    fn w_ready(&self) ->bool {
+        let ring_buffer = self.buffer.lock();
+        let loop_write = ring_buffer.available_write();
+        loop_write > 0
+    }
+
 }

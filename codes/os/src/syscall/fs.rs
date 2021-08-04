@@ -20,6 +20,9 @@ const AT_FDCWD:isize = -100;
 const FD_LIMIT:usize = 128;
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
+    //if fd == 6 || fd == 5 {
+    //    panic!("write 6/5");
+    //}
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
@@ -193,7 +196,6 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    print_free_pages();
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
     if fd >= inner.fd_table.len() {
@@ -908,8 +910,6 @@ pub fn sys_pselect(
 )->isize{
     let task = current_task().unwrap();
     let token = current_user_token();
-    let inner = task.acquire_inner_lock();
-    let fd_table = &inner.fd_table;
 
     let mut r_ready_count = 0;
     let mut w_ready_count = 0;
@@ -919,7 +919,7 @@ pub fn sys_pselect(
     unsafe {
         let sec = translated_ref(token, timeout);
         let usec = translated_ref(token, timeout.add(1));
-        timer = (sec*1000 + usec)/100;
+        timer = sec + usec;
     }
     
     let mut time_up = false;
@@ -928,18 +928,24 @@ pub fn sys_pselect(
     let mut r_all_ready = false;
     let mut w_all_ready = false;
 
+    let mut rfd_vec = Vec::new();
+    let mut wfd_vec = Vec::new();
+
     while !time_up {
         /* handle read fd set */
+        let inner = task.acquire_inner_lock();
+        let fd_table = &inner.fd_table;
         if readfds as usize != 0 && !r_all_ready{
             let mut ubuf_rfds = UserBuffer::new(
                 translated_byte_buffer(token, readfds, size_of::<FdSet>())
             );
             let mut rfd_set = FdSet::new();
             ubuf_rfds.read(rfd_set.as_bytes_mut());
-            let mut rfd_vec = rfd_set.get_fd_vec();
-
-            if rfd_vec[ rfd_vec.len() - 1 ] >= nfds {
-                return -1; // invalid fd
+            if rfd_vec.len() == 0 {
+                rfd_vec = rfd_set.get_fd_vec();
+                if rfd_vec[ rfd_vec.len() - 1 ] >= nfds {
+                    return -1; // invalid fd
+                }
             }
 
             for i in 0..rfd_vec.len() {
@@ -951,7 +957,7 @@ pub fn sys_pselect(
                 let fdescript = fd_table[fd].as_ref().unwrap();
                 match &fdescript.fclass {
                     FileClass::Abstr(file)=>{
-                        if file.readable(){
+                        if file.r_ready(){
                             r_ready_count += 1;
                             rfd_set.set_fd(fd); 
                             // marked for being ready
@@ -962,7 +968,7 @@ pub fn sys_pselect(
                         }
                     },
                     FileClass::File(file)=>{
-                        if file.readable(){
+                        if file.r_ready(){
                             r_ready_count += 1;
                             rfd_set.set_fd(fd);
                             rfd_vec[i] = 1024;
@@ -975,8 +981,8 @@ pub fn sys_pselect(
             }
             if !r_has_nready {
                 r_all_ready = true;
-                ubuf_rfds.write(rfd_set.as_bytes());
             }
+            ubuf_rfds.write(rfd_set.as_bytes());
         }
 
         /* handle write fd set */
@@ -986,10 +992,12 @@ pub fn sys_pselect(
             );
             let mut wfd_set = FdSet::new();
             ubuf_wfds.read(wfd_set.as_bytes_mut());
-            let mut wfd_vec = wfd_set.get_fd_vec();
-
-            if wfd_vec[ wfd_vec.len() - 1 ] >= nfds {
-                return -1; // invalid fd
+            
+            if wfd_vec.len() == 0{
+                wfd_vec = wfd_set.get_fd_vec();
+                if wfd_vec[ wfd_vec.len() - 1 ] >= nfds {
+                    return -1; // invalid fd
+                }
             }
 
             for i in 0..wfd_vec.len() {
@@ -1001,7 +1009,7 @@ pub fn sys_pselect(
                 let fdescript = fd_table[fd].as_ref().unwrap();
                 match &fdescript.fclass {
                     FileClass::Abstr(file)=>{
-                        if file.writable(){
+                        if file.w_ready(){
                             w_ready_count += 1;
                             wfd_set.set_fd(fd);
                             wfd_vec[i] = 1024;
@@ -1011,7 +1019,7 @@ pub fn sys_pselect(
                         }
                     },
                     FileClass::File(file)=>{
-                        if file.writable(){
+                        if file.w_ready(){
                             w_ready_count += 1;
                             wfd_set.set_fd(fd);
                             wfd_vec[i] = 1024;
@@ -1024,18 +1032,30 @@ pub fn sys_pselect(
             }
             if !w_has_nready { 
                 w_all_ready = true;
-                ubuf_wfds.write(wfd_set.as_bytes()); 
             }
+            ubuf_wfds.write(wfd_set.as_bytes());             
         }    
 
         /* Cannot handle exceptfds for now */
-        
+        if exceptfds as usize != 0 {
+            let mut ubuf_efds = UserBuffer::new(
+                translated_byte_buffer(token, exceptfds, size_of::<FdSet>())
+            );
+            let mut efd_set = FdSet::new();
+            ubuf_efds.read(efd_set.as_bytes_mut());
+            e_ready_count = efd_set.count() as isize;
+            efd_set.clear_all();
+            ubuf_efds.write(efd_set.as_bytes()); 
+        }
+
         // if there are some fds not ready, just wait until time up
         if r_has_nready || w_has_nready {
             r_has_nready = false;
             w_has_nready = false;
-            timer -= 1;
+            //println!("timer = {}", timer );
             if timer > 0 {
+                timer -= 1;
+                drop(inner);
                 suspend_current_and_run_next();
             } else {
                 time_up = true;
@@ -1044,6 +1064,5 @@ pub fn sys_pselect(
             break;
         }
     }
-    print_free_pages();
     return r_ready_count + w_ready_count + e_ready_count
 }
