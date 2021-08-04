@@ -209,9 +209,8 @@ impl PageTable {
         let pte = self.find_pte_create(vpn).unwrap();
         // println!{"remapping {:?}", 
         *pte = PageTableEntry::new(ppn, pte.flags() | PTEFlags::W);
-        // pte.set_bits(ppn, pte.flags() | PTEFlags::W);
         pte.set_cow();
-        // ppn.get_bytes_array().copy_from_slice(former_ppn.get_bytes_array());
+        ppn.get_bytes_array().copy_from_slice(former_ppn.get_bytes_array());
     }
     #[allow(unused)]
     pub fn unmap(&mut self, vpn: VirtPageNum) {

@@ -408,7 +408,7 @@ impl MemorySet {
         memory_set
     }
 
-    pub fn from_copy_on_write(user_space: &mut MemorySet, user_heap_top: usize) -> MemorySet {
+    pub fn from_copy_on_write(user_space: &mut MemorySet, split_addr: usize) -> MemorySet {
         // create a new memory_set
         let mut memory_set = Self::new_bare();
         // This part is not for Copy on Write.
@@ -418,8 +418,8 @@ impl MemorySet {
         memory_set.map_trampoline();
         for area in user_space.areas.iter() {
             let head_vpn = area.vpn_range.get_start();
-            let user_heap_top_addr: VirtAddr = user_heap_top.into();
-            if head_vpn < user_heap_top_addr.floor() {
+            let user_split_addr: VirtAddr = split_addr.into();
+            if head_vpn < user_split_addr.floor() {
                 //skipping the part using CoW
                 continue;
             }
@@ -439,8 +439,8 @@ impl MemorySet {
         let page_table = &mut user_space.page_table;
         for area in parent_areas.iter() {
             let head_vpn = area.vpn_range.get_start();
-            let user_heap_top_addr: VirtAddr = user_heap_top.into();
-            if head_vpn >= user_heap_top_addr.floor() {
+            let user_split_addr: VirtAddr = split_addr.into();
+            if head_vpn >= user_split_addr.floor() {
                 //skipping the part using Coping to new ppn
                 continue;
             }
