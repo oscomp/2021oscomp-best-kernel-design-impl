@@ -402,6 +402,8 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
         adjust_len = PAGE_SIZE;
         //println!("[sys_mmap]:adjust_len = {}",adjust_len);
     }
+    
+    println!("[{}][insert_mmap_area]: len 0x{:X} start 0x{:X}", task.pid.0, start, len);
     let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
     gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
     return result_addr as isize;

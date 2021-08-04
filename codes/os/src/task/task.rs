@@ -491,7 +491,7 @@ impl TaskControlBlock {
             return start;
         }
         else{ // "Start" va not mapped
-            // println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
+            println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
             // println!("[insert_mmap_area]: flags 0x{:X}",flags);
             // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
