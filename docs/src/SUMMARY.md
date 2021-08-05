@@ -1,10 +1,9 @@
 # Summary
 
 - [简介](intro.md)
-- [N 扩展规范 (草案)](ch1_0_ext_spec.md)
+- [N 扩展规范 (草案）](ch1_0_n_ext_spec.md)
   - [用户态中断的处理流程](ch1_1_user_trap_flow.md)
 - [设计](ch2_0_design.md)
-  - [与其他特权级中断的比较](ch2_1_trap_comparison.md)
   - [用户态中断的使用方案](ch2_2_usage_of_user_mode_trap.md)
   - [外部中断与 PLIC](ch2_3_external_interrupt_and_plic.md)
   - [用户态中断的管理](ch2_4_user_trap_management.md)
