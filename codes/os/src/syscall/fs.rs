@@ -1,12 +1,14 @@
 use core::{ usize};
 use core::mem::{size_of};
 
+use crate::timer::get_timeval;
 use crate::{fs::{Dirent, FdSet, File, FileClass, FileDescripter, IoVec, IoVecs, Kstat, MNT_TABLE, NewStat, TTY}, gdb_print, gdb_println, 
         mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str, print_free_pages},
         monitor::*, 
         task::{
         FdTable,
         TaskControlBlockInner,
+        TimeVal,
     }};
 use crate::task::{current_user_token, current_task, suspend_current_and_run_next/* , print_core_info*/};
 use crate::fs::{make_pipe, OpenFlags, open, ch_dir, list_files, DiskInodeType};
@@ -926,12 +928,14 @@ pub fn sys_pselect(
     let mut w_ready_count = 0;
     let mut e_ready_count = 0;
 
-    let mut timer = 0;
+    let mut timer_interval = TimeVal::new();
     unsafe {
         let sec = translated_ref(token, timeout);
         let usec = translated_ref(token, timeout.add(1));
-        timer = sec + usec;
+        timer_interval.sec = *sec;
+        timer_interval.usec = *usec;
     }
+    let mut timer = timer_interval + get_timeval();
     
     let mut time_up = false;
     let mut r_has_nready = false;
@@ -1064,8 +1068,8 @@ pub fn sys_pselect(
             r_has_nready = false;
             w_has_nready = false;
             //println!("timer = {}", timer );
-            if timer > 0 {
-                timer -= 1;
+            let time_remain = get_timeval() - timer;
+            if time_remain.is_zero() { // not reach timer (now < timer)
                 drop(inner);
                 suspend_current_and_run_next();
             } else {
@@ -1075,5 +1079,7 @@ pub fn sys_pselect(
             break;
         }
     }
+    gdb_println!(SYSCALL_ENABLE, "sys_pselect( nfds: {}, readfds: {:?}, writefds: {:?}, exceptfds: {:?}, timeout: {:?}) = {}",
+                 nfds, rfd_vec, wfd_vec, rfd_vec, timer_interval, r_ready_count + w_ready_count + e_ready_count);
     return r_ready_count + w_ready_count + e_ready_count
 }

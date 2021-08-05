@@ -203,6 +203,7 @@ pub fn sys_getppid() -> isize {
     // let mut search_task_pid: usize = current_task().unwrap().pid.0;
     let mut search_task: Arc<TaskControlBlock> = current_task().unwrap();
     search_task = search_task.get_parent().unwrap();
+    gdb_println!(SYSCALL_ENABLE,"sys_getppid() = {}",search_task.tgid);
     search_task.tgid as isize
     // while search_task_pid != 0 {
     //     search_task = search_task.get_parent().unwrap();
