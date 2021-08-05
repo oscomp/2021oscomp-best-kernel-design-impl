@@ -74,6 +74,7 @@ bitflags! {
 pub fn dup(fd: usize) -> isize { sys_dup(fd) }
 pub fn chdir(path: &str) -> isize { sys_chdir(path) }
 pub fn unlink(path: &str) -> isize { sys_unlinkat(AT_FDCWD, path, 0) }
+pub fn mkdir(path: &str) -> isize { sys_mkdir(path) }
 pub fn open(path: &str, flags: OpenFlags) -> isize { sys_open(path, flags.bits) }
 pub fn close(fd: usize) -> isize { sys_close(fd) }
 pub fn pipe(pipe_fd: &mut [usize]) -> isize { sys_pipe(pipe_fd) }

@@ -49,20 +49,7 @@ macro_rules! cursor_move_right {
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use user_lib::{
-    fork,
-    exec,
-    waitpid,
-    open,
-    OpenFlags,
-    close,
-    dup,
-    chdir,
-    shutdown,
-    ls,
-    unlink,
-    pipe
-};
+use user_lib::*;
 use user_lib::console::getchar;
 
 
@@ -410,10 +397,43 @@ impl ArgMachine{
 
     pub fn auto_run_lmbench(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
+        // mkdir("/var");
+        // mkdir("/var/tmp");
+        // open("/var/tmp/lmbench", OpenFlags::CREATE);
+        // ls("/");
+        println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
-        // testsuits.push("lmbench_all");
         testsuits.push("lmbench_all lat_syscall -P 1 null");
-
+        // testsuits.push("lmbench_all lat_syscall -P 1 read");
+        // testsuits.push("lmbench_all lat_syscall -P 1 write");
+        // testsuits.push("busybox mkdir -p /var/tmp");
+        // testsuits.push("busybox touch /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
+        testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
+        testsuits.push("lmbench_all lat_sig -P 1 install");
+        testsuits.push("lmbench_all lat_sig -P 1 catch");
+        // testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
+        // testsuits.push("lmbench_all lat_pipe -P 1");
+        testsuits.push("lmbench_all lat_proc -P 1 fork");
+        testsuits.push("lmbench_all lat_proc -P 1 exec");
+        // testsuits.push("busybox cp hello /tmp");
+        testsuits.push("lmbench_all lat_proc -P 1 shell");
+        // testsuits.push("lmbench_all lmdd label=\"File /var/tmp/XXX write bandwidth:\" of=/var/tmp/XXX move=645m");
+        // testsuits.push("lmbench_all lat_pagefault -P 1 /var/tmp/XXX");
+        // testsuits.push("lmbench_all lat_mmap -P 1 512k /var/tmp/XXX");
+        // testsuits.push("busybox echo file system latency");
+        // testsuits.push("lmbench_all lat_fs /var/tmp");
+        // testsuits.push("busybox echo Bandwidth measurements");
+        // testsuits.push("lmbench_all bw_pipe -P 1");
+        // testsuits.push("lmbench_all bw_file_rd -P 1 512k io_only /var/tmp/XXX");
+        // testsuits.push("lmbench_all bw_file_rd -P 1 512k open2close /var/tmp/XXX");
+        // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX");
+        // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k open2close /var/tmp/XXX");
+        // testsuits.push("busybox echo context switch overhead");
+        testsuits.push("lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96");
+        
         for programname_op in testsuits.iter() {
             let mut exit_code = 0;
             let exec_str = String::new() +programname_op;
@@ -437,6 +457,7 @@ impl ArgMachine{
             if pid == 0 {
                 if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
+                    ls("/");
                     shutdown();
                 }
                 unreachable!();
@@ -717,7 +738,7 @@ pub fn main() -> i32 {
     //unlink("initproc\0");
     //unlink("user_shell\0");
     println!("Delete init programs initproc and user_shell in FS");
-    //ArgMachine::auto_run_testsuites();
+    ArgMachine::auto_run_testsuites();
     let mut line: String;
     let mut shellmachine = InputMachine::new();
     let mut arg_machine = ArgMachine::new();

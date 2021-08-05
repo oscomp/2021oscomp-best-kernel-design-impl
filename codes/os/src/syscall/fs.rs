@@ -39,9 +39,17 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
             return -1;
         }
         drop(inner);
-        f.write(
+        let size = f.write(
             UserBuffer::new(translated_byte_buffer(token, buf, len))
-        ) as isize
+        );
+        if fd == 2{
+            let str = str::replace(translated_str(token, buf).as_str(), "\n", "\\n");
+            gdb_println!(SYSCALL_ENABLE, "sys_write(fd: {}, buf: \"{}\", len: {}) = {}", fd, str, len, size);
+        }
+        else if fd > 2{
+            gdb_println!(SYSCALL_ENABLE, "sys_write(fd: {}, buf: ?, len: {}) = {}", fd, len, size);
+        }
+        size as isize
     } else {
         -1
     }
@@ -199,12 +207,15 @@ pub fn sys_close(fd: usize) -> isize {
     let task = current_task().unwrap();
     let mut inner = task.acquire_inner_lock();
     if fd >= inner.fd_table.len() {
+        gdb_println!(SYSCALL_ENABLE, "sys_close(fd: {}) = {}", fd, -1);
         return -1;
     }
     if inner.fd_table[fd].is_none() {
+        gdb_println!(SYSCALL_ENABLE, "sys_close(fd: {}) = {}", fd, -1);
         return -1;
     }
     inner.fd_table[fd].take();
+    gdb_println!(SYSCALL_ENABLE, "sys_close(fd: {}) = {}", fd, 0);
     0
 }
 

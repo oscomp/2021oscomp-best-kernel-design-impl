@@ -24,6 +24,7 @@ const SYSCALL_NEW_FSTATAT: usize = 79;
 const SYSCALL_FSTAT:usize = 80;
 const SYSCALL_UTIMENSAT:usize = 88;
 const SYSCALL_EXIT: usize = 93;
+const SYSCALL_EXIT_GRUOP: usize = 94;
 const SYSCALL_SET_TID_ADDRESS: usize = 96;
 const SYSCALL_NANOSLEEP: usize = 101;
 const SYSCALL_CLOCK_GETTIME: usize = 113;
@@ -67,10 +68,10 @@ use crate::sbi::shutdown;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
-        gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg1 = {}, arg2 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+        // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
     } else {
         if args[0] != 0 && args[0] != 1 && args[0] != 2{
-            gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg1 = {}, arg2 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+            // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
         }
     }
 
@@ -112,6 +113,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
 
         SYSCALL_SET_TID_ADDRESS => sys_set_tid_address(args[0] as usize),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
+        SYSCALL_EXIT_GRUOP => sys_exit(args[0] as i32),
         SYSCALL_NANOSLEEP => sys_sleep(args[0] as *mut u64, args[1] as *mut u64),
         SYSCALL_CLOCK_GETTIME => sys_clock_get_time(args[0] as usize, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),

@@ -1,5 +1,7 @@
 use core::fmt::{self, Debug, Formatter};
+use core::ops::{Add, Sub};
 use bitflags::*;
+use crate::timer::USEC_PER_SEC;
 
 // sys_clone
 bitflags!{
@@ -13,6 +15,10 @@ bitflags!{
 pub const RUSAGE_SELF:isize = 0; /* The calling process.  */
 pub const RUSAGE_CHILDREN:isize = -1; /* All of its terminated child processes.  */
 pub const RUSAGE_THREAD:isize = 1;   /* The calling thread.  */
+// sys_setitimer
+pub const ITIMER_REAL:isize = 0; /* Timers run in real time.  */
+pub const ITIMER_VIRTUAL:isize = 1; /* Timers run only when the process is executing.  */
+pub const ITIMER_PROF:isize = 2; /* Timers run when the process is executing and when the system is executing on behalf of the process.  */
 
 
 
@@ -25,9 +31,17 @@ pub struct utsname{
     domainname: [u8; 65],
 }
 
+#[derive(Copy, Clone)]
 pub struct TimeVal{
-    sec: usize,
-    usec: usize,
+    pub sec: usize,
+    pub usec: usize,
+}
+
+
+#[derive(Copy, Clone)]
+pub struct ITimerVal{
+    pub it_interval: TimeVal, /* Interval for periodic timer */
+    pub it_value: TimeVal,    /* Time until next expiration */
 }
 
 // Resource usage of process
@@ -105,6 +119,33 @@ impl TimeVal{
         self.usec %= 1000_000;
     }
 
+    pub fn is_zero(&self) -> bool{
+        self.sec == 0 && self.usec == 0
+    }
+
+}
+
+impl ITimerVal{
+    pub fn new() -> Self{
+        Self{
+            it_interval: TimeVal::new(),
+            it_value: TimeVal::new(),
+        }
+    }
+
+    pub fn is_zero(&self) -> bool{
+        self.it_interval.is_zero() && self.it_value.is_zero()
+    }
+    
+    pub fn as_bytes(&self) -> &[u8] {
+        let size = core::mem::size_of::<Self>();
+        unsafe {
+            core::slice::from_raw_parts(
+                self as *const _ as usize as *const u8,
+                size,
+            )
+        }
+    }
 }
 
 impl RUsage{
@@ -147,6 +188,53 @@ impl RUsage{
         }
     }
 
+}
+
+impl Add for TimeVal {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let mut sec = self.sec + other.sec;
+        let mut usec = self.usec + other.usec;
+        sec += usec/USEC_PER_SEC;
+        usec %= USEC_PER_SEC;
+        Self {
+            sec: sec,
+            usec: usec,
+        }
+    }
+}
+
+
+// if self is less than other, then return 0
+impl Sub for TimeVal {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        if self.sec < other.sec{
+            return Self{sec:0,usec:0}
+        }
+        else if self.sec == other.sec{
+            if self.usec < other.usec{
+                return Self{sec:0,usec:0}
+            }
+            else{
+                return Self{sec:0,usec:self.usec-other.usec}
+            }
+        }
+        else{
+            let mut sec = self.sec - other.sec;
+            let mut usec = self.usec - other.usec;
+            if self.usec < other.usec{
+                sec -= 1;
+                usec = USEC_PER_SEC + self.usec - other.usec;
+            }
+            Self {
+                sec: sec,
+                usec: usec,
+            }
+        }
+    }
 }
 
 impl Debug for TimeVal {

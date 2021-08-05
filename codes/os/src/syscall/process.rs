@@ -147,6 +147,46 @@ pub fn sys_clock_get_time(clk_id: usize, tp: *mut u64) -> isize{
     0
 }
 
+// @Arg: value: ITimerVal pointer
+pub fn sys_getitimer(which: isize, curr_value: *mut u8) -> isize{
+    // pub struct ITimerVal{
+    //     it_interval: TimeVal, /* Interval for periodic timer */
+    //     it_value: TimeVal,    /* Time until next expiration */
+    // }
+    // pub struct TimeVal{
+    //     sec: usize,
+    //     usec: usize,
+    // }
+    let token = current_user_token();
+    if curr_value as usize != 0{
+        let itimer = current_task().unwrap().acquire_inner_lock().itimer;
+        let mut buf_vec = translated_byte_buffer(token, curr_value, size_of::<ITimerVal>());
+        // 使用UserBuffer结构，以便于跨页读写
+        let mut userbuf = UserBuffer::new(buf_vec);
+        if itimer.is_zero(){
+            userbuf.write(itimer.as_bytes());
+        }
+        else{
+            let mut remaining_itimer = itimer;
+
+        }
+        0
+    }
+    else{
+        -1
+    }
+}
+
+// @Arg: value: ITimerVal pointer
+pub fn sys_setitimer(which: isize, new_value: *mut usize, old_value: *mut usize) -> isize{
+    // if old_value as usize != 0{
+    //     old_value
+    // }
+    0
+}
+
+
+
 pub fn sys_set_tid_address(tidptr: usize) -> isize {
     current_task().unwrap().acquire_inner_lock().address.clear_child_tid = tidptr;
     // print!("sys_set_tid_address: return {}", sys_gettid());
@@ -217,7 +257,7 @@ pub fn sys_brk(brk_addr: usize) -> isize{
 //    int *ptid, int *ctid,
 //    unsigned long newtls);
 pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls: usize) -> isize {
-    print_free_pages();
+    // print_free_pages();
     let current_task = current_task().unwrap();
     let new_task = current_task.fork(false);
     let tid = new_task.getpid();
@@ -247,7 +287,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     trap_cx.x[10] = 0;
     // add new task to scheduler
     add_task(new_task);
-    print_free_pages();
+    // print_free_pages();
     gdb_print!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
