@@ -103,13 +103,14 @@ run:
 
 clean:
 	rm -rf createimage main elf2char payload.c head head.bin k210.bin head_qemu head_qemu.bin main.bin
-	rm -rf generateMapping disk.img bootblock test/*.elf
+	rm -rf generateMapping bootblock
+# 	rm -rf test/*.elf
 
 asm:
 	cd ./txt
 	${OBJDUMP} -d main > txt/kernel.txt
-	${OBJDUMP} -d head > txt/head.txt
-	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
+# 	${OBJDUMP} -d head > txt/head.txt
+# 	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
 # 	for testelf in $(TEST_ELF); do ${OBJDUMP} -d ./test/$$testelf > txt/$${testelf/.elf/.txt}; done
 
 qemu_head: createimage ${SRC_HEAD}
