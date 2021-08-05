@@ -366,7 +366,7 @@ impl MemorySet {
         memory_set
     }
 
-    pub fn from_copy_on_write(user_space: &mut MemorySet, user_heap_top: usize) -> MemorySet {
+    pub fn from_copy_on_write(user_space: &mut MemorySet, split_addr: usize) -> MemorySet {
         // create a new memory_set
         let mut memory_set = Self::new_bare();
         // This part is not for Copy on Write.
@@ -376,8 +376,8 @@ impl MemorySet {
         memory_set.map_trampoline();
         for area in user_space.areas.iter() {
             let head_vpn = area.vpn_range.get_start();
-            let user_heap_top_addr: VirtAddr = user_heap_top.into();
-            if head_vpn < user_heap_top_addr.floor() {
+            let user_split_addr: VirtAddr = split_addr.into();
+            if head_vpn < user_split_addr.floor() {
                 //skipping the part using CoW
                 continue;
             }
@@ -397,8 +397,8 @@ impl MemorySet {
         let page_table = &mut user_space.page_table;
         for area in parent_areas.iter() {
             let head_vpn = area.vpn_range.get_start();
-            let user_heap_top_addr: VirtAddr = user_heap_top.into();
-            if head_vpn > user_heap_top_addr.floor() {
+            let user_split_addr: VirtAddr = split_addr.into();
+            if head_vpn >= user_split_addr.floor() {
                 //skipping the part using Coping to new ppn
                 continue;
             }
@@ -418,7 +418,7 @@ impl MemorySet {
                 page_table.set_cow(vpn);
                 // map the cow page table to src_ppn
                 memory_set.page_table.map(vpn, src_ppn, pte_flags);
-                // println!{"mapping {:?} --- {:?}", vpn, src_ppn};
+                println!{"mapping {:?} --- {:?}", vpn, src_ppn};
                 memory_set.set_cow(vpn);
                 // new_area.data_frames.insert(vpn, FrameTracker::new(src_ppn));
                 new_area.insert_tracker(vpn, src_ppn);
@@ -433,9 +433,7 @@ impl MemorySet {
     pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
         if enquire_refcount(former_ppn) == 1 {
             self.page_table.reset_cow(vpn);
-            // let pte = self.page_table.translate(vpn).unwrap();
             // println!{"The content of PTE: {}", pte.bits};
-            // let pte_flags = pte.flags() | PTEFlags::W;
             // change the flags of the src_pte
             self.page_table.set_flags(
                 vpn, 
@@ -445,8 +443,7 @@ impl MemorySet {
         }
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        // let ppn = frame_alloc_raw().unwrap();
-        // println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
+        println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
         self.remap_cow(vpn, ppn, former_ppn);
         // println!{"finishing remap!"}
         for area in self.areas.iter_mut() {
@@ -455,13 +452,10 @@ impl MemorySet {
             if vpn <= tail_vpn && vpn >= head_vpn {
                 // println!{"find the MapArea to insert FrameTracker"}
                 area.data_frames.insert(vpn, frame);
-                // let tracker = area.data_frames.get_mut(&vpn).unwrap();
-                // tracker.ppn = ppn;
                 // println!{"finished insert frame!"}
                 break;
             }
         }
-        // self.data_frames.insert(vpn, frame);
         // println!{"finishing cow_alloc!"}
         0
     }

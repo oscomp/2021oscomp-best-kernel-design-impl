@@ -57,7 +57,7 @@ sdcard:
 
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
-	# @$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
+	@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 $(APPS):
 

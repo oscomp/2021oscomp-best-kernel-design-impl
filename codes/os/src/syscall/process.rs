@@ -262,7 +262,6 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     let new_task = current_task.fork(false);
     let tid = new_task.getpid();
     let flags = CloneFlags::from_bits(flags).unwrap();
-    gdb_print!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, "?");
     if flags.contains(CloneFlags::CLONE_CHILD_SETTID) && ctid != 0{
         new_task.acquire_inner_lock().address.set_child_tid = ctid; 
         *translated_refmut(new_task.acquire_inner_lock().get_user_token(), ctid as *mut i32) = tid  as i32;
@@ -289,6 +288,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     // add new task to scheduler
     add_task(new_task);
     print_free_pages();
+    gdb_print!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
 
@@ -442,6 +442,8 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
         adjust_len = PAGE_SIZE;
         //println!("[sys_mmap]:adjust_len = {}",adjust_len);
     }
+    
+    println!("[{}][insert_mmap_area]: len 0x{:X} start 0x{:X}", task.pid.0, start, len);
     let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
     gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
     return result_addr as isize;
