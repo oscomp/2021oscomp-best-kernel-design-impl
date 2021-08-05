@@ -15,4 +15,5 @@
   - [操作系统内核](ch3_3_kernel.md)
   - [用户应用程序](ch3_4_user_app.md)
 - [演示](ch4_0_demo.md)
-- [参考](ch5_0_reference.md)
+- [使用方法](ch5_0_user_guide.md)
+- [参考](ch6_0_reference.md)
