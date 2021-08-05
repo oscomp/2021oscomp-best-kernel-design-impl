@@ -19,6 +19,7 @@
 #include <buf.h>
 #include <os/fat32.h>
 #include <os/uname.h>
+#include <os/io.h>
 
 #include <csr.h>
 #include <asm.h>
@@ -124,6 +125,8 @@ static void init_syscall(void)
     syscall[SYS_mprotect] = &do_mprotect;
     syscall[SYS_set_tid_address] = &do_set_tid_address;
     syscall[SYS_clock_gettime] = &do_clock_gettime;
+
+    syscall[SYS_ioctl] = &do_ioctl;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~

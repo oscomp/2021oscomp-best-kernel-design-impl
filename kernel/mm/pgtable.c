@@ -35,7 +35,7 @@ uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_kva)
         return pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) +va_offset;
 }
 
-/* 设置页面的访问权限 */
+/* 重新设置页面的访问权限mask */
 /* success return 0, fail return -1 */
 int32_t reset_va_page_attribute(uintptr_t va, uintptr_t pgdir_kva, uint64_t mask)
 {
@@ -73,11 +73,8 @@ int32_t reset_va_page_attribute(uintptr_t va, uintptr_t pgdir_kva, uint64_t mask
         return -1;
     }
     else{
-        log(0, "%x\n", get_attribute(*ptr, _PAGE_READ|_PAGE_WRITE|_PAGE_EXEC));
         clear_attribute(ptr, _PAGE_READ|_PAGE_WRITE|_PAGE_EXEC);
-        log(0, "%x\n", get_attribute(*ptr, _PAGE_READ|_PAGE_WRITE|_PAGE_EXEC));
         set_attribute(ptr, mask);
-        log(0, "%x\n", get_attribute(*ptr, _PAGE_READ|_PAGE_WRITE|_PAGE_EXEC));
         return 0;
     }
 }

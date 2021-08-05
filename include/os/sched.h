@@ -106,6 +106,7 @@ typedef struct fd{
     long ctime_nsec;
 }fd_t;
 
+#pragma pack(8)
 /* Process Control Block */
 typedef struct pcb
 {
@@ -177,7 +178,8 @@ typedef struct pcb
 
     /* edata */
     uint64_t edata;
-}__attribute__((aligned(64))) pcb_t;
+}pcb_t;
+#pragma pack()
 
 #define DEFAULT_PRIORITY 1
 #define WEXITSTATUS(status,exit_status) (*((uint16_t *)status) = ((exit_status) << 8) & 0xff00)
@@ -287,6 +289,11 @@ static inline void set_user_addr_top(pcb_t *pcb, uint64_t user_addr_top)
     assert(user_addr_top >= pcb->edata);
     assert(user_addr_top % NORMAL_PAGE_SIZE == 0);
     pcb->user_addr_top = user_addr_top;
+}
+
+static inline void set_pcb_edata(pcb_t *pcb_underinit, uint64_t pgdir)
+{
+    pcb_underinit->edata = PAGE_ALIGN(pcb_underinit->elf.edata) + NORMAL_PAGE_SIZE;
 }
 
 /* copy parent thread's both stack to child thread */

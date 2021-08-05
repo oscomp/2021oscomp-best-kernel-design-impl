@@ -14,7 +14,7 @@ USER_CFLAGS = -O0 -w -nostdlib -T linker/user_riscv.lds -Wall -mcmodel=medany -I
 BOOTLOADER_ENTRYPOINT = 0x80000000
 START_ENTRYPOINT = 0x80020000
 
-KERNEL_ENTRYPOINT = 0xffffffff80500000
+KERNEL_ENTRYPOINT = 0xffffffff80300000
 
 START_QEMU_ENTRY = 0x80200000
 
@@ -36,12 +36,13 @@ SRC_INIT 	= ./init/main.c
 SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
 SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c ./kernel/sched/exec.c
-SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c ./kernel/mm/mman.c ./kernel/mm/pgtable.c
+SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c ./kernel/mm/mman.c ./kernel/mm/pgtable.c ./kernel/mm/mmap.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_ELF 	= ./kernel/elf/elf.c
-SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c \
+SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c \
 				./kernel/fat32/utils.c
+SRC_IO		= ./kernel/io/io.c
 SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
@@ -52,10 +53,10 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 SRC_USER	= ./test/shell.c 
 
 TEST_ELF	= shell.elf
-TEST_ELF	+= busybox.elf
+# TEST_ELF	+= busybox.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF} ${SRC_SDCARD}
+				${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c

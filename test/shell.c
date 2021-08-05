@@ -24,7 +24,7 @@ int main()
     #ifdef K210
     /* for K210 do test */
 
-    sys_exec(argv[0], argv, NULL);
+    sys_exec(argv[0], argv, envp);
 
     #else
 

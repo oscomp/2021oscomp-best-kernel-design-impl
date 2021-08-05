@@ -6,13 +6,14 @@
 /* 成功返回已映射区域的指针，失败返回-1*/
 int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 {
+    debug();
+    if (len <= 0)
+        return -1;
     /* just for page allocate */
     if (fd == MMAP_ALLOC_PAGE_FD){
         if (!start){
-            log(0, "%lx ", get_user_addr_top(current_running));
             start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
             set_user_addr_top(current_running, start);
-            log(0, "%lx\n", get_user_addr_top(current_running));
         }
         for (uint64_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
         {
@@ -27,8 +28,8 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
         return -1;
 
     if (!start){
-        start = do_brk(0);
-        do_brk(start + len);
+        start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
+        set_user_addr_top(current_running, start);
     }
 
     uchar *buf = kalloc();

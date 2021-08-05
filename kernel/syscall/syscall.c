@@ -6,7 +6,7 @@ long (*syscall[NUM_SYSCALLS])() = {0};
 
 void handle_syscall(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
 {
-    printk_port("num is %d\n", regs->regs[17]);
+    log(0, "num is %d", regs->regs[17]);
     // printk_port("sp is %lx\n", current_running->user_sp);
     // syscall[fn](arg1, arg2, arg3)
     regs->sepc = regs->sepc + 4;

@@ -14,25 +14,15 @@ int do_mprotect(void *addr, size_t len, int prot)
     if ((uintptr_t)addr % NORMAL_PAGE_SIZE) return -1;
     uint64_t mask = 0lu;
 
-    switch(prot){
-        case PROT_NONE:
-        break;
+    if (prot & PROT_READ)
+        mask |= _PAGE_READ;
+    if (prot & PROT_WRITE)
+        mask |= _PAGE_WRITE;
+    if (prot & PROT_EXEC)
+        mask |= _PAGE_EXEC;
 
-        case PROT_READ:
-        mask = _PAGE_READ;
-        break;
-
-        case PROT_WRITE:
-        mask = _PAGE_WRITE;
-        break;
-
-        case PROT_EXEC:
-        mask = _PAGE_EXEC;
-        break;
-
-        default: assert(0); break;
-    }
-    mask |= _PAGE_ACCESSED | _PAGE_DIRTY;
+    if (prot != PROT_NONE)
+        mask |= _PAGE_ACCESSED | _PAGE_DIRTY;
 
     for (uintptr_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
     {
@@ -45,21 +35,21 @@ int do_mprotect(void *addr, size_t len, int prot)
 /* success return 0, fail return -1*/
 int64_t do_brk(uintptr_t ptr)
 {
-    // printk_port("ptr is %lx\n", ptr);
-    // printk_port("current is %lx\n", current_running->edata);
+    debug();
     if (ptr > current_running->user_addr_top){
         printk_port("brk arg0 too large\n");
         return -1; // larger than stack
     }
     else if (!ptr){
-        alloc_page_helper(current_running->edata, current_running->pgdir,
-            _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+        // alloc_page_helper(current_running->edata, current_running->pgdir,
+        //     _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
         return current_running->edata; // probe edata
     }
     else if (ptr < current_running->edata) return -1; // cannot be smaller than current addr
     else{
+        for (uintptr_t i = current_running->edata; i < ptr; i += NORMAL_PAGE_SIZE)
+            alloc_page_helper(i, current_running->pgdir, _PAGE_READ|_PAGE_WRITE);
         current_running->edata = ptr;
-        alloc_page_helper(ptr, current_running->pgdir, _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
         return current_running->edata;
     }
 }

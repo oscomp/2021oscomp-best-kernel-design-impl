@@ -76,7 +76,7 @@ int8_t do_gettimeofday(struct timespec *ts)
         left = (left * 10) % time_base;
     }
     ts->tv_sec=1628129642; ts->tv_nsec=613489360;
-    log(0, "%d %d\n", ts->tv_sec, ts->tv_nsec);
+    // log(0, "%d %d\n", ts->tv_sec, ts->tv_nsec);
     return 0;
 }
 

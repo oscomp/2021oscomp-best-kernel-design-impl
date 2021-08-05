@@ -11,6 +11,8 @@
 #define SYS_dup 23
 #define SYS_dup3 24
 
+#define SYS_ioctl 29
+
 #define SYS_mkdirat 34
 
 #define SYS_unlinkat 35

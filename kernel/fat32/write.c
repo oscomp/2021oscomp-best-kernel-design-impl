@@ -7,6 +7,7 @@
 #include <os/elf.h>
 #include <os/sched.h>
 #include <log.h>
+#include <os/io.h>
 
 uchar stdout_buf[NORMAL_PAGE_SIZE] = {0};
 uchar stderr_buf[NORMAL_PAGE_SIZE] = {0};
@@ -77,8 +78,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         */
 int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
 {
-    log(DEBUG, "%d\n",iovcnt);
-    log(DEBUG, "%d\n",fd);
+    debug();
     uint8 fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0) return -1;
 
@@ -89,7 +89,8 @@ int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
             memcpy(stdout_buf, iov->iov_base, iov->iov_len);
             stdout_buf[iov->iov_len] = 0;
             printk_port(stdout_buf);
-            iov++; count += iov->iov_len;
+            count += iov->iov_len;
+            iov++;
         }
         return count;
     }

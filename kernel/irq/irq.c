@@ -122,6 +122,7 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     //     printk_port("sepc: %lx\n", regs->sepc);
     //     printk_port("ra: %lx", regs->regs[1]);
     // }
+    debug();
     log(0, "pgfault stval:%lx\n", stval);
     handle_other(regs,stval,cause);
     if (stval >= 0xffffffff00000000lu || stval < 0x1000)
@@ -197,6 +198,7 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
 
 void handle_software()
 {
+    debug();
     log(DEBUG, "handle_software\n");
     while(1);
 }

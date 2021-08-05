@@ -53,7 +53,7 @@ static void set_aux_vec(aux_elem_t *aux_vec, ELF_info_t *elf)
     NEW_AUX_ENT(0x2c, 0);
     NEW_AUX_ENT(0x2d, 0);
 
-    NEW_AUX_ENT(AT_SYSINFO_EHDR, 0x3fc2dee000);     // 0x21
+    // NEW_AUX_ENT(AT_SYSINFO_EHDR, 0x3fc2dee000);     // 0x21
     NEW_AUX_ENT(AT_HWCAP, 0x112d);                  // 0x10
     NEW_AUX_ENT(AT_PAGESZ, NORMAL_PAGE_SIZE);       // 0x06
     NEW_AUX_ENT(AT_CLKTCK, 0x64);                   // 0x11
@@ -114,12 +114,12 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
             for (uintptr_t j = 0; j < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; j++)
-                alloc_page_helper(user_stack - (j + 1)*NORMAL_PAGE_SIZE, pgdir, _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE);
+                alloc_page_helper(user_stack - (j + 1)*NORMAL_PAGE_SIZE, pgdir, _PAGE_READ|_PAGE_WRITE);
             set_user_addr_top(pcb_underinit, user_stack - USER_STACK_INIT_SIZE);
 
             uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper, &pcb_underinit->elf);
-            pcb_underinit->edata = pcb_underinit->elf.edata;
-            share_pgtable(pgdir,pa2kva(PGDIR_PA));
+            set_pcb_edata(pcb_underinit, pgdir);
+            share_pgtable(pgdir,pa2kva(PGDIR_PA)); /* 只有内核高地址段才存在PGDIR_PA */
 
             // prepare stack(argv,envp,aux)
             aux_elem_t aux_vec[MAX_AUX_ARG+1];

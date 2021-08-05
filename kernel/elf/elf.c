@@ -1,5 +1,6 @@
 #include <os/elf.h>
 #include <stdio.h>
+#include <log.h>
 
 /* prepare_page_for_kva should return a kernel virtual address */
 /* return entry point va of this elf */
@@ -21,7 +22,7 @@ uintptr_t load_elf(
     Elf64_Half ph_entry_size;
     Elf64_Half sh_entry_count;
     Elf64_Half sh_entry_size;
-    int i = 0;
+    uint64_t i = 0;
 
     // check whether `binary` is a ELF file.
     if (length < 4 || !is_elf_format(elf_binary)) {
@@ -63,7 +64,7 @@ uintptr_t load_elf(
                         // printk_port("bytes_of_page:%lx\n", bytes_of_page);
                         // printk_port("page offset:%lx\n", offset_in_page);
                         // printk_port("copy_bytes: %lx\n", copy_bytes);
-                        for (int j =
+                        for (uint64_t j =
                                  offset_in_page + copy_bytes;
                              j < NORMAL_PAGE_SIZE; ++j) {
                             bytes_of_page[j] = 0;
@@ -77,7 +78,7 @@ uintptr_t load_elf(
                     // printk_port("bytes_of_page:%lx\n", bytes_of_page);
                     // printk_port("page offset:%lx\n", offset_in_page);
                     // printk_port("copy_bytes: %lx\n", copy_bytes);
-                    for (int j = offset_in_page;
+                    for (uint64_t j = offset_in_page;
                          j < NORMAL_PAGE_SIZE;
                          ++j) {
                         bytes_of_page[j] = 0;

@@ -177,7 +177,7 @@ uintptr_t load_elf(unsigned char elf_binary[], unsigned length, uintptr_t pgdir,
     uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask),
     ELF_info_t *elf);
 
-static inline int is_elf_format(unsigned char *binary)
+static inline uint32_t is_elf_format(unsigned char *binary)
 {
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)binary;
 

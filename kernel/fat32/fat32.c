@@ -387,6 +387,10 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode)
         */
 int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
+    #ifndef K210
+    return -1;
+    #endif
+    
     int fd_index = get_fd_index(fd, current_running);
     if (fd != AT_FDCWD && fd_index < 0) return -1;
 

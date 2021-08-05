@@ -291,8 +291,8 @@ void do_exit(int32_t exit_status)
             if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
                 pcb[i].status = TASK_EXITED;
                 pcb[i].parent.parent = NULL;
-                list_add_tail(&current_running->list,&available_queue);
-                freePage(PAGE_ALIGN(pcb[i].kernel_sp));
+                list_add_tail(&pcb[i].list,&available_queue);
+                free_all_pages(pcb[i].pgdir, PAGE_ALIGN(pcb[i].kernel_sp));
             }
         current_running->status = TASK_EXITED;
         list_add_tail(&current_running->list,&available_queue);
@@ -301,10 +301,12 @@ void do_exit(int32_t exit_status)
     do_scheduler();
 }
 
+/* exit all threads */
+/* same as exit FOR NOW */
 void do_exit_group(int32_t exit_status)
 {
     debug();
-    while(1);
+    do_exit(exit_status);
 }
 
 pid_t do_getpid()
