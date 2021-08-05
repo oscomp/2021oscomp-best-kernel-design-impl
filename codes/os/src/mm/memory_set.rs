@@ -418,7 +418,7 @@ impl MemorySet {
                 page_table.set_cow(vpn);
                 // map the cow page table to src_ppn
                 memory_set.page_table.map(vpn, src_ppn, pte_flags);
-                println!{"mapping {:?} --- {:?}", vpn, src_ppn};
+                // println!{"mapping {:?} --- {:?}", vpn, src_ppn};
                 memory_set.set_cow(vpn);
                 // new_area.data_frames.insert(vpn, FrameTracker::new(src_ppn));
                 new_area.insert_tracker(vpn, src_ppn);
@@ -443,7 +443,7 @@ impl MemorySet {
         }
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
+        // println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
         self.remap_cow(vpn, ppn, former_ppn);
         // println!{"finishing remap!"}
         for area in self.areas.iter_mut() {

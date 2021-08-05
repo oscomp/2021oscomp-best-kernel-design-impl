@@ -125,7 +125,7 @@ pub fn trap_handler() -> ! {
             if pte.is_some() && pte.unwrap().is_cow() {
                 let former_ppn = pte.unwrap().ppn();
                 //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                println!("cow addr = {:X} from pid{}", stval, current_task().unwrap().pid.0);
+                // println!("cow addr = {:X} from pid{}", stval, current_task().unwrap().pid.0);
                 // print_free_pages();
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};

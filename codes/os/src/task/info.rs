@@ -31,14 +31,17 @@ pub struct utsname{
     domainname: [u8; 65],
 }
 
+#[derive(Copy, Clone)]
 pub struct TimeVal{
-    sec: usize,
-    usec: usize,
+    pub sec: usize,
+    pub usec: usize,
 }
 
+
+#[derive(Copy, Clone)]
 pub struct ITimerVal{
-    it_interval: TimeVal, /* Interval for periodic timer */
-    it_value: TimeVal,    /* Time until next expiration */
+    pub it_interval: TimeVal, /* Interval for periodic timer */
+    pub it_value: TimeVal,    /* Time until next expiration */
 }
 
 // Resource usage of process
