@@ -456,7 +456,7 @@ impl ArgMachine{
             args_addr.push(0 as *const u8 );
             let pid = fork();
             if pid == 0 {
-                println!("exec");
+                //println!("exec");
                 if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     ls("/");
