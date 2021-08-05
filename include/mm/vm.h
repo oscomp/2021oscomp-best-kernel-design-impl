@@ -13,18 +13,22 @@
 static inline void permit_usr_mem()
 {
   #ifndef QEMU
-  w_sstatus(r_sstatus() & ~SSTATUS_PUM);
+  // w_sstatus(r_sstatus() & ~SSTATUS_PUM);
+  clr_sstatus_bit(SSTATUS_PUM);
   #else
-  w_sstatus(r_sstatus() | SSTATUS_SUM);
+  // w_sstatus(r_sstatus() | SSTATUS_SUM);
+  set_sstatus_bit(SSTATUS_SUM);
   #endif
 }
 
 static inline void protect_usr_mem()
 {
   #ifndef QEMU
-  w_sstatus(r_sstatus() | SSTATUS_PUM);
+  // w_sstatus(r_sstatus() | SSTATUS_PUM);
+  set_sstatus_bit(SSTATUS_PUM);
   #else
-  w_sstatus(r_sstatus() & ~SSTATUS_SUM);
+  // w_sstatus(r_sstatus() & ~SSTATUS_SUM);
+  clr_sstatus_bit(SSTATUS_SUM);
   #endif
 }
 

@@ -291,6 +291,7 @@ int execve(char *path, char **argv, char **envp)
 	fdcloexec(&p->fds);
 	w_satp(MAKE_SATP(p->pagetable));
 	sfence_vma();
+	w_sstatus_fs(SSTATUS_FS_CLEAN);
 
 	delsegs(oldpagetable, seg);
 	uvmfree(oldpagetable);

@@ -115,6 +115,7 @@ SRC	+= \
 	$K/syscall/syssignal.c \
 	$K/syscall/systime.c \
 	$K/syscall/sysuname.c \
+	$K/trap/fcntxt.S \
 	$K/trap/kernelvec.S \
 	$K/trap/trampoline.S \
 	$K/trap/trap.c \
@@ -286,4 +287,5 @@ clean:
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \
 		target \
 		k210.bin \
+		.gdbinit \
 		$U/*.d $U/*.o $U/*.asm $U/usys.S $U/_*

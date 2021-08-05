@@ -53,10 +53,47 @@ struct trapframe {
 	/* 264 */ uint64 t4;
 	/* 272 */ uint64 t5;
 	/* 280 */ uint64 t6;
+
+	/* 288 */ uint64 ft0;
+	/* 296 */ uint64 ft1;
+	/* 304 */ uint64 ft2;
+	/* 312 */ uint64 ft3;
+	/* 320 */ uint64 ft4;
+	/* 328 */ uint64 ft5;
+	/* 336 */ uint64 ft6;
+	/* 344 */ uint64 ft7;
+	/* 352 */ uint64 fs0;
+	/* 360 */ uint64 fs1;
+	/* 368 */ uint64 fa0;
+	/* 376 */ uint64 fa1;
+	/* 384 */ uint64 fa2;
+	/* 392 */ uint64 fa3;
+	/* 400 */ uint64 fa4;
+	/* 408 */ uint64 fa5;
+	/* 416 */ uint64 fa6;
+	/* 424 */ uint64 fa7;
+	/* 432 */ uint64 fs2;
+	/* 440 */ uint64 fs3;
+	/* 448 */ uint64 fs4;
+	/* 456 */ uint64 fs5;
+	/* 464 */ uint64 fs6;
+	/* 472 */ uint64 fs7;
+	/* 480 */ uint64 fs8;
+	/* 488 */ uint64 fs9;
+	/* 496 */ uint64 fs10;
+	/* 504 */ uint64 fs11;
+	/* 512 */ uint64 ft8;
+	/* 520 */ uint64 ft9;
+	/* 528 */ uint64 ft10;
+	/* 536 */ uint64 ft11;
+
+	/* 544 */ uint64 fcsr;
 };
 
 void            trapinithart(void);
 void            usertrapret(void);
 void            trapframedump(struct trapframe *tf);
+void			floatstore(struct trapframe *tf);
+void			floatload(struct trapframe *tf);
 
 #endif
