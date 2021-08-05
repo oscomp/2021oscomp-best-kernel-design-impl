@@ -1,0 +1,12 @@
+execve
+set_tid_address
+getuid
+clock_gettime
+openat
+mmap
+brk
+ioctl
+writev
+exit_group
+exit
+read
