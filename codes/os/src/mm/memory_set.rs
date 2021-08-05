@@ -103,7 +103,7 @@ impl MemorySet {
         ), None);
     }
     pub fn insert_kernel_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) {
-        println!{"insert kernel mmap_area: {:X} {:X}", start_va.0, end_va.0}
+        // println!{"insert kernel mmap_area: {:X} {:X}", start_va.0, end_va.0}
         self.push_mmap(MapArea::new(
             start_va,
             end_va,
@@ -498,9 +498,7 @@ impl MemorySet {
     pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
         if enquire_refcount(former_ppn) == 1 {
             self.page_table.reset_cow(vpn);
-            // let pte = self.page_table.translate(vpn).unwrap();
             // println!{"The content of PTE: {}", pte.bits};
-            // let pte_flags = pte.flags() | PTEFlags::W;
             // change the flags of the src_pte
             self.page_table.set_flags(
                 vpn, 
@@ -510,7 +508,6 @@ impl MemorySet {
         }
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        // let ppn = frame_alloc_raw().unwrap();
         // println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
         self.remap_cow(vpn, ppn, former_ppn);
         // println!{"finishing remap!"}
@@ -520,19 +517,16 @@ impl MemorySet {
             if vpn <= tail_vpn && vpn >= head_vpn {
                 // println!{"find the MapArea to insert FrameTracker"}
                 area.data_frames.insert(vpn, frame);
-                // let tracker = area.data_frames.get_mut(&vpn).unwrap();
-                // tracker.ppn = ppn;
                 // println!{"finished insert frame!"}
                 break;
             }
         }
-        // self.data_frames.insert(vpn, frame);
         // println!{"finishing cow_alloc!"}
         0
     }
 
     pub fn lazy_alloc (&mut self, vpn: VirtPageNum) -> usize {
-        println!{"performing lazy alloc on {:?}", vpn}
+        // println!{"performing lazy alloc on {:?}", vpn}
         self.push_chunk(vpn);
         // self.chunks.vpn_table.push(vpn);
         // self.chunks.map_one(&mut self.page_table, vpn);

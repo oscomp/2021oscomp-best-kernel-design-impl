@@ -80,8 +80,8 @@ pub fn trap_handler() -> ! {
             // cx is changed during sys_exec, so we have to call it again
             let syscall_id = cx.x[17];
             if syscall_id != 64 && syscall_id != 63{
-                println!("syscall-({}) = 0x{:X}  ",syscall_id, result);
-            }
+                // println!("[{}]syscall-({}) = 0x{:X}  ", current_task().unwrap().pid.0, syscall_id, result);
+            } 
             cx = current_trap_cx();
             cx.x[10] = result as usize;
             // println!{"cx written..."}
@@ -114,7 +114,7 @@ pub fn trap_handler() -> ! {
             // println!{"============================{:?}", vpn}
             let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
             let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
-            println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
+            // println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
             if va >= mmap_start && va < mmap_end {
                 // println!{"where is the lazy_mmap_page!!!!!!!!"}
                 // exit_current_and_run_next(-2);
@@ -129,7 +129,7 @@ pub fn trap_handler() -> ! {
                 if pte.is_some() && pte.unwrap().is_cow() {
                     let former_ppn = pte.unwrap().ppn();
                     //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                    println!("cow addr = {:X}", stval);
+                    // println!("cow addr = {:X}", stval);
                     current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
                     // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                     // println!{"cow_alloc returned..."}

@@ -44,6 +44,9 @@ pub trait File : Send + Sync {
     fn read(&self, buf: UserBuffer) -> usize;
     fn write(&self, buf: UserBuffer) -> usize;
     fn ioctl(&self, cmd: u32, arg: usize)-> isize {0}
+    fn r_ready(&self)->bool{true}
+    fn w_ready(&self)->bool{true}
+
 }
 
 pub use mount::MNT_TABLE;

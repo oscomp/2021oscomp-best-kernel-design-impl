@@ -35,6 +35,8 @@ const SYSCALL_LS: usize = 500;
 const SYSCALL_SHUTDOWN: usize = 501;
 const SYSCALL_CLEAR: usize = 502;
 
+use alloc::string::String;
+
 pub struct TimeVal{
     sec: u64,
     usec: u64,
@@ -66,7 +68,13 @@ pub fn sys_unlinkat(fd:i32, path: &str, flags:u32) -> isize {
 }
 
 pub fn sys_open(path: &str, flags: u32) -> isize {
-    syscall(SYSCALL_OPENAT, [path.as_ptr() as usize, flags as usize, 0])
+    let path_str = String::new() + path + "\0";
+    syscall(SYSCALL_OPENAT, [(-100 as isize) as usize, path_str.as_ptr() as usize, flags as usize])
+}
+
+pub fn sys_mkdir(path: &str) -> isize {
+    let path_str = String::new() + path + "\0";
+    syscall(SYSCALL_MKDIRAT, [(-100 as isize) as usize, path_str.as_ptr() as usize, 0])
 }
 
 pub fn sys_close(fd: usize) -> isize {

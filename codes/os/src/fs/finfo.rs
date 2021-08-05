@@ -395,6 +395,11 @@ impl FdSet {
         }
     }
 
+    pub fn count(&mut self)->usize{
+        let fd_vec = self.get_fd_vec();
+        fd_vec.len()
+    }
+
     pub fn get_fd_vec(&self)->Vec<usize>{
         let mut fd_v = Vec::new();
         for i in 0..16 {
