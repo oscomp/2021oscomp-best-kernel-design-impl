@@ -132,7 +132,7 @@ impl MemorySet {
         self.page_table.remap_cow(vpn, ppn, former_ppn);
     }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        println!{"2"}
+        // println!{"2"}
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data, 0);
@@ -149,7 +149,7 @@ impl MemorySet {
     }
 
     fn push_with_offset(&mut self, mut map_area: MapArea, offset: usize, data: Option<&[u8]>){
-        println!{"3"}
+        // println!{"3"}
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data, offset);
