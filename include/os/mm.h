@@ -4,17 +4,28 @@
 #include <type.h>
 #include <os/list.h>
 #include <pgtable.h>
+#include <qemu.h>
+#include <log.h>
 
 #define MEM_SIZE 32
 #define PAGE_SIZE 4096 // 4K
 #define BLOCK_SIZE 512
 #define BLOCKS_PER_PAGE (PAGE_SIZE/BLOCK_SIZE)
-#define INIT_KERNEL_STACK 0xffffffff80400000lu
+
+#ifdef K210
+    #define INIT_KERNEL_STACK 0xffffffff80400000lu
+#else
+    #define INIT_KERNEL_STACK 0xffffffff80800000lu
+#endif
+
 #define FREEMEM (INIT_KERNEL_STACK+4*PAGE_SIZE)
-#define USER_STACK_ADDR 0x3fffab0000lu
+#define USER_STACK_ADDR 0x3ffff2a000lu
 #define USER_PILE_ADDR 0x20000000lu
 #define FREEMEM_TOP KERNEL_END
 #define MEM_FOR_PROC 0xffffffff80150000lu
+
+#define KERNEL_STACK_SIZE NORMAL_PAGE_SIZE
+#define USER_STACK_INIT_SIZE 2*NORMAL_PAGE_SIZE
 
 /* Rounding; only works for n = power of two */
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
@@ -49,8 +60,17 @@ void shm_page_dt(uintptr_t addr);
 uintptr_t directmap(uintptr_t kva, uintptr_t pgdir);
 void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base);
 
-uint64_t do_mmap(uint64_t start,uint32_t len, uint8 prot, uint8 flags,uint32_t fd,uint32_t off);
+#define MAP_SHARED 0x1
+#define MAP_PRIVATE 0x2
+#define MAP_FIXED 0x10
+#define MAP_ANONYMOUS 0x20
+#define MMAP_ALLOC_PAGE_FD -1
+int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off);
+int64 do_munmap(void *start, size_t len);
+
 int64_t do_brk(uintptr_t ptr);
+
+int do_mprotect(void *addr, size_t len, int prot);
 
 void *kalloc(void);
 void kfree(void *p);

@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <os/sched.h>
 
-long (*syscall[NUM_SYSCALLS])();
+long (*syscall[NUM_SYSCALLS])() = {0};
 
 void handle_syscall(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
 {

@@ -16,7 +16,13 @@
 #   csrr tp, CSR_SSCRATCH
 #   sd sp, PCB_KERNEL_SP(tp)
 _save_context:
-  sd sp, PCB_USER_SP(tp)
+  /* HappyEric uses tp as current_running */
+  addi sp, sp, -8
+  sd tp, 0(sp)
+  ld tp, current_running
+
+  addi sp, sp, 8
+  sd sp, PCB_USER_SP(tp) /* user sp is real */
   ld sp, PCB_KERNEL_SP(tp)
   addi sp, sp, -(OFFSET_SIZE)
 
@@ -24,10 +30,12 @@ _save_context:
   sd zero, OFFSET_REG_ZERO(sp)
   sd ra, OFFSET_REG_RA(sp)
 
-  sd sp, PCB_KERNEL_SP(tp)
+  sd sp, PCB_KERNEL_SP(tp) /* no use */
 
   sd gp, OFFSET_REG_GP(sp)
-  sd tp, OFFSET_REG_TP(sp)
+
+  /* push tp */
+  sd tp, OFFSET_REG_TP(sp) /* no use */
 
   sd t0, OFFSET_REG_T0(sp)
   sd t1, OFFSET_REG_T1(sp)
@@ -89,7 +97,8 @@ _save_context:
   ld ra, OFFSET_REG_RA(sp)
     
   ld gp, OFFSET_REG_GP(sp)
-  ld tp, OFFSET_REG_TP(sp)
+  # ld tp, OFFSET_REG_TP(sp)
+  /* cannot use this tp, because it is previous_running */
 
   ld t0, OFFSET_REG_T0(sp)
   ld t1, OFFSET_REG_T1(sp)
@@ -145,6 +154,11 @@ _save_context:
   addi sp, sp, OFFSET_SIZE
   sd sp, PCB_KERNEL_SP(tp)
   ld sp, PCB_USER_SP(tp)
+
+  /* restore tp, at user_sp - 8 */
+  addi sp, sp, -8
+  ld tp, 0(sp)
+  addi sp, sp, 8
 .endm
 
 ENTRY(enable_preempt)

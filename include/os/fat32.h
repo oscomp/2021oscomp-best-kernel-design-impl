@@ -139,6 +139,11 @@ typedef struct long_dentry{
 }long_dentry_t;
 #pragma pack()
 
+struct iovec{
+    void *iov_base;
+    size_t iov_len;
+};
+
 struct dir_pos{
     uint64_t offset;
     size_t len;
@@ -204,6 +209,7 @@ int16 fat32_close(fd_num_t fd);
 
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count);
+int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt);
 
 int16 fat32_mkdir(fd_num_t dirfd, const uchar *path, uint32_t mode);
 int16 fat32_chdir(const char* path_t);
@@ -229,6 +235,8 @@ int16 fat32_umount();
 
 int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off);
 int64 fat32_munmap(void *start, size_t len);
+
+size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t bufsiz);
 
 void init_inode();
 void init_pipe();
@@ -288,7 +296,7 @@ static inline uint32 fat_offset_of_clus(uint32 cluster)
 static inline uint32_t get_next_cluster(uint32_t cluster)
 {
     uchar *buf2 = kalloc();
-    printk_port("buf2 is %lx\n", buf2);
+    // printk_port("buf2 is %lx\n", buf2);
     sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
     uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
     kfree(buf2);

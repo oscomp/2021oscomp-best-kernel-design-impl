@@ -9,6 +9,7 @@
 #include <pgtable.h>
 #include <qemu.h>
 #include <memlayout.h>
+#include <log.h>
 
 #define SXLEN 64
 
@@ -20,9 +21,9 @@ void reset_irq_timer()
 {
     // TODO clock interrupt handler.
     // TODO: call following functions when task4
-    #ifndef K210
-    screen_reflush();
-    #endif
+    // #ifndef K210
+    // screen_reflush();
+    // #endif
     timer_check();
 
     // note: use sbi_set_timer
@@ -93,19 +94,19 @@ void handle_sext(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
 
     // irq indicates which device interrupted.
     #ifndef K210
-    int irq = plic_claim();
-    if(irq == UART0_IRQ){
-      // uartintr();
-    } else if(irq == VIRTIO0_IRQ){
-      disk_intr();
-    } else if(irq){
-      prints("unexpected interrupt irq=%d\n", irq);
-    }
-    // the PLIC allows each device to raise at most one
-    // interrupt at a time; tell the PLIC the device is
-    // now allowed to interrupt again.
-    if(irq)
-      plic_complete(irq);
+    // int irq = plic_claim();
+    // if(irq == UART0_IRQ){
+    //   // uartintr();
+    // } else if(irq == VIRTIO0_IRQ){
+    //   disk_intr();
+    // } else if(irq){
+    //   prints("unexpected interrupt irq=%d\n", irq);
+    // }
+    // // the PLIC allows each device to raise at most one
+    // // interrupt at a time; tell the PLIC the device is
+    // // now allowed to interrupt again.
+    // if(irq)
+    //   plic_complete(irq);
     #endif
 
     return ;
@@ -121,6 +122,8 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     //     printk_port("sepc: %lx\n", regs->sepc);
     //     printk_port("ra: %lx", regs->regs[1]);
     // }
+    log(0, "pgfault stval:%lx\n", stval);
+    handle_other(regs,stval,cause);
     if (stval >= 0xffffffff00000000lu || stval < 0x1000)
         handle_other(regs,stval,cause);
     uint64_t satp = read_satp();
@@ -159,50 +162,29 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     // 0
     if (!get_attribute(*ptr,_PAGE_PRESENT))
     {
+        // log(0, "1");
         if (!get_attribute(*ptr,_PAGE_SWAP)){
+            // log(0, "2");
             uintptr_t pgdir2 = allocPage();
-            // clear_pgdir(pgdir2);
             uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
             set_pfn(ptr,pfn2);
         }
         else{
-            uint64_t prev_pageva = pa2kva(get_pfn(*ptr)<<NORMAL_PAGE_SHIFT);
-            for (list_node_t *i = swapPageList.next; i != &swapPageList; i=i->next){
-                swappage_node_t *temp = i->ptr;                
-                if (temp->page_basekva == prev_pageva ){
-                    uint64_t page_basekva = allocPage();
-                    clear_pgdir(page_basekva);
-                    sbi_sd_read(kva2pa(page_basekva),BLOCKS_PER_PAGE,temp->block_id);
-                    set_pfn(ptr,(kva2pa(page_basekva)&VA_MASK)>>NORMAL_PAGE_SHIFT);
-                    clear_attribute(ptr,_PAGE_SWAP);
-                    list_del(&temp->list);list_add_tail(&temp->list,&availableSwapSpace);
-                    break;
-                }
-            }
+            assert(0);
         }
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-        #ifndef K210
-        switch(cause){
-            case 12: set_attribute(ptr,_PAGE_EXEC);break;
-            case 13: set_attribute(ptr,_PAGE_READ|_PAGE_WRITE);break;
-            case 15: set_attribute(ptr,_PAGE_READ|_PAGE_WRITE);break;
-            default: printk("page fault handler error!\n");break;
-        }
-        #else
-            set_attribute(ptr,_PAGE_READ|_PAGE_WRITE|_PAGE_ACCESSED|_PAGE_DIRTY);
-        #endif
+        set_attribute(ptr,_PAGE_READ|_PAGE_WRITE|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_PRESENT|_PAGE_USER);
     }
     else if (cause == 15 && !get_attribute(*ptr,_PAGE_WRITE))
     {
-        printk("Segmentation fault\n");        assert(0);
+        printk_port("Segmentation fault\n");        assert(0);
     }
     else if (cause == 13 && !get_attribute(*ptr,_PAGE_READ)) // read/write on inst
     {
-        printk("Segmentation fault\n");        assert(0);
+        printk_port("Segmentation fault\n");        assert(0);
     }
     else if (cause == 12 && !get_attribute(*ptr,_PAGE_EXEC)) // inst on read/write
     {
-        printk("Segmentation fault\n");        assert(0);
+        printk_port("Segmentation fault\n");        assert(0);
     }
     else
     {
@@ -215,7 +197,7 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
 
 void handle_software()
 {
-    printk("666\n");
+    log(DEBUG, "handle_software\n");
     while(1);
 }
 

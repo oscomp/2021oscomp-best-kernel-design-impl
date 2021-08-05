@@ -69,10 +69,6 @@ static void init_pcb()
     pid0_pcb2.wait_list.next = &pid0_pcb2.wait_list; pid0_pcb2.wait_list.prev = &pid0_pcb2.wait_list;
 }
 
-/* just for temp use */
-extern void do_testdisk();
-/* end */
-
 static void init_syscall(void)
 {
     // initialize system call table.
@@ -83,8 +79,7 @@ static void init_syscall(void)
     syscall[SYSCALL_CURSOR] = &screen_move_cursor;
 
     syscall[SYS_exit] = &do_exit;
-
-    syscall[SYSCALL_TESTDISK] = &do_testdisk;
+    syscall[SYS_exit_group] = &do_exit_group;
 
     syscall[SYS_write] = &fat32_write;
     syscall[SYSCALL_TEST] = &fat32_read_test;
@@ -116,13 +111,19 @@ static void init_syscall(void)
     syscall[SYS_unlinkat] = &fat32_unlink;
     syscall[SYS_mount] = &fat32_mount;
     syscall[SYS_umount2] = &fat32_umount;
-    syscall[SYS_mmap] = &fat32_mmap;
-    syscall[SYS_munmap] = &fat32_munmap;
+    syscall[SYS_mmap] = &do_mmap;
+    syscall[SYS_munmap] = &do_munmap;
 
     syscall[SYS_getuid] = &do_getuid;
     syscall[SYS_geteuid] = &do_geteuid;
     syscall[SYS_getgid] = &do_getgid;
     syscall[SYS_getegid] = &do_getegid;
+
+    syscall[SYS_writev] = &fat32_writev;
+    syscall[SYS_readlinkat] = &fat32_readlinkat;
+    syscall[SYS_mprotect] = &do_mprotect;
+    syscall[SYS_set_tid_address] = &do_set_tid_address;
+    syscall[SYS_clock_gettime] = &do_clock_gettime;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~
@@ -135,17 +136,17 @@ int main()
     time_base = TIMEBASE / TICKCOUNT;
     // init interrupt (^_^)
     init_exception();
-    printk("> [INIT] Interrupt processing initialization succeeded.\n\r");
+    printk_port("> [INIT] Interrupt processing initialization succeeded.\n\r");
     // init system call table (0_0)
     init_syscall();
-    printk("> [INIT] System call initialized successfully.\n\r");
+    printk_port("> [INIT] System call initialized successfully.\n\r");
     init_recyc();
-    printk("> [INIT] Memory initialization succeeded.\n\r");
+    printk_port("> [INIT] Memory initialization succeeded.\n\r");
 
 #ifdef K210
     // init sdcard (@—.—@)
     fpioa_pin_init();
-    printk("> [INIT] FPIOA initialized successfully.\n\r");
+    printk_port("> [INIT] FPIOA initialized successfully.\n\r");
     ioremap(UARTHS, NORMAL_PAGE_SIZE);
 #else
     ioremap(UART0, NORMAL_PAGE_SIZE);
@@ -181,10 +182,10 @@ int main()
     fat32_init();
     printk("> [INIT] FAT32 initialized successfully.\n\r");
 #else
-    plicinit();      // set up interrupt controller
-    plicinithart();  // ask PLIC for device interrupts
+    // plicinit();      // set up interrupt controller
+    // plicinithart();  // ask PLIC for device interrupts
     printk("> [INIT] PLIC initialized successfully.\n\r");
-    disk_init();
+    // disk_init();
     printk("> [INIT] Virtio Disk initialized successfully.\n\r");
 #endif
     // init screen (QAQ)

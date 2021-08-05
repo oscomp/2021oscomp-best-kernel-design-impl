@@ -125,7 +125,7 @@ uintptr_t load_elf(
     uint64_t first_load_p_vaddr = 0;
     while (ph_entry_count--) {
         phdr = (Elf64_Phdr *)ptr_ph_table;
-        if (phdr->p_type == PT_LOAD || phdr->p_type == PT_GNU_RELRO) {
+        if (phdr->p_type == PT_LOAD) {
             if (!first_load_p_vaddr) first_load_p_vaddr = phdr->p_vaddr;
             for (i = 0; i < phdr->p_memsz; ) {
                 uintptr_t offset_in_page = (phdr->p_vaddr + i) % NORMAL_PAGE_SIZE; // offset in this page

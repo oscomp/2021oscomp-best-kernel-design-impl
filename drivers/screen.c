@@ -63,8 +63,8 @@ static void screen_write_ch(char ch)
 void init_screen(void)
 {
     #ifndef K210
-    vt100_hidden_cursor();
-    vt100_clear();
+    // vt100_hidden_cursor();
+    // vt100_clear();
     #endif
 }
 
@@ -81,7 +81,7 @@ void screen_clear(void)
     current_running->cursor_x = 1;
     current_running->cursor_y = 1;
     #ifndef K210
-    screen_reflush();
+    // screen_reflush();
     #endif
 }
 

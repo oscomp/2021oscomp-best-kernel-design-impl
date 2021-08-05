@@ -38,7 +38,7 @@
 #define SD_CMD58         58  /*!< CMD58 = 0x58 */
 #define SD_CMD59         59  /*!< CMD59 = 0x59 */
 
-SD_CardInfo cardinfo;
+SD_CardInfo cardinfo = {0};
 
 void sdcard_init() {
 	static int32_t cnt = 0;

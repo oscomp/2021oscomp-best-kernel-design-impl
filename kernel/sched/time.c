@@ -60,6 +60,7 @@ uint64_t do_times(struct tms *tms)
     return now_tick;
 }
 
+/* 成功返回0， 失败返回-1 */
 int8_t do_gettimeofday(struct timespec *ts)
 {
     uint64_t nowtick = get_ticks();
@@ -74,7 +75,20 @@ int8_t do_gettimeofday(struct timespec *ts)
         ts->tv_nsec = 10*ts->tv_nsec + left * 10 / time_base;
         left = (left * 10) % time_base;
     }
+    ts->tv_sec=1628129642; ts->tv_nsec=613489360;
+    log(0, "%d %d\n", ts->tv_sec, ts->tv_nsec);
     return 0;
+}
+
+/* 成功返回0， 失败返回-1 */
+int32_t do_clock_gettime(uint64_t clock_id, struct timespec *tp)
+{
+    assert(clock_id == CLOCK_REALTIME);
+    if (clock_id == CLOCK_REALTIME){
+        return do_gettimeofday(tp);
+    }
+    else
+        ;
 }
 
 /* start and end counter */

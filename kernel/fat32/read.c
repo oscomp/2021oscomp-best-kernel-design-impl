@@ -6,13 +6,13 @@
 #include <os/fat32.h>
 #include <os/elf.h>
 #include <os/sched.h>
+#include <log.h>
 
 uchar stdin_buf[NORMAL_PAGE_SIZE];
 
 /* success : read count */
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
 {
-    debug();
     uint8_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
@@ -23,15 +23,13 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     size_t mycount = 0;
     size_t realcount = min(count, current_running->fd[fd_index].length);
     uchar *buff = kalloc();
-    printk_port("buff is %lx\n", buff);
+
     ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
     isec_t now_sec = first_sec_of_clus(now_clus);
 
     while (mycount < realcount){
         size_t readsize = min(BUFSIZE, realcount - mycount);
-        debug();
         sd_read(buff, now_sec);
-        debug();
         memcpy(buf, buff, readsize);
         buf += readsize;
         mycount += readsize;
@@ -48,4 +46,15 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     kfree(buff);
 
     return realcount;
+}
+
+size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t bufsiz)
+{
+    char busybox_path[25] = "/root/static-bin/busybox";
+    if (!strcmp(pathname, "/proc/self/exe")){
+        strcpy(buf, busybox_path);
+        return strlen(buf);
+    }
+    else
+        assert(0);
 }

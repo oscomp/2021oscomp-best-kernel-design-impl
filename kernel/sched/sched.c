@@ -125,10 +125,10 @@ void do_scheduler(void)
     if (!current_running)
         current_running = &pid0_pcb;
     /* end schedule */
-    #ifndef K210
-    vt100_move_cursor(current_running->cursor_x,
-                      current_running->cursor_y);
-    #endif
+    // #ifndef K210
+    // vt100_move_cursor(current_running->cursor_x,
+    //                   current_running->cursor_y);
+    // #endif
     switch_to(previous_running,current_running);
 }
 
@@ -138,13 +138,11 @@ void do_scheduler(void)
 static void copy_to(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack)
 {
     uint64_t ker_stack_size, user_stack_size;
-    ker_stack_size = current_running->kernel_stack_base + NORMAL_PAGE_SIZE - current_running->kernel_sp;
-    user_stack_size = current_running->user_stack_base + NORMAL_PAGE_SIZE - current_running->user_sp;
+    ker_stack_size = NORMAL_PAGE_SIZE - PAGE_OFFSET(current_running->kernel_sp);
+    user_stack_size = USER_STACK_ADDR - current_running->user_sp;
     
-    pcb_underinit->kernel_stack_base = kernel_stack_top - NORMAL_PAGE_SIZE;
-    pcb_underinit->user_stack_base = user_stack; //wrong but no use
     pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size;
-    pcb_underinit->user_sp = user_stack;
+    pcb_underinit->user_sp = current_running->user_sp;
     copy_stack(pcb_underinit, ker_stack_size, user_stack_size);
 
     // copy fd
@@ -294,15 +292,20 @@ void do_exit(int32_t exit_status)
                 pcb[i].status = TASK_EXITED;
                 pcb[i].parent.parent = NULL;
                 list_add_tail(&current_running->list,&available_queue);
-                freePage(pcb[i].kernel_stack_base);
+                freePage(PAGE_ALIGN(pcb[i].kernel_sp));
             }
         current_running->status = TASK_EXITED;
         list_add_tail(&current_running->list,&available_queue);
-        free_all_pages(current_running->pgdir, current_running->kernel_stack_base);
+        free_all_pages(current_running->pgdir, PAGE_ALIGN(current_running->kernel_sp));
     }
     do_scheduler();
 }
 
+void do_exit_group(int32_t exit_status)
+{
+    debug();
+    while(1);
+}
 
 pid_t do_getpid()
 {
@@ -340,7 +343,10 @@ pid_t do_getegid()
     return 0;
 }
 
-
+pid_t do_set_tid_address(int *tidptr)
+{
+    return current_running->pid;
+}
 
 
 /***************/

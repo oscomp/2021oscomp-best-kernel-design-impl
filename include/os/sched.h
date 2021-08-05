@@ -119,8 +119,8 @@ typedef struct pcb
     reg_t preempt_count;
 
     // stack base
-    ptr_t kernel_stack_base;
-    ptr_t user_stack_base;
+    // ptr_t kernel_stack_base;
+    ptr_t user_addr_top; /* for mem alloc */
 
     /* previous, next pointer */
     list_node_t list;
@@ -206,8 +206,9 @@ typedef struct task_info
 #define AT_HWCAP  16
 #define AT_CLKTCK  17
 #define AT_SECURE 23
-#define AT_RANDOM 25
-#define AT_EXECFN  31
+#define AT_RANDOM 0x19
+#define AT_EXECFN  0x1f
+#define AT_SYSINFO_EHDR 0x21
 typedef struct aux_elem
 {
     uint64_t id;
@@ -242,6 +243,7 @@ void do_scheduler(void);
 
 pid_t do_spawn(task_info_t *task, void* arg, spawn_mode_t mode);
 void do_exit(int32_t exit_status);
+void do_exit_group(int32_t exit_status);
 void do_sleep(uint32_t);
 
 void do_block(list_node_t *, list_head *queue);
@@ -256,6 +258,8 @@ pid_t do_getuid();
 pid_t do_geteuid();
 pid_t do_getgid();
 pid_t do_getegid();
+
+pid_t do_set_tid_address(int *tidptr);
 
 int do_taskset(uint32_t pid,uint32_t mask);
 
@@ -273,24 +277,17 @@ extern int LATTER_TICKS_COUNTER;
 
 extern void do_show_exec();
 
-
-/* set stack base as normal */
-/* set kernel_stack_base, user_stack_base */
-static inline void set_stack_base(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
+static inline uint64_t get_user_addr_top(pcb_t *pcb)
 {
-    pcb_underinit->kernel_stack_base = kernel_stack_top - NORMAL_PAGE_SIZE;
-    pcb_underinit->user_stack_base = user_stack_top - NORMAL_PAGE_SIZE;
+    return pcb->user_addr_top;
 }
 
-/* set sp as normal */
-/* set kernel_sp, user_sp */
-/* make sure you do set_stack_base first */
-static inline void set_stack_sp(pcb_t *pcb_underinit, uint64_t ker_stack_size, uint64_t user_stack_size)
+static inline void set_user_addr_top(pcb_t *pcb, uint64_t user_addr_top)
 {
-    pcb_underinit->kernel_sp = pcb_underinit->kernel_stack_base + NORMAL_PAGE_SIZE - ker_stack_size;
-    pcb_underinit->user_sp = pcb_underinit->user_stack_base + NORMAL_PAGE_SIZE - user_stack_size;
+    assert(user_addr_top >= pcb->edata);
+    assert(user_addr_top % NORMAL_PAGE_SIZE == 0);
+    pcb->user_addr_top = user_addr_top;
 }
-
 
 /* copy parent thread's both stack to child thread */
 /* copy necesaary size */

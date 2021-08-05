@@ -5,15 +5,17 @@ CC = ${CROSS_PREFIX}gcc
 AR = ${CROSS_PREFIX}ar
 OBJDUMP = ${CROSS_PREFIX}objdump
 OBJCOPY = ${CROSS_PREFIX}objcopy
-CFLAGS = -O0 -w -nostdlib -T riscv.lds -Wall -mcmodel=medany -Iinclude -Idrivers \
+CFLAGS = -O0 -w -nostdlib -T linker/riscv.lds -Wall -mcmodel=medany -Iinclude -Idrivers \
 	-Itest -Itiny_libc/include -nostdinc -g -fvar-tracking -ffreestanding \
 	-Idrivers/sdcard/include
-USER_CFLAGS = -O0 -w -nostdlib -T user_riscv.lds -Wall -mcmodel=medany -Itest -Itiny_libc/include -Iinclude -Idrivers -nostdinc -g -fvar-tracking
+USER_CFLAGS = -O0 -w -nostdlib -T linker/user_riscv.lds -Wall -mcmodel=medany -Itest -Itiny_libc/include -Iinclude -Idrivers -nostdinc -g -fvar-tracking
 # USER_LDFLAGS = -L./ -ltiny_libc
 
 BOOTLOADER_ENTRYPOINT = 0x80000000
 START_ENTRYPOINT = 0x80020000
-KERNEL_ENTRYPOINT = 0xffffffff80300000
+
+KERNEL_ENTRYPOINT = 0xffffffff80500000
+
 START_QEMU_ENTRY = 0x80200000
 
 ARCH = riscv
@@ -34,11 +36,12 @@ SRC_INIT 	= ./init/main.c
 SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
 SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c ./kernel/sched/exec.c
-SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c
+SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c ./kernel/mm/mman.c ./kernel/mm/pgtable.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_ELF 	= ./kernel/elf/elf.c
-SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c
+SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mmap.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c \
+				./kernel/fat32/utils.c
 SRC_UNAME	= ./kernel/uname/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
@@ -49,20 +52,17 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 SRC_USER	= ./test/shell.c 
 
 TEST_ELF	= shell.elf
-# clone.elf brk.elf chdir.elf close.elf dup.elf dup2.elf \
-# 			execve.elf exit.elf fork.elf fstat.elf getcwd.elf getdents.elf getppid.elf gettimeofday.elf mkdir_.elf mmap.elf mount.elf \
-# 			munmap.elf open.elf openat.elf pipe.elf read.elf sleep.elf test_echo.elf times.elf umount.elf unlink.elf wait.elf waitpid.elf \
-# 			write.elf yield.elf
+TEST_ELF	+= busybox.elf
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_SDCARD} ${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF}
+				${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF} ${SRC_SDCARD}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c
 
 SRC_BURNER	= ./tools/kflash.py
 
-SRC_LINKER = ./riscv.lds
+SRC_LINKER = ./linker/riscv.lds
 
 K210_SERIALPORT	= /dev/ttyUSB0
 
@@ -72,7 +72,7 @@ all: elf k210 asm# floppy
 
 k210: payload createimage image
 
-qemu: payload createimage qemu_head
+qemu: elf payload createimage qemu_head asm
 
 head: ${SRC_HEAD} ${SRC_LINKER}
 	${CC} ${CFLAGS} -o head $(SRC_HEAD) -Ttext=${START_ENTRYPOINT}
@@ -109,8 +109,8 @@ asm:
 	cd ./txt
 	${OBJDUMP} -d main > txt/kernel.txt
 	${OBJDUMP} -d head > txt/head.txt
-# 	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
-	for testelf in $(TEST_ELF); do ${OBJDUMP} -d ./test/$$testelf > txt/$${testelf/.elf/.txt}; done
+	${OBJDUMP} -d head_qemu > txt/head_qemu.txt
+# 	for testelf in $(TEST_ELF); do ${OBJDUMP} -d ./test/$$testelf > txt/$${testelf/.elf/.txt}; done
 
 qemu_head: createimage ${SRC_HEAD}
 	${CC} ${CFLAGS} -o head_qemu $(SRC_HEAD) -Ttext=${START_QEMU_ENTRY}	
@@ -125,7 +125,7 @@ user: elf2char generateMapping
 	mv user_programs.h include/
 	mv user_programs.c kernel/
 
-libtiny_libc.a: $(SRC_LIBC_C) $(SRC_LIBC_ASM) user_riscv.lds
+libtiny_libc.a: $(SRC_LIBC_C) $(SRC_LIBC_ASM) linker/user_riscv.lds
 	for libobj in $(SRC_LIBC_C); do ${CC} ${USER_CFLAGS} -c $$libobj -o $${libobj/.c/.o}; done
 	for libobj in $(SRC_LIBC_ASM); do ${CC} ${USER_CFLAGS} -c $$libobj -o $${libobj/.S/.o}; done
 	${AR} rcs libtiny_libc.a $(patsubst %.c, %.o, $(patsubst %.S, %.o,$(SRC_LIBC)))
@@ -133,5 +133,5 @@ libtiny_libc.a: $(SRC_LIBC_C) $(SRC_LIBC_ASM) user_riscv.lds
 $(ARCH_DIR)/crt0.o: $(ARCH_DIR)/crt0.S
 	${CC} ${USER_CFLAGS} -c $(ARCH_DIR)/crt0.S -o $(ARCH_DIR)/crt0.o
 
-elf: user_riscv.lds libtiny_libc.a $(ARCH_DIR)/crt0.o
+elf: linker/user_riscv.lds libtiny_libc.a $(ARCH_DIR)/crt0.o
 	for user in ${SRC_USER}; do ${CC} ${USER_CFLAGS} $$user ${SRC_LIBC} $(ARCH_DIR)/crt0.S -o $${user/.c/.elf}; done

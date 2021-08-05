@@ -20,8 +20,8 @@ Disassembly of section .text:
    10026:	f8041f23          	sh	zero,-98(s0)
    1002a:	fa041023          	sh	zero,-96(s0)
    1002e:	fa041123          	sh	zero,-94(s0)
-   10032:	6f6867b7          	lui	a5,0x6f686
-   10036:	36578793          	addi	a5,a5,869 # 6f686365 <__global_pointer$+0x6f674eba>
+   10032:	006c67b7          	lui	a5,0x6c6
+   10036:	16378793          	addi	a5,a5,355 # 6c6163 <__global_pointer$+0x6b4cb8>
    1003a:	f6f43c23          	sd	a5,-136(s0)
    1003e:	f8043023          	sd	zero,-128(s0)
    10042:	f8042423          	sw	zero,-120(s0)

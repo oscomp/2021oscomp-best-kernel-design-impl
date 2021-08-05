@@ -1,10 +1,27 @@
 #include <os/fat32.h>
 #include <os/stdio.h>
 #include <os/sched.h>
+#include <os/mm.h>
 
 /* 成功返回已映射区域的指针，失败返回-1*/
-int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
+int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 {
+    /* just for page allocate */
+    if (fd == MMAP_ALLOC_PAGE_FD){
+        if (!start){
+            log(0, "%lx ", get_user_addr_top(current_running));
+            start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
+            set_user_addr_top(current_running, start);
+            log(0, "%lx\n", get_user_addr_top(current_running));
+        }
+        for (uint64_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
+        {
+            alloc_page_helper(start + i, current_running->pgdir, _PAGE_ALL_MOD);
+            do_mprotect(start + i, NORMAL_PAGE_SIZE, prot);
+        }
+        return start;
+    }
+
     uint32_t fd_index;
     if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
@@ -29,7 +46,7 @@ int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off
 }
 
 /* 成功返回0，失败返回-1*/
-int64 fat32_munmap(void *start, size_t len)
+int64 do_munmap(void *start, size_t len)
 {
     for (int i = 0; i < NUM_FD; ++i)
     {

@@ -10,7 +10,7 @@
 #define TICKCOUNT 62
 
 typedef void (*TimerCallback)(void *parameter);
-typedef uint32_t time_t;
+typedef uint64_t time_t;
 typedef uint64_t clock_t;
 
 typedef struct timer
@@ -30,11 +30,15 @@ struct tms
     clock_t tms_cstime; 
 };
 
+#pragma pack(1)
 /* for gettimeofday */
 struct timespec {
     time_t tv_sec; // seconds
-    uint32_t tv_nsec; // and nanoseconds
+    uint64_t tv_nsec; // and nanoseconds
 };
+#pragma pack
+
+#define CLOCK_REALTIME 0x0
 
 extern uint32_t time_base;
 extern uint64_t time_elapsed;
@@ -47,6 +51,7 @@ void user_time_count();
 
 uint64_t do_times(struct tms *tms);
 int8_t do_gettimeofday(struct timespec *ts);
+int32_t do_clock_gettime(uint64_t clock_id, struct timespec *tp);
 
 extern uint64_t get_time_base();
 

@@ -1,9 +1,9 @@
 #ifndef K210
-#define K210 123
+// #define K210 123
 
-#endif /* ASSERT_H */
+#endif
 
-#ifndef SUBMIT
+#ifdef K210
 #define SUBMIT 123
 
 #endif

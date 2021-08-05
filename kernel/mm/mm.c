@@ -7,6 +7,7 @@
 #include <sbi.h>
 #include <string.h>
 #include <screen.h>
+#include <log.h>
 
 ptr_t memCurr = FREEMEM;
 // ptr_t memTop = KERNEL_END;
@@ -50,7 +51,7 @@ ptr_t allocPage()
     }
     else
         assert(0);
-    printk_port("alloc: %lx\n",ret);
+    // log(DEBUG, "alloc: %lx\n",ret);
     return ret;
 }
 
@@ -203,7 +204,7 @@ void freePage(ptr_t baseAddr)
         // printk_port("sizeof : %d\n", sizeof(list_node_t));
         list_node_t *tmp = freePagebackupList.next;
         assert(tmp != &freePagebackupList);
-        printk_port("free: %lx\n", baseAddr);
+        // printk_port("free: %lx\n", baseAddr);
         tmp->ptr = baseAddr;
         list_del(tmp);
         list_add_tail(tmp,&freePageList);
@@ -214,7 +215,7 @@ void freePage(ptr_t baseAddr)
 
 void *kmalloc(size_t size)
 {
-    printk_port("dangerous alloc\n");
+    assert(0);
     memalloc -= size;
     memalloc -= 64 - (size%64);
     return memalloc;
@@ -424,30 +425,6 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
     return ret;
 }
 
-/* modify data top addr */
-/* success return 0, fail return -1*/
-int64_t do_brk(uintptr_t ptr)
-{
-    printk_port("ptr is %lx\n", ptr);
-    printk_port("current is %lx\n", current_running->edata);
-    if (ptr > USER_STACK_ADDR - NORMAL_PAGE_SIZE){
-        printk_port("brk arg0 too large\n");
-        return -1; // larger than stack
-    }
-    else if (!ptr){
-        alloc_page_helper(current_running->edata, current_running->pgdir,
-            _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-        printk_port("1:%lx\n",get_kva_of(current_running->edata, current_running->pgdir));
-        return current_running->edata; // probe edata
-    }
-    else if (ptr < current_running->edata) return -1; // cannot be smaller than current addr
-    else{
-        current_running->edata = ptr;
-        alloc_page_helper(ptr, current_running->pgdir, _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-        printk_port("2:%lx\n",get_kva_of(current_running->edata, current_running->pgdir));
-        return current_running->edata;
-    }
-}
 
 uintptr_t directmap(uintptr_t kva, uintptr_t pgdir)
 {

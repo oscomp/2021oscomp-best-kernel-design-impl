@@ -27,13 +27,13 @@ ENTRY(_start)
   csrc sstatus, t0
 
   /* setup C environment */
-  la a3, __bss_start
-  la a4, __BSS_END__
-  ble a4, a3, clear_bss_done
-clear_bss:
-  sw zero, (a3)
-  add a3, a3, 4
-  blt a3, a4, clear_bss
+#   la a3, __bss_start
+#   la a4, __BSS_END__
+#   ble a4, a3, clear_bss_done
+# clear_bss:
+#   sw zero, (a3)
+#   add a3, a3, 4
+#   blt a3, a4, clear_bss
 clear_bss_done:  /* this should never return */
   la tp, pid0_pcb
   ld sp, pid0_stack

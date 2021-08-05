@@ -3,12 +3,12 @@
 #include <stdio.h>
 
 utsname_t utsname = {
-    .sysname = "OSKernel-2021-404",
-    .nodename = "@_@",
-    .release = "Top Classified",
-    .version = "0.0.0.0",
-    .machine = "Dage",
-    .domainname = "World Wide Web"
+    .sysname = "Linux",
+    .nodename = "debian",
+    .release = "5.10.0-7-riscv64",
+    .version = "#1 SMP Debian 5.10.40-1 (2021-05-28)",
+    .machine = "riscv64",
+    .domainname = "(none)"
 };
 
 /* return name of my os

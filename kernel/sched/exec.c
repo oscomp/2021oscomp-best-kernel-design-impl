@@ -13,23 +13,27 @@
 #include <qemu.h>
 #include <os/elf.h>
 #include <os/fat32.h>
+#include <log.h>
 
 /* execvc a process */
 /* success: no return value */
 /* fail: return -1 */
-static const char *fixed_envp[] = {"SHELL=ash",
-                     "PWD=/",
-                     "HOME=/",
-                     "USER=root",
+static const char *fixed_envp[] = {"SHELL=/bin/bash",
+                     "PWD=/root/mybin",
+                     "LOGNAME=root",
                      "MOTD_SHOWN=pam",
+                     "HOME=/root",
                      "LANG=C.UTF-8",
-                     "INVOCATION_ID=e9500a871cf044d9886a157f53826684",
+                     "INVOCATION_ID=9f58417fca9d46d4a23cde1329404868",
                      "TERM=vt220",
-                     "SHLVL=2",
-                     "JOURNAL_STREAM=8:9265",
-                     "PATH=/",
-                     "OLDPWD=/",
-                     "_=busybox",
+                     "USER=root",
+                     "SHLVL=1",
+                     "JOURNAL_STREAM=8:9280",
+                     "HUSHLOGIN=FALSE",
+                     "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                     "MAIL=/var/mail/root",
+                     "_=./busybox",
+                     "OLDPWD=/root",
                      0};
 
 
@@ -49,9 +53,10 @@ static void set_aux_vec(aux_elem_t *aux_vec, ELF_info_t *elf)
     NEW_AUX_ENT(0x2c, 0);
     NEW_AUX_ENT(0x2d, 0);
 
+    NEW_AUX_ENT(AT_SYSINFO_EHDR, 0x3fc2dee000);     // 0x21
     NEW_AUX_ENT(AT_HWCAP, 0x112d);                  // 0x10
     NEW_AUX_ENT(AT_PAGESZ, NORMAL_PAGE_SIZE);       // 0x06
-    NEW_AUX_ENT(AT_CLKTCK, 0x64);                   // 0x17
+    NEW_AUX_ENT(AT_CLKTCK, 0x64);                   // 0x11
     NEW_AUX_ENT(AT_PHDR, elf->phoff);               // 0x03
     NEW_AUX_ENT(AT_PHENT, elf->phent);              // 0x04
     NEW_AUX_ENT(AT_PHNUM, elf->phnum);              // 0x05
@@ -76,7 +81,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
         {
             // init pcb
             pcb_t *pcb_underinit = &pcb[i];
-            ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
+            ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE; /* just 1 page */
             ptr_t user_stack = USER_STACK_ADDR;
 
             init_pcb_default(pcb_underinit, USER_PROCESS);
@@ -86,31 +91,34 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             uint64 length;
             int32 fd;
 
-            debug();
+            #ifdef K210
+
             if ((fd = fat32_open(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
                 return -1;
             }
-            debug();
             length = current_running->fd[fd].length;
             _elf_binary = (char *)allocproc();
             if ((uintptr_t)(_elf_binary + length) > (uintptr_t)pa2kva(PGDIR_PA)){
                 printk_port("%lx\n%lx\n", kva2pa(_elf_binary + length), PGDIR_PA);
                 assert(0);
             }
-            printk_port("length: %d\n", length);
+            // log(DEBUG,"length: %d\n", length);
             fat32_read(fd, _elf_binary, length);
+
+            #else
+
+            get_elf_file("busybox", &_elf_binary, &length);
+
+            #endif
 
             uintptr_t pgdir = allocPage();
             clear_pgdir(pgdir);
-            uintptr_t st = alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            printk_port("st is %lx\n", st);
-            // alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+            for (uintptr_t j = 0; j < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; j++)
+                alloc_page_helper(user_stack - (j + 1)*NORMAL_PAGE_SIZE, pgdir, _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE);
+            set_user_addr_top(pcb_underinit, user_stack - USER_STACK_INIT_SIZE);
 
             uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper, &pcb_underinit->elf);
-            pcb_underinit->edata = USER_PILE_ADDR;
-            printk_port("test_elf is %lx\n", test_elf);
-            printk_port("edata is %lx, and real edata is %lx\n", pcb_underinit->edata, pcb_underinit->elf.edata);
-            printk_port("phoff is %lx\n", pcb_underinit->elf.phoff);
+            pcb_underinit->edata = pcb_underinit->elf.edata;
             share_pgtable(pgdir,pa2kva(PGDIR_PA));
 
             // prepare stack(argv,envp,aux)
@@ -119,7 +127,6 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
             set_aux_vec(&aux_vec, &pcb_underinit->elf);
             // init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
             init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
-
             // add to ready_queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);

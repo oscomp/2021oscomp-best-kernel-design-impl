@@ -1,7 +1,7 @@
 #include <os/fat32.h>
 
-ientry_t mount_clus;
-char mountpoint[20];
+ientry_t mount_clus = 0;
+char mountpoint[20] = {0};
 
 /* mount special to dir */
 /* 成功返回0，失败返回-1 */

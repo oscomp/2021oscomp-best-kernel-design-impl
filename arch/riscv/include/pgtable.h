@@ -17,17 +17,41 @@
 #define LARGE_PAGE_SHIFT 21lu
 #define LARGE_PAGE_SIZE (1lu << LARGE_PAGE_SHIFT)
 
+#define PAGE_OFFSET(ptr) \
+    ( ptr & (NORMAL_PAGE_SIZE - 1lu) )
+#define PAGE_ALIGN(ptr) \
+    ( ptr & ~(NORMAL_PAGE_SIZE - 1lu) )
+
 #define START_ENTRYPOINT 0xffffffff80000000lu
-#define KERNEL_ENTRYPOINT 0xffffffff80300000lu
-#define KERNEL_END 0xffffffff80600000lu
 
 #ifdef K210
-#define BOOT_KERNEL 0x80020000lu
+    #define KERNEL_ENTRYPOINT 0xffffffff80300000lu
+    #define KERNEL_END 0xffffffff80600000lu
 #else
-#define BOOT_KERNEL 0x80200000lu
+    #define KERNEL_ENTRYPOINT 0xffffffff80500000lu
+    #define KERNEL_END 0xffffffff90000000lu
 #endif
 
-#define BOOT_KERNEL_END 0x80300000lu
+#ifdef K210
+    #define BOOT_KERNEL 0x80020000lu
+    #define BOOT_KERNEL_END 0x80300000lu
+#else
+    #define BOOT_KERNEL 0x80200000lu
+    #define BOOT_KERNEL_END 0x80500000lu
+#endif
+
+
+
+/* mprotect */
+#define PROT_NONE 0x0
+#define PROT_READ 0x1
+#define PROT_WRITE 0x2
+#define PROT_EXEC 0x4
+#define PROT_GROWSUP 0x2000000
+#define PROT_GROWSDOWN 0x1000000
+
+
+
 /*
  * Flush entire local TLB.  'sfence.vma' implicitly fences with the instruction
  * cache as well, so a 'fence.i' is not necessary.
@@ -81,7 +105,11 @@ static inline void set_satp(
 //     __asm__ __volatile__("fence\nfence.i\nsfence.vm\nfence\nfence.i\ncsrw satp, %0\nfence\nfence.i\nsfence.vm\nfence\nfence.i" : : "rK"(__v) : "memory");
 // }
 
-#define PGDIR_PA 0x802fd000lu  // LEVEL 1 PGDIR
+#ifdef K210
+    #define PGDIR_PA 0x802fd000lu  // LEVEL 1 PGDIR
+#else
+    #define PGDIR_PA 0x804fd000lu
+#endif
 
 /*
  * PTE format:
@@ -92,9 +120,9 @@ static inline void set_satp(
 #define _PAGE_ACCESSED_OFFSET 6
 
 #define _PAGE_PRESENT (1 << 0)
-#define _PAGE_READ (1 << 1)     /* Readable */
-#define _PAGE_WRITE (1 << 2)    /* Writable */
-#define _PAGE_EXEC (1 << 3)     /* Executable */
+#define _PAGE_READ (1lu << 1)     /* Readable */
+#define _PAGE_WRITE (1lu << 2)    /* Writable */
+#define _PAGE_EXEC (1lu << 3)     /* Executable */
 #define _PAGE_USER (1 << 4)     /* User */
 #define _PAGE_GLOBAL (1 << 5)   /* Global */
 #define _PAGE_ACCESSED (1 << 6) /* Set by hardware on any access \
@@ -102,6 +130,8 @@ static inline void set_satp(
 #define _PAGE_DIRTY (1 << 7)    /* Set by hardware on any write */
 #define _PAGE_SWAP (1 << 8)     /* Swapped to SD-card */
 #define _PAGE_SHARE (1 << 9)    /* Shared page */
+
+#define _PAGE_ALL_MOD (_PAGE_READ | _PAGE_WRITE | _PAGE_EXEC)
 
 #define _PAGE_PFN_SHIFT 10lu
 
@@ -153,39 +183,6 @@ static inline void set_attribute(PTE *entry, uint64_t bits)
 {
     *entry = *entry | bits;
 }
-static inline uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va)
-{
-    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
-    uint64_t va_offset = (va&VA_MASK) & (NORMAL_PAGE_SIZE - 1);
-    PTE *ptr = pgdir_va + vpn2*sizeof(PTE);
-    if (!get_attribute(*ptr,_PAGE_PRESENT)){
-        assert(0);
-    }
-    else if (!get_attribute(*ptr,_PAGE_READ)&!get_attribute(*ptr,_PAGE_WRITE)&!get_attribute(*ptr,_PAGE_EXEC))
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
-    else
-        return pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + (vpn1 << VA_VPN1_SHIFT) + (vpn0 << VA_VPN0_SHIFT)+va_offset;
-
-    if (!get_attribute(*ptr,_PAGE_PRESENT)){
-        assert(0);
-    }
-    else if (!get_attribute(*ptr,_PAGE_READ)&!get_attribute(*ptr,_PAGE_WRITE)&!get_attribute(*ptr,_PAGE_EXEC))
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
-    else
-        return pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + (vpn0 << VA_VPN0_SHIFT)+va_offset;
-
-    if (!get_attribute(*ptr,_PAGE_PRESENT)){
-        assert(0);
-    }
-    else if (!get_attribute(*ptr,_PAGE_READ)&!get_attribute(*ptr,_PAGE_WRITE)&!get_attribute(*ptr,_PAGE_EXEC)){
-        assert(0);
-    }
-    else
-        return pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) +va_offset;
-
-}
 
 static inline void clear_attribute(PTE *entry, uint64_t bits)
 {
@@ -201,5 +198,7 @@ static inline void clear_pgdir(uintptr_t pgdir_addr)
         ptr++;
     }
 }
+
+uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va);
 
 #endif  // PGTABLE_H
