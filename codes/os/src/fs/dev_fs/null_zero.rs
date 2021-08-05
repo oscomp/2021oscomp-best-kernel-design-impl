@@ -22,7 +22,7 @@ impl File for NullZero {
         true
     }
 
-    fn read(&self, buf: UserBuffer) -> usize {
+    fn read(&self, mut buf: UserBuffer) -> usize {
         if self.is_null{
             return 0
         } else {

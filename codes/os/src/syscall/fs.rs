@@ -1,7 +1,7 @@
 use core::{ usize};
 use core::mem::{size_of};
 
-use crate::{fs::{Dirent, FdSet, File, FileClass, FileDescripter, IoVec, IoVecs, Kstat, MNT_TABLE, NewStat, TTY}, gdb_print, gdb_println, 
+use crate::{fs::{Dirent, FdSet, File, FileClass, FileDescripter, IoVec, IoVecs, Kstat, MNT_TABLE, NewStat, TTY, NullZero}, gdb_print, gdb_println, 
         mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str, print_free_pages},
         monitor::*, 
         task::{
@@ -126,9 +126,23 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     // 只是测试用的临时处理
     if path.contains("/dev") {
         let fd = inner.alloc_fd();
+        
+        let fclass = {
+            if path.contains("tty") {
+                FileClass::Abstr(TTY.clone())
+            } else if path.contains("null") {
+                FileClass::Abstr(Arc::new(NullZero::new(true)))
+            } else if path.contains("zero") {
+                FileClass::Abstr(Arc::new(NullZero::new(false)))
+            } else {
+                return -1
+            }
+        };
+
         inner.fd_table[fd] = Some( FileDescripter::new(
             false,
-            FileClass::Abstr(TTY.clone())));
+            fclass
+        ));
         return fd as isize
     }
     //if path.contains("|") {
