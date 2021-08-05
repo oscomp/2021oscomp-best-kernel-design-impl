@@ -135,8 +135,6 @@ static void pipewakeup(struct pipe *pi, int who)
 	release(&queue->lock);
 }
 
-// Only when the file's ref decreases down to 0 can we call to this.
-// So we don't need to hold locks.
 void
 pipeclose(struct pipe *pi, int writable)
 {
@@ -158,39 +156,57 @@ pipeclose(struct pipe *pi, int writable)
 static int pipewritable(struct pipe *pi)
 {
 	struct proc *pr = myproc();
-	struct wait_queue *wq = &pi->wqueue;
 	struct wait_node *wait;
 	int m;
+	
+	/**
+	 * We are the first one in the queue, and that's why
+	 * we can be in this function, so we are safe to read
+	 * our wait_node without locking.
+	 */
+	wait = wait_queue_next(&pi->wqueue);
+	
+	/**
+	 * It is not atomic visit that we hold this lock for.
+	 * The writer and reader will not change the opposite
+	 * fields, we don't worry about it.
+	 * First, this lock helps us get through the sleep().
+	 * Second, if it is the moment when we are on our way
+	 * to sleep() that the other end is trying to wake us
+	 * up, then we might miss this wakeup().
+	 * In a word, when waking up the other end, hold pi->lock.
+	 */
+	acquire(&pi->lock);
 	while ((m = pi->nwrite - pi->nread) == PIPESIZE) {		// pipe is full
 		if (pi->readopen == 0 || pr->killed) {
-			return -1;
+			m = -1;
+			break;
 		}
 		pipewakeup(pi, PIPE_READER);
-		acquire(&wq->lock);
-		wait = wait_queue_next(wq);
-		sleep(wait->chan, &wq->lock);
-		release(&wq->lock);
+		sleep(wait->chan, &pi->lock);
 	}
+	release(&pi->lock);
 	return m;
 }
 
 static int pipereadable(struct pipe *pi)
 {
 	struct proc *pr = myproc();
-	struct wait_queue *rq = &pi->rqueue;
 	struct wait_node *wait;
 	int m;
-	// __debug_info("pipereadable", "nr/nw=%d/%d, r=%d, w=%d\n",
-	// 			pi->nread, pi->nwrite, pi->readopen, pi->writeopen);
+
+	// Need no lock here. See pipewritable().
+	wait = wait_queue_next(&pi->rqueue);
+
+	acquire(&pi->lock);
 	while ((m = pi->nwrite - pi->nread) == 0 && pi->writeopen) {	// pipe is empty
 		if (pr->killed) {
-			return -1;
+			m = -1;
+			break;
 		}
-		acquire(&rq->lock);
-		wait = wait_queue_next(rq);
-		sleep(wait->chan, &rq->lock);
-		release(&rq->lock);
+		sleep(wait->chan, &pi->lock);
 	}
+	release(&pi->lock);
 	return m;
 }
 
@@ -224,7 +240,9 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 		if (m > 0)
 			break;
 	}
+	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_READER);
+	release(&pi->lock);
 out:
 	pipeunlock(pi, pwait, PIPE_WRITER);
 	// __debug_info("pipewrite", "written %d/%d\n", i, n);
@@ -255,7 +273,9 @@ piperead(struct pipe *pi, uint64 addr, int n)
 		pi->nread += count;
 		i += count;
 	}
+	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_WRITER);
+	release(&pi->lock);
 out:
 	pipeunlock(pi, pwait, PIPE_READER);
 	// __debug_info("piperead", "read %d\n", i);
@@ -295,7 +315,9 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 		}
 	}
 out1:
+	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_READER);
+	release(&pi->lock);
 out2:
 	pipeunlock(pi, pwait, PIPE_WRITER);
 	return ret;
@@ -331,7 +353,9 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 		}
 	}
 out1:
+	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_WRITER);
+	release(&pi->lock);
 out2:
 	pipeunlock(pi, pwait, PIPE_READER);
 	return ret;
@@ -343,6 +367,10 @@ uint32 pipepoll(struct file *fp, struct poll_table *pt)
 {
 	uint32 mask = 0;
 	struct pipe *pi = fp->pipe;
+
+	__debug_info("pipepoll", "r/w=%d/%d | ro/wo=%d/%d | rq/wq=%d/%d\n",
+				fp->readable, fp->writable, pi->readopen, pi->writeopen,
+				!wait_queue_empty(&pi->rqueue), !wait_queue_empty(&pi->wqueue));
 
 	if (fp->readable)
 		poll_wait(fp, &pi->rqueue, pt);

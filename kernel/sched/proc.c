@@ -263,6 +263,10 @@ int fork_cow(void) {
 	np->elf = idup(p->elf);
 
 	// copy parent's trapframe 
+	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
+		floatstore(p->trapframe);
+		w_sstatus_fs(SSTATUS_FS_CLEAN);
+	}
 	*(np->trapframe) = *(p->trapframe);
 	np->trapframe->a0 = 0;
 
@@ -337,6 +341,10 @@ int clone(uint64 flag, uint64 stack) {
 	np->elf = idup(p->elf);
 
 	// copy parent's trapframe 
+	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
+		floatstore(p->trapframe);
+		w_sstatus_fs(SSTATUS_FS_CLEAN);
+	}
 	*(np->trapframe) = *(p->trapframe);
 	np->trapframe->a0 = 0;
 	np->trapframe->sp = stack;

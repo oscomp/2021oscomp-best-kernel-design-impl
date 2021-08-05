@@ -75,8 +75,6 @@ uint64 sys_clock_settime(void) {
 	// uint64 tmp_ticks = r_time();
 	// cpu_clock.sec = tmp_ticks / CLK_FREQ;
 	// cpu_clock.nsec = 0;
-	uint64 tmp_ticks = readtime();
-	convert_to_timespec(tmp_ticks, &cpu_clock);
 
 	if (tp && copyin2((char*)&cpu_clock, tp, sizeof(struct timespec)) < 0) {
 		return -EFAULT;
@@ -101,6 +99,9 @@ uint64 sys_clock_gettime(void) {
 	}
 
 	struct timespec cpu_clock;
+	uint64 curtime = readtime();
+	convert_to_timespec(curtime, &cpu_clock);
+
 	if (tp && copyout2(tp, (char*)&cpu_clock, sizeof(struct timespec)) < 0) {
 		return EFAULT;
 	}

@@ -106,6 +106,11 @@ int zero_write(struct inode *ip, int usr, uint64 dst, uint off, uint n)
 	return n;
 }
 
+int null_read(struct inode *ip, int usr, uint64 dst, uint off, uint n)
+{
+	return 0;
+}
+
 
 static struct dentry *de_rootfs_cache(struct dentry *parent, char *name)
 {
@@ -145,6 +150,14 @@ struct inode_op rootfs_inode_op = {
 
 struct file_op zero_op = {
 	.read = zero_read,
+	.write = zero_write,
+	.readdir = dummy_file_readdir,
+	.readv = dummy_file_rw_vec,
+	.writev = dummy_file_rw_vec,
+};
+
+struct file_op null_op = {
+	.read = null_read,
 	.write = zero_write,
 	.readdir = dummy_file_readdir,
 	.readv = dummy_file_rw_vec,
@@ -208,7 +221,7 @@ void rootfs_init()
 	if ((rootfs.root = de_root_generate(NULL, "/", inum++, S_IFDIR, 0)) == NULL)
 		panic("rootfs_init 1");
 
-	struct dentry *dev, *home, *con, *proc, *vda, *mount, *zero;
+	struct dentry *dev, *home, *con, *proc, *vda, *mount, *zero, *null;
 	if ((dev = de_root_generate(rootfs.root, "dev", inum++, S_IFDIR, 0)) == NULL)
 		panic("rootfs_init: /dev");
 	if ((home = de_root_generate(rootfs.root, "home", inum++, S_IFDIR, 0)) == NULL)
@@ -219,6 +232,8 @@ void rootfs_init()
 		panic("rootfs_init: /dev/vda2");
 	if ((zero = de_root_generate(dev, "zero", inum++, S_IFCHR, 3)) == NULL)
 		panic("rootfs_init: /dev/zero");
+	if ((null = de_root_generate(dev, "null", inum++, S_IFCHR, 4)) == NULL)
+		panic("rootfs_init: /dev/null");
 	if ((proc = de_root_generate(rootfs.root, "proc", inum++, S_IFDIR, 0)) == NULL)
 		panic("rootfs_init: /proc");
 	if ((mount = de_root_generate(proc, "mounts", inum++, S_IFREG, 0)) == NULL)
@@ -230,6 +245,7 @@ void rootfs_init()
 	con->inode->fop = &console_op;
 
 	zero->inode->fop = &zero_op;
+	null->inode->fop = &null_op;
 
 	extern struct file_op mountinfo_fop;
 	mount->inode->fop = &mountinfo_fop;
