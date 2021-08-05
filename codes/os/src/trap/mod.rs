@@ -80,7 +80,7 @@ pub fn trap_handler() -> ! {
             // cx is changed during sys_exec, so we have to call it again
             let syscall_id = cx.x[17];
             if syscall_id != 64 && syscall_id != 63{
-                println!("[{}]syscall-({}) = 0x{:X}  ", current_task().unwrap().pid.0, syscall_id, result);
+                // println!("[{}]syscall-({}) = 0x{:X}  ", current_task().unwrap().pid.0, syscall_id, result);
             } 
             cx = current_trap_cx();
             cx.x[10] = result as usize;
