@@ -432,8 +432,9 @@ impl ArgMachine{
         // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX");
         // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k open2close /var/tmp/XXX");
         // testsuits.push("busybox echo context switch overhead");
-        testsuits.push("lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96");
+        // testsuits.push("lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96");
         
+        println!("scan str iter");
         for programname_op in testsuits.iter() {
             let mut exit_code = 0;
             let exec_str = String::new() +programname_op;
@@ -455,6 +456,7 @@ impl ArgMachine{
             args_addr.push(0 as *const u8 );
             let pid = fork();
             if pid == 0 {
+                println!("exec");
                 if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     ls("/");
