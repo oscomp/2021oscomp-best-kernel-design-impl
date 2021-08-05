@@ -38,7 +38,7 @@ main(unsigned long hartid, unsigned long dtb_pa)
 	
 	if (hartid == 0) {
 		cpuinit();
-
+		floatinithart();
 		consoleinit();
 		printfinit();   // init a lock for printf 
 		print_logo();
@@ -77,6 +77,7 @@ main(unsigned long hartid, unsigned long dtb_pa)
 			;
 		__sync_synchronize();
 		__debug_info("main", "hart %d enter main()...\n", hartid);
+		floatinithart();
 		kvminithart();
 		trapinithart();
 		plicinithart();  // ask PLIC for device interrupts

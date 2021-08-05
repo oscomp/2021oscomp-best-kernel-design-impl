@@ -70,6 +70,16 @@ w_sstatus(uint64 x)
 	asm volatile("csrw sstatus, %0" : : "r" (x));
 }
 
+static inline void set_sstatus_bit(uint64 bits)
+{
+	asm volatile("csrs sstatus, %0" : : "r" (bits));
+}
+
+static inline void clr_sstatus_bit(uint64 bits)
+{
+	asm volatile("csrc sstatus, %0" : : "r" (bits));
+}
+
 // Supervisor Interrupt Pending
 static inline uint64
 r_sip()
@@ -286,14 +296,16 @@ static inline uint64 readtime()
 static inline void
 intr_on()
 {
-	w_sstatus(r_sstatus() | SSTATUS_SIE);
+	// w_sstatus(r_sstatus() | SSTATUS_SIE);
+	set_sstatus_bit(SSTATUS_SIE);
 }
 
 // disable device interrupts
 static inline void
 intr_off()
 {
-	w_sstatus(r_sstatus() & ~SSTATUS_SIE);
+	// w_sstatus(r_sstatus() & ~SSTATUS_SIE);
+	clr_sstatus_bit(SSTATUS_SIE);
 }
 
 // are device interrupts enabled?
@@ -396,5 +408,49 @@ sfence_vma()
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs
+
+
+/**
+ * RISC-V floating-point control and status register
+ */
+
+#define SSTATUS_FS_INIT		(1L << 13)
+#define SSTATUS_FS_CLEAN	(2L << 13)
+#define SSTATUS_FS_DIRTY	(3L << 13)
+#define SSTATUS_FS_BITS		(3L << 13)
+
+#define FRM_RNE		0
+#define FRM_RTZ		1
+#define FRM_RDN		2
+#define FRM_RUP		3
+#define FRM_RMM		4
+
+// set floating-point rounding mode
+static inline void w_frm(uint x)
+{
+	asm volatile("fsrm %0" : : "r" (x));
+}
+
+static inline uint64 r_sstatus_fs()
+{
+	return r_sstatus() & SSTATUS_FS_BITS;
+}
+
+static inline void w_sstatus_fs(uint64 bits)
+{
+	uint64 status = r_sstatus() & ~SSTATUS_FS_BITS;
+	w_sstatus(status | (bits & SSTATUS_FS_BITS));
+}
+
+// init floating-point unit
+static inline void floatinithart()
+{
+	// If sstatus.fs is off, floating-point instructions
+	// will be treated as illegal ones.
+	w_sstatus_fs(SSTATUS_FS_INIT);
+	w_frm(FRM_RNE);
+	w_sstatus_fs(SSTATUS_FS_CLEAN);
+}
+
 
 #endif

@@ -702,6 +702,7 @@ void scheduler(void) {
 
 	// it should never returns!
 	while (1) {
+		int found = 0;
 		intr_on();		// make sure interrupts are available 
 		__enter_proc_cs 
 		tmp = __get_runnable_no_lock();
@@ -719,9 +720,14 @@ void scheduler(void) {
 			w_satp(MAKE_SATP(kernel_pagetable));
 			sfence_vma();
 			/*__debug_info("scheduler()", "swtch from %s\n", tmp->name);*/
+			found = 1;
 		}
 		c->proc = NULL;
 		__leave_proc_cs
+		if (!found) {
+			intr_on();
+			asm volatile("wfi");
+		}
 	} 
 
 	__debug_error("scheduler", "scheduler returns!\n");
@@ -744,6 +750,13 @@ void sched(void) {
 	if (intr_get()) 
 		panic("sched interruptible\n");
 
+	// save floating-point registers
+	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
+		// printf(__INFO("sched")"floatstore, pid=%d, name=%s\n", p->pid, p->name);
+		floatstore(p->trapframe);
+		w_sstatus_fs(SSTATUS_FS_CLEAN);
+	}
+	
 	p->proc_tms.stime += readtime() - p->proc_tms.ikstmp;
 
 	intena = mycpu()->intena;
@@ -751,6 +764,13 @@ void sched(void) {
 	mycpu()->intena = intena;
 
 	p->proc_tms.ikstmp = readtime();
+
+	// On k210, sstatus.fs seems to be hardwired to dirty(11b).
+	// if (r_sstatus_fs() == SSTATUS_FS_DIRTY)
+	// 	panic("sched out with dirty floating-point registers");
+
+	floatload(p->trapframe);
+	w_sstatus_fs(SSTATUS_FS_CLEAN);
 }
 
 void cpuinit(void) {
@@ -777,6 +797,9 @@ void forkret(void) {
 	extern int first;
 
 	__leave_proc_cs 
+
+	w_sstatus_fs(SSTATUS_FS_CLEAN);
+
 	if (first) {
 		// File system initialization must be run in the context of a 
 		// regular process (e.g., because it calls sleep), and thus 
