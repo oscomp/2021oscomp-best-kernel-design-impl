@@ -257,7 +257,7 @@ pub fn sys_brk(brk_addr: usize) -> isize{
 //    int *ptid, int *ctid,
 //    unsigned long newtls);
 pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls: usize) -> isize {
-    print_free_pages();
+    // print_free_pages();
     let current_task = current_task().unwrap();
     let new_task = current_task.fork(false);
     let tid = new_task.getpid();
@@ -287,7 +287,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     trap_cx.x[10] = 0;
     // add new task to scheduler
     add_task(new_task);
-    print_free_pages();
+    // print_free_pages();
     gdb_print!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
