@@ -397,10 +397,10 @@ impl ArgMachine{
 
     pub fn auto_run_lmbench(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
-        mkdir("/var");
-        mkdir("/var/tmp");
-        open("/var/tmp/lmbench", OpenFlags::CREATE);
-        ls("/");
+        // mkdir("/var");
+        // mkdir("/var/tmp");
+        // open("/var/tmp/lmbench", OpenFlags::CREATE);
+        // ls("/");
         println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("lmbench_all lat_syscall -P 1 null");
@@ -408,9 +408,9 @@ impl ArgMachine{
         // testsuits.push("lmbench_all lat_syscall -P 1 write");
         // testsuits.push("busybox mkdir -p /var/tmp");
         // testsuits.push("busybox touch /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
         testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
         testsuits.push("lmbench_all lat_sig -P 1 install");
         testsuits.push("lmbench_all lat_sig -P 1 catch");
