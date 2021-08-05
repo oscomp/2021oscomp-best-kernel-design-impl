@@ -1,6 +1,7 @@
 use riscv::register::time;
 use crate::sbi::set_timer;
 use crate::config::CLOCK_FREQ;
+use crate::task::TimeVal;
 
 pub const TICKS_PER_SEC: usize = 100;
 pub const MSEC_PER_SEC: usize = 1000;
@@ -16,6 +17,16 @@ pub fn get_time() -> usize {
         );
     }
     time
+}
+
+pub fn get_timeval() -> TimeVal {
+    let ticks = get_time();
+    let sec = ticks/CLOCK_FREQ;
+    let usec = (ticks%CLOCK_FREQ) * (USEC_PER_SEC / CLOCK_FREQ);
+    TimeVal{
+        sec:sec,
+        usec:usec
+    }
 }
 
 pub fn get_time_ns() -> usize {
