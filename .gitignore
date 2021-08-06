@@ -1,3 +1,4 @@
 # qemu: ignore build file
 qemu-build/*
 !qemu-build/README.md
+.vscode
