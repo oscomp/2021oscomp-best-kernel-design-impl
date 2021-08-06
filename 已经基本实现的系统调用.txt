@@ -1,3 +1,5 @@
+8.5
+
 execve
 set_tid_address
 getuid
@@ -10,3 +12,11 @@ writev
 exit_group
 exit
 read
+
+8.6
+
+nanosleep
+clock_gettime
+sysinfo
+rt_sigaction (TODO)
+rt_sigprocmask (TODO)
