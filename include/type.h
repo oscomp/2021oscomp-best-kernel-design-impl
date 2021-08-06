@@ -55,6 +55,7 @@ typedef uint32_t gid_t;
 typedef long int off_t;
 typedef uint32_t blksize_t;
 typedef uint64_t blkcnt_t;
+typedef uint64_t sigval_t;
 
 /* Minimum of signed integral types.  */
 # define INT8_MIN               (-128)
@@ -72,12 +73,5 @@ typedef uint64_t blkcnt_t;
 # define UINT16_MAX             (65535)
 # define UINT32_MAX             (4294967295U)
 # define UINT64_MAX             (18446744073709551615lu)
-
-/* file discriptor */
-#define O_RDONLY 1 /* read only open */
-#define O_WRONLY 2 /* write only open */
-#define O_RDWR 3 /* read/write open */
-#define O_CREATE 0x40 /* create new */
-#define O_DIRECTORY 0x200000 /* open directory */
 
 #endif

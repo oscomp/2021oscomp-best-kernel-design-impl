@@ -18,39 +18,47 @@ uchar stderr_buf[NORMAL_PAGE_SIZE] = {0};
         */
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
 {
+    debug();
     uint8 fd_index = get_fd_index(fd, current_running);
-    if (fd_index < 0) return -1;
+    if (fd_index < 0 || !current_running->fd[fd_index].used)
+        return -1;
 
-    // if (count == 0) return 0;
     if (current_running->fd[fd_index].dev == STDOUT){        
-        // for (uint i = 0; i < count; ++i){
-        //     sbi_console_putchar(*(buff + i));
-        // }
-        // printk_port("\npid %d is writing\n", current_running->pid);
         memcpy(stdout_buf, buff, count);
         stdout_buf[count] = 0;
         printk_port(stdout_buf);
         return count;
     }
+    else if (current_running->fd[fd_index].dev == STDERR)
+    {
+        memcpy(stderr_buf, buff, count);
+        stderr_buf[count] = 0;
+        printk_port(stderr_buf);
+        return count;
+    }
     else{
+        // 如果是管道，就调用pipe_write
         if (current_running->fd[fd_index].piped == FD_PIPED)
             return pipe_write(buff, current_running->fd[fd_index].pip_num, count);
 
         size_t mycount = 0;
         size_t realcount = count; // write as many as possible
         uchar *tempbuff = kalloc();
-        ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
+        ientry_t now_clus = get_clus_from_len(current_running->fd[fd_index].first_clus_num, current_running->fd[fd_index].pos);
+        isec_t now_sec = get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE);
+        now_sec -= now_sec % READ_BUF_CNT; /* bufsize aligned */
         ientry_t old_clus = now_clus;
-        isec_t now_sec = first_sec_of_clus(now_clus);
 
         while (mycount < realcount){
-            size_t writesize = min(BUFSIZE, realcount - mycount);
+            size_t pos_offset_in_buf = current_running->fd[fd_index].pos % BUFSIZE;
+            size_t writesize = min(BUFSIZE - pos_offset_in_buf, realcount - mycount);
             sd_read(tempbuff,now_sec);
-            memcpy(tempbuff + current_running->fd[fd_index].pos, buff, writesize);
+            memcpy(tempbuff + pos_offset_in_buf, buff, writesize);
             sd_write(tempbuff,now_sec);
             buff += writesize;
             mycount += writesize;
-            if (mycount % CLUSTER_SIZE == 0){
+            current_running->fd[fd_index].pos += writesize;
+            if (current_running->fd[fd_index].pos % CLUSTER_SIZE == 0){
                 old_clus = now_clus;
                 now_clus = get_next_cluster(now_clus);
                 if (now_clus == 0x0fffffffu){
@@ -63,7 +71,6 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
             else
                 now_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
         }
-        current_running->fd[fd_index].pos += realcount;
         current_running->fd[fd_index].length = max(current_running->fd[fd_index].pos, current_running->fd[fd_index].length);
 
         kfree(tempbuff);

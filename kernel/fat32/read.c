@@ -21,20 +21,25 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
         return pipe_read(buf, current_running->fd[fd_index].pip_num, count);
 
     size_t mycount = 0;
-    size_t realcount = min(count, current_running->fd[fd_index].length);
+    size_t realcount = min(count, current_running->fd[fd_index].length - current_running->fd[fd_index].pos);
+    if (realcount == 0)
+        return 0;
+    assert(realcount > 0);
     uchar *buff = kalloc();
 
-    ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
-    isec_t now_sec = first_sec_of_clus(now_clus);
+    ientry_t now_clus = get_clus_from_len(current_running->fd[fd_index].first_clus_num, current_running->fd[fd_index].pos);
+    isec_t now_sec = get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE);
+    now_sec -= now_sec % READ_BUF_CNT; /* bufsize aligned */
 
     while (mycount < realcount){
-        size_t readsize = min(BUFSIZE, realcount - mycount);
+        size_t pos_offset_in_buf = current_running->fd[fd_index].pos % BUFSIZE;
+        size_t readsize = min(BUFSIZE - pos_offset_in_buf, realcount - mycount);
         sd_read(buff, now_sec);
-        memcpy(buf, buff, readsize);
+        memcpy(buf, buff + pos_offset_in_buf, readsize);
         buf += readsize;
         mycount += readsize;
         current_running->fd[fd_index].pos += readsize;
-        if (mycount % CLUSTER_SIZE == 0){
+        if (current_running->fd[fd_index].pos % CLUSTER_SIZE == 0){
             now_clus = get_next_cluster(now_clus);
             now_sec = first_sec_of_clus(now_clus);
         }

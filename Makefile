@@ -14,7 +14,11 @@ USER_CFLAGS = -O0 -w -nostdlib -T linker/user_riscv.lds -Wall -mcmodel=medany -I
 BOOTLOADER_ENTRYPOINT = 0x80000000
 START_ENTRYPOINT = 0x80020000
 
+TARGET = K210
 KERNEL_ENTRYPOINT = 0xffffffff80300000
+ifeq ($(TARGET), qemu)
+	KERNEL_ENTRYPOINT = 0xffffffff80500000
+endif
 
 START_QEMU_ENTRY = 0x80200000
 
@@ -35,7 +39,7 @@ SRC_DRIVER	= ./drivers/screen.c
 SRC_INIT 	= ./init/main.c
 SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
-SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c ./kernel/sched/exec.c
+SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c ./kernel/sched/exec.c ./kernel/sched/signal.c
 SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c ./kernel/mm/mman.c ./kernel/mm/pgtable.c ./kernel/mm/mmap.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
@@ -44,6 +48,7 @@ SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mount.c ./kernel/fat32/read.c 
 				./kernel/fat32/utils.c
 SRC_IO		= ./kernel/io/io.c
 SRC_UNAME	= ./kernel/uname/uname.c
+SRC_SYSTEM	= ./kernel/system/system.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
 SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S
@@ -53,10 +58,12 @@ SRC_LIBC_C	= $(filter %.c,$(SRC_LIBC))
 SRC_USER	= ./test/shell.c 
 
 TEST_ELF	= shell.elf
-# TEST_ELF	+= busybox.elf
+ifeq ($(TARGET), qemu)
+	TEST_ELF	+= busybox.elf
+endif
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO}
+				${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO} ${SRC_SYSTEM}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c
@@ -69,9 +76,9 @@ K210_SERIALPORT	= /dev/ttyUSB0
 
 .PHONY:all
 
-all: elf k210 asm# floppy
+all: k210
 
-k210: payload createimage image
+k210: elf payload createimage image asm
 
 qemu: elf payload createimage qemu_head asm
 

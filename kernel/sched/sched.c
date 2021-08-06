@@ -135,15 +135,17 @@ void do_scheduler(void)
 
 /* copy context */
 /* kernel_stack and user_stack are stack top addr */
-static void copy_to(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack)
+static void copy_parent_stacks_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
 {
     uint64_t ker_stack_size, user_stack_size;
-    ker_stack_size = NORMAL_PAGE_SIZE - PAGE_OFFSET(current_running->kernel_sp);
-    user_stack_size = USER_STACK_ADDR - current_running->user_sp;
+    /* kernel_sp is just at user context, but maybe not equal to register sp */
+    ker_stack_size = KERNEL_STACK_SIZE - PAGE_OFFSET(current_running->kernel_sp);
+    user_stack_size = current_running->user_stack_base + USER_STACK_INIT_SIZE - current_running->user_sp;
     
-    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size;
-    pcb_underinit->user_sp = current_running->user_sp;
-    copy_stack(pcb_underinit, ker_stack_size, user_stack_size);
+    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size; /* for user context */
+    pcb_underinit->user_sp = user_stack_top; /* no need to be aligned with user_sp */
+    memcpy(pcb_underinit->kernel_sp, current_running->kernel_sp, ker_stack_size);
+    memcpy(pcb_underinit->user_sp - 8, current_running->user_sp - 8, 8); /* copy tp, very essential */
 
     // copy fd
     for (int i = 0; i < NUM_FD; ++i)
@@ -151,11 +153,12 @@ static void copy_to(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t us
 }
 
 /* clone a child thread for current thread */
-/* for now, use tls as entry point */
+/* FOR NOW, use tls as entry point */
 /* stack : ADDR OF CHILD STACK POINT */
 /* success: child pid; fail: -1 */
 pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
 {
+    debug();
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
         if (pcb[i].status == TASK_EXITED)
         {
@@ -170,18 +173,20 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             /* init child pcb */
             ptr_t kernel_stack_top = allocPage() + NORMAL_PAGE_SIZE;  
             // if stack = NULL, automatically set up      
-            ptr_t user_stack = (stack)? stack : USER_STACK_ADDR + current_running->spawn_num * NORMAL_PAGE_SIZE;
+            ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + 3 * current_running->spawn_num * NORMAL_PAGE_SIZE;
+            for (uint64_t i = 0; i < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; i++)
+                alloc_page_helper(user_stack_top - (i+1)*NORMAL_PAGE_SIZE, current_running->pgdir, _PAGE_READ|_PAGE_WRITE);
 
             // pgdir
             pcb_underinit->pgdir = current_running->pgdir;
            
             // prepare stack
-            copy_to(pcb_underinit, kernel_stack_top, user_stack);
+            copy_parent_stacks_and_set_sp(pcb_underinit, kernel_stack_top, user_stack_top);
 
             // return 0 if child
             regs_context_t *pt_regs =
                 (regs_context_t *)(kernel_stack_top - sizeof(regs_context_t));
-            pt_regs->regs[4] = pcb_underinit;
+            // pt_regs->regs[4] = pcb_underinit;
             pt_regs->regs[10] = 0;
 
             // prepare switch context
@@ -201,6 +206,7 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
 
 pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
+    debug();
     uint64_t status_ker_va = NULL;
     if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
     pid_t ret = -1;
@@ -226,6 +232,7 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 
 uint8 do_nanosleep(struct timespec *ts)
 {
+    debug();
     // 1. block the current_running
     // 2. create a timer which calls `do_unblock` when timeout
     // 3. reschedule because the current_running is blocked.
@@ -246,6 +253,7 @@ uint8 do_nanosleep(struct timespec *ts)
 
 void do_block(list_node_t *list, list_head *queue)
 {
+    debug();
     pcb_t *pcb = list_entry(list, pcb_t, list);
 
     pcb->status = TASK_BLOCKED;
@@ -255,6 +263,7 @@ void do_block(list_node_t *list, list_head *queue)
 /* pcb_node is of type list_node_t */
 void do_unblock(void *pcb_node)
 {
+    debug();
     // unblock the `pcb` from the block queue   
     list_del(pcb_node);
     pcb_t *pcb = (pcb_t *)((list_node_t *)pcb_node)->ptr;
@@ -264,6 +273,7 @@ void do_unblock(void *pcb_node)
 
 void do_exit(int32_t exit_status)
 {
+    debug();
     // check if some other thread is waiting
     // if there is, unblock them
     list_node_t *temp = current_running->wait_list.next;
@@ -311,11 +321,13 @@ void do_exit_group(int32_t exit_status)
 
 pid_t do_getpid()
 {
+    debug();
     return current_running->pid;
 }
 
 pid_t do_getppid()
 {
+    debug();
     if (current_running->parent.parent == NULL)
         return 1;
     return current_running->parent.parent->pid;
@@ -324,29 +336,34 @@ pid_t do_getppid()
 /* return 0 */
 pid_t do_getuid()
 {
+    debug();
     return 0;
 }
 
 /* return 0 */
 pid_t do_geteuid()
 {
+    debug();
     return 0;
 }
 
 /* return 0 */
 pid_t do_getgid()
 {
+    debug();
     return 0;
 }
 
 /* return 0 */
 pid_t do_getegid()
 {
+    debug();
     return 0;
 }
 
 pid_t do_set_tid_address(int *tidptr)
 {
+    debug();
     return current_running->pid;
 }
 

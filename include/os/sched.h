@@ -55,6 +55,21 @@ typedef enum {
     USER_THREAD,
 } task_type_t;
 
+typedef uint32_t isec_t;
+
+typedef struct dir_pos{
+    uint64_t offset;
+    size_t len;
+    isec_t sec;
+}dir_pos_t;
+
+/* file discriptor */
+#define O_RDONLY 1 /* read only open */
+#define O_WRONLY 2 /* write only open */
+#define O_RDWR 3 /* read/write open */
+#define O_CREATE 0x40 /* create new */
+#define O_DIRECTORY 0x200000 /* open directory */
+
 #define NUM_FD 16
 
 typedef struct fd{
@@ -75,6 +90,9 @@ typedef struct fd{
     /* used */
     uint8 used;
 
+    /* dir_pos */
+    dir_pos_t dir_pos;
+
     /* piped */
     uint8 piped;
     pipe_num_t pip_num;
@@ -83,7 +101,6 @@ typedef struct fd{
     struct {
         void *start;
         size_t len;
-        int prot;
         int flags;
         off_t off;
     }mmap;
@@ -120,6 +137,7 @@ typedef struct pcb
     reg_t preempt_count;
 
     // stack base
+    ptr_t user_stack_base;
     // ptr_t kernel_stack_base;
     ptr_t user_addr_top; /* for mem alloc */
 
@@ -217,6 +235,67 @@ typedef struct aux_elem
     uint64_t val;
 }aux_elem_t;
 
+/* signal */
+#define SIGINT 0x2
+#define SIGQUIT 0x3
+#define SIGTERM 0xf
+#define SIGCHLD 0x11
+
+#define SIG_BLCOK 0x0
+#define SIG_UNBLOCK 0x1
+#define SIG_SETMASK 0x2
+
+#define _NSIG_WORDS 16
+
+typedef struct{
+    unsigned long sig[_NSIG_WORDS];
+}sigset_t;
+
+typedef struct siginfo{
+    int      si_signo;     /* Signal number */
+    int      si_errno;     /* An errno value */
+    int      si_code;      /* Signal code */
+    int      si_trapno;    /* Trap number that caused
+                             hardware-generated signal
+                             (unused on most architectures) */
+    pid_t    si_pid;       /* Sending process ID */
+    uid_t    si_uid;       /* Real user ID of sending process */
+    int      si_status;    /* Exit value or signal */
+    clock_t  si_utime;     /* User time consumed */
+    clock_t  si_stime;     /* System time consumed */
+    sigval_t si_value;     /* Signal value */
+    int      si_int;       /* POSIX.1b signal */
+    void    *si_ptr;       /* POSIX.1b signal */
+    int      si_overrun;   /* Timer overrun count;
+                             POSIX.1b timers */
+    int      si_timerid;   /* Timer ID; POSIX.1b timers */
+    void    *si_addr;      /* Memory location which caused fault */
+    long     si_band;      /* Band event (was int in glibc 2.3.2 and earlier) */
+    int      si_fd;        /* File descriptor */
+    short    si_addr_lsb;  /* Least significant bit of address
+                             (since Linux 2.6.32) */
+    void    *si_lower;     /* Lower bound when address violation
+                             occurred (since Linux 3.19) */
+    void    *si_upper;     /* Upper bound when address violation */
+    int      si_pkey;      /* Protection key on PTE that caused
+                             fault (since Linux 4.6) */
+    void    *si_call_addr; /* Address of system call instruction
+                             (since Linux 3.5) */
+    int      si_syscall;   /* Number of attempted system call
+                             (since Linux 3.5) */
+    unsigned int si_arch;  /* Architecture of attempted system call
+                             (since Linux 3.5) */
+}siginfo_t;
+
+
+typedef struct sigaction{
+    void     (*sa_handler)(int);
+    // void     (*sa_sigaction)(int, siginfo_t *, void *);
+    sigset_t   sa_mask;
+    int        sa_flags;
+    void     (*sa_restorer)(void);
+}sigaction_t;
+
 /* ready queue to run */
 extern list_head ready_queue;
 extern list_head general_block_queue;
@@ -273,6 +352,9 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
 uint8_t do_nanosleep(struct timespec *sleep_time);
 int8 do_exec(const char* file_name, char* argv[], char *const envp[]);
 
+int32_t do_rt_sigprocmask(int32_t how, const sigset_t *restrict set, sigset_t *restrict oldset, size_t sigsetsize);
+int32_t do_rt_sigaction(int32_t signum, struct sigaction *act, struct sigaction *oldact, size_t sigsetsize);
+
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;
 extern int LATTER_TICKS_COUNTER;
@@ -300,7 +382,6 @@ static inline void set_pcb_edata(pcb_t *pcb_underinit, uint64_t pgdir)
 /* copy necesaary size */
 static inline void copy_stack(pcb_t *pcb_underinit, uint64_t ker_stack_size, uint64_t user_stack_size)
 {
-    memcpy(pcb_underinit->kernel_sp, current_running->kernel_sp, ker_stack_size);
     /* maybe no need to copy this */
     // memcpy(pcb_underinit->user_sp, current_running->user_sp, user_stack_size);
 }

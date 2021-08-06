@@ -11,6 +11,8 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
         return -1;
     /* just for page allocate */
     if (fd == MMAP_ALLOC_PAGE_FD){
+        if (flags & MAP_ANONYMOUS == 0)
+            return -1;
         if (!start){
             start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
             set_user_addr_top(current_running, start);
@@ -32,16 +34,20 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
         set_user_addr_top(current_running, start);
     }
 
-    uchar *buf = kalloc();
-    fat32_read(fd, buf, len);
+    if (fat32_lseek(fd, off, SEEK_SET) == -1)
+        return -1;
 
+    for (uint64_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
+    {
+        alloc_page_helper(start + i, current_running->pgdir, _PAGE_ALL_MOD);
+        do_mprotect(start + i, NORMAL_PAGE_SIZE, prot);
+        fat32_read(fd, start + i, min(NORMAL_PAGE_SIZE, len - i));
+    }
+     
     current_running->fd[fd_index].mmap.start = start;
     current_running->fd[fd_index].mmap.len =len;
-    current_running->fd[fd_index].mmap.prot = prot;
     current_running->fd[fd_index].mmap.flags = flags;
     current_running->fd[fd_index].mmap.off = off;
-
-    memcpy(start, buf + off, len);
 
     return start;
 }
@@ -51,8 +57,12 @@ int64 do_munmap(void *start, size_t len)
 {
     for (int i = 0; i < NUM_FD; ++i)
     {
-        if (current_running->fd[i].used == FD_USED && current_running->fd[i].mmap.start == start){
-            fat32_seek(current_running->fd[i].fd_num, current_running->fd[i].mmap.off);
+        /* used, shared, not anonymous, start point is correct */
+        if (current_running->fd[i].used == FD_USED && (current_running->fd[i].mmap.flags & MAP_SHARED)
+            && (current_running->fd[i].mmap.flags & MAP_ANONYMOUS == 0) && current_running->fd[i].mmap.start == start){
+            if (current_running->fd[i].mmap.len < len)
+                return -1;
+            fat32_lseek(current_running->fd[i].fd_num, current_running->fd[i].mmap.off, SEEK_SET);
             fat32_write(current_running->fd[i].fd_num, start, len);
             return 0;
         }

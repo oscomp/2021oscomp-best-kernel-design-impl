@@ -39,7 +39,6 @@ typedef struct fat{
 
 /* first cluster numer of cwd */
 typedef uint32_t ientry_t;
-typedef uint32_t isec_t;
 
 #define SHORT_DENTRY_FILENAME_LEN 8
 #define SHORT_DENTRY_EXTNAME_LEN 3
@@ -87,6 +86,29 @@ struct kstat {
     long st_ctime_nsec;
     unsigned __unused[2];
 }kstat_t;
+
+#define S_IFDIR 0x4000
+struct stat {
+    dev_t     st_dev;         /* ID of device containing file */
+    ino_t     st_ino;         /* Inode number */
+    mode_t    st_mode;        /* File type and mode */
+    nlink_t   st_nlink;       /* Number of hard links */
+    uid_t     st_uid;         /* User ID of owner */
+    gid_t     st_gid;         /* Group ID of owner */
+    dev_t     st_rdev;        /* Device ID (if special file) */
+    off_t     st_size;        /* Total size, in bytes */
+    blksize_t st_blksize;     /* Block size for filesystem I/O */
+    blkcnt_t  st_blocks;      /* Number of 512B blocks allocated */
+
+    /* Since Linux 2.6, the kernel supports nanosecond
+      precision for the following timestamp fields.
+      For the details before Linux 2.6, see NOTES. */
+
+    struct timespec st_atim;  /* Time of last access */
+    struct timespec st_mtim;  /* Time of last modification */
+    struct timespec st_ctim;  /* Time of last status change */
+};
+
 
 /* dir entry for linux */
 struct linux_dirent64 {
@@ -144,12 +166,6 @@ struct iovec{
     size_t iov_len;
 };
 
-struct dir_pos{
-    uint64_t offset;
-    size_t len;
-    isec_t sec;
-};
-
 typedef enum{
     SEARCH_FILE,
     SEARCH_DIR,
@@ -197,6 +213,16 @@ enum{
 #define MAP_PRIVATE 0X02
 #define MAP_FAILED ((void *) -1)
 
+/* fcntl */
+#define F_DUPFD 0x0
+#define F_GETFD 0x1
+#define F_GETFL 0x3
+
+/* lseek */
+#define SEEK_SET 0x0
+#define SEEK_CUR 0x1
+#define SEEK_END 0x2
+
 extern fat_t fat;
 extern ientry_t cwd_first_clus;
 extern ientry_t cwd_clus, root_clus, root_first_clus;
@@ -225,7 +251,7 @@ int64 fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
 
 int16 fat32_pipe2(fd_num_t fd[], int32 mode);
 
-size_t fat32_seek(fd_num_t fd, size_t off);
+int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence);
 
 int16 fat32_link();
 int16 fat32_unlink(fd_num_t dirfd, const char* path, uint32_t flags);
@@ -237,6 +263,9 @@ int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off
 int64 fat32_munmap(void *start, size_t len);
 
 size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t bufsiz);
+int32 fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags);
+int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flags);
+int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg);
 
 void init_inode();
 void init_pipe();
@@ -248,16 +277,21 @@ uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_clus(uchar *buf);
 
-ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, file_type_t mode);
+ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, file_type_t mode);
 
 dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
-uint8 set_fd_from_dentry(void *pcb_underinit, uint i, dentry_t *p, uint32_t flags);
+uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint32_t flags);
 int16 get_fd_index(fd_num_t fd, void *pcb);
 
 void write_fat_table(uint32_t old_clus, uint32_t new_clus, uchar *buff);
 
 uchar unicode2char(uint16_t unich);
 unicode_t char2unicode(char ch);
+
+void set_dentry_from_fd(dentry_t *p, fd_t *fdp);
+uint32_t get_next_cluster(uint32_t cluster);
+uint8 is_zero_dentry(dentry_t *p);
+uint8_t filenamecmp(const char *name1, const char *name2);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -270,6 +304,18 @@ static inline uint32 fat_sec_of_clus(uint32 cluster)
 {
     return fat.bpb.rsvd_sec_cnt + fat.bpb.hidd_sec + \
         (cluster * 4) / fat.bpb.byts_per_sec + fat.bpb.fat_sz;
+}
+
+/* get offset of this cluster in fat table */
+static inline uint32 fat_offset_of_clus(uint32 cluster)
+{
+    return ((cluster) * 4) % fat.bpb.byts_per_sec;
+}
+
+/* get sector number, this sector is in cluster, and offset */
+static inline uint32 get_sec_from_clus_and_offset(uint32_t cluster, uint64_t offset)
+{
+    return first_sec_of_clus(cluster) + offset / fat.bpb.byts_per_sec;
 }
 
 static inline uint32 get_cluster_from_dentry(dentry_t *p)
@@ -288,27 +334,19 @@ static inline uint32 get_length_from_dentry(dentry_t *p)
     return p->length;
 }
 
-static inline uint32 fat_offset_of_clus(uint32 cluster)
-{
-    return ((cluster) * 4) % fat.bpb.byts_per_sec;
-}
-
-static inline uint32_t get_next_cluster(uint32_t cluster)
-{
-    uchar *buf2 = kalloc();
-    // printk_port("buf2 is %lx\n", buf2);
-    sd_read_sector(buf2, fat_sec_of_clus(cluster), 1);
-    uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
-    kfree(buf2);
-    return ret;
-}
-
 static inline uint32_t clus_of_sec(uint32_t sector)
 {
     return (sector - fat.first_data_sec) / fat.bpb.sec_per_clus + 2;
 }
 
-uint8 is_zero_dentry(dentry_t *p);
-uint8_t filenamecmp(const char *name1, const char *name2);
+/* cluster: first cluster number of this file */
+/* 返回长度为length的块号 */
+static inline uint32_t get_clus_from_len(uint32_t cluster, uint32_t length)
+{
+    /* find .pos cluster number */
+    for (uint64_t i = 0; i < length; i += CLUSTER_SIZE)
+        cluster = get_next_cluster(cluster);
+    return cluster;
+}
 
 #endif

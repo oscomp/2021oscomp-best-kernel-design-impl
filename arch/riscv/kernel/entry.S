@@ -30,7 +30,7 @@ _save_context:
   sd zero, OFFSET_REG_ZERO(sp)
   sd ra, OFFSET_REG_RA(sp)
 
-  sd sp, PCB_KERNEL_SP(tp) /* no use */
+  sd sp, PCB_KERNEL_SP(tp) /* very important */
 
   sd gp, OFFSET_REG_GP(sp)
 

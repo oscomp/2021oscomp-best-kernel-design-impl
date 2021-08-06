@@ -31,8 +31,6 @@
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
 #define ROUNDDOWN(a, n) (((uint64_t)(a)) & ~((n)-1))
 
-extern ptr_t memCurr;
-
 typedef struct swappage
 {
     unsigned int block_id;
@@ -47,6 +45,9 @@ typedef struct shm_page
     int key;
     list_node_t list;
 }shm_page_node_t;
+
+extern ptr_t memCurr;
+extern list_head freePageList;
 extern list_head swapPageList;
 extern list_head availableSwapSpace;
 

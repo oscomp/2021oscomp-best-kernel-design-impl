@@ -6,16 +6,31 @@ typedef int __attribute__((__mode__(SI))) int32_t;
 int main()
 {
 
-    char *argv[4], *envp[4];
+    char *argv[7], *envp[4];
+
+    int argc = 3;
+
     char str1[20] = "./busybox";
     // char str2[20] = "sh";
     // char str3[20] = "busybox_testcode.sh";
-    char str2[20] = "cal";
+    char str2[20] = "sleep";
     char str3[20] = "1";
+    char str4[20] = "+";
+    char str5[20] = "1";
+    char str6[20] = "";
+
     argv[0] = str1; 
-    argv[1] = str2;
-    argv[2] = NULL;
-    argv[3] = NULL;
+    if (argc > 1)
+        argv[1] = str2;
+    if (argc > 2)
+        argv[2] = str3;
+    if (argc > 3)
+        argv[3] = str4;
+    if (argc > 4)
+        argv[4] = str5;
+    if (argc > 5)
+        argv[5] = str6;
+    argv[argc] = NULL;
     envp[0] = NULL;
     // argv[1] = str2; 
     // argv[2] = str3;

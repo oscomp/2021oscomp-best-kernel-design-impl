@@ -19,10 +19,10 @@
 /* success: no return value */
 /* fail: return -1 */
 static const char *fixed_envp[] = {"SHELL=/bin/bash",
-                     "PWD=/root/mybin",
+                     "PWD=/",
                      "LOGNAME=root",
                      "MOTD_SHOWN=pam",
-                     "HOME=/root",
+                     "HOME=/",
                      "LANG=C.UTF-8",
                      "INVOCATION_ID=9f58417fca9d46d4a23cde1329404868",
                      "TERM=vt220",

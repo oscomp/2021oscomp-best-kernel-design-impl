@@ -284,7 +284,8 @@ void init_pcb_stack(
     ra = pcb->elf.entry;
 
     pcb->kernel_sp = (reg_t)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
-    pcb->user_sp = (reg_t)user_stack;
+    pcb->user_sp = (void*)user_stack;
+    pcb->user_stack_base = (void*)user_stack - USER_STACK_INIT_SIZE;
     pcb->pgdir = pgdir;
 
     reg_t *regs = pt_regs->regs;    

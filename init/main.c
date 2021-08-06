@@ -20,6 +20,7 @@
 #include <os/fat32.h>
 #include <os/uname.h>
 #include <os/io.h>
+#include <os/system.h>
 
 #include <csr.h>
 #include <asm.h>
@@ -127,6 +128,15 @@ static void init_syscall(void)
     syscall[SYS_clock_gettime] = &do_clock_gettime;
 
     syscall[SYS_ioctl] = &do_ioctl;
+    syscall[SYS_fcntl] =&fat32_fcntl;
+
+    syscall[SYS_rt_sigaction] = &do_rt_sigaction;
+    syscall[SYS_rt_sigprocmask] = &do_rt_sigprocmask;
+    syscall[SYS_fstatat] = &fat32_fstatat;
+    syscall[SYS_syslog] = &do_syslog;
+    syscall[SYS_faccessat] = &fat32_faccessat;
+    syscall[SYS_sysinfo] = &do_sysinfo;
+    syscall[SYS_lseek] = &fat32_lseek;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~

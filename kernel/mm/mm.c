@@ -14,7 +14,7 @@ ptr_t memCurr = FREEMEM;
 unsigned int start_block_id = 1024;
 static ptr_t memalloc = KERNEL_END;
 
-static LIST_HEAD(freePageList);
+LIST_HEAD(freePageList);
 static LIST_HEAD(shmPageList);
 static LIST_HEAD(freePagebackupList);
 LIST_HEAD(swapPageList);
@@ -215,7 +215,8 @@ void freePage(ptr_t baseAddr)
 
 void *kmalloc(size_t size)
 {
-    assert(0);
+    debug();
+    log(0, "dangerous malloc");
     memalloc -= size;
     memalloc -= 64 - (size%64);
     return memalloc;
