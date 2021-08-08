@@ -46,11 +46,11 @@ ifeq ($(platform), qemu)
 linker = ./linker/qemu.ld
 endif
 
-# RustSBI
+# SBI
 ifeq ($(platform), k210)
-	RUSTSBI := ./sbi/sbi-k210
+	SBI := ./sbi/sbi-k210
 else
-	RUSTSBI	:= ./sbi/sbi-qemu
+	SBI	:= ./sbi/sbi-qemu
 endif
 
 # QEMU 
@@ -61,11 +61,16 @@ QEMUOPTS = -machine virt -kernel $T/kernel -m 8M -nographic
 # use multi-core 
 QEMUOPTS += -smp $(CPUS)
 
-QEMUOPTS += -bios $(RUSTSBI)
+QEMUOPTS += -bios $(SBI)
 
 # import virtual disk image
 QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0 
 QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+
+# Open GDB server at localhost:1234
+ifeq ($(mode), debug)
+	QEMUOPTS += -gdb tcp::1234
+endif 
 
 k210-serialport := /dev/ttyUSB0
 
@@ -152,10 +157,10 @@ OBJ := $(addsuffix .o, $(OBJ))
 
 
 # Generate binary file to burn onto k210
-all: $T/kernel $(RUSTSBI) 
+all: $T/kernel $(SBI) 
 ifeq ($(platform), k210) 
 	@$(OBJCOPY) $T/kernel --strip-all -O binary $T/kernel.bin
-	@$(OBJCOPY) $(RUSTSBI) --strip-all -O binary $T/k210.bin
+	@$(OBJCOPY) $(SBI) --strip-all -O binary $T/k210.bin
 	@dd if=$T/kernel.bin of=$T/k210.bin bs=128k seek=1
 	cp $T/k210.bin ./k210.bin
 endif 
@@ -166,14 +171,20 @@ $T/kernel: $(OBJ)
 	@$(LD) $(LDFLAGS) -T $(linker) -o $@ $^
 	@$(OBJDUMP) -S $@ >$T/kernel.asm
 
-# Compile RustSBI 
-#! This may not work now
-$(RUSTSBI): 
-ifeq ($(mode), release)
-	@cd ./sbi/$(addprefix rust, $@) && cargo build --release
-else 
-	@cd ./sbi/$(addprefix rust, $@) && cargo build 
-endif 
+# Compile SBI 
+$(SBI): 
+	cd ./sbi/psicasbi && cargo build --no-default-features --features=$(platform)
+	cp ./sbi/psicasbi/target/riscv64imac-unknown-none-elf/$(mode)/psicasbi $@
+
+# explicitly compile SBI 
+sbi: 
+	cd ./sbi/psicasbi && cargo build --no-default-features --features=$(platform)
+	cp ./sbi/psicasbi/target/riscv64imac-unknown-none-elf/$(mode)/psicasbi $(SBI)
+
+# explicitly clean SBI 
+sbi-clean: 
+	cd ./sbi/psicasbi && cargo clean
+	rm $(SBI)
 
 run: all
 ifeq ($(platform), k210) 
@@ -184,19 +195,19 @@ else
 endif 
 
 
-# try to generate a unique GDB port
-GDBPORT = $(shell expr `id -u` % 5000 + 25000)
-# QEMU's gdb stub command line changed in 0.11
-QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
-	then echo "-gdb tcp::$(GDBPORT)"; \
-	else echo "-s -p $(GDBPORT)"; fi)
+# # try to generate a unique GDB port
+# GDBPORT = $(shell expr `id -u` % 5000 + 25000)
+# # QEMU's gdb stub command line changed in 0.11
+# QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
+# 	then echo "-gdb tcp::$(GDBPORT)"; \
+# 	else echo "-s -p $(GDBPORT)"; fi)
 
-.gdbinit: debug/.gdbinit.tmpl-riscv
-	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
+# .gdbinit: debug/.gdbinit.tmpl-riscv
+# 	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
 
-qemu-gdb: $T/kernel .gdbinit fs.img
-	@echo "*** Now run 'gdb' in another window." 1>&2
-	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+# qemu-gdb: $T/kernel .gdbinit fs.img
+# 	@echo "*** Now run 'gdb' in another window." 1>&2
+# 	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
 
 
 # Compile user programs
@@ -281,7 +292,7 @@ sdcard: user
 	@sudo cp $U/_echo $(dst)/echo
 	@sudo cp README $(dst)/README
 
-.PHONY: clean run all fs sdcard user
+.PHONY: clean run all fs sdcard user sbi sbi-clean
 
 clean: 
 	@rm -rf $(OBJ) $(addsuffix .d, $(basename $(OBJ))) \

@@ -11,3 +11,4 @@ xv6-user/usys.S
 xv6-user/*.asm
 xv6-user/_*
 /bootloader
+/sbi/rustsbi*

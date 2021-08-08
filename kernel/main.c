@@ -35,15 +35,14 @@ void
 main(unsigned long hartid, unsigned long dtb_pa)
 {
 	inithartid(hartid);
-	started = 0;
 	
 	if (hartid == 0) {
+		started = 0;
 		cpuinit();
 		floatinithart();
 		consoleinit();
 		printfinit();   // init a lock for printf 
 		print_logo();
-		__debug_info("main", "hart %d enter main()...\n", hartid);
 		kpminit();       // physical page allocator
 		kvminit();       // create kernel page table
 		kvminithart();   // turn on paging
@@ -64,12 +63,12 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		printf("hart 0 init done\n");
 
 		// we need IPI to wake up other hart
-		// for (int i = 1; i < NCPU; i ++) {
-		// 	unsigned long mask = 1 << i;
-		// 	sbi_send_ipi(&mask);
-		// }
+		for (int i = 1; i < NCPU; i ++) {
+			unsigned long mask = 1 << i;
+			sbi_send_ipi(&mask);
+		}
 		__sync_synchronize();
-		// started = 1;
+		started = 1;
 	}
 	else
 	{
@@ -77,12 +76,12 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		while (started == 0)
 			;
 		__sync_synchronize();
-		__debug_info("main", "hart %d enter main()...\n", hartid);
 		floatinithart();
 		kvminithart();
 		trapinithart();
 		plicinithart();  // ask PLIC for device interrupts
 		printf("hart 1 init done\n");
 	}
+	__debug_info("main", "hart %d enter main()...\n", hartid);
 	scheduler();
 }
