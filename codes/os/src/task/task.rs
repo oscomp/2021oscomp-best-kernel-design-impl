@@ -20,7 +20,8 @@ use crate::config::*;
 use crate::gdb_println;
 use crate::monitor::*;
 use super::TaskContext;
-use super::{PidHandle, pid_alloc, KernelStack, RUsage, ITimerVal};
+use super::{PidHandle, pid_alloc, KernelStack};
+use super::info::*;
 use alloc::sync::{Weak, Arc};
 use alloc::vec;
 use alloc::vec::Vec;
@@ -77,6 +78,7 @@ pub struct TaskControlBlockInner {
     pub address: ProcAddress,
     pub rusage:RUsage,
     pub itimer: ITimerVal, // it_value if not remaining time but the time to alarm
+    pub siginfo: SigInfo,
 }
 
 impl ProcAddress {
@@ -163,6 +165,7 @@ impl TaskControlBlock {
                 address: ProcAddress::new(),
                 rusage: RUsage::new(),
                 itimer: ITimerVal::new(),
+                siginfo: SigInfo::new(),
                 trap_cx_ppn,
                 base_size: user_sp,
                 heap_start: user_heap,
@@ -430,6 +433,7 @@ impl TaskControlBlock {
                 address: ProcAddress::new(),
                 rusage: RUsage::new(),
                 itimer: ITimerVal::new(),
+                siginfo: SigInfo::new(),
                 trap_cx_ppn,
                 base_size: parent_inner.base_size,
                 heap_start: parent_inner.heap_start,

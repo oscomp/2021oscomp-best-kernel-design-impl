@@ -239,6 +239,8 @@ impl MemorySet {
         auxv.push(AuxHeader{aux_type: AT_CLKTCK, value: 100 as usize});
         auxv.push(AuxHeader{aux_type: AT_SECURE, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_NOTELF, value: 0x112d as usize});
+        // auxv.push(AuxHeader{aux_type: AT_SYSINFO, value: 0x1 as usize});
+        // auxv.push(AuxHeader{aux_type: AT_SYSINFO_EHDR, value: 0x3 as usize});
 
         // denotes if .comment should be mapped
         let mut comment_flag = true;
@@ -327,7 +329,7 @@ impl MemorySet {
         // maparea2: TrapContext
         memory_set.push(MapArea::new(
             TRAP_CONTEXT.into(),
-            TRAMPOLINE.into(),
+            (TRAP_CONTEXT+PAGE_SIZE).into(),
             MapType::Framed,
             MapPermission::R | MapPermission::W,
         ), None);

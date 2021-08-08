@@ -10,6 +10,8 @@
 use lazy_static::lazy_static;
 use sbi::sbi_send_ipi;
 use spin::*;
+use timer::get_timeval;
+use syscall::*;
 use alloc::sync::Arc;
 
 extern crate alloc;
@@ -51,6 +53,16 @@ pub fn id() -> usize {
         llvm_asm!("mv $0, tp" : "=r"(cpu_id));
     }
     cpu_id
+}
+
+pub const SYSCALL_GETPPID:usize = 173;
+pub fn test() {
+    // let start = get_timeval();
+    // for _ in 0..100000000{
+    //     syscall(SYSCALL_GETPPID,[0,0,0,0,0,0]);
+    // }
+    // let end = get_timeval();
+    // println!("test: run sys_getppid 100000000 times, spent {:?}",end-start);
 }
 
 struct Core2flag{
@@ -118,6 +130,7 @@ pub fn rust_main() -> ! {
     let mask:usize = 1 << 1;
     sbi_send_ipi(&mask as *const usize as usize);
     // CORE2_FLAG.lock().set_in();
+    test();
     task::run_tasks();
     panic!("Unreachable in rust_main!");
 }

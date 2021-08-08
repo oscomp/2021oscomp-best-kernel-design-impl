@@ -18,7 +18,7 @@ use crate::mm::{
     VirtPageNum,
     print_free_pages,
 };
-use crate::syscall::syscall;
+use crate::syscall::{syscall, test};
 use crate::task::{
     exit_current_and_run_next,
     suspend_current_and_run_next,
@@ -58,14 +58,19 @@ pub fn enable_timer_interrupt() {
     unsafe { sie::set_stimer(); }
 }
 
+
+
 #[no_mangle]
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
 
+    //test 
+    // test();
+
     // update RUsage of process
-    let ru_utime = get_user_runtime_usec();
-    current_task().unwrap().acquire_inner_lock().rusage.add_utime(ru_utime);
-    update_kernel_clock();
+    // let ru_utime = get_user_runtime_usec();
+    // current_task().unwrap().acquire_inner_lock().rusage.add_utime(ru_utime);
+    // update_kernel_clock();
 
     let scause = scause::read();
     let stval = stval::read();
@@ -176,9 +181,9 @@ pub fn trap_return() -> ! {
     // println!("trap_return");
 
     // update RUsage of process
-    update_user_clock();
-    let ru_stime = get_kernel_runtime_usec();
-    current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
+    // update_user_clock();
+    // let ru_stime = get_kernel_runtime_usec();
+    // current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
 
     set_user_trap_entry();
     // println!("core:{} trap return ",get_core_id());
@@ -204,7 +209,7 @@ pub fn trap_return() -> ! {
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
     // println!{"restore_va: {}", restore_va}
     unsafe {
-        llvm_asm!("fence.i" :::: "volatile");
+        // llvm_asm!("fence.i" :::: "volatile");
         llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp) :: "volatile");
     }
     panic!("Unreachable in back_to_user!");

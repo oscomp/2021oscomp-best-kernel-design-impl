@@ -131,7 +131,7 @@ impl File for Pipe {
                 if ring_buffer.all_write_ends_closed() {
                     return read_size;  //return后就ring_buffer释放了，锁自然释放
                 }
-                gdb_print!(SYSCALL_ENABLE,"[pipe] try read");
+                // gdb_print!(SYSCALL_ENABLE,"[pipe] try read");
                 drop(ring_buffer);
                 suspend_current_and_run_next();
                 continue;
@@ -161,7 +161,7 @@ impl File for Pipe {
             let loop_write = ring_buffer.available_write();
             if loop_write == 0 {
                 drop(ring_buffer);
-                gdb_print!(SYSCALL_ENABLE,"[pipe] try write");
+                // gdb_print!(SYSCALL_ENABLE,"[pipe] try write");
                 suspend_current_and_run_next();
                 continue;
             }

@@ -1,5 +1,7 @@
 use core::fmt::{self, Debug, Formatter};
 use core::ops::{Add, Sub};
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use bitflags::*;
 use crate::timer::USEC_PER_SEC;
 
@@ -11,6 +13,65 @@ bitflags!{
         const CLONE_CHILD_SETTID = 0x01000000;
     }
 }
+// signal
+bitflags!{
+    pub struct Signals: usize{
+        /* ISO C99 signals.  */
+        const	SIGINT		= 1 << 2 ;  /* Interactive attention signal.  */
+        const	SIGILL		= 1 << 4 ;  /* Illegal instruction.  */
+        const	SIGABRT		= 1 << 6 ;  /* Abnormal termination.  */
+        const	SIGFPE		= 1 << 8 ;  /* Erroneous arithmetic operation.  */
+        const	SIGSEGV		= 1 << 11;	/* Invalid access to storage.  */
+        const	SIGTERM		= 1 << 15;	/* Termination request.  */
+
+        /* Historical signals specified by POSIX. */
+        const	SIGHUP		= 1 << 1 ;  /* Hangup.  */
+        const	SIGQUIT		= 1 << 3 ;  /* Quit.  */
+        const	SIGTRAP		= 1 << 5 ;  /* Trace/breakpoint trap.  */
+        const	SIGKILL		= 1 << 9 ;  /* Killed.  */
+        const	SIGBUS		= 1 << 10;	/* Bus error.  */
+        const	SIGSYS		= 1 << 12;	/* Bad system call.  */
+        const	SIGPIPE		= 1 << 13;	/* Broken pipe.  */
+        const	SIGALRM		= 1 << 14;	/* Alarm clock.  */
+
+        /* New(er) POSIX signals (1003.1-2008, 1003.1-2013).  */
+        const	SIGURG		= 1 << 16;	/* Urgent data is available at a socket.  */
+        const	SIGSTOP		= 1 << 17;	/* Stop, unblockable.  */
+        const	SIGTSTP		= 1 << 18;	/* Keyboard stop.  */
+        const	SIGCONT		= 1 << 19;	/* Continue.  */
+        const	SIGCHLD		= 1 << 20;	/* Child terminated or stopped.  */
+        const	SIGTTIN		= 1 << 21;	/* Background read from control terminal.  */
+        const	SIGTTOU		= 1 << 22;	/* Background write to control terminal.  */
+        const	SIGPOLL		= 1 << 23;	/* Pollable event occurred (System V).  */
+        const	SIGXCPU		= 1 << 24;	/* CPU time limit exceeded.  */
+        const	SIGXFSZ		= 1 << 25;	/* File size limit exceeded.  */
+        const	SIGVTALRM	= 1 << 26;	/* Virtual timer expired.  */
+        const	SIGPROF		= 1 << 27;	/* Profiling timer expired.  */
+        const	SIGUSR1		= 1 << 30;	/* User-defined signal 1.  */
+        const	SIGUSR2		= 1 << 31;	/* User-defined signal 2.  */
+
+        /* Nonstandard signals found in all modern POSIX systems
+           (including both BSD and Linux).  */
+        const	SIGWINCH	= 1 << 28;	/* Window size change (4.3 BSD, Sun).  */
+    }
+}
+bitflags!{
+    /* Bits in `sa_flags'.  */
+    pub struct SaFlags: usize{
+        const SA_NOCLDSTOP = 1		   ;     /* Don't send SIGCHLD when children stop.  */
+        const SA_NOCLDWAIT = 2		   ;     /* Don't create zombie on child death.  */
+        const SA_SIGINFO   = 4		   ;     /* Invoke signal-catching function with three arguments instead of one.  */
+        const SA_ONSTACK   = 0x08000000;    /* Use signal stack by using `sa_restorer'. */
+        const SA_RESTART   = 0x10000000;    /* Restart syscall on signal return.  */
+        const SA_NODEFER   = 0x40000000;    /* Don't automatically block the signal when its handler is being executed.  */
+        const SA_RESETHAND = 0x80000000;    /* Reset to SIG_DFL on entry to handler.  */
+        const SA_INTERRUPT = 0x20000000;    /* Historical no-op.  */
+    }
+}
+pub const SIGRTMIN:usize = 32;
+// sighandler
+pub const SIG_DFL:usize = 0;	/* Default action.  */
+pub const SIG_IGN:usize = 1;	/* Ignore signal.  */
 // sys_getrusage
 pub const RUSAGE_SELF:isize = 0; /* The calling process.  */
 pub const RUSAGE_CHILDREN:isize = -1; /* All of its terminated child processes.  */
@@ -62,6 +123,19 @@ pub struct RUsage{
     ru_nsignals:isize  ,      // NOT IMPLEMENTED /* signals received */
     ru_nvcsw   :isize  ,      // NOT IMPLEMENTED /* voluntary context switches */
     ru_nivcsw  :isize  ,      // NOT IMPLEMENTED /* involuntary context switches */
+}
+
+pub struct SigAction {
+    sa_handler:usize,
+    sa_sigaction:usize,
+    sa_mask:Vec<Signals>,
+    sa_flags:SaFlags,
+}
+
+
+pub struct SigInfo{
+    signal_pending: Signals,
+    signal_handler: BTreeMap<Signals,SigAction>,
 }
 
 
@@ -188,6 +262,16 @@ impl RUsage{
         }
     }
 
+}
+
+
+impl SigInfo{
+    pub fn new() -> Self{
+        Self{
+            signal_pending: Signals::from_bits(0).unwrap(),
+            signal_handler: BTreeMap::new(),
+        }
+    }
 }
 
 impl Add for TimeVal {

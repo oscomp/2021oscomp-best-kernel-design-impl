@@ -58,7 +58,7 @@ pub fn sys_get_time_of_day(time: *mut u64) -> isize {
     let token = current_user_token();
     let ticks = get_time();
     let sec = (ticks/CLOCK_FREQ) as u64;
-    let usec = ((ticks%CLOCK_FREQ) * (USEC_PER_SEC / CLOCK_FREQ)) as u64;
+    let usec = ((ticks%CLOCK_FREQ) * USEC_PER_SEC / CLOCK_FREQ) as u64;
     *translated_refmut(token, time) = sec ;
     *translated_refmut(token, unsafe { time.add(1) }) = usec;
     0
@@ -185,7 +185,11 @@ pub fn sys_setitimer(which: isize, new_value: *mut usize, old_value: *mut usize)
     0
 }
 
-
+// int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
+pub fn sys_sigaction(signum: isize, act :*mut u8, oldact: *mut u8) -> isize{
+    
+    0
+}
 
 pub fn sys_set_tid_address(tidptr: usize) -> isize {
     current_task().unwrap().acquire_inner_lock().address.clear_child_tid = tidptr;
@@ -289,7 +293,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     // add new task to scheduler
     add_task(new_task);
     // print_free_pages();
-    gdb_print!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
+    gdb_println!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
 

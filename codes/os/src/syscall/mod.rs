@@ -63,8 +63,27 @@ use process::*;
 use crate::gdb_print;
 use crate::monitor::*;
 use crate::sbi::shutdown;
+use crate::timer::get_timeval;
 
 //use crate::fs::Dirent;
+
+pub fn test() {
+    if sys_getpid() == 1{
+        let start = get_timeval();
+        // println!("test: run sys_getppid 1000000 times, start {:?}",start);
+        for _ in 0..1000000{
+            syscall(SYSCALL_GETPPID,[0,0,0,0,0,0]);
+            // unsafe{
+            //     asm!(
+            //         "sfence.vma",
+            //     );
+            // }
+        }
+        let end = get_timeval();
+        // println!("test: run sys_getppid 1000000 times, end {:?}",end);
+        println!("test: run sys_getppid + sfence.vma 1000000 times, spent {:?}",end-start);
+    }
+}
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
@@ -74,6 +93,11 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
         }
     }
+
+    
+    // if sys_getpid() == 1{
+    //     test();
+    // }
 
     
     match syscall_id {
@@ -119,7 +143,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_TIMES => sys_times(args[0] as *mut i64),
         SYSCALL_UNAME => sys_uname(args[0] as *mut u8),
-        SYSCALL_GETRUSAGE => sys_getrusage(args[0] as isize, args[1] as *mut u8),
+        // SYSCALL_GETRUSAGE => sys_getrusage(args[0] as isize, args[1] as *mut u8),
         SYSCALL_GET_TIME_OF_DAY => sys_get_time_of_day(args[0] as *mut u64),
         SYSCALL_SBRK => sys_sbrk(args[0] as isize, args[1] as usize),
         SYSCALL_BRK => sys_brk(args[0]),

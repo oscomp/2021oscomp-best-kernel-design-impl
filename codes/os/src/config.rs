@@ -28,13 +28,14 @@ pub const PAGE_SIZE: usize = 0x1000;//should not change
 pub const PAGE_SIZE_BITS: usize = 0xc;
 pub const USER_STACK_SIZE: usize = PAGE_SIZE * 20;
 pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 64;
+// pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 4;
 pub const KERNEL_STACK_SIZE: usize = PAGE_SIZE * 2;
 pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x80;
 pub const MEMORY_END: usize = 0x80800000;
 
-pub const MMAP_BASE: usize = 0x70000000;
+pub const MMAP_BASE: usize = 0x60000000;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
-pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
+pub const TRAP_CONTEXT: usize = 0x80000000 - PAGE_SIZE;
 
 // Execution of programs
 pub const  AT_NULL      : usize = 0 ;    /* end of vector */
@@ -63,6 +64,10 @@ pub const AT_RANDOM     : usize = 25;    /* address of 16 random bytes */
 pub const AT_HWCAP2     : usize = 26;    /* extension of AT_HWCAP */
 
 pub const AT_EXECFN     : usize = 31;   /* filename of program */
+/* Pointer to the global system page used for system calls and other
+   nice things.  */
+pub const AT_SYSINFO	: usize = 32;
+pub const AT_SYSINFO_EHDR: usize = 	33;
 
 #[cfg(feature = "board_k210")]
 pub const CLOCK_FREQ: usize = 403000000 / 62;

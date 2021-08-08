@@ -23,3 +23,8 @@ monitor:
 build:
 	cd codes/os && make build
 
+elf:
+	cd codes/user && make elf
+
+os:
+	cd codes/os && make run
