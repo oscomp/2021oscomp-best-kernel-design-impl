@@ -9,6 +9,4 @@ typedef struct utsname {
     uchar domainname[65];
 }utsname_t;
 
-extern utsname_t utsname;
-
 extern uint8 do_uname(struct utsname *uts);

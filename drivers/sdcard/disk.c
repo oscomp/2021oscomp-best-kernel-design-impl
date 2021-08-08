@@ -9,28 +9,28 @@
 void disk_init(void)
 {
     #ifndef K210
-    // virtio_disk_init();
+    virtio_disk_init();
     #endif
 }
 
 void disk_read(struct buf *b)
 {
     #ifndef K210
-	// virtio_disk_rw(b, 0);
+	virtio_disk_rw(b, 0);
     #endif
 }
 
 void disk_write(struct buf *b)
 {
     #ifndef K210
-	// virtio_disk_rw(b, 1);
+	virtio_disk_rw(b, 1);
     #endif
 }
 
 void disk_intr(void)
 {
     #ifndef K210
-    // virtio_disk_intr();
+    virtio_disk_intr();
     #endif
 }
 

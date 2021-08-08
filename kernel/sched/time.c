@@ -7,9 +7,23 @@
 #include <os/sched.h>
 
 LIST_HEAD(timers);
+LIST_HEAD(available_timers);
+timer_t all_timers[NUM_TIMER];
 
 uint64_t time_elapsed = 0;
 uint32_t time_base = 0;
+
+void init_timers()
+{
+    for (int32_t i = 0; i < NUM_TIMER; ++i)
+        list_add_tail(&all_timers[i].list, &available_timers);
+}
+
+/* if no available timer, return NULL */
+static inline timer_t *alloc_timer()
+{
+    return (available_timers.next == &available_timers)? NULL : available_timers.next;
+}
 
 /* create a timer to sleep */
 /* call func(parameter) when timeout */
@@ -18,12 +32,14 @@ void timer_create(TimerCallback func, void* parameter, uint64_t tick)
 {
     disable_preempt();
 
-    timer_t *newtimer = (timer_t *)kmalloc(sizeof(timer_t));
+    timer_t *newtimer = alloc_timer();
+    assert(newtimer != NULL);
 
     newtimer->timeout_tick = get_ticks() + tick;
     newtimer->callback_func = func;
     newtimer->parameter = parameter;
     newtimer->list.ptr = newtimer;
+    list_del(&newtimer->list);
     list_add_tail(&newtimer->list,&timers);
 
     enable_preempt();
@@ -40,6 +56,7 @@ void timer_check()
         if (handling_timer->timeout_tick < nowtick)
         {            
             list_del(&handling_timer->list);
+            list_add_tail(&handling_timer->list, &available_timers);
             (*handling_timer->callback_func)(handling_timer->parameter);
         }
     }
@@ -63,6 +80,7 @@ uint64_t do_times(struct tms *tms)
 /* 成功返回0， 失败返回-1 */
 int8_t do_gettimeofday(struct timespec *ts)
 {
+    debug();
     uint64_t nowtick = get_ticks();
 
     ts->tv_sec = (uint32)(nowtick / time_base);
@@ -133,4 +151,23 @@ void latency(uint64_t time)
 
     while (get_timer() - begin_time < time);
     return;
+}
+
+void get_regular_time_from_spec(struct regular_time *mytp, struct timespec *tp)
+{
+    if (!mytp) return ;
+    mytp->nano_seconds = tp->tv_nsec;
+
+    time_t sec = tp->tv_sec;
+
+    mytp->seconds = sec % SECONDS_PER_MIN;
+    sec -= mytp->seconds;
+
+    mytp->min = (sec / SECONDS_PER_MIN) % MIN_PER_HOUR;
+    sec -= mytp->min * SECONDS_PER_MIN;
+
+    mytp->hour = (sec / MIN_PER_HOUR) % HOUR_PER_DAY;
+    sec -= mytp->hour * MIN_PER_HOUR * SECONDS_PER_MIN;
+
+    return ;
 }

@@ -5,6 +5,7 @@
 #include <pgtable.h>
 #include <../../drivers/sdcard/include/sdcard.h>
 #include <os/sched.h>
+#include <os/system.h>
 
 #ifndef max
 #define max(x,y) (((x) > (y)) ? (x) : (y))
@@ -214,9 +215,15 @@ enum{
 #define MAP_FAILED ((void *) -1)
 
 /* fcntl */
-#define F_DUPFD 0x0
-#define F_GETFD 0x1
-#define F_GETFL 0x3
+#define F_DUPFD 0
+#define F_GETFD 1
+#define F_SETFD 2
+#define F_GETFL 3
+
+#define F_DUPFD_CLOEXEC 1030
+
+#define FD_CLOEXEC 1
+
 
 /* lseek */
 #define SEEK_SET 0x0
@@ -227,6 +234,7 @@ extern fat_t fat;
 extern ientry_t cwd_first_clus;
 extern ientry_t cwd_clus, root_clus, root_first_clus;
 extern isec_t cwd_sec, root_sec;
+extern pipe_t pipes[NUM_PIPE];
 
 int8 fat32_read_test(const char *filename);
 
@@ -234,6 +242,7 @@ int16 fat32_open(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
 int16 fat32_close(fd_num_t fd);
 
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
+int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt);
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count);
 int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt);
 
@@ -266,6 +275,12 @@ size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t 
 int32 fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags);
 int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flags);
 int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg);
+
+int64 fat32_readmy(uchar *buf, size_t count);
+int64_t fat32_lseekmy(size_t off, uint32_t whence);
+
+int32_t do_utimensat(fd_num_t dirfd, const char *pathname, const struct timespec times[2], int32_t flags);
+size_t do_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
 void init_inode();
 void init_pipe();
@@ -344,7 +359,7 @@ static inline uint32_t clus_of_sec(uint32_t sector)
 static inline uint32_t get_clus_from_len(uint32_t cluster, uint32_t length)
 {
     /* find .pos cluster number */
-    for (uint64_t i = 0; i < length; i += CLUSTER_SIZE)
+    for (uint64_t i = CLUSTER_SIZE; i <= length; i += CLUSTER_SIZE)
         cluster = get_next_cluster(cluster);
     return cluster;
 }

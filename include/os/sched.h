@@ -71,7 +71,11 @@ typedef struct dir_pos{
 #define O_DIRECTORY 0x200000 /* open directory */
 
 #define NUM_FD 16
+#define NUM_PHDR_IN_PCB 2
 
+typedef uint64_t poll_status_t;
+
+#pragma pack(8)
 typedef struct fd{
     /* dev number */
     uint8 dev;
@@ -95,7 +99,11 @@ typedef struct fd{
 
     /* piped */
     uint8 piped;
+    /* pipes[pip_num] is the pipe */
     pipe_num_t pip_num;
+
+    /* poll status */
+    poll_status_t poll_status;
 
     /* mmap */
     struct {
@@ -104,6 +112,7 @@ typedef struct fd{
         int flags;
         off_t off;
     }mmap;
+
     /* links */
     uint8 nlink;
 
@@ -122,10 +131,11 @@ typedef struct fd{
     long ctime_sec;
     long ctime_nsec;
 }fd_t;
+#pragma pack()
 
 #pragma pack(8)
 /* Process Control Block */
-typedef struct pcb
+struct pcb
 {
     /* register context */
     // this must be this order!! The order is defined in regs.h
@@ -147,6 +157,7 @@ typedef struct pcb
 
     /* process id */
     pid_t pid;
+    pid_t tid;
 
     /* kernel/user thread/process */
     task_type_t type;
@@ -156,7 +167,6 @@ typedef struct pcb
 
     /* spawn mode */
     spawn_mode_t mode;
-    uint32_t spawn_num;
 
     /* priority */
     int32_t priority;
@@ -196,8 +206,14 @@ typedef struct pcb
 
     /* edata */
     uint64_t edata;
-}pcb_t;
+
+    /* file discriptor for ELF only, always open */
+    fd_t myelf_fd;
+    /* ELF program headers for load */
+    Elf64_Phdr phdr[NUM_PHDR_IN_PCB];
+};
 #pragma pack()
+typedef struct pcb pcb_t;
 
 #define DEFAULT_PRIORITY 1
 #define WEXITSTATUS(status,exit_status) (*((uint16_t *)status) = ((exit_status) << 8) & 0xff00)
@@ -236,15 +252,34 @@ typedef struct aux_elem
 }aux_elem_t;
 
 /* signal */
-#define SIGINT 0x2
-#define SIGQUIT 0x3
-#define SIGTERM 0xf
-#define SIGCHLD 0x11
+#define SIGHUP 1
+#define SIGINT 2
+#define SIGQUIT 3
+#define SIGTERM 15
+#define SIGCHLD 17
+#define SIGKILL 9
+#define SIGSTOP 19      
+#define SIGTSTP 20
+#define SIGCONT 18
+#define SIGUSR1 10
+#define SIGUSR2 12
 
+/* sa_flags */
+#define SA_NOCLDSTOP 0x1
+#define SA_NOCLDWAIT 0x2
+#define SA_SIGINFO 0x4
+#define SA_RESTORER 0x4000000
+#define SA_NODEFER 0x40000000
+#define SA_ONSTACK 0x8000000
+#define SA_RESETHAND 0x80000000
+#define SA_RESTART 0x10000000
+
+/* for sigprocmask */
 #define SIG_BLCOK 0x0
 #define SIG_UNBLOCK 0x1
 #define SIG_SETMASK 0x2
 
+/* size of sigset_t */
 #define _NSIG_WORDS 16
 
 typedef struct{
@@ -330,7 +365,7 @@ void do_sleep(uint32_t);
 void do_block(list_node_t *, list_head *queue);
 void do_unblock(void *);
 
-int do_kill(pid_t pid);
+int32_t do_kill(pid_t pid, int32_t sig);
 int do_waitpid(pid_t pid);
 void do_process_show();
 pid_t do_getpid();
@@ -339,6 +374,7 @@ pid_t do_getuid();
 pid_t do_geteuid();
 pid_t do_getgid();
 pid_t do_getegid();
+pid_t do_gettid();
 
 pid_t do_set_tid_address(int *tidptr);
 
@@ -346,7 +382,7 @@ int do_taskset(uint32_t pid,uint32_t mask);
 
 void do_exit();
 
-pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid);
+pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid, void *nouse);
 pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
 
 uint8_t do_nanosleep(struct timespec *sleep_time);
@@ -354,6 +390,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[]);
 
 int32_t do_rt_sigprocmask(int32_t how, const sigset_t *restrict set, sigset_t *restrict oldset, size_t sigsetsize);
 int32_t do_rt_sigaction(int32_t signum, struct sigaction *act, struct sigaction *oldact, size_t sigsetsize);
+void do_rt_sigreturn();
 
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;
@@ -386,5 +423,14 @@ static inline void copy_stack(pcb_t *pcb_underinit, uint64_t ker_stack_size, uin
     // memcpy(pcb_underinit->user_sp, current_running->user_sp, user_stack_size);
 }
 
+static inline uint8_t count_spawn_num(pid_t pid)
+{
+    uint8_t ret = 0;
+    for (uint8_t i = 0; i < NUM_MAX_TASK; ++i)
+        if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE
+            && pcb[i].pid == pid)
+            ret++;
+    return ret;
+}
 
 #endif

@@ -9,8 +9,8 @@
    * the kernel thread pointer.  If we came from the kernel, sscratch
    * will contain 0, and we should continue on the current TP.
    */
-#   csrrw tp, CSR_SSCRATCH, tp
-#   bnez tp, _save_context
+  # csrrw tp, CSR_SSCRATCH, tp
+  # bnez tp, _save_context
 
 # _restore_kernel_tpsp:
 #   csrr tp, CSR_SSCRATCH
@@ -155,7 +155,7 @@ _save_context:
   sd sp, PCB_KERNEL_SP(tp)
   ld sp, PCB_USER_SP(tp)
 
-  /* restore tp, at user_sp - 8 */
+  /* restore tp from CSR_SSCRATCH */
   addi sp, sp, -8
   ld tp, 0(sp)
   addi sp, sp, 8

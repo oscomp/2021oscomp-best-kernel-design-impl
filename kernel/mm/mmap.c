@@ -55,6 +55,7 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 /* 成功返回0，失败返回-1*/
 int64 do_munmap(void *start, size_t len)
 {
+    debug();
     for (int i = 0; i < NUM_FD; ++i)
     {
         /* used, shared, not anonymous, start point is correct */

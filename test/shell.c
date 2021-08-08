@@ -13,10 +13,10 @@ int main()
     char str1[20] = "./busybox";
     // char str2[20] = "sh";
     // char str3[20] = "busybox_testcode.sh";
-    char str2[20] = "sleep";
+    char str2[20] = "echo";
     char str3[20] = "1";
-    char str4[20] = "+";
-    char str5[20] = "1";
+    char str4[20] = ">";
+    char str5[20] = "test.txt";
     char str6[20] = "";
 
     argv[0] = str1; 

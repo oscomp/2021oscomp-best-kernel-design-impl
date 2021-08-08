@@ -34,12 +34,18 @@
 #define SYS_lseek 62
 #define SYS_read 63
 #define SYS_write 64
+#define SYS_readv 65
 #define SYS_writev 66
+
+#define SYS_sendfile 71
+#define SYS_ppoll 73
 
 #define SYS_readlinkat 78
 
 #define SYS_fstatat 79
 #define SYS_fstat 80
+
+#define SYS_utimensat 88
 
 #define SYS_exit 93
 #define SYS_exit_group 94
@@ -58,6 +64,8 @@
 #define SYS_rt_sigaction 134
 #define SYS_rt_sigprocmask 135
 
+#define SYS_rt_sigreturn 139
+
 #define SYS_times 153
 
 #define SYS_uname 160
@@ -70,7 +78,7 @@
 #define SYS_geteuid 175
 #define SYS_getgid 176
 #define SYS_getegid 177
-
+#define SYS_gettid 178
 #define SYS_sysinfo 179
 
 #define SYS_brk 214

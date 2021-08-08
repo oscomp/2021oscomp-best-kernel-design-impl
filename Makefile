@@ -45,10 +45,10 @@ SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_ELF 	= ./kernel/elf/elf.c
 SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c \
-				./kernel/fat32/utils.c
+				./kernel/fat32/utils.c ./kernel/fat32/file.c ./kernel/fat32/pipe.c ./kernel/fat32/poll.c \
+				./kernel/fat32/safe.c
 SRC_IO		= ./kernel/io/io.c
-SRC_UNAME	= ./kernel/uname/uname.c
-SRC_SYSTEM	= ./kernel/system/system.c
+SRC_SYSTEM	= ./kernel/system/system.c ./kernel/system/uname.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
 SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S
@@ -60,10 +60,12 @@ SRC_USER	= ./test/shell.c
 TEST_ELF	= shell.elf
 ifeq ($(TARGET), qemu)
 	TEST_ELF	+= busybox.elf
+	TEST_ELF	+= testcode.elf
+	TEST_ELF	+= cmd.elf
 endif
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_FAT32} ${SRC_UNAME} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO} ${SRC_SYSTEM}
+				${SRC_FAT32} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO} ${SRC_SYSTEM}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c
@@ -72,7 +74,7 @@ SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker/riscv.lds
 
-K210_SERIALPORT	= /dev/ttyUSB0
+K210_SERIALPORT	= /dev/ttyUSB1
 
 .PHONY:all
 
@@ -102,7 +104,8 @@ createimage: ${SRC_IMAGE}
 
 image: createimage head main 
 	./createimage --extended head head.bin
-	cp ./bootloader/rustsbi-k210.bin k210.bin
+	./createimage --extended ./bootloader/sbi-k210 ./bootloader/sbi-k210.bin
+	cp ./bootloader/sbi-k210.bin k210.bin
 	dd if=head.bin of=k210.bin bs=128K seek=1
 
 run:

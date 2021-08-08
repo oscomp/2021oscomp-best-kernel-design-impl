@@ -1,5 +1,9 @@
 #include <asm.h>
 #include <csr.h>
+ENTRY(set_sstatus)
+  csrs CSR_SSTATUS, a0
+  jr ra
+ENDPROC(set_sstatus)
 
 ENTRY(get_current_cpu_id)
   csrr a0, CSR_MHARTID

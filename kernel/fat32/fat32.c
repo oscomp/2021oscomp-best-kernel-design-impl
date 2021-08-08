@@ -14,7 +14,6 @@ uchar filebuf[NORMAL_PAGE_SIZE] = {0};
 ientry_t cwd_first_clus = 0;
 ientry_t cwd_clus = 0, root_clus = 0, root_first_clus = 0;
 isec_t cwd_sec = 0, root_sec = 0;
-pipe_t pipes[NUM_PIPE] = {0};
 
 uint8_t fat32_init()
 {
@@ -56,15 +55,6 @@ uint8_t fat32_init()
     kfree(b);
 
     return 0;
-}
-
-/* init pipe */
-void init_pipe()
-{
-    for (int i = 0; i < NUM_PIPE; ++i){
-        pipes[i].r_valid = PIPE_INVALID;
-        pipes[i].w_valid = PIPE_INVALID;
-    }
 }
 
 /* init metadata */
@@ -337,49 +327,6 @@ int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
     return readsize;
 }
 
-/* create pipe */
-/* success return 0, fail return -1; */
-int16 fat32_pipe2(fd_num_t fd[], int32 mode)
-{
-    int16 fd_index[2] = {-1,-1};
-    for (int i = 0; i < NUM_FD; ++i)
-        if (current_running->fd[i].used == FD_UNUSED){
-            if (fd_index[0] == -1){
-                fd[0] = current_running->fd[i].fd_num;
-                fd_index[0] = i;
-            }
-            else if (fd_index[1] == -1){
-                fd[1] = current_running->fd[i].fd_num;
-                fd_index[1] = i;
-                break;
-            }
-        }
-
-    pipe_num_t pip_num;
-    for (pip_num = 0; pip_num < NUM_PIPE; ++pip_num)
-    {
-        if (pipes[pip_num].r_valid == PIPE_INVALID && pipes[pip_num].w_valid == PIPE_INVALID){
-            pipes[pip_num].fd[0] = fd[0];
-            pipes[pip_num].fd[1] = fd[1];
-            pipes[pip_num].top = 0;
-            pipes[pip_num].bottom = 0;
-            pipes[pip_num].pid = current_running->pid;
-            init_list_head(&pipes[pip_num].wait_list);
-            pipes[pip_num].r_valid = PIPE_ERROR; // cannot be used when error
-            pipes[pip_num].w_valid = PIPE_ERROR;
-            break;
-        }
-    }
-
-    if (pip_num == NUM_PIPE) return -1;
-
-    for (int i = 0; i < 2; ++i)
-    {
-        current_running->fd[fd_index[i]].used = FD_USED;
-        current_running->fd[fd_index[i]].piped = FD_PIPED;
-        current_running->fd[fd_index[i]].pip_num = pip_num;
-    }
-}
 
 /* write count bytes from buff to file in fd */
 /* return fd_num: success
@@ -388,8 +335,14 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode)
 int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
     debug();
+    log(0, "fd:%d path:%s", fd, path_const);
     #ifndef K210
-    return -1;
+    for (int i = 0; i < NUM_FD; ++i)
+        if (!current_running->fd[i].used){
+            current_running->fd[i].used = FD_USED;
+            return current_running->fd[i].fd_num;
+        }
+        return -1;
     #endif
 
     int fd_index = get_fd_index(fd, current_running);
@@ -546,6 +499,7 @@ int16 fat32_fstat(fd_num_t fd, struct kstat *kst)
 int32 fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags)
 {
     debug();
+    log(0, "fd: %d, pathname: %s", dirfd, pathname);
     statbuf->st_dev= 1;
     statbuf->st_ino=266426;
     statbuf->st_mode=0755|S_IFDIR;
@@ -577,7 +531,7 @@ int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flag
     // int32_t ret;
     if ((fd = fat32_open(dirfd, pathname, flags, mode)) != -1)
     {
-        fclose(fd);
+        fat32_close(fd);
         return 0;
     }
     else
@@ -588,12 +542,40 @@ int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flag
 int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg)
 {
     debug();
+    log(0, "fd:%d, cmd:%d, arg:%d", fd, cmd, arg);
     uint8_t fd_index;
+
     if ((fd_index = get_fd_index(fd, current_running)) == -1) // old doesn't exists, cannot dup
-        return -1;
+        return SYSCALL_FAILED;
+
     if (cmd == F_GETFL)
         return current_running->fd[fd_index].flags;
-    return 0;
+
+    else if (cmd == F_SETFD)
+        current_running->fd[fd_index].flags = arg;
+
+    else if (cmd == F_DUPFD_CLOEXEC){
+        int32_t fd_min = SYSCALL_FAILED;
+        for (uint8_t i = 0; i < NUM_FD; i++){
+            if (!current_running->fd[i].used)
+                if (fd_min == SYSCALL_FAILED)
+                    fd_min = current_running->fd[i].fd_num;
+                else
+                    fd_min = min(fd_min, current_running->fd[i].fd_num);
+        }
+        /* found min free fd_num, and if no free fd, fd_min is -1 */
+        log(0, "fd_min: %d", fd_min);
+        if (fd_min == SYSCALL_FAILED)
+            return SYSCALL_FAILED;
+        else{
+            fd_min = max(fd_min, arg);
+            log(0, "final fd_min is %d", fd_min);
+            assert(fat32_dup3(fd, fd_min, IGNORE) != SYSCALL_FAILED);
+            return fd_min;
+        }
+
+    }
+    return SYSCALL_SUCCESSED;
 }
 
 /* duplicate file descriptor */
@@ -620,21 +602,44 @@ fd_num_t fat32_dup(fd_num_t fd)
 /* success return fd_num, fail return -1 */
 fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
 {
+    debug();
+    log(0, "old: %d, new:%d", old, new);
+
+    if (old == new)
+        return SYSCALL_FAILED;
+
     uint8_t fd_index;
-    if ((fd_index = get_fd_index(old, current_running)) == -1) // old not exist
+    if ((fd_index = get_fd_index(old, current_running)) == -1){
+        log(0, "old not exist");
         return -1;
-    if (get_fd_index(new, current_running) != -1)// new exists
+    }
+    if (get_fd_index(new, current_running) != -1){
+        log(0, "new exist");
         return -1;
+    }
 
     /* Now new doesn't exists, which means we can use it */
-    for (int i = 0; i < NUM_FD; ++i)
+    /* 1. there is fd, whose fd_num is new, and available */
+    uint8_t i;
+    for (i = 0; i < NUM_FD; ++i){
         // find an available one, i is index
-        if (!current_running->fd[i].used){
+        if (!current_running->fd[i].used && current_running->fd[i].fd_num == new){
+            log(0, "just found");
             memcpy(&current_running->fd[i], &current_running->fd[fd_index], sizeof(fd_t));
-            current_running->fd[i].fd_num = new;
-            // must be used, because old is used, no need to set
+            current_running->fd[i].fd_num = new; /* fd_num should be new, not old */
             return new;
         }
+    }
+    /* 2. there is available fd, and its num should be set as new */
+    for (i = 0; i < NUM_FD; ++i){
+        // find an available one, i is index
+        if (!current_running->fd[i].used){
+            log(0, "finally found");
+            memcpy(&current_running->fd[i], &current_running->fd[fd_index], sizeof(fd_t));
+            current_running->fd[i].fd_num = new; /* fd_num should be new, not old */
+            return new;
+        }
+    }
     /* no available */
     return -1;
 }
@@ -663,35 +668,6 @@ int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence)
     return current_running->fd[fd_index].pos;
 }
 
-/* read from pipe */
-/* return read count */
-int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
-{
-    uint64_t buf_kva = get_kva_of(buf, current_running->pgdir);
-    while (pipes[pip_num].r_valid != PIPE_INVALID && pipes[pip_num].top == pipes[pip_num].bottom){
-        do_block(&current_running->list, &pipes[pip_num].wait_list);
-        do_scheduler();
-    }
-    uint32_t readsize = min(pipes[pip_num].top - pipes[pip_num].bottom, count); // neq count
-    memcpy(buf_kva, pipes[pip_num].buff + pipes[pip_num].bottom, readsize); // maybe exceed?
-    pipes[pip_num].bottom += readsize;
-    return readsize;
-}
-
-/* write pipe */
-/* return write count */
-int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
-{
-    if (pipes[pip_num].w_valid != PIPE_VALID)
-        return -1;
-    if (pipes[pip_num].top + count > PIPE_BUF_SIZE)
-        return -1;
-    memcpy(pipes[pip_num].buff + pipes[pip_num].top, buf, count);
-    pipes[pip_num].top += count;
-    if (!list_empty(&pipes[pip_num].wait_list))
-        do_unblock(pipes[pip_num].wait_list.next);
-    return count; // write count
-}
 
 uchar unicode2char(uint16_t unich)
 {
@@ -722,6 +698,7 @@ unicode_t char2unicode(char ch)
 /* temp1: filename */
 /* now_clus : now dir cluster */
 /* dir_pos could be NULL, and if it's not NULL, it is set to be the BOTTOM dentry */
+/* mode: FILE_FILE is creating file, FILE_DIR is making new directory */
 ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, file_type_t mode)
 {
     int noextname = 1;
@@ -766,7 +743,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
     if (demand == 1){
         // only short
         for (uint i = 0; i < filename_length; ++i)
-            new_dentry.filename[i] = *(temp1+i);
+            new_dentry.filename[i] = (*(temp1+i) <= 'z' && *(temp1+i) >= 'a')? *(temp1+i) - 'a' + 'A' : *(temp1+i);
         for (uint i = filename_length; i < 8; ++i)
             new_dentry.filename[i] = ' ';
     }
@@ -793,7 +770,10 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
     else
         new_dentry.attribute = FILE_ATTRIBUTE_GDIR;
     // reserved
-    new_dentry.reserved = 0;
+    if (mode == FILE_DIR || demand > 1)
+        new_dentry.reserved = 0;
+    else
+        new_dentry.reserved = 0x18;
     // create time
     new_dentry.create_time_ms = 0;
     new_dentry.create_time = 0x53D4; //10:30:20
@@ -1441,6 +1421,21 @@ int16 fat32_unlink(fd_num_t dirfd, const char* path_t, uint32_t flags)
 /* success return 0, fail return 1*/
 int16 fat32_close(fd_num_t fd)
 {
+    debug();
+    log(0, "fd : %d", fd);
+    /* FOR NOW */
+    #ifndef K210
+    uint8 fd_index1 = get_fd_index(fd, current_running);
+    if (fd_index1 == -1 || fd_index1 == STDIN || fd_index1 == STDOUT || fd_index1 == STDERR){
+        log(0, "fd not exists");
+        return 1;
+    }
+    else{
+        current_running->fd[fd_index1].used = FD_UNUSED;
+        return 0;
+    }
+    #endif
+
     uint8 fd_index = get_fd_index(fd, current_running);
     if (fd_index == -1 || fd_index == STDIN || fd_index == STDOUT || fd_index == STDERR)
         return 1;
@@ -1451,9 +1446,11 @@ int16 fat32_close(fd_num_t fd)
         if (fdp->piped == FD_PIPED){
             /* note that fd[0] != fd[1] , and if this fd is piped, its fd_num must equal to fd[0] or fd[1]*/
             if (pipes[fdp->pip_num].fd[0] == fd){
+                log(0, "pipe %d w_valid--", fdp->pip_num);
                 pipes[fdp->pip_num].w_valid--; // ERROR to VALID, VALID to INVALID
             }
             else{
+                log(0, "pipe %d r_valid--", fdp->pip_num);
                 pipes[fdp->pip_num].r_valid--;// ERROR to VALID, VALID to INVALID
             }
         }

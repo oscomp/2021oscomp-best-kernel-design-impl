@@ -1,6 +1,7 @@
 /* RISC-V kernel boot stage */
 #include <pgtable.h>
 #include <sbi.h>
+#include <csr.h>
 #include <os/elf.h>
 
 typedef void (*kernel_entry_t)(unsigned long, uintptr_t);

@@ -14,3 +14,8 @@ int32_t do_rt_sigaction(int32_t signum, struct sigaction *act, struct sigaction 
     debug();
     return 0;
 }
+
+void do_rt_sigreturn()
+{
+    return ;
+}

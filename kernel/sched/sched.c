@@ -135,17 +135,19 @@ void do_scheduler(void)
 
 /* copy context */
 /* kernel_stack and user_stack are stack top addr */
-static void copy_parent_stacks_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
+static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
 {
     uint64_t ker_stack_size, user_stack_size;
     /* kernel_sp is just at user context, but maybe not equal to register sp */
     ker_stack_size = KERNEL_STACK_SIZE - PAGE_OFFSET(current_running->kernel_sp);
     user_stack_size = current_running->user_stack_base + USER_STACK_INIT_SIZE - current_running->user_sp;
+    log(0, "user_stack_base: %lx, user_stack_size:%lx", current_running->user_stack_base, user_stack_size);
     
     pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size; /* for user context */
-    pcb_underinit->user_sp = user_stack_top; /* no need to be aligned with user_sp */
+    pcb_underinit->user_sp = user_stack_top - user_stack_size; /* no need to be aligned with user_sp */
+    pcb_underinit->user_stack_base = user_stack_top - USER_STACK_INIT_SIZE;
     memcpy(pcb_underinit->kernel_sp, current_running->kernel_sp, ker_stack_size);
-    memcpy(pcb_underinit->user_sp - 8, current_running->user_sp - 8, 8); /* copy tp, very essential */
+    memcpy(pcb_underinit->user_sp - 8, current_running->user_sp - 8, user_stack_size + 8); /* copy tp, very essential */
 
     // copy fd
     for (int i = 0; i < NUM_FD; ++i)
@@ -156,16 +158,21 @@ static void copy_parent_stacks_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_
 /* FOR NOW, use tls as entry point */
 /* stack : ADDR OF CHILD STACK POINT */
 /* success: child pid; fail: -1 */
-pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
+pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid, void *nouse)
 {
     debug();
+    log(0, "flag: %d, stack: %lx, ptid: %lx", flag, stack, ptid);
+    log(0, "tls: %lx, ctid: %lx, nouse: %lx", tls, ctid, nouse);
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
         if (pcb[i].status == TASK_EXITED)
         {
             pcb_t *pcb_underinit = &pcb[i];
             init_pcb_default(pcb_underinit, USER_THREAD);
-            /* set current_running pcb */
-            current_running->spawn_num++;
+            /* set some special properties */
+            pcb_underinit->pid = current_running->pid; /* FOR NOW no pid-- */
+            uint8_t spawn_num = count_spawn_num(pcb_underinit->pid); /* >= 2 */
+            // log(0, "spawn_num: %d", spawn_num);
+            pcb_underinit->tid = pcb_underinit->pid + spawn_num - 1;
 
             pcb_underinit->parent.parent = current_running;
             pcb_underinit->parent.flag = flag;
@@ -173,7 +180,8 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             /* init child pcb */
             ptr_t kernel_stack_top = allocPage() + NORMAL_PAGE_SIZE;  
             // if stack = NULL, automatically set up      
-            ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + 3 * current_running->spawn_num * NORMAL_PAGE_SIZE;
+            ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + 3 * (spawn_num - 1) * NORMAL_PAGE_SIZE;
+            log(0, "child process usp top is %lx", user_stack_top);
             for (uint64_t i = 0; i < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; i++)
                 alloc_page_helper(user_stack_top - (i+1)*NORMAL_PAGE_SIZE, current_running->pgdir, _PAGE_READ|_PAGE_WRITE);
 
@@ -181,15 +189,14 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             pcb_underinit->pgdir = current_running->pgdir;
            
             // prepare stack
-            copy_parent_stacks_and_set_sp(pcb_underinit, kernel_stack_top, user_stack_top);
+            copy_parent_all_and_set_sp(pcb_underinit, kernel_stack_top, user_stack_top);
 
             // return 0 if child
             regs_context_t *pt_regs =
                 (regs_context_t *)(kernel_stack_top - sizeof(regs_context_t));
-            // pt_regs->regs[4] = pcb_underinit;
             pt_regs->regs[10] = 0;
 
-            // prepare switch context
+            // prepare switch context under user context
             pcb_underinit->kernel_sp -= sizeof(switchto_context_t);
             switchto_context_t *switch_to_reg = 
                 (switchto_context_t *)(pcb_underinit->kernel_sp);
@@ -199,7 +206,10 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid)
             // add to ready queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
-            return pcb_underinit->pid;
+            log(0, "child process usp is %lx", pcb_underinit->user_sp);
+            log(0, "child process usp base is %lx", pcb_underinit->user_stack_base);
+            log(0, "child process ra is %lx", pt_regs->regs[1]);
+            return pcb_underinit->tid;
         }
     return -1;
 }
@@ -229,7 +239,7 @@ pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
     return ret;
 }
 
-
+/* success return 0 */
 uint8 do_nanosleep(struct timespec *ts)
 {
     debug();
@@ -271,6 +281,7 @@ void do_unblock(void *pcb_node)
     list_add_tail(pcb_node,&ready_queue);
 }
 
+/* exit a program */
 void do_exit(int32_t exit_status)
 {
     debug();
@@ -297,6 +308,7 @@ void do_exit(int32_t exit_status)
         current_running->status = TASK_ZOMBIE;
     else if (current_running->mode == AUTO_CLEANUP_ON_EXIT)
     {
+        /* check if there are child process who is terminated and its source is waiting to be free */
         for (int i = 0; i < NUM_MAX_TASK; ++i)
             if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
                 pcb[i].status = TASK_EXITED;
@@ -311,12 +323,74 @@ void do_exit(int32_t exit_status)
     do_scheduler();
 }
 
+/* send signal to pid */
+/* pid > =: to the process whose process id is pid */
+/* pid = 0: to all processes */
+/* pid = -1: to all processes that can be sent signals by current running */
+/* pid < -1: to all processes whose process id is pid */
+/* sig = 0: no signal is sent, but permission check still goes */
+/* success return 0, fail return -1 */
+int32_t do_kill(pid_t pid, int32_t sig)
+{
+    debug();
+    if (pid > 0 || pid < -1)
+        for (int i = 0; i < NUM_MAX_TASK; ++i)
+        {
+            if (pcb[i].status != TASK_EXITED && pcb[i].pid == pid)
+                return 0;
+        }
+    return -1;
+}
+
 /* exit all threads */
 /* same as exit FOR NOW */
 void do_exit_group(int32_t exit_status)
 {
     debug();
-    do_exit(exit_status);
+    pid_t temp_pid = current_running->pid; /* restore it, in case that current_running is freed */
+    for (uint8_t i = 0; i < NUM_MAX_TASK; ++i)
+    {
+        /* exit all process(es) whose process id is pid */
+        if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE && pcb[i].pid == temp_pid){
+            log(0, "found a process, pid is %d", pcb[i].pid);
+            /* same as do_exit */
+            // check if some other thread is waiting
+            // if there is, unblock them
+            list_node_t *temp = pcb[i].wait_list.next;
+
+            while (temp != &pcb[i].wait_list)
+            {
+                list_node_t *tempnext = temp->next;
+                list_del(temp);
+
+                pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
+                if (pt_pcb->status != TASK_EXITED){
+                    do_unblock(temp);
+                }
+                
+                temp = tempnext;
+            }
+
+            pcb[i].exit_status = exit_status;
+            // decide terminal state by mode
+            if (pcb[i].type == USER_THREAD || pcb[i].mode == ENTER_ZOMBIE_ON_EXIT)
+                pcb[i].status = TASK_ZOMBIE;
+            else if (pcb[i].mode == AUTO_CLEANUP_ON_EXIT)
+            {
+                /* check if there are child process who is terminated and its source is waiting to be free */
+                for (int j = 0; j < NUM_MAX_TASK; ++j)
+                    if (pcb[j].status == TASK_ZOMBIE && pcb[j].parent.parent == current_running){
+                        pcb[j].status = TASK_EXITED;
+                        pcb[j].parent.parent = NULL;
+                        list_add_tail(&pcb[j].list,&available_queue);
+                        free_all_pages(pcb[j].pgdir, PAGE_ALIGN(pcb[j].kernel_sp));
+                    }
+                pcb[i].status = TASK_EXITED;
+                list_add_tail(&pcb[i].list,&available_queue);
+                free_all_pages(pcb[i].pgdir, PAGE_ALIGN(pcb[i].kernel_sp));
+            }
+        }
+    }
 }
 
 pid_t do_getpid()
@@ -367,6 +441,11 @@ pid_t do_set_tid_address(int *tidptr)
     return current_running->pid;
 }
 
+pid_t do_gettid()
+{
+    debug();
+    return current_running->tid;
+}
 
 /***************/
 //DEBUG FUNCTION

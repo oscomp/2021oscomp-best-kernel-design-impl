@@ -13,19 +13,20 @@
 #include <os/fat32.h>
 
 
-/* default setup pcb */
+/* default setup pcb */ 
+/* tid = pid */
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
 {
     pcb_underinit->preempt_count = 0; 
     pcb_underinit->list.ptr = pcb_underinit; 
     pcb_underinit->pid = process_id++; 
+    pcb_underinit->tid = pcb_underinit->pid;
     pcb_underinit->type = type; 
     init_list_head(&pcb_underinit->wait_list);
     pcb_underinit->status = TASK_READY; 
     pcb_underinit->priority = DEFAULT_PRIORITY; 
     pcb_underinit->temp_priority = pcb_underinit->priority; 
     pcb_underinit->mode = DEFAULT_MODE; 
-    pcb_underinit->spawn_num = 0;
     pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
     pcb_underinit->mask = 0xf; 
     pcb_underinit->parent.parent = NULL;
@@ -35,6 +36,7 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     for (int i = 0; i < NUM_FD; ++i){
         pcb_underinit->fd[i].fd_num = i;
         pcb_underinit->fd[i].piped = FD_UNPIPED;
+        pcb_underinit->fd[i].poll_status = 0;
     }
     // open stdin , stdout and stderr
     pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
@@ -271,6 +273,7 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
 /* kernel_stack is kernel_stack_top, user_stack is user_stack_top */
 /* prepare USER content, SWITCH content and ARGV & ENVP & AUX_VEC */
 /* argv, envp, aux_vec cound be NULL, called at special point */
+/* user_stack_base is set */
 void init_pcb_stack(
     ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point, unsigned char* argv[], unsigned char *envp[],
     aux_elem_t *aux_vec, pcb_t *pcb)
@@ -293,10 +296,10 @@ void init_pcb_stack(
     regs[4] = pcb; //tp
     regs[10] = get_argc_from_argv(argv); //a0=argc
     // regs[11]= (ptr_t)argv; //a1=argv
-    pt_regs->sstatus = SR_SUM; //enable supervisor-mode userpage access
+    pt_regs->sstatus = SR_SUM | SR_FS; //enable supervisor-mode userpage access and float point instruction
 
 #ifdef K210
-    pt_regs->sstatus = 0; //enable supervisor-mode userpage access for K210
+    pt_regs->sstatus = SR_FS; //enable supervisor-mode userpage access for K210
 #endif
 
     pt_regs->sepc = ra;

@@ -159,6 +159,7 @@ typedef struct elf64_phdr
 } Elf64_Phdr;
 
 typedef struct ELF_info{
+    uint64_t text_begin;
     uint64_t phoff;
     uint64_t phent;
     uint64_t phnum;
@@ -170,12 +171,15 @@ typedef struct ELF_info{
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-/* prepare_page_for_kva should return a kernel virtual address */
-/* return entry point va of this elf */
-/* modify *edata as end of all data */
 uintptr_t load_elf(unsigned char elf_binary[], unsigned length, uintptr_t pgdir,
     uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask),
     ELF_info_t *elf);
+
+uintptr_t lazy_load_elf(
+    fd_num_t fd, uintptr_t pgdir,
+    uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask), 
+    void *pcb);
+
 
 static inline uint32_t is_elf_format(unsigned char *binary)
 {

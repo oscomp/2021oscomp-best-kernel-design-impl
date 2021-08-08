@@ -1,8 +1,9 @@
 #include <os/uname.h>
 #include <os/string.h>
 #include <stdio.h>
+#include <log.h>
 
-utsname_t utsname = {
+static utsname_t utsname = {
     .sysname = "Linux",
     .nodename = "debian",
     .release = "5.8.0-59-generic",
@@ -17,6 +18,7 @@ utsname_t utsname = {
     */
 uint8 do_uname(struct utsname *uts)
 {
+    debug();
     // if (sizeof(uts) != sizeof(utsname_t))
     //     return -1;
     strcpy(uts->sysname, utsname.sysname); 

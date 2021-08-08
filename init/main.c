@@ -21,6 +21,7 @@
 #include <os/uname.h>
 #include <os/io.h>
 #include <os/system.h>
+#include <os/poll.h>
 
 #include <csr.h>
 #include <asm.h>
@@ -122,6 +123,7 @@ static void init_syscall(void)
     syscall[SYS_getegid] = &do_getegid;
 
     syscall[SYS_writev] = &fat32_writev;
+    syscall[SYS_readv] = &fat32_readv;
     syscall[SYS_readlinkat] = &fat32_readlinkat;
     syscall[SYS_mprotect] = &do_mprotect;
     syscall[SYS_set_tid_address] = &do_set_tid_address;
@@ -132,11 +134,18 @@ static void init_syscall(void)
 
     syscall[SYS_rt_sigaction] = &do_rt_sigaction;
     syscall[SYS_rt_sigprocmask] = &do_rt_sigprocmask;
+    syscall[SYS_rt_sigreturn] = &do_rt_sigreturn;
     syscall[SYS_fstatat] = &fat32_fstatat;
     syscall[SYS_syslog] = &do_syslog;
     syscall[SYS_faccessat] = &fat32_faccessat;
     syscall[SYS_sysinfo] = &do_sysinfo;
     syscall[SYS_lseek] = &fat32_lseek;
+    syscall[SYS_kill] = &do_kill;
+
+    syscall[SYS_utimensat] = &do_utimensat;
+    syscall[SYS_gettid] = &do_gettid;
+    syscall[SYS_ppoll] = &do_ppoll;
+    syscall[SYS_sendfile] = &do_sendfile;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~
@@ -155,6 +164,8 @@ int main()
     printk_port("> [INIT] System call initialized successfully.\n\r");
     init_recyc();
     printk_port("> [INIT] Memory initialization succeeded.\n\r");
+    init_timers();
+    printk_port("> [INIT] Timers initialization succeeded.\n\r");
 
 #ifdef K210
     // init sdcard (@—.—@)
@@ -195,10 +206,10 @@ int main()
     fat32_init();
     printk("> [INIT] FAT32 initialized successfully.\n\r");
 #else
-    // plicinit();      // set up interrupt controller
-    // plicinithart();  // ask PLIC for device interrupts
+    plicinit();      // set up interrupt controller
+    plicinithart();  // ask PLIC for device interrupts
     printk("> [INIT] PLIC initialized successfully.\n\r");
-    // disk_init();
+    disk_init();
     printk("> [INIT] Virtio Disk initialized successfully.\n\r");
 #endif
     // init screen (QAQ)
@@ -208,6 +219,7 @@ int main()
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
     /* setup exception */
     clear_interrupt();
+    set_sstatus(SR_FS);
     setup_exception();
     enable_interrupt();
 

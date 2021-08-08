@@ -11,6 +11,10 @@
 	#define FALSE 	0
 #endif
 
+#ifndef IGNORE
+    #define IGNORE 0
+#endif
+
 typedef unsigned __attribute__((__mode__(QI))) int8_t;
 typedef unsigned __attribute__((__mode__(QI))) uint8_t;
 typedef int      __attribute__((__mode__(HI))) int16_t;

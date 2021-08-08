@@ -5,6 +5,9 @@
 #include <type.h>
 #include <os/list.h>
 
+#define NUM_TIMER 16
+
+#define MICRO 6
 #define NANO 9
 #define TIMEBASE 403000000
 #define TICKCOUNT 62
@@ -30,13 +33,34 @@ struct tms
     clock_t tms_cstime; 
 };
 
+#define SECONDS_PER_MIN 60
+#define MIN_PER_HOUR 60
+#define HOUR_PER_DAY 24
+#define DAY_PER_MONTH 30
+#define MONTH_PER_YEAR 12
+/* for time trasmission */
+struct regular_time{
+    uint32_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t min;
+    uint64_t seconds;
+    uint64_t nano_seconds;
+};
+
 #pragma pack(1)
 /* for gettimeofday */
 struct timespec {
     time_t tv_sec; // seconds
-    uint64_t tv_nsec; // and nanoseconds
+    time_t tv_nsec; // and nanoseconds
 };
 #pragma pack
+
+struct timeval {
+    time_t  tv_sec;   
+    time_t  tv_usec;
+};
 
 #define CLOCK_REALTIME 0x0
 
@@ -44,6 +68,7 @@ extern uint32_t time_base;
 extern uint64_t time_elapsed;
 extern uint64_t MHZ;
 
+void init_timers();
 uint64_t get_timer(void);
 uint64_t get_ticks(void);
 void kernel_time_count();
