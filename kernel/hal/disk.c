@@ -37,7 +37,7 @@ void disk_read(struct buf *b)
 	__debug_info("disk_read", "enter\n");
 
 	#ifdef QEMU
-	virtio_disk_rw(b, 0);
+	virtio_disk_rw(b, b->sectorno, 0);
 	#else 
 	sdcard_read_sector(b->data, b->sectorno);
 	#endif
@@ -45,14 +45,14 @@ void disk_read(struct buf *b)
 	__debug_info("disk_read", "leave\n");
 }
 
-void disk_write(struct buf *b)
+void disk_write(struct buf *b, uint sector)
 {
 	__debug_info("disk_write", "enter\n");
 
 	#ifdef QEMU
-	virtio_disk_rw(b, 1);
+	virtio_disk_rw(b, sector, 1);
 	#else 
-	sdcard_write_sector(b->data, b->sectorno);
+	sdcard_write_sector(b->data, sector);
 	#endif
 
 	__debug_info("disk_write", "leave\n");

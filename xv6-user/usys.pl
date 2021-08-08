@@ -48,3 +48,4 @@ entry("umount");
 entry("uname");
 entry("mmap");
 entry("munmap");
+entry("sync");

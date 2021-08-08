@@ -210,10 +210,8 @@ alloc3_desc(int *idx)
 }
 
 void
-virtio_disk_rw(struct buf *b, int write)
+virtio_disk_rw(struct buf *b, uint sector, int write)
 {
-  uint64 sector = b->sectorno * (BSIZE / 512);
-
   acquire(&disk.vdisk_lock);
 
   // the spec's Section 5.2 says that legacy block operations use

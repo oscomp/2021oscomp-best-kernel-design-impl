@@ -48,6 +48,11 @@ static inline void dlist_del(struct d_list *node) {
 	__dlist_link(node, node);
 }
 
+// Doesn't relink the deleted node itself.
+static inline void dlist_del_no_fix(struct d_list *node) {
+	__dlist_link(node->prev, node->next);
+}
+
 static inline struct d_list *dlist_prev(struct d_list *node) {
 	return node->prev;
 }

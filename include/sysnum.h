@@ -39,6 +39,7 @@
 #define SYS_readlinkat		78
 #define SYS_fstatat			79
 #define SYS_fstat			80
+#define SYS_sync            81
 #define SYS_utimensat		88
 #define SYS_exit			93
 #define SYS_exit_group		94
