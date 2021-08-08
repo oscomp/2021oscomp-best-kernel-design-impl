@@ -1,9 +1,3 @@
-#ifndef __VIRTIO_H
-#define __VIRTIO_H
-
-#include "types.h"
-#include "fs/buf.h"
-
 //
 // virtio device definitions.
 // for both the mmio interface, and virtio descriptors.
@@ -13,6 +7,12 @@
 // the virtio spec:
 // https://docs.oasis-open.org/virtio/virtio/v1.1/virtio-v1.1.pdf
 //
+
+#ifndef __VIRTIO_H
+#define __VIRTIO_H
+
+#include "types.h"
+#include "fs/buf.h"
 
 // virtio mmio control registers, mapped starting at 0x10001000.
 // from qemu virtio_mmio.h
@@ -53,7 +53,8 @@
 // must be a power of two.
 #define NUM 8
 
-struct VRingDesc {
+// a single descriptor, from the spec.
+struct virtq_desc {
   uint64 addr;
   uint32 len;
   uint16 flags;
@@ -62,23 +63,44 @@ struct VRingDesc {
 #define VRING_DESC_F_NEXT  1 // chained with another descriptor
 #define VRING_DESC_F_WRITE 2 // device writes (vs read)
 
-struct VRingUsedElem {
+// the (entire) avail ring, from the spec.
+struct virtq_avail {
+  uint16 flags; // always zero
+  uint16 idx;   // driver will write ring[idx] next
+  uint16 ring[NUM]; // descriptor numbers of chain heads
+  uint16 unused;
+};
+
+// one entry in the "used" ring, with which the
+// device tells the driver about completed requests.
+struct virtq_used_elem {
   uint32 id;   // index of start of completed descriptor chain
   uint32 len;
 };
 
-// for disk ops
+struct virtq_used {
+  uint16 flags; // always zero
+  uint16 idx;   // device increments when it adds a ring[] entry
+  struct virtq_used_elem ring[NUM];
+};
+
+// these are specific to virtio block devices, e.g. disks,
+// described in Section 5.2 of the spec.
+
 #define VIRTIO_BLK_T_IN  0 // read the disk
 #define VIRTIO_BLK_T_OUT 1 // write the disk
 
-struct UsedArea {
-  uint16 flags;
-  uint16 id;
-  struct VRingUsedElem elems[NUM];
+// the format of the first descriptor in a disk request.
+// to be followed by two more descriptors containing
+// the block, and a one-byte status.
+struct virtio_blk_req {
+  uint32 type; // VIRTIO_BLK_T_IN or ..._OUT
+  uint32 reserved;
+  uint64 sector;
 };
 
-void            virtio_disk_init(void);
-void            virtio_disk_rw(struct buf *b, int write);
-void            virtio_disk_intr(void);
+void virtio_disk_init(void);
+void virtio_disk_rw(struct buf *b, int write);
+void virtio_disk_intr(void);
 
-#endif
+#endif 

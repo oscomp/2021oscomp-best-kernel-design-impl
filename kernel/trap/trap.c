@@ -292,7 +292,7 @@ int handle_intr(uint64 scause) {
 		return 0;
 	}
 	else {
-		// to be honest, on QEMU software interrupts may be used for IPI, 
+		// to be honest, on k210 software interrupts may be used for IPI, 
 		// but as it is not yet supported, handle this as an unsupported one 
 		return -1;
 	}

@@ -35,6 +35,7 @@ void
 main(unsigned long hartid, unsigned long dtb_pa)
 {
 	inithartid(hartid);
+	started = 0;
 	
 	if (hartid == 0) {
 		cpuinit();
@@ -63,12 +64,12 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		printf("hart 0 init done\n");
 
 		// we need IPI to wake up other hart
-		for (int i = 1; i < NCPU; i ++) {
-			unsigned long mask = 1 << i;
-			sbi_send_ipi(&mask);
-		}
+		// for (int i = 1; i < NCPU; i ++) {
+		// 	unsigned long mask = 1 << i;
+		// 	sbi_send_ipi(&mask);
+		// }
 		__sync_synchronize();
-		started = 1;
+		// started = 1;
 	}
 	else
 	{
