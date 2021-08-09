@@ -286,7 +286,11 @@ int handle_intr(uint64 scause) {
 
 		#ifndef QEMU 
 		w_sip(r_sip() & ~2);	// clear pending bit 
-		sbi_set_mie();
+		{
+			struct sbiret res = sbi_xv6_set_ext();
+			__debug_assert("handle_intr", SBI_SUCCESS == res.error, 
+					"sbi_xv6_set_ext() failed with %d\n", res.error);
+		}
 		#endif 
 
 		return 0;

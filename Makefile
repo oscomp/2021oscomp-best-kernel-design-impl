@@ -38,13 +38,7 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
-ifeq ($(platform), k210)
-linker = ./linker/k210.ld
-endif
-
-ifeq ($(platform), qemu)
-linker = ./linker/qemu.ld
-endif
+linker = ./linker/linker64.ld
 
 # SBI
 ifeq ($(platform), k210)
@@ -56,7 +50,7 @@ endif
 # QEMU 
 CPUS := 2
 
-QEMUOPTS = -machine virt -kernel $T/kernel -m 8M -nographic
+QEMUOPTS = -machine virt -kernel $T/kernel -m 6M -nographic
 
 # use multi-core 
 QEMUOPTS += -smp $(CPUS)
@@ -75,11 +69,7 @@ endif
 k210-serialport := /dev/ttyUSB0
 
 # entry file 
-ifeq ($(platform), k210) 
-SRC := $K/entry_k210.S
-else 
-SRC := $K/entry_qemu.S
-endif 
+SRC := $K/entry.S
 
 SRC	+= \
 	$K/printf.c \
@@ -142,13 +132,6 @@ SRC += \
 else 
 SRC += \
 	$K/hal/virtio_disk.c
-endif 
-
-# linker script 
-ifeq ($(platform), k210) 
-linker = ./linker/k210.ld
-else 
-linker = ./linker/qemu.ld
 endif 
 
 # object files 

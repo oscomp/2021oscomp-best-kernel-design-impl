@@ -81,6 +81,7 @@ static inline void clr_sstatus_bit(uint64 bits)
 }
 
 // Supervisor Interrupt Pending
+#define SIP_SSIP 	(1L << 1)		// software
 static inline uint64
 r_sip()
 {

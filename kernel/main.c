@@ -62,10 +62,11 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		userinit();      // first user process
 		printf("hart 0 init done\n");
 
-		// we need IPI to wake up other hart
+		// we need IPI to wake up other hart(s)
 		for (int i = 1; i < NCPU; i ++) {
 			unsigned long mask = 1 << i;
-			sbi_send_ipi(&mask);
+			struct sbiret res = sbi_send_ipi(mask, 0);
+			__debug_assert("main", SBI_SUCCESS == res.error, "sbi_send_ipi failed");
 		}
 		__sync_synchronize();
 		started = 1;
