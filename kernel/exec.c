@@ -200,10 +200,10 @@ int execve(char *path, char **argv, char **envp)
 	__debug_info("execve", "making stack\n");
 	// Stack
 	uint64 sp = VUSTACK;
-	// uint64 stackbase = VUSTACK - PGSIZE;
-	uint64 stackbase = VUSTACK - PGSIZE * 4;
+	#define STACK_PAGES	35
+	uint64 stackbase = VUSTACK - PGSIZE * STACK_PAGES;
 	seg = newseg(pagetable, seghead, STACK, stackbase, sp - stackbase, flags);
-	stackbase += PGSIZE * 3;
+	stackbase += PGSIZE * (STACK_PAGES - 1);
 	if(seg == NULL || uvmalloc(pagetable, stackbase, sp, flags) == 0) {
 		__debug_warn("execve", "new stack fail\n");
 		ret = -ENOMEM;

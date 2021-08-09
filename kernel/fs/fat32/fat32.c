@@ -205,6 +205,18 @@ uint fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user, uin
 			break;
 		}
 	}
+	// if (write) {
+	// 	for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
+	// 		m = bps - off % bps;
+	// 		if (n - tot < m)
+	// 			m = n - tot;
+	// 		// __debug_info("fat_rw_clus", "sec:%d m:%d\n", sec, m);
+	// 		if (sb->op.write(sb, user, (char*)data, sec, off % bps, m) < 0)
+	// 			break;
+	// 	}
+	// } else {
+	// 	tot = sb->op.read(sb, user, (char*)data, sec, off % bps, n);
+	// }
 	__debug_info("fat_rw_clus", "done: tot:%d\n", tot);
 	return tot;
 }
@@ -284,8 +296,12 @@ int fat_read_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint of
 {
 	uint tot = 0;
 	for (int i = 0; i < count; i++) {
+		uint64 addr = (uint64)iovecs[i].iov_base;
 		uint n = iovecs[i].iov_len;
-		uint ret = fat_read_file(ip, 1, (uint64)iovecs[i].iov_base, off + tot, n);
+		if (!rangeinseg(addr, addr + n))
+			return -EFAULT;
+
+		uint ret = fat_read_file(ip, 1, addr, off + tot, n);
 		tot += ret;
 		if (ret != n) {
 			break;
@@ -349,8 +365,12 @@ int fat_write_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint o
 {
 	uint tot = 0;
 	for (int i = 0; i < count; i++) {
+		uint64 addr = (uint64)iovecs[i].iov_base;
 		uint n = iovecs[i].iov_len;
-		int ret = fat_write_file(ip, 1, (uint64)iovecs[i].iov_base, off + tot, n);
+		if (!rangeinseg(addr, addr + n))
+			return -EFAULT;
+
+		int ret = fat_write_file(ip, 1, addr, off + tot, n);
 		if (ret < 0) {
 			return ret;
 		}

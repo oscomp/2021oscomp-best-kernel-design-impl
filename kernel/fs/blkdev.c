@@ -21,6 +21,7 @@
 #include "fat32/fat32.h"
 #include "fs/buf.h"
 #include "mm/kmalloc.h"
+#include "mm/vm.h"
 #include "sched/proc.h"
 #include "utils/string.h"
 #include "utils/debug.h"
@@ -86,97 +87,38 @@ static int img_clear_block(struct superblock *sb, uint64 sectorno, uint64 sector
 }
 
 
-// // Caller must hold img->lock.
-// struct superblock *image_fs_init(struct inode *img)
-// {
-// 	if (img->size < 512) // Can such a small file contain a file system image?
-// 		return NULL;
-
-// 	struct superblock *sb = NULL;
-// 	char *sb_buf = NULL;
-// 	struct fat32_sb *fat = NULL;
-// 	struct inode *iroot = NULL;
-	
-// 	__debug_info("image_fs_init", "start\n");
-// 	if ((sb = kmalloc(sizeof(struct superblock))) == NULL) {
-// 		return NULL;
-// 	}
-// 	if ((sb_buf = kmalloc(512)) == NULL || 
-// 		img->fop->read(img, 0, (uint64)sb_buf, 0, 512) != 512 ||
-// 		(fat = fat32_init(sb_buf)) == NULL ||
-// 		img->fop->read(img, 0, (uint64)sb_buf, fat->fs_info * 512, 512) != 512 ||
-// 		fat32_info_init(fat, sb_buf) < 0)
-// 	{
-// 		goto fail;
-// 	}
-// 	kfree(sb_buf);
-// 	sb_buf = NULL;
-
-// 	initsleeplock(&sb->sb_lock, "imgfs_sb");
-// 	initlock(&sb->cache_lock, "imgfs_dcache");
-// 	sb->next = NULL;
-// 	sb->devnum = img->inum;
-// 	sb->real_sb = fat;
-// 	sb->ref = 0;
-// 	sb->blocksz = fat->bpb.byts_per_sec;
-// 	sb->op.alloc_inode = fat_alloc_inode;
-// 	sb->op.destroy_inode = fat_destroy_inode;
-// 	sb->op.read = imgfs_read;
-// 	sb->op.write = imgfs_write;
-// 	sb->op.clear = imgfs_clear;
-// 	sb->op.statfs = fat_stat_fs;
-
-// 	// Initialize in-mem root.
-// 	iroot = fat32_root_init(sb);
-// 	sb->root = kmalloc(sizeof(struct dentry));
-// 	if (iroot == NULL || sb->root == NULL)
-// 		goto fail;
-
-// 	iroot->entry = sb->root;
-// 	memset(sb->root, 0, sizeof(struct dentry));
-// 	sb->root->inode = iroot;
-// 	sb->root->op = &rootfs_dentry_op;
-// 	// sb->root->filename[0] = '\0';
-
-// 	sb->dev = idup(img);
-
-// 	__debug_info("image_fs_init", "done\n");
-// 	return sb;
-
-// fail:
-// 	__debug_warn("image_fs_init", "fail\n");
-// 	if (iroot)
-// 		fat_destroy_inode(iroot);
-// 	if (fat)
-// 		kfree(fat);
-// 	if (sb_buf)
-// 		kfree(sb_buf);
-// 	if (sb)
-// 		kfree(sb);
-// 	return NULL;
-// }
-
-
 int disk_write_block(struct superblock *sb, int usr, char *src, uint64 sectorno, uint64 off, uint64 len)
 {
 	if (off + len > BSIZE)
 		panic("diskfs_write");
 
 	// __debug_info("diskfs_write", "sec:%d off:%d len:%d\n", sectorno, off, len);
-	struct buf *b = bread(sb->devnum, sectorno);
-	int ret = either_copyin(b->data + off, usr, (uint64)src, len);
+	struct buf *b;
+
+	if (off == 0 && len == BSIZE)
+		/**
+		 * It hints that the coming write totally
+		 * covers the sector. So the original data
+		 * will be overwritten, and we don't need
+		 * to read the disk.
+		 */
+		b = bget(sb->devnum, sectorno);
+	else
+		b = bread(sb->devnum, sectorno);
 	
-	// if (ret < 0) { // fail to write
-	// 	b->valid = 0;  // invalidate the buf
-	// } else {
-	// 	ret = len;
-	// 	bwrite(b, BWRITE_BACK);
-	// }
+	int ret = either_copyin_nocheck(b->data + off, usr, (uint64)src, len);
 
-	if (ret == 0)
+	if (ret < 0) {		// fail to write
+		b->valid = 0;	// invalidate the buf
+	} else {
 		ret = len;
+		bwrite(b, BWRITE_BACK);
+	}
 
-	bwrite(b, BWRITE_BACK);
+	// if (ret == 0)
+	// 	ret = len;
+	// bwrite(b, BWRITE_BACK);
+
 	brelse(b);
 
 	return ret;
@@ -187,13 +129,37 @@ int disk_read_block(struct superblock *sb, int usr, char *dst, uint64 sectorno, 
 {
 	if (off + len > BSIZE)
 		panic("diskfs_read");
+	int ret;
+	// if (off + len <= BSIZE) {
+		// __debug_info("diskfs_read", "sec:%d off:%d len:%d\n", sectorno, off, len);
+		struct buf *b = bread(sb->devnum, sectorno);
+		ret = either_copyout_nocheck(usr, (uint64)dst, b->data + off, len);
+		brelse(b);
+	// } else {	// over sectors
+	// 	int const cnt = (off + len + BSIZE - 1) / BSIZE;
+	// 	int i;
+	// 	uint32 m, tot = 0;
+	// 	struct buf *bufs[cnt];
+	// 	// gathering buffers
+	// 	for (i = 0; i < cnt; i++)
+	// 		bufs[i] = bget(sb->devnum, sectorno++);
 
-	// __debug_info("diskfs_read", "sec:%d off:%d len:%d\n", sectorno, off, len);
-	struct buf *b = bread(sb->devnum, sectorno);
-	int ret = either_copyout(usr, (uint64)dst, b->data + off, len);
-	brelse(b);
-
-	return ret < 0 ? -1 : len;
+	// 	ret = breads(bufs, cnt);
+	// 	if (ret >= 0) {
+	// 		m = BSIZE - off;
+	// 		ret = either_copyout_nocheck(usr, (uint64)dst, bufs[0]->data + off, m);
+	// 		tot += m;
+	// 	}
+	// 	for (i = 1, m = BSIZE; ret >= 0 && i < cnt; i++) {
+	// 		if (len - tot < BSIZE)
+	// 			m = len - tot;
+	// 		ret = either_copyout_nocheck(usr, (uint64)dst + tot, bufs[i]->data, m);
+	// 		tot += m;
+	// 	}
+	// 	for (i = 0; i < cnt; i++)
+	// 		brelse(bufs[i]);
+	// }
+	return ret < 0 ? ret : len;
 }
 
 

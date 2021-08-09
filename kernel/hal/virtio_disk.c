@@ -281,3 +281,94 @@ virtio_disk_intr()
 
   release(&disk.vdisk_lock);
 }
+
+/*
+static int alloc_descs(int *idx, int n)
+{
+	for (int i = 0; i < n; i++) {
+		idx[i] = alloc_desc();
+		if (idx[i] < 0) {
+			for (int j = 0; j < i; j++)
+				free_desc(idx[j]);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int virtio_disk_multi_rw(struct buf *bufs[], int nbuf, int write)
+{
+	int ndesc = nbuf + 2;
+	if (nbuf <= 0 || ndesc > NUM)
+		panic("virtio_disk_multi_rw: bad nbuf");
+
+	acquire(&disk.vdisk_lock);
+
+	int idx[NUM];
+	while (1) {
+		if (alloc_descs(idx, ndesc) == 0)
+			break;
+		sleep(&disk.free[0], &disk.vdisk_lock);
+	}
+	
+	struct virtio_blk_outhdr {
+		uint32 type;
+		uint32 reserved;
+		uint64 sector;
+	};
+	struct virtio_blk_outhdr buf0;
+	struct virtio_blk_outhdr *pbuf0;
+	uint64 sector = bufs[0]->sectorno;
+	
+	pbuf0 = (struct virtio_blk_outhdr*)kwalkaddr(myproc()->pagetable, (uint64)&buf0);
+
+
+	buf0.type = write ? VIRTIO_BLK_T_OUT : VIRTIO_BLK_T_IN;
+	buf0.reserved = 0;
+	buf0.sector = sector;
+
+	disk.desc[idx[0]].addr = (uint64)pbuf0;
+	disk.desc[idx[0]].len = sizeof(struct virtio_blk_outhdr);
+	disk.desc[idx[0]].flags = VRING_DESC_F_NEXT;
+	disk.desc[idx[0]].next = idx[1];
+
+	for (int i = 1; i <= nbuf; i++) {
+		if (sector++ != bufs[i - 1]->sectorno)
+			panic("inconsecutive sector number");
+
+		disk.desc[idx[i]].addr = (uint64)bufs[i - 1]->data;
+		disk.desc[idx[i]].len = BSIZE;
+		disk.desc[idx[i]].flags = write ? 0 : VRING_DESC_F_WRITE;
+		disk.desc[idx[i]].flags |= VRING_DESC_F_NEXT;
+		disk.desc[idx[i]].next = idx[i + 1];
+	}
+
+	disk.info[idx[0]].status = -1;
+	disk.desc[idx[ndesc - 1]].addr = (uint64)&disk.info[idx[0]].status;
+	disk.desc[idx[ndesc - 1]].len = 1;
+	disk.desc[idx[ndesc - 1]].flags = VRING_DESC_F_WRITE;
+	disk.desc[idx[ndesc - 1]].next = 0;
+
+	bufs[0]->disk = 1;
+	disk.info[idx[0]].b = bufs[0];
+
+	disk.avail[2 + (disk.avail[1] % NUM)] = idx[0];
+	__sync_synchronize();
+	disk.avail[1] = disk.avail[1] + 1;
+
+	*R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // queue number
+
+	while (bufs[0]->disk == 1) {
+		sleep(bufs[0], &disk.vdisk_lock);
+	}
+
+	int ret = disk.info[idx[0]].status == 0 ? 0 : -1;
+
+	disk.info[idx[0]].b = 0;
+	free_chain(idx[0]);
+
+	release(&disk.vdisk_lock);
+
+	return ret;
+}
+*/

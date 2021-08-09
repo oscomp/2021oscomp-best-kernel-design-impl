@@ -6,6 +6,7 @@
 
 #include "types.h"
 #include "param.h"
+#include "errno.h"
 #include "fs/fs.h"
 #include "mm/kmalloc.h"
 #include "mm/vm.h"
@@ -78,24 +79,33 @@ int root_file_readdir(struct inode *dp, struct dirent *dent, uint off)
 
 int zero_read(struct inode *ip, int usr, uint64 dst, uint off, uint n)
 {
-	if (n == 0)
-		return 0;
+#define ZBUFSZ		128
+#define ZBIGBUFSZ	512
 
-	uint const bufsz = 512;
-	char *buf = kmalloc(bufsz);
+	uint bufsz = ZBUFSZ;
+	char sbuf[ZBUFSZ];
+	char *buf = sbuf;
 
-	if (buf == NULL)
-		return 0;
+	if (n > ZBUFSZ * 8) {
+		buf = kmalloc(ZBIGBUFSZ);
+		if (buf == NULL)
+			buf = sbuf;
+		else
+			bufsz = ZBIGBUFSZ;
+	}
+
 	memset(buf, 0, bufsz);
 
 	uint tot, m = bufsz;
 	for (tot = 0; tot < n; tot += m, dst += m) {
 		if (n - tot < m)
 			m = n - tot;
-		if (either_copyout(usr, dst, buf, m) < 0)
+		if (either_copyout_nocheck(usr, dst, buf, m) < 0)
 			break;
 	}
-	kfree(buf);
+
+	if (bufsz == ZBIGBUFSZ)
+		kfree(buf);
 
 	return tot;
 }

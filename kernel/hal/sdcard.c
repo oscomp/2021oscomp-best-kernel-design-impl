@@ -4,6 +4,7 @@
 
 #include "printf.h"
 #include "types.h"
+#include "errno.h"
 #include "fs/buf.h"
 #include "sync/spinlock.h"
 
@@ -49,6 +50,7 @@ static void sd_write_data_dma(uint8 const *data_buff, uint32 length) {
 	 * It is wired that the dmac only works with 32-bit data width.
 	 * So here we cast the uint8 buf into uint32 type, and divide the
 	 * length by 4 temporarily.
+	 * ... Perhaps it's the spi FIFO's problem, whose data width is 32-bit.
 	 */
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
 	spi_send_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4);
@@ -60,6 +62,18 @@ static void sd_read_data_dma(uint8 *data_buff, uint32 length) {
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
 	spi_receive_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4);
 }
+
+// static int sd_read_multiple_data_dma(uint8 *bufs[], uint32 lens[], uint32 nbuf)
+// {
+// 	spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
+// 	return spi_receive_multiple_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, bufs, lens, nbuf);
+// }
+
+// static int sd_write_multiple_data_dma(uint8 *bufs[], uint32 lens[], uint32 nbuf)
+// {
+// 	spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
+// 	return spi_send_multiple_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, bufs, lens, nbuf);
+// }
 
 /*
  * @brief  Send 5 bytes command to the SD card.
@@ -103,6 +117,9 @@ static void sd_end_cmd(void) {
 #define SD_CMD17 	17 		// READ_SINGLE_BLOCK
 #define SD_CMD24 	24 		// WRITE_SINGLE_BLOCK 
 #define SD_CMD13 	13 		// SEND_STATUS
+#define SD_CMD18 	18 		// READ_MULTIPLE_BLOCK
+#define SD_CMD25 	25 		// WRITE_MULTIPLE_BLOCK
+#define SD_CMD12 	12 		// STOP_TRANSMISSION
 
 /*
  * Read sdcard response in R1 type. 
@@ -481,3 +498,55 @@ void test_sdcard(void) {
 
 	while (1) ;
 }
+
+/*
+static uint8 dummy_data_for_dma[16] = { 0xff };
+int sdcard_read_sectors(struct buf *bufs[], int nbuf)
+{
+	if (nbuf <= 0)
+		panic("sdcard_read_multiple: bad nbuf");
+
+	int ret = -EIO;
+	uint8 *addrs[nbuf * 2];
+	uint32 lens[nbuf * 2];
+	uint32 sector = bufs[0]->sectorno;
+	uint32 address = is_standard_sd ? sector << 9 : sector;
+
+	for (int i = 0; i < nbuf; i++) {
+		if (bufs[i]->sectorno != sector++)
+			panic("inconsecutive sector number");
+
+		addrs[i * 2] = bufs[i]->data;
+		lens[i * 2] = BSIZE;
+		addrs[i * 2 + 1] = dummy_data_for_dma;
+		lens[i * 2 + 1] = 4;
+	}
+
+	acquiresleep(&sdcard_lock);
+
+	sd_send_cmd(SD_CMD18, address, 0);
+	if (sd_get_response_R1() != 0)
+		goto end;
+
+
+	uint8 result = 0xff;
+	int timeout = 0xffff;
+	while (timeout-- > 0 && result != 0xfe)
+		sd_read_data(&result, 1);
+
+	if (result != 0xfe)
+		goto end;
+
+	ret = sd_read_multiple_data_dma(addrs, lens, nbuf * 2);
+	sd_end_cmd();
+
+	sd_send_cmd(SD_CMD12, 0, 0);
+	sd_get_response_R1();
+	sd_end_cmd();	// this is needed
+
+end:
+	sd_end_cmd();
+	releasesleep(&sdcard_lock);
+	return ret;
+}
+*/

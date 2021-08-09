@@ -110,5 +110,6 @@ void delsegs(pagetable_t pagetable, struct seg *head);
 struct seg *copysegs(pagetable_t pt, struct seg *seg, pagetable_t pt2);
 
 int loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip);
+int rangeinseg(uint64 start, uint64 end);
 
 #endif

@@ -148,7 +148,7 @@ void dmac_channel_disable(dmac_channel_number_t channel_num)
 
 	writeq(chen.data, &dmac->chen);
 }
-
+/*
 void dmac_enable_common_interrupt_status(void)
 {
 	dmac_commonreg_intstatus_enable_u_t intstatus;
@@ -176,7 +176,7 @@ void dmac_enable_common_interrupt_signal(void)
 
 	writeq(intsignal.data, &dmac->com_intsignal_en);
 }
-
+*/
 static void dmac_enable_channel_interrupt(dmac_channel_number_t channel_num)
 {
 	writeq(0xffffffff, &dmac->channel[channel_num].intclear);
@@ -188,7 +188,7 @@ void dmac_disable_channel_interrupt(dmac_channel_number_t channel_num)
 	writeq(0, &dmac->channel[channel_num].intstatus_en);
 }
 
-static void dmac_chanel_interrupt_clear(dmac_channel_number_t channel_num)
+static void dmac_channel_interrupt_clear(dmac_channel_number_t channel_num)
 {
 	writeq(0xffffffff, &dmac->channel[channel_num].intclear);
 }
@@ -306,7 +306,7 @@ void dmac_set_single_mode(dmac_channel_number_t channel_num,
 						  dmac_transfer_width_t dmac_trans_width,
 						  uint64 block_size)
 {
-	dmac_chanel_interrupt_clear(channel_num);
+	dmac_channel_interrupt_clear(channel_num);
 	dmac_channel_disable(channel_num);
 	dmac_wait_idle(channel_num);
 	dmac_set_channel_param(channel_num, src, dest, src_inc, dest_inc,
@@ -353,6 +353,66 @@ void dmac_wait_idle(dmac_channel_number_t channel_num)
 
 void dmac_intr(dmac_channel_number_t channel_num)
 {
-	dmac_chanel_interrupt_clear(channel_num);
+	dmac_channel_interrupt_clear(channel_num);
 	wakeup(dmac_chan);
 }
+
+/*
+// This is only for I/O between sd and mem. The items are always mem.
+void dmac_set_single_multiple(dmac_channel_number_t channel_num, int src_multi,
+							dmac_lli_item_t items[], uint32 nitem, void *single,
+							dmac_address_increment_t src_inc,
+							dmac_address_increment_t dest_inc,
+							dmac_burst_trans_length_t dmac_burst_size,
+							dmac_transfer_width_t dmac_trans_width)
+{
+	dmac_ch_ctl_u_t ctl;
+	dmac_ch_cfg_u_t cfg;
+
+	dmac_channel_interrupt_clear(channel_num);
+	dmac_channel_disable(channel_num);
+	dmac_wait_idle(channel_num);
+
+	ctl.data = readq(&dmac->channel[channel_num].ctl);
+
+	ctl.ch_ctl.sms = DMAC_MASTER1;
+	ctl.ch_ctl.dms = DMAC_MASTER2;
+	ctl.ch_ctl.sinc = src_inc;
+	ctl.ch_ctl.dinc = dest_inc;
+	ctl.ch_ctl.src_tr_width = dmac_trans_width;
+	ctl.ch_ctl.dst_tr_width = dmac_trans_width;
+	ctl.ch_ctl.src_msize = dmac_burst_size;
+	ctl.ch_ctl.dst_msize = dmac_burst_size;
+	ctl.ch_ctl.shadowreg_or_lli_valid = 1;
+	ctl.ch_ctl.shadowreg_or_lli_last = 0;
+
+	// init the list
+	// dst, src and ch_block_ts are set by caller
+	for (int i = 0; i < nitem; i++) {
+		items[i].llp = (uint64)&items[i + 1];	// compiling attribution has aligned this
+		items[i].ctl = ctl.data;
+		items[i].sstat = 0;
+		items[i].dstat = 0;
+		items[i].resv = 0;
+	}
+	ctl.ch_ctl.shadowreg_or_lli_last = 1;		// mark the last one
+	items[nitem - 1].llp = 0;
+	items[nitem - 1].ctl = ctl.data;
+
+	cfg.data = readq(&dmac->channel[channel_num].cfg);
+	cfg.ch_cfg.tt_fc = src_multi ? DMAC_MEM2PRF_DMA : DMAC_PRF2MEM_DMA;
+	cfg.ch_cfg.hs_sel_src = src_multi ? DMAC_HS_SOFTWARE : DMAC_HS_HARDWARE;
+	cfg.ch_cfg.hs_sel_dst = src_multi ? DMAC_HS_HARDWARE : DMAC_HS_SOFTWARE;
+	cfg.ch_cfg.src_per = channel_num;
+	cfg.ch_cfg.dst_per = channel_num;
+	cfg.ch_cfg.src_multblk_type = LINKEDLIST;
+	cfg.ch_cfg.dst_multblk_type = LINKEDLIST;
+
+	writeq(cfg.data, &dmac->channel[channel_num].cfg);
+	writeq((uint64)items, &dmac->channel[channel_num].llp);
+
+	dmac_enable();
+	dmac_enable_channel_interrupt(channel_num);
+	dmac_channel_enable(channel_num);
+}
+*/

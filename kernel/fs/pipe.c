@@ -231,7 +231,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 			char *paddr = pi->data + pi->nwrite % PIPESIZE;
 			int count = (pipebound - paddr < m) ? pipebound - paddr : m;
 
-			if (copyin2(paddr, addr + i, count) < 0)
+			if (copyin_nocheck(paddr, addr + i, count) < 0)
 				break;
 			i += count;
 			pi->nwrite += count;
@@ -268,7 +268,7 @@ piperead(struct pipe *pi, uint64 addr, int n)
 		char *paddr = pi->data + pi->nread % PIPESIZE;
 		int count = (pipebound - paddr < m - i) ? pipebound - paddr : m - i;
 
-		if (copyout2(addr + i, paddr, count) < 0)
+		if (copyout_nocheck(addr + i, paddr, count) < 0)
 			break;
 		pi->nread += count;
 		i += count;
@@ -292,8 +292,12 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 	pipelock(pi, pwait, PIPE_WRITER);	// block other writers
 
 	for (int i = 0; i < count; i++) {
+		uint64 addr = (uint64)ioarr[i].iov_base;
 		uint64 n = ioarr[i].iov_len;
 		int j;
+		
+		if (!rangeinseg(addr, addr + n))
+			break;
 		for (j = 0; j < n;) {
 			int m = pipewritable(pi);
 			if (m < 0) {
@@ -305,7 +309,7 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 				char *paddr = pi->data + pi->nwrite % PIPESIZE;
 				int cnt = (pipebound - paddr < m) ? pipebound - paddr : m;
 
-				if (copyin2(paddr, (uint64)ioarr[i].iov_base + j, cnt) < 0)
+				if (copyin_nocheck(paddr, addr + j, cnt) < 0)
 					goto out1;
 				m -= cnt;
 				j += cnt;
@@ -337,14 +341,18 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 		goto out2;
 	}
 	for (int i = 0; i < count && ndata > 0; i++) {
+		uint64 addr = (uint64)ioarr[i].iov_base;
 		uint64 n = ioarr[i].iov_len;
 		int m = n < ndata ? n : ndata;
 		int j;
+
+		if (!rangeinseg(addr, addr + n))
+			break;
 		for (j = 0; j < m;) {
 			char *paddr = pi->data + pi->nread % PIPESIZE;
 			int cnt = (pipebound - paddr < m - j) ? pipebound - paddr : m - j;
 
-			if (copyout2((uint64)ioarr[i].iov_base + j, paddr, cnt) < 0)
+			if (copyout_nocheck(addr + j, paddr, cnt) < 0)
 				goto out1;
 			pi->nread += cnt;
 			j += cnt;

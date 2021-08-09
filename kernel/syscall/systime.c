@@ -94,7 +94,7 @@ uint64 sys_clock_gettime(void) {
 		return -EINVAL;
 	}
 
-	if (CLOCK_REALTIME != clockid) {
+	if (CLOCK_REALTIME != clockid && clockid != CLOCK_MONOTONIC) {
 		return -EINVAL;
 	}
 

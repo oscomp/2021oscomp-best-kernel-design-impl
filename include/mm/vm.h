@@ -12,24 +12,24 @@
 
 static inline void permit_usr_mem()
 {
-  #ifndef QEMU
-  // w_sstatus(r_sstatus() & ~SSTATUS_PUM);
-  clr_sstatus_bit(SSTATUS_PUM);
-  #else
-  // w_sstatus(r_sstatus() | SSTATUS_SUM);
-  set_sstatus_bit(SSTATUS_SUM);
-  #endif
+	#ifndef QEMU
+	// w_sstatus(r_sstatus() & ~SSTATUS_PUM);
+	clr_sstatus_bit(SSTATUS_PUM);
+	#else
+	// w_sstatus(r_sstatus() | SSTATUS_SUM);
+	set_sstatus_bit(SSTATUS_SUM);
+	#endif
 }
 
 static inline void protect_usr_mem()
 {
-  #ifndef QEMU
-  // w_sstatus(r_sstatus() | SSTATUS_PUM);
-  set_sstatus_bit(SSTATUS_PUM);
-  #else
-  // w_sstatus(r_sstatus() & ~SSTATUS_SUM);
-  clr_sstatus_bit(SSTATUS_SUM);
-  #endif
+	#ifndef QEMU
+	// w_sstatus(r_sstatus() | SSTATUS_PUM);
+	set_sstatus_bit(SSTATUS_PUM);
+	#else
+	// w_sstatus(r_sstatus() & ~SSTATUS_SUM);
+	clr_sstatus_bit(SSTATUS_SUM);
+	#endif
 }
 
 extern pagetable_t kernel_pagetable;
@@ -68,6 +68,10 @@ int             copyout2(uint64 dstva, char *src, uint64 len);
 int             copyin2(char *dst, uint64 srcva, uint64 len);
 int             copyinstr2(char *dst, uint64 srcva, uint64 max);
 void            vmprint(pagetable_t pagetable);
+int				copyout_nocheck(uint64 dstva, char *src, uint64 len);
+int				copyin_nocheck(char *dst, uint64 srcva, uint64 len);
+int				either_copyout_nocheck(int user_dst, uint64 dst, void *src, uint64 len);
+int				either_copyin_nocheck(void *dst, int user_src, uint64 src, uint64 len);
 
 int             handle_page_fault(int type, uint64 badaddr);
 uint64          kern_pgfault_escape(uint64 badaddr);

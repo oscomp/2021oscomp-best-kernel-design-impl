@@ -116,8 +116,12 @@ fileread(struct file *f, uint64 addr, int n)
 	int r = 0;
 	struct inode *ip = f->ip;
 
-	if(f->readable == 0)
-		return -1;
+	if (f->readable == 0)
+		return -EPERM;
+	if (!rangeinseg(addr, addr + n))
+		return -EFAULT;
+	if (n == 0)
+		return 0;
 
 	switch (f->type) {
 		case FD_PIPE:
@@ -155,19 +159,18 @@ filewrite(struct file *f, uint64 addr, int n)
 {
 	int ret = 0;
 
-	if(f->writable == 0)
-		return -1;
+	if (f->writable == 0)
+		return -EPERM;
+	if (!rangeinseg(addr, addr + n))
+		return -EFAULT;
 
 	struct inode *ip = f->ip;
 	// __debug_info("filewrite", "addr=%p, n=%d\n", addr, n);
-	if(f->type == FD_PIPE){
+	if (f->type == FD_PIPE) {
 		ret = pipewrite(f->pipe, addr, n);
-	} else if(f->type == FD_DEVICE){
-		// if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
-		//   return -1;
-		// ret = devsw[f->major].write(1, addr, n);
+	} else if (f->type == FD_DEVICE) {
 		ret = ip->fop->write(ip, 1, addr, 0, n);
-	} else if(f->type == FD_INODE){
+	} else if (f->type == FD_INODE) {
 		ilock(ip);
 		ret = ip->fop->write(ip, 1, addr, f->off, n);
 		if (ret == n) {
@@ -198,8 +201,10 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 	struct dirent dent;
 	struct inode *ip = f->ip;
 
-	if(!S_ISDIR(ip->mode))
+	if (!S_ISDIR(ip->mode))
 		return -ENOTDIR;
+	if (!rangeinseg(addr, addr + n))
+		return -EFAULT;
 
 	int ret;
 	uint off = f->off;
@@ -210,7 +215,7 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 		if (ret <= 0 || dent.reclen > n) // 0 is end, -1 is err
 			break;
 
-		if(copyout2(addr, (char *)&dent, dent.reclen) < 0) {
+		if (copyout_nocheck(addr, (char *)&dent, dent.reclen) < 0) {
 			ret = -EFAULT;
 			break;	
 		}
@@ -220,11 +225,10 @@ filereaddir(struct file *f, uint64 addr, uint64 n)
 		n -= dent.reclen;
 
 	}
-	iunlock(ip);
-
 	acquire(&f->lock);
 	f->off = off;
 	release(&f->lock);
+	iunlock(ip);
 
 	if (ret < 0)
 		return -ret;

@@ -223,6 +223,26 @@ void bsync(void)
 	release(&bcachelock);
 }
 
+/*
+int breads(struct buf *bufs[], int nbuf)
+{
+	int i, j;
+	for (i = 0; i < nbuf && bufs[i]->valid; i++);
+	for (j = nbuf - 1; j > i && bufs[j]->valid; j--);
+
+	int ret = 0;
+	if (i <= j) {
+		// for (int k = i; k <= j; k++)
+		// 	printf("the %d buf: sec %d\n", k, bufs[k]->sectorno);
+		ret = disk_read_multi_blk(&bufs[i], j - i + 1);
+		if (ret >= 0)
+			for (; i <= j; i++)
+				bufs[i]->valid = 1;
+	}
+	return ret;
+}
+*/
+
 void bprint()
 {
 	acquire(&bcachelock);

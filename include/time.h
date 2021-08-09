@@ -21,6 +21,7 @@ struct itimeval {
 
 
 #define CLOCK_REALTIME 		0
+#define CLOCK_MONOTONIC		1	// nonsettable
 
 /**
  * 'time' is read from mtime register
