@@ -407,6 +407,15 @@ impl UserBuffer {
         return len;
     }
 
+    pub fn clear( &mut self ){
+        for sub_buff in self.buffers.iter_mut() {
+            let sblen = (*sub_buff).len();
+            for j in 0..sblen {
+                (*sub_buff)[j] = 0;
+            }
+        }
+    }
+
     pub fn write_at(&mut self, offset:usize, char:u8)->isize{
         if offset > self.len() {
             return -1

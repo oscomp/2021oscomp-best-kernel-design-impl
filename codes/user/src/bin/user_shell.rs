@@ -397,10 +397,10 @@ impl ArgMachine{
 
     pub fn auto_run_lmbench(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
-        mkdir("/var");
-        mkdir("/var/tmp");
-        open("/var/tmp/lmbench", OpenFlags::CREATE);
-        ls("/");
+        // mkdir("/var");
+        // mkdir("/var/tmp");
+        // open("/var/tmp/lmbench", OpenFlags::CREATE);
+        // ls("/");
         println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("lmbench_all lat_syscall -P 1 null");
@@ -408,9 +408,9 @@ impl ArgMachine{
         // testsuits.push("lmbench_all lat_syscall -P 1 write");
         // testsuits.push("busybox mkdir -p /var/tmp");
         // testsuits.push("busybox touch /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
+        // testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
         testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
         testsuits.push("lmbench_all lat_sig -P 1 install");
         testsuits.push("lmbench_all lat_sig -P 1 catch");
@@ -432,8 +432,9 @@ impl ArgMachine{
         // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX");
         // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k open2close /var/tmp/XXX");
         // testsuits.push("busybox echo context switch overhead");
-        testsuits.push("lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96");
+        // testsuits.push("lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96");
         
+        println!("scan str iter");
         for programname_op in testsuits.iter() {
             let mut exit_code = 0;
             let exec_str = String::new() +programname_op;
@@ -455,6 +456,7 @@ impl ArgMachine{
             args_addr.push(0 as *const u8 );
             let pid = fork();
             if pid == 0 {
+                //println!("exec");
                 if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     ls("/");

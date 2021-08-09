@@ -18,9 +18,9 @@ pub const MAP_ENABLE:usize        = MEMORY_GDB_START + 6;
 
 
 // always open channel
-// pub const EXIT_ENABLE:usize       = 1;
+//pub const EXIT_ENABLE:usize       = 1;
 // pub const EXEC_ENABLE:usize       = 1;
-// pub const SYSCALL_ENABLE:usize    = 1; //always open
+//pub const SYSCALL_ENABLE:usize    = 1; //always open
 //pub const TIMER_ENABLE:usize   = 1;
 
 #[macro_export]
