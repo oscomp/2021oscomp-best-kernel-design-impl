@@ -288,8 +288,9 @@ int handle_intr(uint64 scause) {
 		w_sip(r_sip() & ~2);	// clear pending bit 
 		{
 			struct sbiret res = sbi_xv6_set_ext();
-			__debug_assert("handle_intr", SBI_SUCCESS == res.error, 
-					"sbi_xv6_set_ext() failed with %d\n", res.error);
+			if (SBI_SUCCESS != res.error) {
+				panic("sbi_xv6_set_ext() failed\n");
+			}
 		}
 		#endif 
 
