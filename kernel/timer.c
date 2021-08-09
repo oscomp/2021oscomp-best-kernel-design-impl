@@ -1,5 +1,9 @@
 // Timer Interrupt handler
 
+#ifndef __DEBUG_timer
+#undef DEBUG
+#endif 
+
 #include "types.h"
 #include "param.h"
 #include "hal/riscv.h"
@@ -8,6 +12,8 @@
 #include "timer.h"
 #include "printf.h"
 #include "sched/proc.h"
+
+#include "utils/debug.h"
 
 struct spinlock tickslock;
 uint64 ticks;
@@ -29,7 +35,11 @@ set_next_timeout() {
 
 	// this bug seems to disappear automatically
 	// printf("");
-	sbi_set_timer(r_time() + INTERVAL);
+	// sbi_set_timer(r_time() + INTERVAL);
+	struct sbiret result = sbi_xv6_get_timer();
+	__debug_assert("set_next_timeout", SBI_SUCCESS == result.error, "SBI call failed");
+	result = sbi_set_timer(result.value + INTERVAL);
+	__debug_assert("set_next_timeout", SBI_SUCCESS == result.error, "SBI call failed");
 }
 
 void timer_tick() {

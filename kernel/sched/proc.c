@@ -975,13 +975,14 @@ static void __print_list_no_lock(struct proc const *list) {
 				heap = s->sz;
 			}
 		}
-		printf("%d\t%d\t%s\t%d\t%s\t%d\t%d\n", 
+		printf("%d\t%d\t%s\t%d\t%s\t%d\t%d\t%p\n", 
 			list->pid, 
 			__initproc == list ? 0 : list->parent->pid, 
 			__state_to_str(list->state),
 			list->killed, 
 			list->name, 
-			load, heap
+			load, heap, 
+			list->chan
 		);
 		list = list->next;
 	}

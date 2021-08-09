@@ -286,13 +286,18 @@ int handle_intr(uint64 scause) {
 
 		#ifndef QEMU 
 		w_sip(r_sip() & ~2);	// clear pending bit 
-		sbi_set_mie();
+		{
+			struct sbiret res = sbi_xv6_set_ext();
+			if (SBI_SUCCESS != res.error) {
+				panic("sbi_xv6_set_ext() failed\n");
+			}
+		}
 		#endif 
 
 		return 0;
 	}
 	else {
-		// to be honest, on QEMU software interrupts may be used for IPI, 
+		// to be honest, on k210 software interrupts may be used for IPI, 
 		// but as it is not yet supported, handle this as an unsupported one 
 		return -1;
 	}
