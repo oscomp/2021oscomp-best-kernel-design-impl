@@ -14,12 +14,12 @@ use crate::{console::print, mm::{
     MmapArea,
     MapPermission,
     // PTEFlags,
-}};
+}, syscall::FD_LIMIT, task::RLIMIT_NOFILE};
 use crate::trap::{TrapContext, trap_handler};
 use crate::config::*;
 use crate::gdb_println;
 use crate::monitor::*;
-use super::TaskContext;
+use super::{RLimit, TaskContext};
 use super::{PidHandle, pid_alloc, KernelStack, RUsage, ITimerVal};
 use alloc::sync::{Weak, Arc};
 use alloc::vec;
@@ -75,8 +75,10 @@ pub struct TaskControlBlockInner {
     pub current_path: String,
     // info
     pub address: ProcAddress,
-    pub rusage:RUsage,
+    pub rusage: RUsage,
     pub itimer: ITimerVal, // it_value if not remaining time but the time to alarm
+    // resource
+    pub resource_list: [RLimit;17],
 }
 
 impl ProcAddress {
@@ -131,6 +133,12 @@ impl TaskControlBlockInner {
         let ret = self.memory_set.cow_alloc(vpn, former_ppn);
         // println!{"finished cow_alloc!"}
         ret
+    }
+
+    pub fn init_rlimits(&mut self){
+        let r_nofile = &mut self.resource_list[RLIMIT_NOFILE as usize];
+        r_nofile.set_cur(FD_LIMIT as i64);
+        r_nofile.set_max(FD_LIMIT as i64);
     }
 }
 
@@ -192,8 +200,17 @@ impl TaskControlBlock {
                     )),
                 ],
                 current_path: String::from("/"), // 只有initproc在此建立，其他进程均为fork出
+                resource_list: [RLimit::new();17],
             }),
         };
+
+
+        // [WARNING] init resource for proc
+        //let file_limit = &mut task_control_block.acquire_inner_lock().resource_list[RLIMIT_NOFILE as usize];
+        //file_limit.set_cur(FD_LIMIT as i64);
+        //file_limit.set_cur(FD_LIMIT as i64);
+        task_control_block.acquire_inner_lock().init_rlimits();
+
         // prepare TrapContext in user space
         let trap_cx = task_control_block.acquire_inner_lock().get_trap_cx();
         *trap_cx = TrapContext::app_init_context(
@@ -205,6 +222,7 @@ impl TaskControlBlock {
         );
         task_control_block
     }
+
     pub fn get_parent(&self) -> Option<Arc<TaskControlBlock>> {
         let inner = self.inner.lock();
         inner.parent.as_ref().unwrap().upgrade()
@@ -443,6 +461,7 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: new_fd_table,
                 current_path: parent_inner.current_path.clone(),
+                resource_list: parent_inner.resource_list.clone(),
             }),
         });
         // add child
@@ -494,7 +513,7 @@ impl TaskControlBlock {
             return start;
         }
         else{ // "Start" va not mapped
-            println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
+            //println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
             // println!("[insert_mmap_area]: flags 0x{:X}",flags);
             // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());

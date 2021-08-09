@@ -58,15 +58,44 @@ pub fn enable_timer_interrupt() {
     unsafe { sie::set_stimer(); }
 }
 
+pub struct GlobalSatp {
+    satp:usize,
+    syscall:usize,
+}
+
+impl GlobalSatp{
+    pub fn set(&mut self, satp:usize){
+        self.satp = satp;
+    }
+    pub fn get(&self)->usize{
+        self.satp
+    }
+    pub fn set_syscall(&mut self, syscall_id:usize){
+        self.syscall = syscall_id;
+    }
+    pub fn get_syscall(&self)->usize{
+        self.syscall
+    }
+}
+
+use lazy_static::lazy_static;
+use alloc::sync::Arc;
+use spin::Mutex;
+lazy_static! {
+    pub static ref G_SATP: Arc<Mutex<GlobalSatp>> = Arc::new(Mutex::new(GlobalSatp{satp:0, syscall:0}));
+}
+
 #[no_mangle]
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
-
+    //G_SATP.lock().set(current_user_token());
+    //crate::syscall::test();
     // update RUsage of process
-    let ru_utime = get_user_runtime_usec();
-    current_task().unwrap().acquire_inner_lock().rusage.add_utime(ru_utime);
-    update_kernel_clock();
+    // let ru_utime = get_user_runtime_usec();
+    // current_task().unwrap().acquire_inner_lock().rusage.add_utime(ru_utime);
+    // update_kernel_clock();
 
+    //let mut is_schedule = false;
     let scause = scause::read();
     let stval = stval::read();
     match scause.cause() {
@@ -75,13 +104,20 @@ pub fn trap_handler() -> ! {
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
-            // get system call return value
-            let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]]);
-            // cx is changed during sys_exec, so we have to call it again
+
+            //G_SATP.lock().set_syscall(cx.x[17]);
             let syscall_id = cx.x[17];
-            if syscall_id != 64 && syscall_id != 63{
-                // println!("[{}]syscall-({}) = 0x{:X}  ", current_task().unwrap().pid.0, syscall_id, result);
-            } 
+            if syscall_id > 62 && syscall_id != 113 {
+                unsafe {
+                    //llvm_asm!("sfence.vma zero, zero" :::: "volatile");
+                }
+            }
+            //get system call return value
+            let result = syscall(syscall_id, [cx.x[10], cx.x[11], cx.x[12], cx.x[13], cx.x[14], cx.x[15]]);
+            // cx is changed during sys_exec, so we have to call it again
+            //if syscall_id != 64 && syscall_id != 63{
+            //    println!("[{}]syscall-({}) = 0x{:X}  ", current_task().unwrap().pid.0, syscall_id, result);
+            //} 
             cx = current_trap_cx();
             cx.x[10] = result as usize;
             // println!{"cx written..."}
@@ -89,10 +125,13 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::InstructionFault) |
         Trap::Exception(Exception::InstructionPageFault) |
         Trap::Exception(Exception::LoadFault) => {
+            let task = current_task().unwrap();
             // println!{"pinLoadFault"}
+            //println!("prev syscall = {}", G_SATP.lock().get_syscall());
             println!(
-                "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                "[kernel] {:?} in application-{}, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                 scause.cause(),
+                task.pid.0,
                 stval,
                 current_trap_cx().sepc,
             );
@@ -128,6 +167,9 @@ pub fn trap_handler() -> ! {
                 // println!("cow addr = {:X} from pid{}", stval, current_task().unwrap().pid.0);
                 // print_free_pages();
                 current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                unsafe {
+                    //llvm_asm!("sfence.vma" :::: "volatile");
+                }
                 // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
                 // println!{"cow_alloc returned..."}
                 // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
@@ -162,6 +204,7 @@ pub fn trap_handler() -> ! {
             gdb_print!(TIMER_ENABLE,"[timer]");
             set_next_trigger();
             suspend_current_and_run_next();
+            //is_schedule = true;
         }
         _ => {
             panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
@@ -173,17 +216,19 @@ pub fn trap_handler() -> ! {
 
 #[no_mangle]
 pub fn trap_return() -> ! {
-    // println!("trap_return");
+   
 
     // update RUsage of process
-    update_user_clock();
-    let ru_stime = get_kernel_runtime_usec();
-    current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
+    // update_user_clock();
+    // let ru_stime = get_kernel_runtime_usec();
+    // current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
 
     set_user_trap_entry();
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
+    //println!("{:X}", TRAP_CONTEXT);
     let user_satp = current_user_token();
+    //println!("[trap_return] satp = {:X}", user_satp);
     // println!("satp = {:X}", current_user_token());
     //let task = current_task().unwrap();
     //let inner = task.acquire_inner_lock();
@@ -203,9 +248,17 @@ pub fn trap_return() -> ! {
     }
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
     // println!{"restore_va: {}", restore_va}
+    //let sched:usize = {
+    //    if user_satp != G_SATP.lock().get() {
+    //        //println!("{:X}  {:X}", user_satp, G_SATP.lock().get());
+    //        1
+    //    } else {
+    //        0
+    //    }
+    //};
     unsafe {
-        llvm_asm!("fence.i" :::: "volatile");
-        llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp) :: "volatile");
+        //llvm_asm!("fence.i" :::: "volatile");
+        llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp) /*, "{a2}"(sched)*/ :: "volatile");
     }
     panic!("Unreachable in back_to_user!");
 }

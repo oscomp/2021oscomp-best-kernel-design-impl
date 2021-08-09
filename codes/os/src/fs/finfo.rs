@@ -7,33 +7,33 @@ pub const DT_REG:u8 = 4; //常规文件
 
 pub const NAME_LIMIT:usize = 128; // TODO:太大了会有跨页问题。。
 
-pub const S_IFMT    :u32 = 0170000;   //bit mask for the file type bit field
-pub const S_IFSOCK  :u32 = 0140000;   //socket
-pub const S_IFLNK   :u32 = 0120000;   //symbolic link
-pub const S_IFREG   :u32 = 0100000;   //regular file
-pub const S_IFBLK   :u32 = 0060000;   //block device
-pub const S_IFDIR   :u32 = 0040000;   //directory
-pub const S_IFCHR   :u32 = 0020000;   //character device
-pub const S_IFIFO   :u32 = 0010000;   //FIFO
+pub const S_IFMT    :u32 = 0o170000;   //bit mask for the file type bit field
+pub const S_IFSOCK  :u32 = 0o140000;   //socket
+pub const S_IFLNK   :u32 = 0o120000;   //symbolic link
+pub const S_IFREG   :u32 = 0o100000;   //regular file
+pub const S_IFBLK   :u32 = 0o060000;   //block device
+pub const S_IFDIR   :u32 = 0o040000;   //directory
+pub const S_IFCHR   :u32 = 0o020000;   //character device
+pub const S_IFIFO   :u32 = 0o010000;   //FIFO
 
-pub const S_ISUID:u32 = 04000;   //set-user-ID bit (see execve(2))
-pub const S_ISGID:u32 = 02000;   //set-group-ID bit (see below)
-pub const S_ISVTX:u32 = 01000;   //sticky bit (see below)
+pub const S_ISUID:u32 = 0o4000;   //set-user-ID bit (see execve(2))
+pub const S_ISGID:u32 = 0o2000;   //set-group-ID bit (see below)
+pub const S_ISVTX:u32 = 0o1000;   //sticky bit (see below)
 
-pub const S_IRWXU:u32 = 00700;   //owner has read, write, and execute permission
-pub const S_IRUSR:u32 = 00400;   //owner has read permission
-pub const S_IWUSR:u32 = 00200;   //owner has write permission
-pub const S_IXUSR:u32 = 00100;   //owner has execute permission
+pub const S_IRWXU:u32 = 0o0700;   //owner has read, write, and execute permission
+pub const S_IRUSR:u32 = 0o0400;   //owner has read permission
+pub const S_IWUSR:u32 = 0o0200;   //owner has write permission
+pub const S_IXUSR:u32 = 0o0100;   //owner has execute permission
 
-pub const S_IRWXG:u32 = 00070;   //group has read, write, and execute permission
-pub const S_IRGRP:u32 = 00040;   //group has read permission
-pub const S_IWGRP:u32 = 00020;   //group has write permission
-pub const S_IXGRP:u32 = 00010;   //group has execute permission
+pub const S_IRWXG:u32 = 0o0070;   //group has read, write, and execute permission
+pub const S_IRGRP:u32 = 0o0040;   //group has read permission
+pub const S_IWGRP:u32 = 0o0020;   //group has write permission
+pub const S_IXGRP:u32 = 0o0010;   //group has execute permission
 
-pub const S_IRWXO:u32 = 00007;   //others (not in group) have read, write,and execute permission
-pub const S_IROTH:u32 = 00004;   //others have read permission
-pub const S_IWOTH:u32 = 00002;   //others have write permission
-pub const S_IXOTH:u32 = 00001;   //others have execute permission
+pub const S_IRWXO:u32 = 0o0007;   //others (not in group) have read, write,and execute permission
+pub const S_IROTH:u32 = 0o0004;   //others have read permission
+pub const S_IWOTH:u32 = 0o0002;   //others have write permission
+pub const S_IXOTH:u32 = 0o0001;   //others have execute permission
 
 
 
@@ -121,11 +121,11 @@ pub struct Kstat {
     st_uid  :u32,
     st_gid  :u32,
     //__pad   :u64,
-    //st_size :i64,
     st_blksize   :u32,
     //__pad2       :i32,
     st_blocks    :u64,
-    st_rdev :u64,   /* Device ID (if special file) */
+    pub st_size :i64,
+    //st_rdev :u64,   /* Device ID (if special file) */
     st_atime_sec :i64, 
     st_atime_nsec:i64,  
     st_mtime_sec :i64,  
@@ -143,9 +143,9 @@ impl Kstat {
             st_nlink:0,
             st_uid  :0,
             st_gid  :0,
-            st_rdev :0,
+            //st_rdev :0,
             //__pad   :0,
-            //st_size :0,
+            st_size :0,
             st_blksize   :512,
             //__pad2       :0,
             st_blocks    :0,
@@ -166,9 +166,9 @@ impl Kstat {
             st_nlink:1,
             st_uid  :0,
             st_gid  :0,
-            st_rdev :0x0000000400000040,
+            //st_rdev :0x0000000400000040,
             //__pad   :0,
-            //st_size :0,
+            st_size :0,
             st_blksize   :512,
             //__pad2       :0,
             st_blocks    :0,
@@ -211,9 +211,9 @@ impl Kstat {
             st_nlink,
             st_uid  :0,
             st_gid  :0,
-            st_rdev :0,
+            //st_rdev :0,
             //__pad   :0,
-            //st_size ,
+            st_size ,
             st_blksize   :512,
             //__pad2       :0,
             st_blocks    ,
@@ -250,34 +250,72 @@ impl Kstat {
 #[derive(Debug)]
 #[repr(C)]
 pub struct NewStat{
+    //st_mode: u32,
+    //st_ino:  u64,
+    //st_dev:  u64,
+    //st_nlink: u64,
+    //st_uid  :u32,
+    //st_gid  :u32,
+    //pub st_size :u64, 
+    //st_atime_sec :i64,    
+    //st_atime_nsec:i64,  
+    //st_mtime_sec :i64,  
+    //st_mtime_nsec:i64,   
+    //st_ctime_sec :i64,  
+    //st_ctime_nsec:i64,  
+
     st_dev  :u64,   /* ID of device containing file */
+    //__pad1  :u32,
     st_ino  :u64,   /* Inode number */
     st_mode :u32,   /* File type and mode */
     st_nlink:u64,   /* Number of hard links */
     st_uid  :u32,
     st_gid  :u32,
-    st_rdev :u64,   /* Device ID (if special file) */
-    st_size :u64,         /* Total size, in bytes */
-    st_blksize   :u32,    /* Block size for filesystem I/O */
+    //st_rdev :u64,   /* Device ID (if special file) */
+    //__pad2  :u32,
+    st_blksize   :u64,    /* Block size for filesystem I/O */
     st_blocks    :u64,    /* Number of 512B blocks allocated */
+    pub st_size  :u64,         /* Total size, in bytes */
     st_atime_sec :i64,    
     st_atime_nsec:i64,  
     st_mtime_sec :i64,  
     st_mtime_nsec:i64,   
     st_ctime_sec :i64,  
     st_ctime_nsec:i64,  
+
+    //st_dev  :u64,   /* ID of device containing file */
+    //__pad1  :u32,
+    //st_ino  :u64,   /* Inode number */
+    //st_mode :u32,   /* File type and mode */
+    //st_nlink:u64,   /* Number of hard links */
+    //st_uid  :u32,
+    //st_gid  :u32,
+    //st_rdev :u64,   /* Device ID (if special file) */
+    //__pad2  :u32,
+    //st_blksize   :u32,    /* Block size for filesystem I/O */
+    //st_blocks    :u64,    /* Number of 512B blocks allocated */
+    //pub st_size :u64,         /* Total size, in bytes */
+    //st_atime_sec :i64,    
+    //st_atime_nsec:i64,  
+    //st_mtime_sec :i64,  
+    //st_mtime_nsec:i64,   
+    //st_ctime_sec :i64,  
+    //st_ctime_nsec:i64,  
+
 }
 
 impl NewStat {
     pub fn empty()->Self{
         Self{
             st_dev  :0,
+            //__pad1  :0,
             st_ino  :0,
             st_mode :0,
             st_nlink:0,
             st_uid  :0,
             st_gid  :0,
-            st_rdev :0,
+            //st_rdev :0,
+            //__pad2  :0,
             st_size :0,
             st_blksize   :512,
             st_blocks    :0,
@@ -313,13 +351,15 @@ impl NewStat {
                             / self.st_blksize as u64;
 
         *self = Self {
-            st_dev  ,
-            st_ino  ,
-            st_mode ,
+            st_dev,
+            //__pad1  :0,
+            st_ino ,
+            st_mode,
             st_nlink,
             st_uid  :0,
             st_gid  :0,
-            st_rdev :0,
+            //st_rdev :0,
+            //__pad2  :0,
             st_size : st_size as u64,
             st_blksize :self.st_blksize, //TODO:real blksize
             st_blocks ,
@@ -415,6 +455,7 @@ impl FdSet {
         fd_v
     }
 
+    /* 
     pub fn as_bytes(&self) -> &[u8] {
         let size = core::mem::size_of::<Self>();
         unsafe {
@@ -433,5 +474,8 @@ impl FdSet {
                 size,
             )
         }
-    }
+    }  */
 }
+
+use crate::lang_items::Bytes;
+impl Bytes<FdSet> for FdSet {}

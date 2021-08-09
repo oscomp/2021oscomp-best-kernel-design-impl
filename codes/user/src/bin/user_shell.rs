@@ -397,48 +397,54 @@ impl ArgMachine{
 
     pub fn auto_run_lmbench(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
-        // mkdir("/var");
-        // mkdir("/var/tmp");
-        // open("/var/tmp/lmbench", OpenFlags::CREATE);
-        // ls("/");
+        mkdir("/var");
+        mkdir("/var/tmp");
+        open("/var/tmp/lmbench", OpenFlags::CREATE);
+        mkdir("/tmp");
+        //open("/hello", OpenFlags::CREATE);
+        //ls("/");
         println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
-        testsuits.push("lmbench_all lat_syscall -P 1 null");
-        // testsuits.push("lmbench_all lat_syscall -P 1 read");
-        // testsuits.push("lmbench_all lat_syscall -P 1 write");
-        // testsuits.push("busybox mkdir -p /var/tmp");
-        // testsuits.push("busybox touch /var/tmp/lmbench");
-        // testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
-        // testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
-        // testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
-        testsuits.push("lmbench_all lat_sig -P 1 install");
-        testsuits.push("lmbench_all lat_sig -P 1 catch");
-        // testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
-        // testsuits.push("lmbench_all lat_pipe -P 1");
-        testsuits.push("lmbench_all lat_proc -P 1 fork");
-        testsuits.push("lmbench_all lat_proc -P 1 exec");
-        // testsuits.push("busybox cp hello /tmp");
-        testsuits.push("lmbench_all lat_proc -P 1 shell");
-        // testsuits.push("lmbench_all lmdd label=\"File /var/tmp/XXX write bandwidth:\" of=/var/tmp/XXX move=645m");
-        // testsuits.push("lmbench_all lat_pagefault -P 1 /var/tmp/XXX");
-        // testsuits.push("lmbench_all lat_mmap -P 1 512k /var/tmp/XXX");
-        // testsuits.push("busybox echo file system latency");
-        // testsuits.push("lmbench_all lat_fs /var/tmp");
-        // testsuits.push("busybox echo Bandwidth measurements");
-        // testsuits.push("lmbench_all bw_pipe -P 1");
-        // testsuits.push("lmbench_all bw_file_rd -P 1 512k io_only /var/tmp/XXX");
-        // testsuits.push("lmbench_all bw_file_rd -P 1 512k open2close /var/tmp/XXX");
-        // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX");
-        // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k open2close /var/tmp/XXX");
-        // testsuits.push("busybox echo context switch overhead");
-        // testsuits.push("lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96");
+        //testsuits.push("syscalltest");
+        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0null");
+        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0read");
+        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0write");
+        //testsuits.push("busybox mkdir -p /var/tmp");
+        //testsuits.push("busybox touch /var/tmp/lmbench");
+        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0stat\0/var/tmp/lmbench");
+        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0fstat\0/var/tmp/lmbench");
+        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0open\0/var/tmp/lmbench");
+        //testsuits.push("lmbench_all\0lat_select\0-n\0100\0-P\01\0file");
+        //testsuits.push("lmbench_all\0lat_sig\0-P\01\0install");
+        //testsuits.push("lmbench_all\0lat_sig\0-P\01\0catch");
+        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
+        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
+        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0shell");
+        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1k\0fsync=1\0print=3");
+        //testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX"); //
+        //testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");//ok
+
+
+
+        //testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
+        //testsuits.push("lmbench_all\0lat_pipe\0-P\01");  // pipe的read阻塞了，似乎需要signal??
+        //testsuits.push("busybox\0cp\0hello\0/tmp");
+        testsuits.push("busybox\0echo\0file\0system\0latency");
+        testsuits.push("lmbench_all\0lat_fs\0/var/tmp");
+        //testsuits.push("busybox\0echo\0Bandwidth\0measurements");
+        // testsuits.push("lmbench_all\0bw_pipe\0-P\01");
+        //testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0io_only\0/var/tmp/XXX");   //ok  
+        //testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok  
+        //testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0mmap_only\0/var/tmp/XXX"); //ok 
+        //testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok
+        testsuits.push("busybox\0echo\0context\0switch\0overhead");
+        testsuits.push("lmbench_all\0lat_ctx\0-P\01\0-s\032\02\04\08\016\024\032\064\096");
         
         println!("scan str iter");
         for programname_op in testsuits.iter() {
             let mut exit_code = 0;
             let exec_str = String::new() +programname_op;
-            let args: Vec<&str> = exec_str.as_str().split(' ').into_iter().collect();
+            let args: Vec<&str> = exec_str.as_str().split('\0').into_iter().collect();
             let args_string: Vec<String> = args.iter().map(
                 |str|{
                     let mut string = String::new();

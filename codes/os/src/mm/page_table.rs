@@ -383,6 +383,12 @@ impl UserBuffer {
         Self { buffers }
     }
 
+    pub fn empty()->Self{
+        Self {
+            buffers:Vec::new(),
+        }
+    }
+     
     pub fn len(&self) -> usize {
         let mut total: usize = 0;
         for b in self.buffers.iter() {

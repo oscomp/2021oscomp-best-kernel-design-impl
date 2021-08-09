@@ -34,3 +34,13 @@ pub fn fetch_task() -> Option<Arc<TaskControlBlock>> {
     // println!("core{}:fetch task",get_core_id());
     TASK_MANAGER.lock().fetch()
 }
+
+pub fn find_task(pid:usize)->Option<Arc<TaskControlBlock>>{
+    let inner = TASK_MANAGER.lock();
+    for task in &inner.ready_queue {
+        if task.pid.0 == pid {
+            return Some(task.clone())
+        }
+    }
+    return None
+}

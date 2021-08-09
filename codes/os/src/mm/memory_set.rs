@@ -51,7 +51,7 @@ lazy_static! {
 
 lazy_static! {
     pub static ref KERNEL_MMAP_AREA: Arc<Mutex<MmapArea>> = Arc::new(Mutex::new(
-        MmapArea::new(VirtAddr::from(MMAP_BASE), VirtAddr::from(MMAP_BASE))
+        MmapArea::new(VirtAddr::from(KMMAP_BASE), VirtAddr::from(KMMAP_BASE))
     ));
 }
 
@@ -327,7 +327,7 @@ impl MemorySet {
         // maparea2: TrapContext
         memory_set.push(MapArea::new(
             TRAP_CONTEXT.into(),
-            TRAMPOLINE.into(),
+            (TRAP_CONTEXT+PAGE_SIZE).into(),
             MapType::Framed,
             MapPermission::R | MapPermission::W,
         ), None);

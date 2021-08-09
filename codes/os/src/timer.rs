@@ -22,7 +22,7 @@ pub fn get_time() -> usize {
 pub fn get_timeval() -> TimeVal {
     let ticks = get_time();
     let sec = ticks/CLOCK_FREQ;
-    let usec = (ticks%CLOCK_FREQ) * (USEC_PER_SEC / CLOCK_FREQ);
+    let usec = (ticks%CLOCK_FREQ) * USEC_PER_SEC / CLOCK_FREQ;
     TimeVal{
         sec:sec,
         usec:usec

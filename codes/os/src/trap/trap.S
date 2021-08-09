@@ -10,7 +10,14 @@
     .globl __restore
     .align 2
 __alltraps:
+    #sd x1, 1*8(t0)
     csrrw sp, sscratch, sp
+    #csrw sscratch, sp
+    #addi t0, zero, 8
+    #slli t0, t0, 28
+    #addi t1, t1, 1
+    #slli t1, t1, 12
+    #sub  sp, t0, t1 #sp should be 0x7FFFF000
     # now sp->*TrapContext in user space, sscratch->user stack
     # save other general purpose registers
     sd x1, 1*8(sp)
@@ -39,7 +46,7 @@ __alltraps:
     ld sp, 35*8(sp)
     # switch to kernel space
     csrw satp, t0
-    sfence.vma
+    sfence.vma zero, zero
     # jump to trap_handler
     jr t1
 
@@ -47,7 +54,16 @@ __restore:
     # a0: *TrapContext in user space(Constant); a1: user space token
     # switch to user space
     csrw satp, a1
-    sfence.vma
+    #mv t0, a1
+    #addi t0, zero, 15 #t0 = f
+    #slli t0, t0, 60  
+    #not t0, t0
+    #and t0, t0, a1
+    #csrw 0x180, t0
+    #.word 0x10400073
+    #beqz a2, nsfvma
+    sfence.vma zero, zero
+nsfvma:
     csrw sscratch, a0
     mv sp, a0
     # now sp points to TrapContext in user space, start restoring based on it

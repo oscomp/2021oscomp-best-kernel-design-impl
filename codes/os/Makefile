@@ -6,8 +6,14 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
 U_FAT32_DIR := ../fat32-fuse
-#U_FAT32 := /dev/sdb1
-U_FAT32 := ${U_FAT32_DIR}/fat32.img
+ifeq ($(BOARD), k210)
+	U_FAT32 := /dev/sdb1
+else 
+	U_FAT32 := ${U_FAT32_DIR}/fat32.img
+endif
+
+
+
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../k210.bin
@@ -15,7 +21,11 @@ TOP := ../../k210.bin
 # BOARD
 BOARD ?= qemu
 SBI ?= rustsbi
-BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
+ifeq ($(BOARD), qemu)
+	BOOTLOADER := default
+else ifeq ($(BOARD), k210)
+	BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
+endif
 K210_BOOTLOADER_SIZE := 131072
 
 # KERNEL ENTRY
@@ -40,10 +50,10 @@ DISASM ?= -x
 build: env $(KERNEL_BIN)
 
 env:
-	(rustup target list | grep "riscv64imac-unknown-none-elf (installed)") || rustup target add $(TARGET)
-	cargo install cargo-binutils
-	rustup component add rust-src
-	rustup component add llvm-tools-preview
+#(rustup target list | grep "riscv64imac-unknown-none-elf (installed)") || rustup target add $(TARGET)
+#cargo install cargo-binutils
+#rustup component add rust-src
+#rustup component add llvm-tools-preview
 
 #(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
 #cargo install cargo-binutils
@@ -57,7 +67,7 @@ sdcard:
 
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
-#	@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
+#@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 $(APPS):
 
@@ -108,10 +118,10 @@ monitor:
 	riscv64-unknown-elf-gdb -ex 'file target/riscv64imac-unknown-none-elf/release/os' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
 
 gdb:
-	@qemu-system-riscv64 -machine virt -nographic -bios ../bootloader/rustsbi-qemu.bin -device loader,\
+	@qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,\
 	file=target/riscv64imac-unknown-none-elf/release/os,addr=0x80200000 -drive \
 	file=$(U_FAT32),if=none,format=raw,id=x0 \
-	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=2 -S -s
+	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=1 -S -s
 
 runsimple:
 	@qemu-system-riscv64 \

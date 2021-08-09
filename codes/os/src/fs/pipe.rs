@@ -124,6 +124,7 @@ impl File for Pipe {
         assert_eq!(self.readable(), true);
         let mut buf_iter = buf.into_iter();
         let mut read_size = 0usize;
+        let mut try_time = 0;
         loop {
             let mut ring_buffer = self.buffer.lock();
             let loop_read = ring_buffer.available_read();
@@ -131,11 +132,13 @@ impl File for Pipe {
                 if ring_buffer.all_write_ends_closed() {
                     return read_size;  //return后就ring_buffer释放了，锁自然释放
                 }
-                gdb_print!(SYSCALL_ENABLE,"[pipe] try read");
+                gdb_print!(SYSCALL_ENABLE,"[pipe] try read, wcount = {}\n", ring_buffer.count);
                 drop(ring_buffer);
                 suspend_current_and_run_next();
+                try_time += 1;
                 continue;
             }
+            gdb_print!(SYSCALL_ENABLE,"[pipe] can read {} bytes\n", loop_read);
             // read at most loop_read bytes
             for i in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
@@ -148,7 +151,6 @@ impl File for Pipe {
                     return read_size;
                 }
             }
-            ring_buffer.count += 1; 
             return read_size;
         }
     }
@@ -170,6 +172,7 @@ impl File for Pipe {
                 if let Some(byte_ref) = buf_iter.next() {
                     ring_buffer.write_byte(unsafe { *byte_ref });
                     write_size += 1;
+                    ring_buffer.count += 1;
                 } else {
                     return write_size;
                 }
