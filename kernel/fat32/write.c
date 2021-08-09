@@ -8,9 +8,7 @@
 #include <os/sched.h>
 #include <log.h>
 #include <os/io.h>
-
-uchar stdout_buf[NORMAL_PAGE_SIZE] = {0};
-uchar stderr_buf[NORMAL_PAGE_SIZE] = {0};
+#include <screen.h>
 
 /* write count bytes from buff to file in fd */
 /* return count: success
@@ -25,18 +23,11 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         return -1;
 
     if (current_running->fd[fd_index].dev == STDOUT){        
-        memcpy(stdout_buf, buff, count);
-        stdout_buf[count] = 0;
-        printk_port(stdout_buf);
-        return count;
+        return write_ring_buffer(&stdout_buf, buff, count);
     }
     else if (current_running->fd[fd_index].dev == STDERR)
     {
-        printk_port("ERROR: ");
-        memcpy(stderr_buf, buff, count);
-        stderr_buf[count] = 0;
-        printk_port(stderr_buf);
-        return count;
+        return write_ring_buffer(&stderr_buf, buff, count);
     }
     else{
         // 如果是管道，就调用pipe_write
@@ -97,10 +88,7 @@ int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
     if (current_running->fd[fd_index].dev == STDOUT){  
         for (uint32_t i = 0; i < iovcnt; i++){
             log(0, "iov_base:%lx, iov_len: %d", iov->iov_base, iov->iov_len);      
-            memcpy(stdout_buf, iov->iov_base, min(iov->iov_len, NORMAL_PAGE_SIZE - 1));
-            stdout_buf[iov->iov_len] = 0;
-            printk_port(stdout_buf);
-            count += iov->iov_len; /* FOR NOW */
+            count += write_ring_buffer(&stdout_buf, iov->iov_base, iov->iov_len); /* FOR NOW */
             iov++;
         }
         return count;
@@ -108,12 +96,8 @@ int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
     else if (current_running->fd[fd_index].dev == STDERR){
         for (uint32_t i = 0; i < iovcnt; i++){  
             log(0, "iov_base:%lx, iov_len: %d", iov->iov_base, iov->iov_len);     
-            printk_port("ERROR:");
-            memcpy(stderr_buf, iov->iov_base, min(iov->iov_len, NORMAL_PAGE_SIZE - 1));
-            stderr_buf[iov->iov_len] = 0;
-            printk_port(stderr_buf);
-            printk_port("\n");
-            iov++; count += iov->iov_len; /* FOR NOW */
+            count += write_ring_buffer(&stderr_buf, iov->iov_base, iov->iov_len);
+            iov++;
         }
         return count;
     }

@@ -14,13 +14,15 @@ typedef struct spin_lock
     volatile lock_status_t status;
 } spin_lock_t;
 
+#pragma pack(8)
 typedef struct mutex_lock
 {
     spin_lock_t lock;
     list_head block_queue;
     pid_t pid;
-    int valid;
+    int32_t valid;
 } mutex_lock_t;
+#pragma pack()
 
 typedef struct barrier
 {

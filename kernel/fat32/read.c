@@ -7,8 +7,8 @@
 #include <os/elf.h>
 #include <os/sched.h>
 #include <log.h>
-
-uchar stdin_buf[NORMAL_PAGE_SIZE];
+#include <screen.h>
+#include <os/ring_buffer.h>
 
 /* success : read count */
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
@@ -20,6 +20,8 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
         log(0, "fd not found");
         return SYSCALL_FAILED;
     }
+    if (current_running->fd[fd_index].dev == STDIN)
+        return read_ring_buffer(&stdin_buf, buf, count);
     // 如果是管道，就读取管道输出
     if (current_running->fd[fd_index].piped == FD_PIPED){
         log(0, "it's a pipe fd");
@@ -99,15 +101,26 @@ int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt)
         return SYSCALL_FAILED;
     if (current_running->fd[fd_index].dev == STDOUT || current_running->fd[fd_index].dev == STDERR)
         return SYSCALL_FAILED;
-
+    
     size_t count = 0, this_count;
 
-    for (uint32_t i = 0; i < iovcnt; i++){
-        if ((this_count = fat32_write(fd, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
-            return SYSCALL_FAILED;
-        count += this_count;
-        log(0, "count is %d", count);
-        iov++;
+    if (current_running->fd[fd_index].dev == STDIN){
+        for (uint32_t i = 0; i < iovcnt; i++){
+            if ((this_count = read_ring_buffer(&stdin_buf, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
+                return SYSCALL_FAILED;
+            count += this_count;
+            log(0, "count is %d", count);
+            iov++;
+        }
     }
-    return count; 
+    else{
+        for (uint32_t i = 0; i < iovcnt; i++){
+            if ((this_count = fat32_write(fd, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
+                return SYSCALL_FAILED;
+            count += this_count;
+            log(0, "count is %d", count);
+            iov++;
+        }
+    }
+    return count;
 }

@@ -11,6 +11,7 @@
 #include <qemu.h>
 #include <memlayout.h>
 #include <log.h>
+#include <os/io.h>
 
 #define SXLEN 64
 
@@ -20,16 +21,9 @@ uintptr_t riscv_dtb;
 
 void reset_irq_timer()
 {
-    // TODO clock interrupt handler.
-    // TODO: call following functions when task4
-    // #ifndef K210
-    // screen_reflush();
-    // #endif
+    /* clock interrupt handler */
     timer_check();
-
-    // note: use sbi_set_timer
-    // remember to reschedule
-
+    screen_reflush();
     sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
     do_scheduler();
 }

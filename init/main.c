@@ -77,9 +77,9 @@ static void init_syscall(void)
     // initialize system call table.
 
     /* for shell to use */
-    syscall[SYSCALL_WRITE] = &screen_write;
+    syscall[SYSCALL_WRITE] = &screen_assert;
     // syscall[SYSCALL_READ] = ???;
-    syscall[SYSCALL_CURSOR] = &screen_move_cursor;
+    syscall[SYSCALL_CURSOR] = &screen_assert;
 
     syscall[SYS_exit] = &do_exit;
     syscall[SYS_exit_group] = &do_exit_group;

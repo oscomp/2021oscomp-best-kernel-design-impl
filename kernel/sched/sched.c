@@ -347,50 +347,51 @@ int32_t do_kill(pid_t pid, int32_t sig)
 void do_exit_group(int32_t exit_status)
 {
     debug();
-    pid_t temp_pid = current_running->pid; /* restore it, in case that current_running is freed */
-    for (uint8_t i = 0; i < NUM_MAX_TASK; ++i)
-    {
-        /* exit all process(es) whose process id is pid */
-        if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE && pcb[i].pid == temp_pid){
-            log(0, "found a process, pid is %d", pcb[i].pid);
-            /* same as do_exit */
-            // check if some other thread is waiting
-            // if there is, unblock them
-            list_node_t *temp = pcb[i].wait_list.next;
+    do_exit(exit_status);
+    // pid_t temp_pid = current_running->pid; /* restore it, in case that current_running is freed */
+    // for (uint8_t i = 0; i < NUM_MAX_TASK; ++i)
+    // {
+    //     /* exit all process(es) whose process id is pid */
+    //     if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE && pcb[i].pid == temp_pid){
+    //         log(0, "found a process, pid is %d", pcb[i].pid);
+    //         /* same as do_exit */
+    //         // check if some other thread is waiting
+    //         // if there is, unblock them
+    //         list_node_t *temp = pcb[i].wait_list.next;
 
-            while (temp != &pcb[i].wait_list)
-            {
-                list_node_t *tempnext = temp->next;
-                list_del(temp);
+    //         while (temp != &pcb[i].wait_list)
+    //         {
+    //             list_node_t *tempnext = temp->next;
+    //             list_del(temp);
 
-                pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
-                if (pt_pcb->status != TASK_EXITED){
-                    do_unblock(temp);
-                }
+    //             pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
+    //             if (pt_pcb->status != TASK_EXITED){
+    //                 do_unblock(temp);
+    //             }
                 
-                temp = tempnext;
-            }
+    //             temp = tempnext;
+    //         }
 
-            pcb[i].exit_status = exit_status;
-            // decide terminal state by mode
-            if (pcb[i].type == USER_THREAD || pcb[i].mode == ENTER_ZOMBIE_ON_EXIT)
-                pcb[i].status = TASK_ZOMBIE;
-            else if (pcb[i].mode == AUTO_CLEANUP_ON_EXIT)
-            {
-                /* check if there are child process who is terminated and its source is waiting to be free */
-                for (int j = 0; j < NUM_MAX_TASK; ++j)
-                    if (pcb[j].status == TASK_ZOMBIE && pcb[j].parent.parent == current_running){
-                        pcb[j].status = TASK_EXITED;
-                        pcb[j].parent.parent = NULL;
-                        list_add_tail(&pcb[j].list,&available_queue);
-                        free_all_pages(pcb[j].pgdir, PAGE_ALIGN(pcb[j].kernel_sp));
-                    }
-                pcb[i].status = TASK_EXITED;
-                list_add_tail(&pcb[i].list,&available_queue);
-                free_all_pages(pcb[i].pgdir, PAGE_ALIGN(pcb[i].kernel_sp));
-            }
-        }
-    }
+    //         pcb[i].exit_status = exit_status;
+    //         // decide terminal state by mode
+    //         if (pcb[i].type == USER_THREAD || pcb[i].mode == ENTER_ZOMBIE_ON_EXIT)
+    //             pcb[i].status = TASK_ZOMBIE;
+    //         else if (pcb[i].mode == AUTO_CLEANUP_ON_EXIT)
+    //         {
+    //             /* check if there are child process who is terminated and its source is waiting to be free */
+    //             for (int j = 0; j < NUM_MAX_TASK; ++j)
+    //                 if (pcb[j].status == TASK_ZOMBIE && pcb[j].parent.parent == current_running){
+    //                     pcb[j].status = TASK_EXITED;
+    //                     pcb[j].parent.parent = NULL;
+    //                     list_add_tail(&pcb[j].list,&available_queue);
+    //                     free_all_pages(pcb[j].pgdir, PAGE_ALIGN(pcb[j].kernel_sp));
+    //                 }
+    //             pcb[i].status = TASK_EXITED;
+    //             list_add_tail(&pcb[i].list,&available_queue);
+    //             free_all_pages(pcb[i].pgdir, PAGE_ALIGN(pcb[i].kernel_sp));
+    //         }
+    //     }
+    // }
 }
 
 pid_t do_getpid()
@@ -451,13 +452,12 @@ pid_t do_gettid()
 //DEBUG FUNCTION
 void show_ready_queue()
 {
-    vt100_move_cursor(1,8);
     list_node_t *test_readyqueue = ready_queue.next;
     while (test_readyqueue != &ready_queue)
     {
         pcb_t *a = test_readyqueue->ptr;
-        printk("id[ %d ] is in ready_queue;\n",a->pid);
+        printk_port("id[ %d ] is in ready_queue;\n",a->pid);
         test_readyqueue = test_readyqueue->next;
     }
-    printk("\n\nid[ %d ] is running;\n",current_running->pid);
+    printk_port("\n\nid[ %d ] is running;\n",current_running->pid);
 }

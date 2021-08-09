@@ -255,23 +255,6 @@ int printk(const char *fmt, ...)
     return ret;
 }
 
-int vprints(const char *fmt, va_list _va)
-{
-    return _vprints(fmt, _va, screen_write);
-}
-
-int prints(const char *fmt, ...)
-{
-    int ret = 0;
-    va_list va;
-
-    va_start(va, fmt);
-    ret = vprints(fmt, va);
-    va_end(va);
-
-    return ret;
-}
-
 /* for port output, direct output */
 
 static int _vprintk_port(const char* fmt, va_list _va,
