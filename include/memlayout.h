@@ -96,12 +96,8 @@
 
 // the kernel expects there to be RAM
 // for use by the kernel and user pages
-// from physical address 0x80200000 to PHYSTOP.
-#ifndef QEMU
-#define KERNBASE                0x80020000UL
-#else
-#define KERNBASE                0x80200000UL
-#endif
+// from physical address 0x80020000 to PHYSTOP.
+#define KERNBASE 		0x80020000UL
 
 #define PHYSTOP                 0x80600000UL
 
