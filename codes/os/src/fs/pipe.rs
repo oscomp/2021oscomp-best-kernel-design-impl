@@ -132,13 +132,13 @@ impl File for Pipe {
                 if ring_buffer.all_write_ends_closed() {
                     return read_size;  //return后就ring_buffer释放了，锁自然释放
                 }
-                gdb_print!(SYSCALL_ENABLE,"[pipe] try read, wcount = {}\n", ring_buffer.count);
+                //gdb_print!(SYSCALL_ENABLE,"[pipe] try read, wcount = {}\n", ring_buffer.count);
                 drop(ring_buffer);
                 suspend_current_and_run_next();
                 try_time += 1;
                 continue;
             }
-            gdb_print!(SYSCALL_ENABLE,"[pipe] can read {} bytes\n", loop_read);
+            //gdb_print!(SYSCALL_ENABLE,"[pipe] can read {} bytes\n", loop_read);
             // read at most loop_read bytes
             for i in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
@@ -163,11 +163,11 @@ impl File for Pipe {
             let loop_write = ring_buffer.available_write();
             if loop_write == 0 {
                 drop(ring_buffer);
-                gdb_print!(SYSCALL_ENABLE,"[pipe] try write");
+                //gdb_print!(SYSCALL_ENABLE,"[pipe] try write");
                 suspend_current_and_run_next();
                 continue;
             }
-            // write at most loop_write bytes
+
             for i in 0..loop_write {
                 if let Some(byte_ref) = buf_iter.next() {
                     ring_buffer.write_byte(unsafe { *byte_ref });

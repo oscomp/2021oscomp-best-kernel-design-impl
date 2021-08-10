@@ -71,7 +71,7 @@ use crate::sbi::shutdown;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
-        //gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+        gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
         //println!("syscallid-{}", syscall_id);
     } else {
         if args[0] != 0 && args[0] != 1 && args[0] != 2{
@@ -204,8 +204,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => shutdown(),
         SYSCALL_CLEAR => sys_clear(args[0] as *const u8),
-        _ => 0
-        //_ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
+        //_ => 0
+        _ => {println!("Unsupported syscall_id:{}, arg0={} arg1={}", syscall_id, args[0], args[1]); 0}
         //_ => panic!("Unsupported syscall_id: {}", syscall_id),
 
     }

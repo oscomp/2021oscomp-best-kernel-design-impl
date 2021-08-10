@@ -419,20 +419,20 @@ impl ArgMachine{
         //testsuits.push("lmbench_all\0lat_sig\0-P\01\0catch");
         //testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
         //testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
+        //testsuits.push("busybox\0cp\0hello\0/tmp");                                            
         //testsuits.push("lmbench_all\0lat_proc\0-P\01\0shell");
-        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1k\0fsync=1\0print=3");
+        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
         //testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX"); //
         //testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");//ok
 
 
 
-        //testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
-        //testsuits.push("lmbench_all\0lat_pipe\0-P\01");  // pipe的read阻塞了，似乎需要signal??
-        //testsuits.push("busybox\0cp\0hello\0/tmp");
-        testsuits.push("busybox\0echo\0file\0system\0latency");
-        testsuits.push("lmbench_all\0lat_fs\0/var/tmp");
+        testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
+        //testsuits.push("lmbench_all\0lat_pipe\0-P\01");                                  // 需要SIGKILL
+        //testsuits.push("busybox\0echo\0file\0system\0latency"); 
+        //testsuits.push("lmbench_all\0lat_fs\0/var/tmp");                                 //ok
         //testsuits.push("busybox\0echo\0Bandwidth\0measurements");
-        // testsuits.push("lmbench_all\0bw_pipe\0-P\01");
+        testsuits.push("lmbench_all\0bw_pipe\0-P\01");                                     //需要SIGKILL
         //testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0io_only\0/var/tmp/XXX");   //ok  
         //testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok  
         //testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0mmap_only\0/var/tmp/XXX"); //ok 
