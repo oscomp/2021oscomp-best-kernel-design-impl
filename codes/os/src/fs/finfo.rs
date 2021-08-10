@@ -1,5 +1,6 @@
 //use bitflags::*;
 use alloc::vec::Vec;
+use core::mem::size_of;
 
 pub const DT_UNKNOWN:u8 = 0;
 pub const DT_DIR:u8 = 4;
@@ -39,10 +40,11 @@ pub const S_IXOTH:u32 = 0o0001;   //others have execute permission
 
 
 
-#[repr(C)]
+
 #[derive(Debug)]
+#[repr(C)]
 pub struct Dirent {
-    pub d_ino: usize,
+    pub d_ino: usize,   
     pub d_off: isize,   //到下一个dirent的偏移？？？/ 在目录中的偏移
     pub d_reclen: u16,  //当前dirent长度？？？/ 文件名的长度
     pub d_type: u8,     
@@ -54,7 +56,7 @@ impl Dirent {
         Self{
             d_ino:0,
             d_off:0,
-            d_reclen:0,
+            d_reclen: size_of::<Self>() as u16,
             d_type:0,
             d_name:[0;NAME_LIMIT],
         }
@@ -64,7 +66,7 @@ impl Dirent {
         let mut dirent = Self{
             d_ino:inode,
             d_off:offset,
-            d_reclen:reclen,
+            d_reclen: size_of::<Self>() as u16,
             d_type,
             d_name:[0;NAME_LIMIT],
         };
@@ -76,7 +78,7 @@ impl Dirent {
         *self = Self {
             d_ino:inode,
             d_off:offset,
-            d_reclen:reclen,
+            d_reclen: self.d_reclen,
             d_type,
             d_name:self.d_name,
         };
@@ -89,6 +91,7 @@ impl Dirent {
         for i in 0..len {
             self.d_name[i] = name_bytes[i];
         }
+        self.d_name[len] = 0;
     }
     
     pub fn as_bytes(&self) -> &[u8] {

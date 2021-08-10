@@ -402,9 +402,11 @@ impl ArgMachine{
         open("/var/tmp/lmbench", OpenFlags::CREATE);
         mkdir("/tmp");
         //open("/hello", OpenFlags::CREATE);
-        //ls("/");
+        ls("/");
+        
         println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
+        testsuits.push("busybox\0ls"); 
         //testsuits.push("syscalltest");
         //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0null");
         //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0read");
@@ -421,11 +423,9 @@ impl ArgMachine{
         //testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
         //testsuits.push("busybox\0cp\0hello\0/tmp");                                            
         //testsuits.push("lmbench_all\0lat_proc\0-P\01\0shell");
-        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
+        //testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
         //testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX"); //
         //testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");//ok
-
-
 
         testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
         //testsuits.push("lmbench_all\0lat_pipe\0-P\01");                                  // 需要SIGKILL

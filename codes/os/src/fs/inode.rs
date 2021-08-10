@@ -165,6 +165,7 @@ impl OSInode {
             } else {
                 d_type = DT_UNKNOWN;
             }
+            //println!("name = {}", name.as_str());
             dirent.fill_info(
                 name.as_str(), 
                 first_clu as usize, 

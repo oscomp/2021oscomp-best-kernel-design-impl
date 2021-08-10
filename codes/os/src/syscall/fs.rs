@@ -385,10 +385,14 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
 
 pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
     //return 0;
+    //println!("=====================================");
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
     let buf_vec = translated_byte_buffer(token, buf, len);
+    let dent_len = size_of::<Dirent>();
+    //let max_num = len / dent_len;
+    let mut total_len:usize = 0;
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut dirent = Dirent::empty();
@@ -400,12 +404,19 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
             OpenFlags::RDONLY,
             DiskInodeType::Directory
         ) {
-            let len = file.getdirent(&mut dirent);
-            userbuf.write(dirent.as_bytes());
-            gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}) = {}", fd, 0 );
-            return 0; //warning
+            loop {
+                if total_len + dent_len > len {break;}
+                if file.getdirent(&mut dirent) > 0 {
+                    userbuf.write_at( total_len, dirent.as_bytes());
+                    total_len += dent_len;
+                } else {
+                    break;
+                }
+            }
+            gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}, len:{}) = {}", fd, len, total_len );
+            return total_len as isize; //warning
         } else {
-            gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}) = {}", fd, -1 );
+            gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}, len:{}) = {}", fd, len, -1 );
             return -1
         }
     } else {
@@ -416,10 +427,17 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
         if let Some(file) = &inner.fd_table[fd_usz] {
             match &file.fclass {
                 FileClass::File(f) => {
-                    let len = f.getdirent(&mut dirent);
-                    userbuf.write(dirent.as_bytes());
-                    gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}) = {}", fd, 0 );
-                    return 0; //warning
+                    loop {
+                        if total_len + dent_len > len {break;}
+                        if f.getdirent(&mut dirent) > 0 {
+                            userbuf.write_at( total_len, dirent.as_bytes());
+                            total_len += dent_len;
+                        } else {
+                            break;
+                        }
+                    }
+                    gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}, len:{}) = {}", fd, len, total_len );
+                    return total_len as isize; //warning
                 },
                 _ => {
                     gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}) = {}", fd, -1 );
