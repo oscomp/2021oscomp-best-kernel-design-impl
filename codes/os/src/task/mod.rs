@@ -196,3 +196,7 @@ pub fn add_initproc() {
     add_initproc_into_fs();
     add_task(INITPROC.clone());
 }
+
+pub fn perform_signal_handler(){
+    perform_signal_handler();
+}
