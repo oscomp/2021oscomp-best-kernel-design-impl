@@ -498,6 +498,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
             return found_pid as isize;
         } else {
             drop(inner);
+            print!("\n");
             suspend_current_and_run_next();
             continue;
         }

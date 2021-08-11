@@ -468,7 +468,7 @@ impl ArgMachine{
             args_addr.push(0 as *const u8 );
             let pid = fork();
             if pid == 0 {
-                println!("exec");
+                //println!("exec");
                 if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
                     println!("Error when executing autorun_testsuites!");
                     ls("/");
@@ -547,14 +547,14 @@ impl ArgMachine{
         testsuits.push("ls\0");
         
         // lua: all pass
-        testsuits.push("date.lua\0");
-        testsuits.push("file_io.lua\0");
-        testsuits.push("random.lua\0");
+        // testsuits.push("date.lua\0");
+        // testsuits.push("file_io.lua\0");
+        // testsuits.push("random.lua\0");
         testsuits.push("remove.lua\0");
         testsuits.push("sin30.lua\0");
-        testsuits.push("max_min.lua\0");
+        // testsuits.push("max_min.lua\0");
         testsuits.push("round_num.lua\0");
-        testsuits.push("sort.lua\0");
+        // testsuits.push("sort.lua\0");
         testsuits.push("strings.lua\0");
         
         testsuits.push("ash\0 -c\0 exit\0");
@@ -640,8 +640,10 @@ impl ArgMachine{
                 if result != "false" && exit_code != 0{
                     if is_lua {
                         println!("testcase lua {} fail", result);
+                        panic!("lua fail");
                     } else {
                         println!("testcase busybox {} fail", result);
+                        panic!("busybox fail");
                     }   
                 }
                 else{
