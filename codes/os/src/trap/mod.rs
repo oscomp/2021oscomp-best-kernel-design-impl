@@ -32,7 +32,7 @@ use crate::task::{
     get_kernel_runtime_usec
 };
 use crate::timer::set_next_trigger;
-use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
+use crate::config::{TRAP_CONTEXT, TRAMPOLINE, USER_STACK_SIZE};
 use crate::gdb_print;
 use crate::monitor::*;
 
@@ -110,6 +110,8 @@ pub fn trap_handler() -> ! {
             let vpn: VirtPageNum = va.floor();
             let heap_base = current_task().unwrap().acquire_inner_lock().heap_start;
             let heap_pt = current_task().unwrap().acquire_inner_lock().heap_pt;
+            let stack_top = current_task().unwrap().acquire_inner_lock().base_size;
+            let stack_bottom = stack_top - USER_STACK_SIZE;
             // println!{"The base of the user heap: {:X}", heap};
             // println!{"============================{:?}", vpn}
             let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
@@ -120,7 +122,9 @@ pub fn trap_handler() -> ! {
                 // exit_current_and_run_next(-2);
                 current_task().unwrap().lazy_mmap(va.0);
             } else if va.0 >= heap_base && va.0 <= heap_pt {
-                current_task().unwrap().acquire_inner_lock().lazy_alloc(vpn);
+                current_task().unwrap().acquire_inner_lock().lazy_alloc_heap(vpn);
+            } else if va.0 >= stack_bottom && va.0 <= stack_top {
+                current_task().unwrap().acquire_inner_lock().lazy_alloc_stack(vpn);
             } else {
                 // get the PageTableEntry that faults
                 let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
