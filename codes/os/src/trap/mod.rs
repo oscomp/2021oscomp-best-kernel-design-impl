@@ -29,7 +29,9 @@ use crate::task::{
     update_user_clock, 
     update_kernel_clock, 
     get_user_runtime_usec, 
-    get_kernel_runtime_usec
+    get_kernel_runtime_usec,
+    Signals,
+    perform_signal_handler,
 };
 use crate::timer::set_next_trigger;
 use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
@@ -102,7 +104,10 @@ pub fn trap_handler() -> ! {
                 current_trap_cx().sepc,
             );
             // page fault exit code
-            exit_current_and_run_next(-2);
+            let current_task = current_task().unwrap();
+            if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                exit_current_and_run_next(-2);
+            }
         }
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
@@ -145,7 +150,10 @@ pub fn trap_handler() -> ! {
                     current_trap_cx().sepc,
                 );
                 // page fault exit code
-                exit_current_and_run_next(-2);
+                let current_task = current_task().unwrap();
+                if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                    exit_current_and_run_next(-2);
+                }
             }
             // println!{"Trap solved..."}
         }
@@ -184,8 +192,9 @@ pub fn trap_return() -> ! {
     // update_user_clock();
     // let ru_stime = get_kernel_runtime_usec();
     // current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
-
+    perform_signal_handler();
     set_user_trap_entry();
+
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
     let user_satp = current_user_token();

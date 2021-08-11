@@ -27,8 +27,13 @@ const SYSCALL_EXIT: usize = 93;
 const SYSCALL_EXIT_GRUOP: usize = 94;
 const SYSCALL_SET_TID_ADDRESS: usize = 96;
 const SYSCALL_NANOSLEEP: usize = 101;
+const SYSCALL_GETITIMER: usize = 102;
+const SYSCALL_SETITIMER: usize = 103;
 const SYSCALL_CLOCK_GETTIME: usize = 113;
 const SYSCALL_YIELD: usize = 124;
+const SYSCALL_KILL: usize = 129;
+const SYSCALL_SIGACTION: usize = 134;
+const SYSCALL_SIGRETURN: usize = 139;
 const SYSCALL_TIMES: usize = 153;
 const SYSCALL_UNAME: usize = 160;
 const SYSCALL_GETRUSAGE: usize = 165;
@@ -101,6 +106,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
 
     
     match syscall_id {
+        SYSCALL_SIGRETURN => sys_sigreturn(),
         SYSCALL_GETCWD=> sys_getcwd(args[0] as *mut u8, args[1] as usize),
         SYSCALL_DUP=> sys_dup(args[0]),
         SYSCALL_DUP3=> sys_dup3(args[0] as usize, args[1] as usize),
@@ -110,6 +116,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_MKDIRAT=> sys_mkdir(args[0] as isize, args[1] as *const u8, args[2] as u32),
         //SYSCALL_UNLINKAT=> sys_unlinkat(args[0] as i32, args[1] as *const u8, args[2] as i32,args[3] as *const u8,args[4] as u32),
         SYSCALL_UNLINKAT=> sys_unlinkat(args[0] as i32, args[1] as *const u8, args[2] as u32),
+        SYSCALL_GETITIMER => sys_getitimer(args[0] as isize, args[1] as *mut u8),
+        SYSCALL_SETITIMER => sys_setitimer(args[0] as isize, args[1] as *mut usize, args[2] as *mut u8),
         SYSCALL_UMOUNT2=> sys_umount(args[0] as *const u8, args[1] as usize),
         SYSCALL_MOUNT=> sys_mount(args[0] as *const u8, args[1] as *const u8, args[2] as *const u8, args[3] as usize, args[4] as *const u8),
         /* faccessat is fake */
@@ -141,6 +149,8 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_NANOSLEEP => sys_sleep(args[0] as *mut u64, args[1] as *mut u64),
         SYSCALL_CLOCK_GETTIME => sys_clock_get_time(args[0] as usize, args[1] as *mut u64),
         SYSCALL_YIELD => sys_yield(),
+        SYSCALL_KILL => sys_kill(args[0] as isize, args[1] as isize),
+        SYSCALL_SIGACTION => sys_sigaction(args[0] as isize, args[1] as *mut usize, args[2] as *mut usize),
         SYSCALL_TIMES => sys_times(args[0] as *mut i64),
         SYSCALL_UNAME => sys_uname(args[0] as *mut u8),
         // SYSCALL_GETRUSAGE => sys_getrusage(args[0] as isize, args[1] as *mut u8),

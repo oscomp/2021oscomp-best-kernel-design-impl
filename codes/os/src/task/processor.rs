@@ -90,11 +90,14 @@ impl Processor {
                     self.inner.borrow_mut().current = Some(task);
                     ////////// current task  /////////
                     // update RUsage of process
-                    let ru_stime = get_kernel_runtime_usec();
-                    update_kernel_clock();
-                    current_task_inner.rusage.add_stime(ru_stime);
+                    // let ru_stime = get_kernel_runtime_usec();
+                    // update_kernel_clock();
+                    // current_task_inner.rusage.add_stime(ru_stime);
                     // Change status to Ready
                     current_task_inner.task_status = TaskStatus::Ready;
+                    // if current_task.pid.0 >1 {
+                    //     current_task_inner.memory_set.print_pagetable();
+                    // }
                     drop(current_task_inner);
                     //println!("drop lock1");
                     
@@ -110,6 +113,10 @@ impl Processor {
                 }
                 else{
                     //print!("[no ready process]");
+                    // if current_task.pid.0 >1 {
+                    //     current_task_inner.memory_set.print_pagetable();
+
+                    // }
                     drop(current_task_inner);
                     //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
@@ -133,6 +140,10 @@ impl Processor {
                     // println!("*2");
                     let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
                     task_inner.task_status = TaskStatus::Running;
+                    // if task.pid.0 >1 {
+                    //     task_inner.memory_set.print_pagetable();
+
+                    // }
                     drop(task_inner);
                     // release
                     self.inner.borrow_mut().current = Some(task);
@@ -213,10 +224,22 @@ pub fn get_kernel_runtime_usec() -> usize{
     return get_time_us() - PROCESSOR_LIST[core_id].get_kernel_clock();
 }
 
+// if there is unhandled signal, it will automatic change trap_cx which makes it unseen in codes outside the func
+pub fn perform_signal_handler(){
+    let current_task = current_task().unwrap();
+    // mask all the signals when processing signal handler
+    if !current_task.is_signal_execute(){
+        current_task.scan_signal_handler();
+    }
+}
+
 pub fn schedule(switched_task_cx_ptr2: *const usize) {
     let core_id: usize = get_core_id();
     //println!("core {} still alive", core_id);    
     let idle_task_cx_ptr2 = PROCESSOR_LIST[core_id].get_idle_task_cx_ptr2();
+    // if PROCESSOR_LIST[core_id].current().unwrap().pid.0 > 1{
+    //     PROCESSOR_LIST[core_id].current().unwrap().acquire_inner_lock().memory_set.print_pagetable();
+    // }
     unsafe {
         __switch(
             switched_task_cx_ptr2,

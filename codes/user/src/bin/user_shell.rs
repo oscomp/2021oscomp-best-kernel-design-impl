@@ -409,7 +409,13 @@ impl ArgMachine{
         // testsuits.push("syscalltest");
         // testsuits.push("syscalltest");
         // testsuits.push("syscalltest");
-        testsuits.push("lmbench_all lat_syscall -P 1 null");
+        testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
+        // testsuits.push("lmbench_all lat_syscall -P 1 null");
+        // testsuits.push("lmbench_all lat_syscall -P 1 null");
+        // testsuits.push("lmbench_all lat_syscall -P 1 null");
+        // testsuits.push("lmbench_all lat_syscall -P 1 null");
+        // testsuits.push("lmbench_all lat_syscall -P 1 null");
+        // testsuits.push("lmbench_all lat_syscall -P 1 null");
         // testsuits.push("lmbench_all lat_syscall -P 1 read");
         // testsuits.push("lmbench_all lat_syscall -P 1 write");
         // testsuits.push("busybox mkdir -p /var/tmp");

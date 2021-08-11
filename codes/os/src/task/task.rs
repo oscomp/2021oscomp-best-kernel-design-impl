@@ -19,6 +19,8 @@ use crate::trap::{TrapContext, trap_handler};
 use crate::config::*;
 use crate::gdb_println;
 use crate::monitor::*;
+use crate::utils::*;
+use crate::timer::get_timeval;
 use super::TaskContext;
 use super::{PidHandle, pid_alloc, KernelStack};
 use super::info::*;
@@ -79,6 +81,7 @@ pub struct TaskControlBlockInner {
     pub rusage:RUsage,
     pub itimer: ITimerVal, // it_value if not remaining time but the time to alarm
     pub siginfo: SigInfo,
+    pub trapcx_backup: TrapContext,
 }
 
 impl ProcAddress {
@@ -134,6 +137,10 @@ impl TaskControlBlockInner {
         // println!{"finished cow_alloc!"}
         ret
     }
+
+    pub fn add_signal(&mut self, signal: Signals){
+        self.siginfo.signal_pending.push(signal);
+    }
 }
 
 
@@ -143,6 +150,89 @@ impl TaskControlBlock {
         // println!{"acquiring lock..."}
         self.inner.lock()
     }
+    
+    pub fn get_parent(&self) -> Option<Arc<TaskControlBlock>> {
+        let inner = self.inner.lock();
+        inner.parent.as_ref().unwrap().upgrade()
+    }
+
+    /// @return: (signum, handler)
+    /// WARNING: no operation of "mask" + "flags"
+    /// func: 1. check if there are some signals that need to be operated
+    ///       2. and also do the backup of the trap_cx
+    ///       3. change trap_cx to execute signal handler in user
+    pub fn scan_signal_handler(&self) -> Option<(Signals,usize)>{
+        let mut inner = self.acquire_inner_lock();
+        // timer signal check
+        {
+            let itimer = inner.itimer.clone();
+            let now = get_timeval();
+            if (itimer.it_value - now).is_zero(){ // now > timer ( time up)
+                inner.siginfo.signal_pending.push(Signals::SIGALRM);
+            }
+            if !inner.itimer.it_interval.is_zero() && !inner.itimer.it_value.is_zero(){
+                inner.itimer.it_value = inner.itimer.it_value + inner.itimer.it_interval;
+            }
+            else{
+                inner.itimer.it_value = TimeVal::new();
+            }
+        }
+        // find unhandled signal and exec it
+        let signal_handler = inner.siginfo.signal_handler.clone();
+        while !inner.siginfo.signal_pending.is_empty() {
+            let signum = inner.siginfo.signal_pending.pop().unwrap();
+            if let Some(sigaction) = signal_handler.get(&signum){
+                if sigaction.sa_handler == 0{
+                    continue;
+                }
+                {// avoid borrow mut trap_cx, because we need to modify trapcx_backup
+                    let trap_cx = inner.get_trap_cx().clone();
+                    inner.trapcx_backup = trap_cx;          // backup
+                }
+                let trap_cx = inner.get_trap_cx();
+                trap_cx.set_sp(USER_SIGNAL_STACK);      // sp->signal_stack
+                trap_cx.x[10] = log2(signum.bits());    // a0=signum
+                trap_cx.x[1] = USER_SIGNAL_STACK;       // ra-> signal_stack
+                trap_cx.sepc = sigaction.sa_handler;    // sepc-> sa_handler
+                gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=0x{:X})", signum, signum, sigaction.sa_handler);
+                return Some((signum, sigaction.sa_handler));
+            }   
+        }
+        None
+    }
+
+    /// Checks if certain signal has other signal handler than default
+    /// If yes, return true. At the same time, this process will change 
+    /// the trap_cx to execute the handler.
+    pub fn check_signal_handler(&self, signal: Signals) -> bool {
+        let mut inner = self.acquire_inner_lock();
+        let signal_handler = inner.siginfo.signal_handler.clone();
+        if let Some(sigaction) = signal_handler.get(&signal){
+            if sigaction.sa_handler == 0{
+                return false;
+            }
+            {// avoid borrow mut trap_cx, because we need to modify trapcx_backup
+                let trap_cx = inner.get_trap_cx().clone();
+                inner.trapcx_backup = trap_cx;          // backup
+            }
+            let trap_cx = inner.get_trap_cx();
+            trap_cx.set_sp(USER_SIGNAL_STACK);      // sp->signal_stack
+            trap_cx.x[10] = log2(signal.bits());    // a0=signum
+            trap_cx.x[1] = USER_SIGNAL_STACK;       // ra-> signal_stack
+            trap_cx.sepc = sigaction.sa_handler;    // sepc-> sa_handler
+            gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=0x{:X})", signal, signal, sigaction.sa_handler);
+            true
+        }   
+        else{
+            false
+        }
+    }
+
+    pub fn is_signal_execute(&self) -> bool {
+        return self.acquire_inner_lock().siginfo.is_signal_execute;
+    }
+
+
     pub fn new(elf_data: &[u8]) -> Self {
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, user_heap, entry_point, auxv) = MemorySet::from_elf(elf_data);
@@ -166,6 +256,13 @@ impl TaskControlBlock {
                 rusage: RUsage::new(),
                 itimer: ITimerVal::new(),
                 siginfo: SigInfo::new(),
+                trapcx_backup: TrapContext::app_init_context(
+                    entry_point,
+                    user_sp,
+                    KERNEL_SPACE.lock().token(),
+                    kernel_stack_top,
+                    trap_handler as usize,
+                ),
                 trap_cx_ppn,
                 base_size: user_sp,
                 heap_start: user_heap,
@@ -207,10 +304,6 @@ impl TaskControlBlock {
             trap_handler as usize,
         );
         task_control_block
-    }
-    pub fn get_parent(&self) -> Option<Arc<TaskControlBlock>> {
-        let inner = self.inner.lock();
-        inner.parent.as_ref().unwrap().upgrade()
     }
     
     // exec will push following arguments to user stack:
@@ -433,7 +526,8 @@ impl TaskControlBlock {
                 address: ProcAddress::new(),
                 rusage: RUsage::new(),
                 itimer: ITimerVal::new(),
-                siginfo: SigInfo::new(),
+                siginfo: parent_inner.siginfo.clone(),
+                trapcx_backup: parent_inner.get_trap_cx().clone(),
                 trap_cx_ppn,
                 base_size: parent_inner.base_size,
                 heap_start: parent_inner.heap_start,
@@ -449,6 +543,7 @@ impl TaskControlBlock {
                 current_path: parent_inner.current_path.clone(),
             }),
         });
+        // println!("[fork] parent_inner.siginfo {:?}",parent_inner.siginfo);
         // add child
         parent_inner.children.push(task_control_block.clone());
         // modify kernel_sp in trap_cx
@@ -461,6 +556,7 @@ impl TaskControlBlock {
         task_control_block
         // ---- release parent PCB lock
     }
+    
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
@@ -536,7 +632,7 @@ impl TaskControlBlock {
         //unsafe{
         //    *(MMAP_BASE as *mut usize) = 5;
         //}
-    
+        // ks_lock.print_pagetable();
         kma_lock.push(va_top.into(), len, prot, flags, fd, off, fd_table, token)
     }
 

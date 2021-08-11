@@ -1,6 +1,6 @@
 use core::fmt::{self, Debug, Formatter};
 use core::ops::{Add, Sub};
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BinaryHeap};
 use alloc::vec::Vec;
 use bitflags::*;
 use crate::timer::USEC_PER_SEC;
@@ -16,43 +16,36 @@ bitflags!{
 // signal
 bitflags!{
     pub struct Signals: usize{
-        /* ISO C99 signals.  */
-        const	SIGINT		= 1 << 2 ;  /* Interactive attention signal.  */
-        const	SIGILL		= 1 << 4 ;  /* Illegal instruction.  */
-        const	SIGABRT		= 1 << 6 ;  /* Abnormal termination.  */
-        const	SIGFPE		= 1 << 8 ;  /* Erroneous arithmetic operation.  */
-        const	SIGSEGV		= 1 << 11;	/* Invalid access to storage.  */
-        const	SIGTERM		= 1 << 15;	/* Termination request.  */
-
-        /* Historical signals specified by POSIX. */
-        const	SIGHUP		= 1 << 1 ;  /* Hangup.  */
-        const	SIGQUIT		= 1 << 3 ;  /* Quit.  */
-        const	SIGTRAP		= 1 << 5 ;  /* Trace/breakpoint trap.  */
-        const	SIGKILL		= 1 << 9 ;  /* Killed.  */
-        const	SIGBUS		= 1 << 10;	/* Bus error.  */
-        const	SIGSYS		= 1 << 12;	/* Bad system call.  */
-        const	SIGPIPE		= 1 << 13;	/* Broken pipe.  */
-        const	SIGALRM		= 1 << 14;	/* Alarm clock.  */
-
-        /* New(er) POSIX signals (1003.1-2008, 1003.1-2013).  */
-        const	SIGURG		= 1 << 16;	/* Urgent data is available at a socket.  */
-        const	SIGSTOP		= 1 << 17;	/* Stop, unblockable.  */
-        const	SIGTSTP		= 1 << 18;	/* Keyboard stop.  */
-        const	SIGCONT		= 1 << 19;	/* Continue.  */
-        const	SIGCHLD		= 1 << 20;	/* Child terminated or stopped.  */
-        const	SIGTTIN		= 1 << 21;	/* Background read from control terminal.  */
-        const	SIGTTOU		= 1 << 22;	/* Background write to control terminal.  */
-        const	SIGPOLL		= 1 << 23;	/* Pollable event occurred (System V).  */
-        const	SIGXCPU		= 1 << 24;	/* CPU time limit exceeded.  */
-        const	SIGXFSZ		= 1 << 25;	/* File size limit exceeded.  */
-        const	SIGVTALRM	= 1 << 26;	/* Virtual timer expired.  */
-        const	SIGPROF		= 1 << 27;	/* Profiling timer expired.  */
-        const	SIGUSR1		= 1 << 30;	/* User-defined signal 1.  */
-        const	SIGUSR2		= 1 << 31;	/* User-defined signal 2.  */
-
-        /* Nonstandard signals found in all modern POSIX systems
-           (including both BSD and Linux).  */
-        const	SIGWINCH	= 1 << 28;	/* Window size change (4.3 BSD, Sun).  */
+        const	SIGHUP		= 1 << ( 1-1);  
+        const	SIGINT		= 1 << ( 2-1);  
+        const	SIGQUIT		= 1 << ( 3-1);  
+        const	SIGILL		= 1 << ( 4-1);  
+        const	SIGTRAP		= 1 << ( 5-1);	
+        const	SIGABRT		= 1 << ( 6-1);	
+        const	SIGIOT		= 1 << ( 6-1);  
+        const	SIGBUS		= 1 << ( 7-1);  
+        const	SIGFPE		= 1 << ( 8-1);  
+        const	SIGKILL		= 1 << ( 9-1);  
+        const	SIGUSR1		= 1 << (10-1);	
+        const	SIGSEGV		= 1 << (11-1);	
+        const	SIGUSR2		= 1 << (12-1);	
+        const	SIGPIPE		= 1 << (13-1);	
+        const	SIGALRM		= 1 << (14-1);	
+        const	SIGTERM		= 1 << (15-1);	
+        const	SIGSTKFLT	= 1 << (16-1);	
+        const	SIGCHLD		= 1 << (17-1);	
+        const	SIGCONT		= 1 << (18-1);	
+        const	SIGSTOP		= 1 << (19-1);	
+        const	SIGTSTP		= 1 << (20-1);	
+        const	SIGTTIN		= 1 << (21-1);	
+        const	SIGTTOU		= 1 << (22-1);	
+        const	SIGURG		= 1 << (23-1);	
+        const	SIGXCPU		= 1 << (24-1);	
+        const	SIGXFSZ		= 1 << (25-1);	
+        const	SIGVTALRM	= 1 << (26-1);	
+        const	SIGPROF		= 1 << (27-1);	
+        const	SIGWINCH	= 1 << (28-1);	
+        const	SIGIO		= 1 << (29-1);	
     }
 }
 bitflags!{
@@ -125,17 +118,20 @@ pub struct RUsage{
     ru_nivcsw  :isize  ,      // NOT IMPLEMENTED /* involuntary context switches */
 }
 
+#[derive(Clone)]
 pub struct SigAction {
-    sa_handler:usize,
-    sa_sigaction:usize,
-    sa_mask:Vec<Signals>,
-    sa_flags:SaFlags,
+    pub sa_handler:usize,
+    // pub sa_sigaction:usize,
+    pub sa_mask:Vec<Signals>,
+    pub sa_flags:SaFlags,
 }
 
 
+#[derive(Clone)]
 pub struct SigInfo{
-    signal_pending: Signals,
-    signal_handler: BTreeMap<Signals,SigAction>,
+    pub is_signal_execute: bool, // is process now executing in signal handler
+    pub signal_pending: BinaryHeap<Signals>,
+    pub signal_handler: BTreeMap<Signals,SigAction>,
 }
 
 
@@ -264,11 +260,25 @@ impl RUsage{
 
 }
 
+impl SigAction{
+    pub fn new() -> Self{
+        Self{
+            sa_handler: 0,
+            sa_flags: SaFlags::from_bits(0).unwrap(),
+            sa_mask: Vec::new(),
+        }
+    }
+
+    pub fn is_null(&self) -> bool{
+        self.sa_handler==0 && self.sa_flags.is_empty() && self.sa_mask.is_empty()
+    }
+}
 
 impl SigInfo{
     pub fn new() -> Self{
         Self{
-            signal_pending: Signals::from_bits(0).unwrap(),
+            is_signal_execute: false,
+            signal_pending: BinaryHeap::new(),
             signal_handler: BTreeMap::new(),
         }
     }
@@ -327,8 +337,26 @@ impl Debug for TimeVal {
     }
 }
 
+impl Debug for ITimerVal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("( it_interval:{:?}, it_value:{:?})", self.it_interval, self.it_value))
+    }
+}
+
 impl Debug for RUsage {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("( ru_utime:{:?}, ru_stime:{:?})", self.ru_utime, self.ru_stime))
+    }
+}
+
+impl Debug for SigAction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("( sa_handler:0x{:X}, sa_mask:{:?}, sa_flags:{:?})", self.sa_handler,  self.sa_mask,  self.sa_flags ))
+    }
+}
+
+impl Debug for SigInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!("( is_signal_execute:{}, signal_pending:{:?}, signal_handler:{:?})", self.is_signal_execute,  self.signal_pending,  self.signal_handler ))
     }
 }

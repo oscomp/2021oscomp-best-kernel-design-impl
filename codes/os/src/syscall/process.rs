@@ -24,9 +24,18 @@ use core::slice;
 //use easy_fs::DiskInodeType;
 
 
-pub fn sys_exit(exit_code: i32) -> ! {
-    exit_current_and_run_next(exit_code);
-    panic!("Unreachable in sys_exit!");
+pub fn sys_exit(exit_code: i32) -> isize {
+    let current_task = current_task().unwrap();
+    if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+        exit_current_and_run_next(exit_code);
+        panic!("Unreachable in sys_exit!");
+    }
+    // mark not processing signal handler
+    let mut inner = current_task.acquire_inner_lock();
+    // restore trap_cx
+    let trap_cx = inner.get_trap_cx();
+    *trap_cx = inner.trapcx_backup.clone();
+    return trap_cx.x[10] as isize; //return a0: not modify any of trap_cx
 }
 
 pub fn sys_yield() -> isize {
@@ -159,36 +168,133 @@ pub fn sys_getitimer(which: isize, curr_value: *mut u8) -> isize{
     // }
     let token = current_user_token();
     if curr_value as usize != 0{
-        let itimer = current_task().unwrap().acquire_inner_lock().itimer;
+        let mut itimer = current_task().unwrap().acquire_inner_lock().itimer;
         let mut buf_vec = translated_byte_buffer(token, curr_value, size_of::<ITimerVal>());
         // 使用UserBuffer结构，以便于跨页读写
         let mut userbuf = UserBuffer::new(buf_vec);
-        if itimer.is_zero(){
-            userbuf.write(itimer.as_bytes());
+        if !itimer.is_zero(){
+            itimer.it_value = itimer.it_value - get_timeval();
         }
-        else{
-            let mut remaining_itimer = itimer;
+        userbuf.write(itimer.as_bytes());
+        gdb_println!(SYSCALL_ENABLE, "sys_getitimer(which: {}, curr_value: {:?}) = {},", which, itimer, 0);
 
-        }
         0
     }
     else{
+        gdb_println!(SYSCALL_ENABLE, "sys_getitimer(which: {}, curr_value: {}) = {},", which, 0, 0);
         -1
     }
 }
 
 // @Arg: value: ITimerVal pointer
-pub fn sys_setitimer(which: isize, new_value: *mut usize, old_value: *mut usize) -> isize{
-    // if old_value as usize != 0{
-    //     old_value
-    // }
+pub fn sys_setitimer(which: isize, new_value: *mut usize, old_value: *mut u8) -> isize{
+    let token = current_user_token();
+    let mut itimer_old = ITimerVal::new();
+    if old_value as usize != 0{
+        let mut itimer = current_task().unwrap().acquire_inner_lock().itimer;
+        let mut buf_vec = translated_byte_buffer(token, old_value, size_of::<ITimerVal>());
+        // 使用UserBuffer结构，以便于跨页读写
+        let mut userbuf = UserBuffer::new(buf_vec);
+        if !itimer.is_zero(){
+            itimer.it_value = itimer.it_value - get_timeval();
+        }
+        itimer_old = itimer;
+        userbuf.write(itimer.as_bytes());
+    }
+    let mut itimer = ITimerVal::new();
+    itimer.it_interval.sec = *translated_refmut(token, new_value); 
+    itimer.it_interval.usec = *translated_refmut(token, unsafe{new_value.add(1)}); 
+    itimer.it_value.sec = *translated_refmut(token, unsafe{new_value.add(2)}); 
+    itimer.it_value.usec = *translated_refmut(token, unsafe{new_value.add(3)}); 
+    gdb_println!(SYSCALL_ENABLE, "sys_setitimer(which: {}, new_value: {:?}, old_value: {:?}) = {}", which, itimer, itimer_old, 0);
+    itimer.it_value = itimer.it_value + get_timeval();
+    current_task().unwrap().acquire_inner_lock().itimer = itimer;
     0
 }
 
 // int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
-pub fn sys_sigaction(signum: isize, act :*mut u8, oldact: *mut u8) -> isize{
-    
+pub fn sys_sigaction(signum: isize, act :*mut usize, oldact: *mut usize) -> isize{
+    // pub struct SigAction {
+    //     sa_handler:usize,
+    //     sa_sigaction:usize,
+    //     sa_mask:Vec<Signals>,
+    //     sa_flags:SaFlags,
+    // }
+    let mut task = current_task().unwrap();
+    let token = current_user_token();
+    let signum = Signals::from_bits(1 << (signum-1)).unwrap();
+    // act new
+    let handler = *translated_refmut(token, act);
+    let flags = *translated_refmut(token, unsafe{act.add(1)});
+    let mask = *translated_refmut(token, unsafe{act.add(2)});
+    let mut sigaction_new = SigAction{
+        sa_handler:handler,
+        sa_mask:Vec::new(),
+        sa_flags:SaFlags::from_bits(flags).unwrap(),
+    };
+    if mask != 0 {
+        sigaction_new.sa_mask.push(Signals::from_bits(mask).unwrap());
+    }
+    // act old
+    let mut task_inner = task.acquire_inner_lock();
+    let mut sigaction_old = SigAction::new();
+    if let Some(sigaction) = task_inner.siginfo.signal_handler.remove(&signum){
+        sigaction_old = sigaction;
+        *translated_refmut(token, oldact) = sigaction_old.sa_handler;
+        *translated_refmut(token, unsafe{oldact.add(1)}) = sigaction_old.sa_flags.bits();
+        if sigaction_old.sa_mask.is_empty(){
+            *translated_refmut(token, unsafe{oldact.add(2)}) = 0;
+        }
+        else{
+            *translated_refmut(token, unsafe{oldact.add(2)}) = sigaction_old.sa_mask[0].bits();
+        }
+    }
+    else{
+        *translated_refmut(token, oldact) = 0;
+        *translated_refmut(token, unsafe{oldact.add(1)}) = 0;
+        *translated_refmut(token, unsafe{oldact.add(2)}) = 0;
+    }
+    // push to PCB
+    let sigaction_new_copy = sigaction_new.clone();
+    task_inner.siginfo.signal_handler.insert(signum, sigaction_new);
+    // gdb_println!(SYSCALL_ENABLE, "sys_sigaction(handler: 0x{:X}, mask: 0x{:X}, flags: 0x{:X}) = {}", handler, mask, flags, 0);
+    gdb_println!(SYSCALL_ENABLE, "sys_sigaction(signum: {:?}, act: {:?}, oldact: {:?}) = {}", signum, sigaction_new_copy, sigaction_old, 0);
     0
+}
+
+pub fn sys_sigreturn() -> isize{
+    // mark not processing signal handler
+    let current_task = current_task().unwrap();
+    let mut inner = current_task.acquire_inner_lock();
+    inner.siginfo.is_signal_execute = false;
+    // restore trap_cx
+    let trap_cx = inner.get_trap_cx();
+    *trap_cx = inner.trapcx_backup.clone();
+    return trap_cx.x[10] as isize; //return a0: not modify any of trap_cx
+}
+
+
+/// This function only supports sending signal to the calling process
+pub fn sys_kill(pid: isize, signal: isize) -> isize {
+    if pid <= 0 {
+        println!("[sys_kill]: pid <= 0 not support");
+        return 0;
+    }
+    if signal == 0{ // currently ignore capability check when signal == 0 
+        return 0;
+    }
+    // let ppid = sys_getppid();
+    let current_task = current_task().unwrap();
+    if current_task.getpid() == pid as usize {
+        let mut inner = current_task.acquire_inner_lock();
+        inner.add_signal(Signals::from_bits(1 << (signal - 1)).unwrap());
+        gdb_println!(SYSCALL_ENABLE,"sys_kill(pid: {}, signal: {:?}) = {}", pid, Signals::from_bits(1 << (signal - 1)).unwrap(), 0);
+        0
+    }
+    else{
+        gdb_println!(SYSCALL_ENABLE,"sys_kill(pid: {}, signal: {:?}) = {}", pid, Signals::from_bits(1 << (signal - 1)), -1);
+        -1
+    }
 }
 
 pub fn sys_set_tid_address(tidptr: usize) -> isize {

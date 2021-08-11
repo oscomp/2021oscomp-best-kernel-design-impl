@@ -25,6 +25,7 @@ extern "C" {
     fn ebss();
     fn ekernel();
     fn strampoline();
+    fn ssignaltrampoline();
 }
 
 
@@ -51,7 +52,7 @@ lazy_static! {
 
 lazy_static! {
     pub static ref KERNEL_MMAP_AREA: Arc<Mutex<MmapArea>> = Arc::new(Mutex::new(
-        MmapArea::new(VirtAddr::from(MMAP_BASE), VirtAddr::from(MMAP_BASE))
+        MmapArea::new(VirtAddr::from(KMMAP_BASE), VirtAddr::from(KMMAP_BASE))
     ));
 }
 
@@ -146,6 +147,17 @@ impl MemorySet {
             PTEFlags::R | PTEFlags::X,
         );
     }
+
+    /// Mention that trampoline is not collected by areas.
+    /// Different from trampoline: this dosen't need to be mapped in kernel(executed in user)
+    fn map_signal_trampoline(&mut self) {
+        self.page_table.map(
+            VirtAddr::from(SIGNAL_TRAMPOLINE).into(),
+            PhysAddr::from(ssignaltrampoline as usize).into(),
+            PTEFlags::R | PTEFlags::X | PTEFlags::U,
+        );
+    }
+
     /// Without kernel stacks.
     pub fn new_kernel() -> Self {
         let mut memory_set = Self::new_bare();
@@ -209,6 +221,7 @@ impl MemorySet {
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
+        memory_set.map_signal_trampoline();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -335,10 +348,10 @@ impl MemorySet {
         ), None);
 
         // map user stack with U flags
-        //maparea3: user_stack
+        // maparea3: user_stack
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
-        user_stack_top -= PAGE_SIZE;
+        user_stack_top = USER_STACK;
         let user_stack_bottom: usize = user_stack_top - USER_STACK_SIZE;
         memory_set.push(MapArea::new(
             user_stack_bottom.into(),
@@ -347,6 +360,18 @@ impl MemorySet {
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
 
+        // map signal user stack with U flags
+        // maparea4: signal_user_stack
+        let mut signal_stack_top: usize = USER_SIGNAL_STACK;
+        let signal_stack_bottom: usize = signal_stack_top - SIGNAL_STACK_SIZE;
+        memory_set.push(MapArea::new(
+            signal_stack_bottom.into(),
+            signal_stack_top.into(),
+            MapType::Framed,
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        ), None);
+        
+
         (memory_set, user_stack_top, user_heap_bottom, elf.header.pt2.entry_point() as usize, auxv)
     }
  
@@ -354,6 +379,7 @@ impl MemorySet {
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
+        memory_set.map_signal_trampoline();
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
             let new_area = MapArea::from_another(area);
@@ -376,6 +402,7 @@ impl MemorySet {
         //              Trap_Context
         //              User_Stack
         memory_set.map_trampoline();
+        memory_set.map_signal_trampoline();
         for area in user_space.areas.iter() {
             let head_vpn = area.vpn_range.get_start();
             let user_split_addr: VirtAddr = split_addr.into();

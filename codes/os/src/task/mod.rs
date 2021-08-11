@@ -55,12 +55,19 @@ pub fn suspend_current_and_run_next() {
 }
 
 pub fn exit_current_and_run_next(exit_code: i32) {
-    // Forbid more than one process exit
+    println!("exit 1");
+    // Forbid more than one process exit (by acquiring lock of INITPROC)
     let mut initproc_inner = INITPROC.acquire_inner_lock();
-    // take from Processor
     let task = take_current_task().unwrap();
-    // **** hold current PCB lock
+    //send signal SIGCHLD to parent
+    {
+        let parent_task = task.get_parent().unwrap(); // this will acquire inner of current task
+        let mut parent_inner = parent_task.acquire_inner_lock();
+        parent_inner.add_signal(Signals::SIGCHLD);
+    }
     let mut inner = task.acquire_inner_lock();
+    println!("exit 2");
+    // reset user tid area
     let clear_child_tid = inner.address.clear_child_tid;
     if clear_child_tid != 0{
         *translated_refmut(inner.get_user_token(), clear_child_tid as *mut i32) = 0;
@@ -74,6 +81,8 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         initproc_inner.children.push(child.clone());
     }
 
+    println!("exit 3");
+    // recycle all the data of task
     inner.children.clear();
     // deallocate user space
     inner.memory_set.recycle_data_pages();

@@ -107,9 +107,13 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
         }
         // release Task lock manually to avoid deadlock
         drop(inner);
-        file.read(
+        let size = file.read(
             UserBuffer::new(translated_byte_buffer(token, buf, len))
-        ) as isize
+        );
+        if fd > 2{
+            gdb_println!(SYSCALL_ENABLE, "sys_read(fd: {}, buf: ?, len: {}) = {}", fd, len, size);
+        }
+        size as isize
     } else {
         -1
     }

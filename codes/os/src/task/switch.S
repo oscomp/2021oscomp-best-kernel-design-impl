@@ -33,7 +33,7 @@ __switch:
     .endr
     # pop TaskContext
     addi sp, sp, 13*8
-    # sfence.vma
-    fence.i
+    # sfence.vma zero, zero
+    # fence.i
     ret
 

@@ -16,7 +16,7 @@ pub fn get_time() -> usize {
             inout("a0") time
         );
     }
-    time
+    time*10
 }
 
 pub fn get_timeval() -> TimeVal {
