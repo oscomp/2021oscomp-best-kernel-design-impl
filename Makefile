@@ -18,7 +18,10 @@ TARGET = K210
 KERNEL_ENTRYPOINT = 0xffffffff80300000
 ifeq ($(TARGET), qemu)
 	KERNEL_ENTRYPOINT = 0xffffffff80500000
+	CFLAGS += -Iqemu
+	USER_CFLAGS += -Iqemu
 endif
+K210_SERIALPORT	= /dev/ttyUSB1
 
 START_QEMU_ENTRY = 0x80200000
 
@@ -73,8 +76,6 @@ SRC_ELF2CHAR = ./tools/elf2char.c
 SRC_BURNER	= ./tools/kflash.py
 
 SRC_LINKER = ./linker/riscv.lds
-
-K210_SERIALPORT	= /dev/ttyUSB0
 
 .PHONY:all
 

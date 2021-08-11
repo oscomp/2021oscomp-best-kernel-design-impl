@@ -2,19 +2,18 @@
 #include <type.h>
 #include <qemu.h>
 
-typedef int __attribute__((__mode__(SI))) int32_t;
 int main()
 {
 
     char *argv[7], *envp[4];
 
-    int argc = 3;
+    int argc = 5;
 
     char str1[20] = "./busybox";
-    // char str2[20] = "sh";
-    // char str3[20] = "busybox_testcode.sh";
-    char str2[20] = "echo";
-    char str3[20] = "1";
+    char str2[20] = "sh";
+    char str3[20] = "busybox_testcode.sh";
+    // char str2[20] = "echo";
+    // char str3[20] = "1";
     char str4[20] = ">";
     char str5[20] = "test.txt";
     char str6[20] = "";
@@ -36,19 +35,15 @@ int main()
     // argv[2] = str3;
     // argv[3] = NULL;
 
-    #ifdef K210
-    /* for K210 do test */
-
-    sys_exec(argv[0], argv, envp);
-
-    #else
-
-    /* for qemu singal test*/
-
-    sys_exec(argv[0], argv, NULL);
-
-    #endif
-
+    uint64_t tid;
+    if ((tid = sys_clone(0,0,0,0,0)) != 0){
+        sys_wait4(-1,0,0);
+        // sys_write(1, "shell success", 12);
+    }
+    else{
+        sys_exec(argv[0], argv, envp);
+    }
+    
     while (1)
         for (int i = 0; i < 10000000; ++i)
         {

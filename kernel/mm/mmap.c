@@ -7,6 +7,7 @@
 int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 {
     debug();
+    log(0, "start %lx, len %lx, fd %d", start, len, fd);
     if (len <= 0)
         return -1;
     /* just for page allocate */
@@ -22,10 +23,12 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
             alloc_page_helper(start + i, current_running->pgdir, _PAGE_ALL_MOD);
             do_mprotect(start + i, NORMAL_PAGE_SIZE, prot);
         }
+        log(0, "return is %lx", start);
         return start;
     }
+    assert(0);
 
-    uint32_t fd_index;
+    int32_t fd_index;
     if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
 
@@ -56,6 +59,10 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 int64 do_munmap(void *start, size_t len)
 {
     debug();
+    log(0, "start %lx, len %lx", start, len);
+#ifndef K210
+    return 0;
+#endif
     for (int i = 0; i < NUM_FD; ++i)
     {
         /* used, shared, not anonymous, start point is correct */

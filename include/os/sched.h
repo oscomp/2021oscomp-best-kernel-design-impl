@@ -31,6 +31,7 @@ typedef struct switchto_context
 {
     /* Callee saved registers.*/
     reg_t regs[14];
+    reg_t satp
 } switchto_context_t;
 
 typedef enum {
@@ -87,15 +88,18 @@ typedef struct fd{
     uint64 pos;
     /* length */
     uint32 length;
+    /* dir_pos */
+    dir_pos_t dir_pos;
+
     /* fd number */
     /* default: its index in fd-array*/
     fd_num_t fd_num;
 
     /* used */
     uint8 used;
-
-    /* dir_pos */
-    dir_pos_t dir_pos;
+    /* redirect */
+    uint8 redirected;
+    uint8 redirected_fd_index;
 
     /* piped */
     uint8 piped;
@@ -142,6 +146,8 @@ struct pcb
     reg_t kernel_sp;
     reg_t user_sp;
 
+    /* is this an exec pcb? */
+    uint8_t exec;
     // count the number of disable_preempt
     // enable_preempt enables CSR_SIE only when preempt_count == 0
     reg_t preempt_count;
@@ -157,6 +163,7 @@ struct pcb
 
     /* process id */
     pid_t pid;
+    pid_t pid_on_exec;
     pid_t tid;
 
     /* kernel/user thread/process */
@@ -167,6 +174,9 @@ struct pcb
 
     /* spawn mode */
     spawn_mode_t mode;
+
+    /* spawn num */
+    spawn_num_t spawn_num;
 
     /* priority */
     int32_t priority;
@@ -353,6 +363,7 @@ extern void __global_pointer$();
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type);
 void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,unsigned char *argv[], 
     unsigned char *envp[], aux_elem_t *aux_vec, pcb_t *pcb);
+void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top, uint32_t flag);
 extern void ret_from_exception();
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
@@ -383,7 +394,7 @@ int do_taskset(uint32_t pid,uint32_t mask);
 void do_exit();
 
 pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid, void *nouse);
-pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
+int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options);
 
 uint8_t do_nanosleep(struct timespec *sleep_time);
 int8 do_exec(const char* file_name, char* argv[], char *const envp[]);
@@ -400,17 +411,35 @@ extern void do_show_exec();
 
 static inline uint64_t get_user_addr_top(pcb_t *pcb)
 {
+    // while (pcb->parent.parent && pcb->parent.parent->pid == pcb->pid)
+    //     pcb = pcb->parent.parent;
     return pcb->user_addr_top;
 }
 
 static inline void set_user_addr_top(pcb_t *pcb, uint64_t user_addr_top)
 {
+    // while (pcb->parent.parent && pcb->parent.parent->pid == pcb->pid)
+    //     pcb = pcb->parent.parent;
     assert(user_addr_top >= pcb->edata);
     assert(user_addr_top % NORMAL_PAGE_SIZE == 0);
     pcb->user_addr_top = user_addr_top;
 }
 
-static inline void set_pcb_edata(pcb_t *pcb_underinit, uint64_t pgdir)
+static inline uint64_t get_edata(pcb_t *pcb)
+{
+    // while (pcb->parent.parent && pcb->parent.parent->pid == pcb->pid)
+    //     pcb = pcb->parent.parent;
+    return pcb->edata;
+}
+
+static inline void set_edata(pcb_t *pcb, uint64_t edata)
+{
+    // while (pcb->parent.parent && pcb->parent.parent->pid == pcb->pid)
+    //     pcb = pcb->parent.parent;
+    pcb->edata = edata;
+}
+
+static inline void set_pcb_edata(pcb_t *pcb_underinit)
 {
     pcb_underinit->edata = PAGE_ALIGN(pcb_underinit->elf.edata) + NORMAL_PAGE_SIZE;
 }

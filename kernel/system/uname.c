@@ -6,10 +6,10 @@
 static utsname_t utsname = {
     .sysname = "Linux",
     .nodename = "debian",
-    .release = "5.8.0-59-generic",
-    .version = "#66~20.04.1-Ubuntu",
-    .machine = "Sipeed M1 DOCK",
-    .domainname = "NIS domain name"
+    .release = "5.10.0-7-riscv64",
+    .version = "#1 SMP Debian 5.10.40-1 (2021-05-28)",
+    .machine = "riscv64",
+    .domainname = "(none)"
 };
 
 /* return name of my os

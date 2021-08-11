@@ -1,12 +1,12 @@
 #include <os/syscall.h>
 #include <stdio.h>
 #include <os/sched.h>
+#include <os/fat32.h>
 
 long (*syscall[NUM_SYSCALLS])() = {0};
 
 void handle_syscall(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
 {
-    log(0, "\n");
     log(0, "current pid is %d", current_running->pid);
     log(0, "current tid is %d", current_running->tid);
     log(0, "num is %d", regs->regs[17]);
@@ -23,4 +23,5 @@ void handle_syscall(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
                                               regs->regs[14],
                                               regs->regs[15],
                                               regs->regs[16]);
+
 }

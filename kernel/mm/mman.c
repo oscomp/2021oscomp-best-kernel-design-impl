@@ -36,20 +36,23 @@ int do_mprotect(void *addr, size_t len, int prot)
 int64_t do_brk(uintptr_t ptr)
 {
     debug();
-    if (ptr > current_running->user_addr_top){
+    assert(ptr % NORMAL_PAGE_SIZE == 0);
+    uint64_t user_addr_top = get_user_addr_top(current_running);
+    uint64_t edata = get_edata(current_running);
+    if (ptr > user_addr_top){
         printk_port("brk arg0 too large\n");
         return -1; // larger than stack
     }
     else if (!ptr){
         // alloc_page_helper(current_running->edata, current_running->pgdir,
         //     _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-        return current_running->edata; // probe edata
+        return edata; // probe edata
     }
-    else if (ptr < current_running->edata) return -1; // cannot be smaller than current addr
+    else if (ptr < edata) return -1; // cannot be smaller than current addr
     else{
-        for (uintptr_t i = current_running->edata; i < ptr; i += NORMAL_PAGE_SIZE)
+        for (uintptr_t i = edata; i < ptr; i += NORMAL_PAGE_SIZE)
             alloc_page_helper(i, current_running->pgdir, _PAGE_READ|_PAGE_WRITE);
-        current_running->edata = ptr;
-        return current_running->edata;
+        set_edata(current_running, ptr);
+        return ptr;
     }
 }

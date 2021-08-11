@@ -17,16 +17,19 @@
 /* tid = pid */
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
 {
+    pcb_underinit->exec = 0;
     pcb_underinit->preempt_count = 0; 
     pcb_underinit->list.ptr = pcb_underinit; 
-    pcb_underinit->pid = process_id++; 
-    pcb_underinit->tid = pcb_underinit->pid;
+    pcb_underinit->pid = process_id;
+    pcb_underinit->pid_on_exec = process_id;
+    pcb_underinit->tid = process_id++;
     pcb_underinit->type = type; 
     init_list_head(&pcb_underinit->wait_list);
     pcb_underinit->status = TASK_READY; 
     pcb_underinit->priority = DEFAULT_PRIORITY; 
     pcb_underinit->temp_priority = pcb_underinit->priority; 
     pcb_underinit->mode = DEFAULT_MODE; 
+    pcb_underinit->spawn_num = 0;
     pcb_underinit->cursor_x = 1; pcb_underinit->cursor_y = 1; 
     pcb_underinit->mask = 0xf; 
     pcb_underinit->parent.parent = NULL;
@@ -35,6 +38,7 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     // number, piped
     for (int i = 0; i < NUM_FD; ++i){
         pcb_underinit->fd[i].fd_num = i;
+        pcb_underinit->fd[i].redirected = FD_UNREDIRECTED;
         pcb_underinit->fd[i].piped = FD_UNPIPED;
         pcb_underinit->fd[i].poll_status = 0;
     }
@@ -42,14 +46,25 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
     pcb_underinit->fd[1].dev = STDOUT; pcb_underinit->fd[1].used = FD_USED; pcb_underinit->fd[1].flags = O_WRONLY;
     pcb_underinit->fd[2].dev = STDERR; pcb_underinit->fd[2].used = FD_USED; pcb_underinit->fd[2].flags = O_WRONLY;
-    for (int i = 3; i < NUM_FD; ++i)
+    for (int i = 3; i < NUM_FD; ++i){
         pcb_underinit->fd[i].used = FD_UNUSED; // remember to set up other props when use it
+        pcb_underinit->fd[i].dev = DEFAULT_DEV;
+    }
+    /* my file descriptor */
+    pcb_underinit->myelf_fd.pos = 0;
 
     // systime
     pcb_underinit->stime = 0;
     pcb_underinit->utime = 0;
 }
 
+void init_pcb_exec(pcb_t *pcb_underinit)
+{
+    pcb_underinit->spawn_num = 0;
+    pcb_underinit->pid = pcb_underinit->pid_on_exec;
+    pcb_underinit->type = USER_PROCESS;
+    pcb_underinit->mode = AUTO_CLEANUP_ON_EXIT;
+}
 // static void copyout(uintptr_t pgdir, unsigned char *dst, unsigned char *src, size_t size)
 // {
 //     alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
@@ -289,11 +304,12 @@ void init_pcb_stack(
     pcb->kernel_sp = (reg_t)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     pcb->user_sp = (void*)user_stack;
     pcb->user_stack_base = (void*)user_stack - USER_STACK_INIT_SIZE;
+    pcb->user_addr_top = user_stack - USER_STACK_INIT_SIZE;
     pcb->pgdir = pgdir;
 
     reg_t *regs = pt_regs->regs;    
     regs[3] = gp;  //gp
-    regs[4] = pcb; //tp
+    regs[4] = 0; //tp
     regs[10] = get_argc_from_argv(argv); //a0=argc
     // regs[11]= (ptr_t)argv; //a1=argv
     pt_regs->sstatus = SR_SUM | SR_FS; //enable supervisor-mode userpage access and float point instruction
@@ -303,12 +319,13 @@ void init_pcb_stack(
 #endif
 
     pt_regs->sepc = ra;
-    unsigned mode = SATP_MODE_SV39, asid = pcb->pid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;
+    unsigned mode = SATP_MODE_SV39, asid = pcb->tid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;
     pt_regs->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
     
     switchto_context_t *switch_to_reg = 
         (switchto_context_t *)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     switch_to_reg->regs[0] = &ret_from_exception;
+    switch_to_reg->satp = pt_regs->satp;
 
     /* 注意，user_stack并未分配页面 */
     uint64_t user_stack_kva = get_kva_of(user_stack - NORMAL_PAGE_SIZE, pgdir) + NORMAL_PAGE_SIZE;
@@ -323,4 +340,82 @@ void init_pcb_stack(
     pcb->user_sp = copy_above_user_stack(user_stack_kva, argv, envp, aux_vec, filename); 
     // printk_port("sp is at %lx, %lx\n", pcb->user_sp, get_kva_of(pcb->user_sp, pcb->pgdir)); 
     assert(USER_STACK_ADDR - pcb->user_sp < NORMAL_PAGE_SIZE);
+}
+
+/* copy context */
+/* kernel_stack and user_stack are stack top addr */
+static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
+{
+    uint64_t ker_stack_size, user_stack_size;
+    /* kernel_sp is just at user context, but maybe not equal to register sp */
+    ker_stack_size = sizeof(regs_context_t) + sizeof(switchto_context_t);
+    log(0, "ker_stack_size: %lx", ker_stack_size);
+    user_stack_size = current_running->user_stack_base + USER_STACK_INIT_SIZE - current_running->user_sp;
+    log(0, "user_stack_base: %lx, user_stack_size:%lx", current_running->user_stack_base, user_stack_size);
+    
+    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size; /* for user context */
+    pcb_underinit->user_sp = user_stack_top - user_stack_size; /* no need to be aligned with user_sp */
+    pcb_underinit->user_stack_base = user_stack_top - USER_STACK_INIT_SIZE;
+    memcpy(pcb_underinit->kernel_sp + sizeof(switchto_context_t), PAGE_ALIGN(current_running->kernel_sp) + NORMAL_PAGE_SIZE - sizeof(regs_context_t), sizeof(regs_context_t));
+    // memcpy(pcb_underinit->user_sp, current_running->user_sp, user_stack_size); /* copy tp, very essential */
+
+    // copy fd
+    for (int i = 0; i < NUM_FD; ++i){
+        memcpy(&pcb_underinit->fd[i], &current_running->fd[i], sizeof(fd_t));
+        if (current_running->fd[i].piped == FD_PIPED){
+            pipe_num_t pip_num = current_running->fd[i].pip_num;
+            if (current_running->fd[i].fd_num == pipes[pip_num].fd[0]){
+                log(0, "pipe %d r_valid++ = %d", pip_num, pipes[pip_num].r_valid + 1);
+                pipes[pip_num].r_valid++;
+            }
+            else if (current_running->fd[i].fd_num == pipes[pip_num].fd[1]){
+                log(0, "pipe %d w_valid++ = %d", pip_num, pipes[pip_num].w_valid + 1);
+                pipes[pip_num].w_valid++;
+            }
+            else
+                assert(0);
+        }
+    }
+    memcpy(&pcb_underinit->elf, &current_running->elf, sizeof(struct ELF_info));
+    memcpy(&pcb_underinit->myelf_fd, &current_running->myelf_fd, sizeof(fd_t));
+    for (int i = 0; i < NUM_PHDR_IN_PCB; i++)
+        memcpy(&pcb_underinit->phdr[i], &current_running->phdr[i], sizeof(Elf64_Phdr));
+
+    for (uint8 i = 0; i < NUM_PHDR_IN_PCB; i++){
+        log(0, "v_addr:%lx, filesz: %lx, memsz: %lx", pcb_underinit->phdr[i].p_vaddr, pcb_underinit->phdr[i].p_filesz, pcb_underinit->phdr[i].p_memsz);
+    }
+}
+
+static void init_clone_pcb_prop(pcb_t *pcb_underinit, uint32_t flag)
+{
+    pcb_underinit->type = USER_THREAD;
+    pcb_underinit->mode = ENTER_ZOMBIE_ON_EXIT;
+    pcb_underinit->parent.parent = current_running;
+    pcb_underinit->parent.flag = flag;
+    pcb_underinit->user_addr_top = current_running->user_addr_top;
+    pcb_underinit->edata = current_running->edata;
+}
+
+/* init a cloned pcb */
+void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top, uint32_t flag)
+{
+    init_clone_pcb_prop(pcb_underinit, flag);
+    // prepare stack
+    copy_parent_all_and_set_sp(pcb_underinit, kernel_stack_top, user_stack_top);
+    pcb_underinit->pgdir = pgdir;
+    regs_context_t *pt_regs =
+        (regs_context_t *)(kernel_stack_top - sizeof(regs_context_t));
+    /* return 0 if child */
+    pt_regs->regs[10] = 0;
+    unsigned mode = SATP_MODE_SV39, asid = pcb_underinit->tid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;
+    pt_regs->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
+
+    // prepare switch context under user context
+    switchto_context_t *switch_to_reg = 
+        (switchto_context_t *)(pcb_underinit->kernel_sp);
+    // kernel stack should be different
+    switch_to_reg->regs[0] = &ret_from_exception;
+    switch_to_reg->satp = pt_regs->satp;
+
+    log(0, "%lx, %lx, %lx", pt_regs->sepc, pt_regs->satp, switch_to_reg->satp);
 }

@@ -22,6 +22,7 @@ typedef struct switchto_context
 {
     /* Callee saved registers.*/
     reg_t regs[14];
+    reg_t satp;
 } switchto_context_t;
 
 #endif

@@ -130,10 +130,14 @@ uintptr_t lazy_load_elf(
 
     /* read ELF header */
     uint8_t fd_index = get_fd_index(fd, current_running);
-    fat32_lseek(fd, 0, SEEK_SET);
-    fat32_read(fd, elf_binary, NORMAL_PAGE_SIZE);
+    memcpy(&pcb->myelf_fd, &current_running->fd[fd_index], sizeof(fd_t));
+    fat32_close(fd);
+
+    fat32_lseekmy(0, SEEK_SET);
+    fat32_readmy(elf_binary, NORMAL_PAGE_SIZE);
+
     // check whether `binary` is a ELF file.
-    if (current_running->fd[fd_index].length < 4 || !is_elf_format(elf_binary)) {
+    if (current_running->myelf_fd.length < 4 || !is_elf_format(elf_binary)) {
         log(0, "is not an ELF");
         assert(0);  // return NULL when error!
     }
@@ -147,8 +151,9 @@ uintptr_t lazy_load_elf(
     /* 2. get program headers */
     uint64_t ph_entry_count = pcb->elf.phnum;
     assert(pcb->elf.phent * pcb->elf.phnum <= NORMAL_PAGE_SIZE); /* FOR NOW assume is 1 page */
-    fat32_lseek(fd, pcb->elf.phoff, SEEK_SET);
-    fat32_read(fd, elf_binary, NORMAL_PAGE_SIZE);
+    fat32_lseekmy(pcb->elf.phoff, SEEK_SET);
+    fat32_readmy(elf_binary, NORMAL_PAGE_SIZE);
+
     phdr = (Elf64_Phdr *)elf_binary;
     uint8_t is_first = 1;
 
@@ -162,7 +167,6 @@ uintptr_t lazy_load_elf(
         }
         phdr++;
     }
-    memcpy(&pcb->myelf_fd, &current_running->fd[fd_index], sizeof(fd_t));
 
     return pcb->elf.entry;
 }

@@ -3,6 +3,8 @@
 #include <sbi.h>
 #include <csr.h>
 #include <os/elf.h>
+#include <os/mm.h>
+#include <assert.h>
 
 typedef void (*kernel_entry_t)(unsigned long, uintptr_t);
 
@@ -204,16 +206,26 @@ uintptr_t load_elf(
 /*********** start here **************/
 int boot_kernel(unsigned long mhartid, uintptr_t riscv_dtb)
 {    
-    if (mhartid == 0) {
+    static int cnt = 0;
+    if (cnt == 0) {
         setup_vm();
         // load kernel
         ELF_info_t elf;
         start_kernel =
                 (kernel_entry_t)load_elf(_elf_main, _length_main,
                                          PGDIR_PA, directmap, &elf);
+        if (start_kernel + elf.edata > INIT_KERNEL_STACK){
+            sbi_console_putchar('E');
+            sbi_console_putchar('R');
+            sbi_console_putchar('R');
+            sbi_console_putchar('O');
+            sbi_console_putchar('R');
+            while(1);
+        }
+        cnt = 1;
     } else {
         // TODO: what should we do for other cores?
-        while (1) sbi_console_putchar('6');
+        while (1) sbi_console_putchar('7');
     }
     // uintptr_t s0 = get_s0();
     // local_flush_tlb_all();   

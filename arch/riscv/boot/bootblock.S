@@ -25,6 +25,7 @@ main:
 	la a0, msg
 	SBI_CALL SBI_CONSOLE_PUTSTR
 
+	csrr a0, CSR_MHARTID
 	j boot_kernel
 
 // while(1) --> stop here

@@ -118,12 +118,15 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     //     printk_port("sepc: %lx\n", regs->sepc);
     //     printk_port("ra: %lx", regs->regs[1]);
     // }
-    debug();
-    // log(0, "\ncurrent tid is %d", current_running->tid);
-    // log(0, "pgfault stval:%lx", stval);
+    // printk_port("pgfault stval:%lx, cause:%d\n", stval, cause);
+    // printk_port("current pid is %d, tid is %d\n", current_running->pid, current_running->tid);
+    // printk_port("pgdir: %lx", current_running->pgdir);
     /* if not valid address, go handle other */
-    if (stval >= 0xffffffff00000000lu || stval < current_running->elf.text_begin)
+
+    if (stval >= 0xffffffff00000000lu || stval < current_running->elf.text_begin){
+        log(0, "invalid addr");
         handle_other(regs,stval,cause);
+    }
     // uint64_t satp = read_satp();
     // uint64_t va = stval;
     // uint64_t pgdir = (satp&0xffffffffffflu) << NORMAL_PAGE_SHIFT;
@@ -194,10 +197,11 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
                     //     }
                     //     while(1);
                     // }
+                    // log(0, "handle pgfault success");
                     return ;
                 }
             }
-            assert(0);
+            handle_other(regs,stval,cause);
             // if (cause == EXCC_INST_ACCESS || cause == EXCC_INST_PAGE_FAULT)
             //     set_attribute(ptr,_PAGE_ALL_MOD|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_PRESENT|_PAGE_USER);
             // else if (cause == EXCC_LOAD_ACCESS || cause == EXCC_LOAD_PAGE_FAULT)

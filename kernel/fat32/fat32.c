@@ -203,7 +203,11 @@ int8 fat32_read_test(const char *filename)
 /* make sure buf is enough */
 int64 fat32_getdent(fd_num_t fd, char *outbuf, uint32_t len)
 {
-    uint8 fd_index;
+    debug();
+    log(0, "fd:%d, outbuf:%lx, len:%x", fd, outbuf, len);
+    assert(0);
+
+    int32_t fd_index;
     if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
 
@@ -472,7 +476,7 @@ int16 fat32_fstat(fd_num_t fd, struct kstat *kst)
     return -1;
     #endif
 
-    uint8 fd_index;
+    int fd_index;
     if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
     /* exists, now read fd info */
@@ -499,7 +503,10 @@ int16 fat32_fstat(fd_num_t fd, struct kstat *kst)
 int32 fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags)
 {
     debug();
-    log(0, "fd: %d, pathname: %s", dirfd, pathname);
+    log(0, "statbuf : %lx", statbuf);
+    log(0, "fd: %d", dirfd);
+    log(0, "pathaddr: %lx", pathname);
+    log(0, "pathname: %c", pathname[0]);
     statbuf->st_dev= 1;
     statbuf->st_ino=266426;
     statbuf->st_mode=0755|S_IFDIR;
@@ -543,7 +550,7 @@ int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg)
 {
     debug();
     log(0, "fd:%d, cmd:%d, arg:%d", fd, cmd, arg);
-    uint8_t fd_index;
+    int32_t fd_index;
 
     if ((fd_index = get_fd_index(fd, current_running)) == -1) // old doesn't exists, cannot dup
         return SYSCALL_FAILED;
@@ -582,17 +589,18 @@ int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg)
 /* success return fd_num, fail return -1 */
 fd_num_t fat32_dup(fd_num_t fd)
 {
-    uint8_t fd_index;
+    debug();
+    log(0, "dup fd : %d", fd);
+    int32_t fd_index;
     if ((fd_index = get_fd_index(fd, current_running)) == -1) // old doesn't exists, cannot dup
         return -1;
     for (int i = 0; i < NUM_FD; ++i)
         // find an available one, i is index
         if (!current_running->fd[i].used){
-            fd_num_t temp = current_running->fd[i].fd_num; // save fd_num
-            memcpy(&current_running->fd[i], &current_running->fd[fd_index], sizeof(fd_t));
-            current_running->fd[i].fd_num = temp;
-            // must be used, because old is used, no need to set
-            return temp;
+            redirect_fd(&current_running->fd[i], fd_index);
+            current_running->fd[i].used = FD_USED;
+            // fd[i] must be unused
+            return current_running->fd[i].fd_num;
         }
     /* no available */
     return -1;
@@ -608,25 +616,31 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
     if (old == new)
         return SYSCALL_FAILED;
 
-    uint8_t fd_index;
-    if ((fd_index = get_fd_index(old, current_running)) == -1){
+    int32_t old_fd_index, new_fd_index;
+    if ((old_fd_index = get_fd_index(old, current_running)) == -1){
         log(0, "old not exist");
         return -1;
     }
-    if (get_fd_index(new, current_running) != -1){
+
+    /* Now new could be open and not redirected, which means we need to close it first */
+    if ((new_fd_index = get_fd_index(new, current_running)) != -1){
         log(0, "new exist");
-        return -1;
+        // new_fd_index = get_my_fd_index(new, current_running);
+        // if (current_running->fd[new_fd_index].redirected == FD_UNREDIRECTED){
+        fat32_close(new);
+        // }
+        // current_running->fd[new_fd_index].used = FD_UNUSED;
     }
 
-    /* Now new doesn't exists, which means we can use it */
     /* 1. there is fd, whose fd_num is new, and available */
+    /* if you do fat32_close just before, there must be one file descriptor who matches this loop */
     uint8_t i;
     for (i = 0; i < NUM_FD; ++i){
         // find an available one, i is index
         if (!current_running->fd[i].used && current_running->fd[i].fd_num == new){
             log(0, "just found");
-            memcpy(&current_running->fd[i], &current_running->fd[fd_index], sizeof(fd_t));
-            current_running->fd[i].fd_num = new; /* fd_num should be new, not old */
+            redirect_fd(&current_running->fd[i], old_fd_index);
+            current_running->fd[i].used = FD_USED;
             return new;
         }
     }
@@ -635,8 +649,9 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
         // find an available one, i is index
         if (!current_running->fd[i].used){
             log(0, "finally found");
-            memcpy(&current_running->fd[i], &current_running->fd[fd_index], sizeof(fd_t));
-            current_running->fd[i].fd_num = new; /* fd_num should be new, not old */
+            redirect_fd(&current_running->fd[i], old_fd_index);
+            current_running->fd[i].fd_num = new; /* fd_num should be new */
+            current_running->fd[i].used = FD_USED;
             return new;
         }
     }
@@ -649,7 +664,7 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
 int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence)
 {
     debug();
-    uint8_t fd_index = get_fd_index(fd, current_running);
+    int32_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
     switch(whence){
@@ -992,7 +1007,7 @@ int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
         if (dirfd == AT_FDCWD)
             now_clus = cwd_first_clus;
         else{
-            int16 dirfd_index = get_fd_index(dirfd, current_running);
+            int32_t dirfd_index = get_fd_index(dirfd, current_running);
             if (current_running->fd[dirfd_index].used)
                 now_clus = current_running->fd[dirfd_index].first_clus_num;
             else{
@@ -1423,49 +1438,82 @@ int16 fat32_close(fd_num_t fd)
 {
     debug();
     log(0, "fd : %d", fd);
-    /* FOR NOW */
-    #ifndef K210
-    uint8 fd_index1 = get_fd_index(fd, current_running);
-    if (fd_index1 == -1 || fd_index1 == STDIN || fd_index1 == STDOUT || fd_index1 == STDERR){
-        log(0, "fd not exists");
-        return 1;
-    }
-    else{
-        current_running->fd[fd_index1].used = FD_UNUSED;
-        return 0;
-    }
-    #endif
 
-    uint8 fd_index = get_fd_index(fd, current_running);
-    if (fd_index == -1 || fd_index == STDIN || fd_index == STDOUT || fd_index == STDERR)
-        return 1;
-    fd_t *fdp = &current_running->fd[fd_index];
-    if (fdp->used)
+    int32_t fd_index, my_fd_index;
+    if ((fd_index = get_fd_index(fd, current_running)) == -1)
+        return -SYSCALL_FAILED;
+    my_fd_index = get_my_fd_index(fd, current_running);
+
+    fd_t *fdp = &current_running->fd[my_fd_index];
+    if (fdp->redirected == FD_REDIRECTED){
+        log(0, "closing a redirected fd");
+        for (uint8_t i = 0; i < NUM_FD; i++){
+            if (current_running->fd[i].used && current_running->fd[i].redirected &&
+                current_running->fd[i].redirected_fd_index == my_fd_index)
+                /* multiple level link */
+                current_running->fd[i].redirected_fd_index = current_running->fd[my_fd_index].redirected_fd_index;
+        }
+        clear_all_valid(fdp);
+        /* go to close the real one */
+        return SYSCALL_SUCCESSED;
+    }
+    else
     {
-        fdp->used = FD_UNUSED;
-        if (fdp->piped == FD_PIPED){
-            /* note that fd[0] != fd[1] , and if this fd is piped, its fd_num must equal to fd[0] or fd[1]*/
-            if (pipes[fdp->pip_num].fd[0] == fd){
-                log(0, "pipe %d w_valid--", fdp->pip_num);
-                pipes[fdp->pip_num].w_valid--; // ERROR to VALID, VALID to INVALID
-            }
-            else{
-                log(0, "pipe %d r_valid--", fdp->pip_num);
-                pipes[fdp->pip_num].r_valid--;// ERROR to VALID, VALID to INVALID
+        /* for all the duplicated file descriptors who were directly-redirected to me, modify them */
+        uint8_t i = 0;
+        for (i = 0; i < NUM_FD; i++){
+            if (current_running->fd[i].used == FD_USED && current_running->fd[i].redirected == FD_REDIRECTED &&
+                current_running->fd[i].redirected_fd_index == my_fd_index){
+                fd_num_t this_fd_num = current_running->fd[i].fd_num;
+                memcpy(&current_running->fd[i], &current_running->fd[my_fd_index], sizeof(fd_t));
+                current_running->fd[i].fd_num = this_fd_num; /* cannot copy fd_num */
+                for (uint8_t j = i + 1; j < NUM_FD; j++){
+                    /* i is the first file descriptor who point to my_fd_index, so start with i + 1 */
+                    if (current_running->fd[j].used == FD_USED && current_running->fd[j].redirected == FD_REDIRECTED &&
+                        current_running->fd[j].redirected_fd_index == my_fd_index)
+                        current_running->fd[j].redirected_fd_index = i;
+                }
+                if (fdp->piped == FD_PIPED){
+                    pipe_num_t pip_num = current_running->fd[i].pip_num;
+                    if (pipes[pip_num].fd[0] == fd)
+                        pipes[pip_num].fd[0] = this_fd_num;
+                    else if (pipes[pip_num].fd[1] == fd)
+                        pipes[pip_num].fd[1] = this_fd_num;
+                    else
+                        assert(0);
+                }
+                break;
             }
         }
-        else{
+
+        /* if nobody redirect to it ,close pipe */
+        if (i == NUM_FD && fdp->piped == FD_PIPED){
+            /* note that fd[0] != fd[1] , and if this fd is piped, its fd_num must equal to fd[0] or fd[1]*/
+            if (pipes[fdp->pip_num].fd[0] == fd){
+                log(0, "pipe %d r_valid-- and is %d", fdp->pip_num, pipes[fdp->pip_num].r_valid - 1);
+                pipes[fdp->pip_num].r_valid--;
+            }
+            else{
+                log(0, "pipe %d w_valid-- and is %d", fdp->pip_num, pipes[fdp->pip_num].w_valid - 1);
+                pipes[fdp->pip_num].w_valid--;
+            }
+        }
+        else if (fdp->dev != STDIN && fdp->dev != STDOUT && fdp->dev != STDERR){
+    #ifdef K210
+            /* it must be a real file discriptor */
             /* update dentry */
             uchar *buf = kalloc();
             sd_read(buf, fdp->dir_pos.sec);
             dentry_t *p = buf + fdp->dir_pos.offset;
             set_dentry_from_fd(p, fdp);
             sd_write(buf, fdp->dir_pos.sec);
+    #endif
         }
-        return 0;
+        /* do nothing for STDIN, STDOUT and STDERR */
+        /* disable myself */
+        clear_all_valid(fdp);
+        return SYSCALL_SUCCESSED;
     }
-    else
-        return 1;
 }
 
 /* read as many sectors as we can */

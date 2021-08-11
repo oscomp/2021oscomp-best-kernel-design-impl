@@ -1,4 +1,5 @@
 #include <os/fat32.h>
+#include <os/ring_buffer.h>
 
 pipe_t pipes[NUM_PIPE] = {0};
 /* init pipe */
@@ -34,15 +35,14 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
     pipe_num_t pip_num;
     for (pip_num = 0; pip_num < NUM_PIPE; ++pip_num)
     {
-        if (pipes[pip_num].r_valid == PIPE_INVALID && pipes[pip_num].w_valid == PIPE_INVALID){
+        if ((pipes[pip_num].r_valid | pipes[pip_num].w_valid) == PIPE_INVALID){
             pipes[pip_num].fd[0] = fd[0];
             pipes[pip_num].fd[1] = fd[1];
-            pipes[pip_num].top = 0;
-            pipes[pip_num].bottom = 0;
             pipes[pip_num].pid = current_running->pid;
+            init_ring_buffer(&pipes[pip_num].rbuf);
             init_list_head(&pipes[pip_num].wait_list);
-            pipes[pip_num].r_valid = PIPE_ERROR; // cannot be used when error
-            pipes[pip_num].w_valid = PIPE_ERROR;
+            pipes[pip_num].r_valid = PIPE_VALID;
+            pipes[pip_num].w_valid = PIPE_VALID;
             break;
         }
     }
@@ -67,27 +67,32 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
 int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
 {
     uint64_t buf_kva = get_kva_of(buf, current_running->pgdir); /* in case thread changes */
-    while (pipes[pip_num].r_valid != PIPE_INVALID && pipes[pip_num].top == pipes[pip_num].bottom){
+    if (pipes[pip_num].r_valid < PIPE_VALID)
+        return -1;
+    else if (pipes[pip_num].r_valid > PIPE_VALID)
+        log(0, "dangerous pipe read, more than 1 outlet");
+    size_t readsize;
+    while ((readsize = read_ring_buffer(&pipes[pip_num].rbuf, buf_kva, count)) <= 0){
         do_block(&current_running->list, &pipes[pip_num].wait_list);
         do_scheduler();
     }
-    uint32_t readsize = min(pipes[pip_num].top - pipes[pip_num].bottom, count); // neq count
-    memcpy(buf_kva, pipes[pip_num].buff + pipes[pip_num].bottom, readsize); // maybe exceed?
-    pipes[pip_num].bottom += readsize;
+    log(0, "pipe read %d", readsize);
     return readsize;
 }
 
 /* write pipe */
 /* return write count */
-int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
+ssize_t pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
 {
-    if (pipes[pip_num].w_valid != PIPE_VALID)
+    if (pipes[pip_num].w_valid < PIPE_VALID)
         return -1;
-    if (pipes[pip_num].top + count > PIPE_BUF_SIZE)
-        return -1;
-    memcpy(pipes[pip_num].buff + pipes[pip_num].top, buf, count);
-    pipes[pip_num].top += count;
-    if (!list_empty(&pipes[pip_num].wait_list))
+    else if (pipes[pip_num].w_valid > PIPE_VALID)
+        log(0, "dangerous pipe write, more than 1 inlet");
+    int64_t writesize = write_ring_buffer(&pipes[pip_num].rbuf, buf, count);
+    /* someone maybe waiting for read pipe */
+    if (writesize > 0 && !list_empty(&pipes[pip_num].wait_list))
         do_unblock(pipes[pip_num].wait_list.next);
-    return count; // write count
+    /* someone maybe polling */
+    log(0, "pipe write %d", writesize);
+    return writesize; // write count
 }

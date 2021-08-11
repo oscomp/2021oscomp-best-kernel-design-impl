@@ -4,7 +4,7 @@
 int64_t do_ioctl(fd_num_t fd, uint64_t request, const char *argp[])
 {
     debug();
-    uint32_t fd_index;
+    int32_t fd_index;
     if ((fd_index = get_fd_index(fd, current_running)) == -1)
         return -1;
 

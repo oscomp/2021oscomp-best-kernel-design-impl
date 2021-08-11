@@ -4,38 +4,37 @@
 .macro SAVE_CONTEXT
   .local _restore_kernel_tpsp
   .local _save_context
-  /*
-   * If coming from userspace, preserve the user thread pointer and load
-   * the kernel thread pointer.  If we came from the kernel, sscratch
-   * will contain 0, and we should continue on the current TP.
-   */
-  # csrrw tp, CSR_SSCRATCH, tp
-  # bnez tp, _save_context
-
+  .local _from_kernel
+# csrrw tp, CSR_SSCRATCH, tp
+# bnez tp, _save_context
 # _restore_kernel_tpsp:
 #   csrr tp, CSR_SSCRATCH
 #   sd sp, PCB_KERNEL_SP(tp)
 _save_context:
   /* HappyEric uses tp as current_running */
-  addi sp, sp, -8
-  sd tp, 0(sp)
+  /*
+   * If coming from userspace, tp is greater or equal to 0
+   * If coming from kernel, tp is less than 0xffffffff00000000
+   */
+  bltz tp, _from_kernel
+  csrw CSR_SSCRATCH, tp
   ld tp, current_running
-
-  addi sp, sp, 8
   sd sp, PCB_USER_SP(tp) /* user sp is real */
   ld sp, PCB_KERNEL_SP(tp)
+  csrr tp, CSR_SSCRATCH
+_from_kernel:
   addi sp, sp, -(OFFSET_SIZE)
 
   /* TODO: save all general purpose registers here! */
   sd zero, OFFSET_REG_ZERO(sp)
   sd ra, OFFSET_REG_RA(sp)
-
-  sd sp, PCB_KERNEL_SP(tp) /* very important */
-
   sd gp, OFFSET_REG_GP(sp)
 
   /* push tp */
-  sd tp, OFFSET_REG_TP(sp) /* no use */
+  sd tp, OFFSET_REG_TP(sp)
+  
+  ld tp, current_running
+  sd sp, PCB_KERNEL_SP(tp) /* very important */
 
   sd t0, OFFSET_REG_T0(sp)
   sd t1, OFFSET_REG_T1(sp)
@@ -89,16 +88,17 @@ _save_context:
   sd s0, OFFSET_REG_SCAUSE(sp)
   csrr s0, CSR_SATP
   sd s0, OFFSET_REG_SATP(sp)
+
 .endm
 
 .macro RESTORE_CONTEXT
+  .local _back_to_kernel
   /* TODO: Restore all registers and sepc,sstatus */
   ld zero, OFFSET_REG_ZERO(sp)
   ld ra, OFFSET_REG_RA(sp)
     
   ld gp, OFFSET_REG_GP(sp)
-  # ld tp, OFFSET_REG_TP(sp)
-  /* cannot use this tp, because it is previous_running */
+  ld tp, OFFSET_REG_TP(sp)
 
   ld t0, OFFSET_REG_T0(sp)
   ld t1, OFFSET_REG_T1(sp)
@@ -152,13 +152,13 @@ _save_context:
   ld s0, OFFSET_REG_S0(sp)
 
   addi sp, sp, OFFSET_SIZE
+  bltz tp, _back_to_kernel
+  csrw CSR_SSCRATCH, tp
+  ld tp, current_running
   sd sp, PCB_KERNEL_SP(tp)
   ld sp, PCB_USER_SP(tp)
-
-  /* restore tp from CSR_SSCRATCH */
-  addi sp, sp, -8
-  ld tp, 0(sp)
-  addi sp, sp, 8
+  csrr tp, CSR_SSCRATCH
+_back_to_kernel:
 .endm
 
 ENTRY(enable_preempt)
@@ -199,6 +199,7 @@ ENDPROC(disable_interrupt)
 // the address of previous pcb in a0
 // the address of next pcb in a1
 ENTRY(switch_to)
+  beqz a0, switch_to_restore
   addi tp, a0, 0
   // save all callee save registers on kernel stack
   addi sp, sp, -(SWITCH_TO_SIZE)
@@ -217,13 +218,29 @@ ENTRY(switch_to)
   sd s9, SWITCH_TO_S9(sp)
   sd s10, SWITCH_TO_S10(sp)
   sd s11, SWITCH_TO_S11(sp)
+  csrr s11, CSR_SATP
+  sd s11, SWITCH_TO_SATP(sp)
 
   sd sp, PCB_KERNEL_SP(tp)
-  
+
+switch_to_restore:
   // restore next
   addi tp, a1, 0
   ld sp, PCB_KERNEL_SP(tp)  
 
+  ld s0, SWITCH_TO_SATP(sp)
+  fence
+  fence.i
+  sfence.vma
+  fence
+  fence.i
+  csrw CSR_SATP, s0
+  fence
+  fence.i
+  sfence.vma
+  fence
+  fence.i
+  
   ld s0, SWITCH_TO_S0(sp)
   ld s1, SWITCH_TO_S1(sp)
   

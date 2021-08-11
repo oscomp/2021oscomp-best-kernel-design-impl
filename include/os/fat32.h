@@ -6,6 +6,8 @@
 #include <../../drivers/sdcard/include/sdcard.h>
 #include <os/sched.h>
 #include <os/system.h>
+#include <os/ring_buffer.h>
+#include <os/pipe.h>
 
 #ifndef max
 #define max(x,y) (((x) > (y)) ? (x) : (y))
@@ -120,26 +122,8 @@ struct linux_dirent64 {
     char           d_name[];
 };
 
-/* pipe */
-#define NUM_PIPE 16
-#define PIPE_BUF_SIZE 512
-#define PIPE_INVALID 0
-#define PIPE_VALID 1
-#define PIPE_ERROR 2
-
-#define FD_UNPIPED 0
-#define FD_PIPED 1
-
-typedef struct pipe{
-    fd_num_t fd[2]; // 0 out, 1 in
-    char buff[PIPE_BUF_SIZE];
-    uint32 top; // buff top
-    uint32 bottom; // buff bottom
-    pid_t pid; // parent id
-    list_head wait_list;
-    uint8 r_valid;
-    uint8 w_valid;
-}pipe_t;
+#define FD_UNREDIRECTED 0
+#define FD_REDIRECTED 1
 
 #define LONG_DENTRY_NAME1_LEN 5
 #define LONG_DENTRY_NAME2_LEN 6
@@ -297,7 +281,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
 dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
 uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint32_t flags);
 int16 get_fd_index(fd_num_t fd, void *pcb);
-
+int16 get_my_fd_index(fd_num_t fd, void *pcb);
 void write_fat_table(uint32_t old_clus, uint32_t new_clus, uchar *buff);
 
 uchar unicode2char(uint16_t unich);
@@ -307,6 +291,8 @@ void set_dentry_from_fd(dentry_t *p, fd_t *fdp);
 uint32_t get_next_cluster(uint32_t cluster);
 uint8 is_zero_dentry(dentry_t *p);
 uint8_t filenamecmp(const char *name1, const char *name2);
+void redirect_fd(fd_t *new, fd_num_t old_fd_index);
+void clear_all_valid(fd_t *fdp);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)

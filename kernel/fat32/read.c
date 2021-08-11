@@ -15,31 +15,49 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
 {
     debug();
     log(0, "fd:%d count:%d", fd, count);
-    uint8_t fd_index = get_fd_index(fd, current_running);
+    int32_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0 || !current_running->fd[fd_index].used){
         log(0, "fd not found");
         return SYSCALL_FAILED;
     }
-    if (current_running->fd[fd_index].dev == STDIN)
-        return read_ring_buffer(&stdin_buf, buf, count);
+    if (current_running->fd[fd_index].dev == STDIN){
+        log(0, "it's STDIN");
+        ssize_t ret = read_ring_buffer(&stdin_buf, buf, count);
+        log(0, "ret is %lx %c", ret, buf[0]);
+        return ret;
+    }
     // 如果是管道，就读取管道输出
     if (current_running->fd[fd_index].piped == FD_PIPED){
         log(0, "it's a pipe fd");
-        return pipe_read(buf, current_running->fd[fd_index].pip_num, count);
+        ssize_t ret = pipe_read(buf, current_running->fd[fd_index].pip_num, count);
+        log(0, "ret is %lx %c", ret, buf[0]);
+        return ret;
     }
 
-    #ifndef K210
-    uchar *mybuff;
-    size_t length = -1;
+#ifndef K210
+
+    uchar *mybuff = kalloc();
+    int32_t length = 0;
     static int cnt = 0;
-    if (cnt++ == 0)
+    if (cnt == 0)
         get_elf_file("code", &mybuff, &length);
-    else if (cnt++ == 1)
-        get_elf_file("cmd", &mybuff, &length);
-    log(0, "retcount: %d", length);
-    memcpy(buf, mybuff, length);
-    return length;
-    #endif
+    else if (cnt >= 1){
+        length = 14;
+        char temp[20] = "echo 1\necho 2\n";
+        memcpy(mybuff, temp, length);
+        // get_elf_file("cmd", &mybuff, &length);
+    }
+    else
+        assert(0);
+    cnt++;
+    length -= current_running->fd[fd_index].pos; 
+    if (length < 0) length = 0;
+    log(0, "retcount: %d, %d", length, min(length, count));
+    memcpy(buf, mybuff + current_running->fd[fd_index].pos, min(length, count));
+    current_running->fd[fd_index].pos += min(length, count);
+    return min(length, count);
+
+#endif
 
     size_t mycount = 0;
     assert(count < (1lu << 63)); /* cannot be too large */
@@ -95,7 +113,7 @@ int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt)
 {
     debug();
     log(0, "fd:%d, iovcnt:%d", fd, iovcnt);
-    uint8 fd_index = get_fd_index(fd, current_running);
+    int32_t fd_index = get_fd_index(fd, current_running);
 
     if (fd_index < 0)
         return SYSCALL_FAILED;

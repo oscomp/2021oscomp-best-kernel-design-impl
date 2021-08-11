@@ -29,7 +29,7 @@
     #define KERNEL_END 0xffffffff80600000lu
 #else
     #define KERNEL_ENTRYPOINT 0xffffffff80500000lu
-    #define KERNEL_END 0xffffffff90000000lu
+    #define KERNEL_END 0xffffffff90200000lu
 #endif
 
 #ifdef K210
@@ -200,5 +200,6 @@ static inline void clear_pgdir(uintptr_t pgdir_addr)
 }
 
 uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va);
+uintptr_t probe_kva_of(uintptr_t va, uintptr_t pgdir_kva);
 
 #endif  // PGTABLE_H

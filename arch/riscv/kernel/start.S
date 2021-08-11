@@ -35,13 +35,15 @@ ENTRY(_start)
 #   add a3, a3, 4
 #   blt a3, a4, clear_bss
 clear_bss_done:  /* this should never return */
-  la tp, pid0_pcb
+  # la tp, pid0_pcb
+  li tp, 0
   ld sp, pid0_stack
   csrw CSR_SSCRATCH, x0
   j main
 
 secondary:
-  la tp, pid0_pcb2
+  # la tp, pid0_pcb2
+  li tp, 0
   ld sp, pid0_stack2
   csrw CSR_SSCRATCH, x0
   j main

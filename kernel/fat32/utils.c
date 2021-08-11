@@ -289,7 +289,7 @@ uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint3
     pcb_t *pcb_under = (pcb_t *)pcb_underinit;
     if (pcb_under->fd[i].used) return -1;
 
-    pcb_under->fd[i].dev = DEFAULT_DEV;
+    // pcb_under->fd[i].dev = DEFAULT_DEV;
 
     pcb_under->fd[i].first_clus_num = get_cluster_from_dentry(p);
     
@@ -330,17 +330,30 @@ void set_dentry_from_fd(dentry_t *p, fd_t *fdp)
     p->length = fdp->length;
 }
 
-/* return file descriptor index whose fd_num = fd*/
+/* return real file descriptor index(if it is a copied file descriptor, return its origin) */
 /* Not found return -1 */
 int16 get_fd_index(fd_num_t fd, void *arg)
 {
     pcb_t *pcb = (pcb_t *)arg;
     for (int i = 0; i < NUM_FD; ++i)
     {
-        if (pcb->fd[i].used && pcb->fd[i].fd_num == fd){
+        if (pcb->fd[i].used == FD_USED && pcb->fd[i].fd_num == fd){
+            while (pcb->fd[i].redirected == FD_REDIRECTED)
+                i = pcb->fd[i].redirected_fd_index;
             return i;
         }
     }
+    return -1;
+}
+
+/* return this fd index(even though if is a copied file descriptor, return itself) */
+/* not found return -1 */
+int16 get_my_fd_index(fd_num_t fd, void *arg)
+{
+    pcb_t *pcb = (pcb_t *)arg;
+    for (int i = 0; i < NUM_FD; ++i)
+        if (pcb->fd[i].used == FD_USED && pcb->fd[i].fd_num == fd)
+            return i;
     return -1;
 }
 
@@ -376,3 +389,19 @@ uint8_t filenamecmp(const char *name1, const char *name2)
     return strcmp(name1_t, name2_t);
 }
 
+/* redirect a file descriptor */
+/* new must be unused */
+void redirect_fd(fd_t *new, fd_num_t old_fd_index)
+{
+    assert(new->used == FD_UNUSED);
+    new->used = FD_USED;
+    new->redirected = FD_REDIRECTED;
+    new->redirected_fd_index = old_fd_index;
+}
+
+void clear_all_valid(fd_t *fdp)
+{
+    fdp->piped = FD_UNPIPED;
+    fdp->redirected = FD_UNREDIRECTED;
+    fdp->used = FD_UNUSED;
+}

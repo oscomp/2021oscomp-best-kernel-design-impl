@@ -34,6 +34,7 @@ void init_recyc()
 
 ptr_t allocPage()
 {
+    // log(0, "memCurr %lx, memalloc %lx", memCurr, memalloc);
     ptr_t ret;
     // memCurr += NORMAL_PAGE_SIZE;
     // ret = memCurr - NORMAL_PAGE_SIZE;
@@ -201,6 +202,9 @@ void freePage(ptr_t baseAddr)
         }
     }
     if (clear){
+        for (list_node_t *test = freePageList.next; test != &freePageList; test = test->next)
+            if (test->ptr == baseAddr)
+                assert(0);
         // printk_port("sizeof : %d\n", sizeof(list_node_t));
         list_node_t *tmp = freePagebackupList.next;
         assert(tmp != &freePagebackupList);
@@ -209,6 +213,7 @@ void freePage(ptr_t baseAddr)
         list_del(tmp);
         list_add_tail(tmp,&freePageList);
     }
+    else assert(0);
     // vt100_move_cursor(1,10);
     // printk("Free:%x",baseAddr);
 }
@@ -418,11 +423,12 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
         clear_pgdir(pgdir2);
         uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
         set_pfn(ptr,pfn2);
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER|mask);
+        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER|mask|_PAGE_ACCESSED|_PAGE_DIRTY);
         ret = pgdir2;
     }
     else
         ret = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT);
+    local_flush_tlb_all();
     return ret;
 }
 

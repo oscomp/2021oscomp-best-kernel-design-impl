@@ -13,6 +13,7 @@
 #include <qemu.h>
 #include <os/elf.h>
 #include <os/fat32.h>
+#include <os/pipe.h>
 
 #define TOO_LARGE_PRIORITY 10000000
 #define true 1
@@ -60,6 +61,8 @@ pid_t process_id = 1;
 int FORMER_TICKS_COUNTER;
 int LATTER_TICKS_COUNTER;
 
+/* decide who is the next running process */
+/* current_running->exec could be 1, which means we come here from do_execve() */
 void do_scheduler(void)
 {
     // static int32_t cnt = 0;
@@ -129,30 +132,13 @@ void do_scheduler(void)
     // vt100_move_cursor(current_running->cursor_x,
     //                   current_running->cursor_y);
     // #endif
+    if (previous_running->exec){
+        previous_running->exec = 0;
+        previous_running = NULL;
+    }
     switch_to(previous_running,current_running);
 }
 
-
-/* copy context */
-/* kernel_stack and user_stack are stack top addr */
-static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top)
-{
-    uint64_t ker_stack_size, user_stack_size;
-    /* kernel_sp is just at user context, but maybe not equal to register sp */
-    ker_stack_size = KERNEL_STACK_SIZE - PAGE_OFFSET(current_running->kernel_sp);
-    user_stack_size = current_running->user_stack_base + USER_STACK_INIT_SIZE - current_running->user_sp;
-    log(0, "user_stack_base: %lx, user_stack_size:%lx", current_running->user_stack_base, user_stack_size);
-    
-    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size; /* for user context */
-    pcb_underinit->user_sp = user_stack_top - user_stack_size; /* no need to be aligned with user_sp */
-    pcb_underinit->user_stack_base = user_stack_top - USER_STACK_INIT_SIZE;
-    memcpy(pcb_underinit->kernel_sp, current_running->kernel_sp, ker_stack_size);
-    memcpy(pcb_underinit->user_sp - 8, current_running->user_sp - 8, user_stack_size + 8); /* copy tp, very essential */
-
-    // copy fd
-    for (int i = 0; i < NUM_FD; ++i)
-        memcpy(&pcb_underinit->fd[i], &current_running->fd[i], sizeof(fd_t));
-}
 
 /* clone a child thread for current thread */
 /* FOR NOW, use tls as entry point */
@@ -168,74 +154,90 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
         {
             pcb_t *pcb_underinit = &pcb[i];
             init_pcb_default(pcb_underinit, USER_THREAD);
+            log(0, "new tid is %d, pid_on_exec %d", pcb_underinit->tid, pcb_underinit->pid_on_exec);
             /* set some special properties */
-            pcb_underinit->pid = current_running->pid; /* FOR NOW no pid-- */
-            uint8_t spawn_num = count_spawn_num(pcb_underinit->pid); /* >= 2 */
-            // log(0, "spawn_num: %d", spawn_num);
-            pcb_underinit->tid = pcb_underinit->pid + spawn_num - 1;
-
-            pcb_underinit->parent.parent = current_running;
-            pcb_underinit->parent.flag = flag;
+            pcb_underinit->pid = current_running->pid; /* pid is current_running->pid before exec */
 
             /* init child pcb */
             ptr_t kernel_stack_top = allocPage() + NORMAL_PAGE_SIZE;  
-            // if stack = NULL, automatically set up      
-            ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + 3 * (spawn_num - 1) * NORMAL_PAGE_SIZE;
+            /* if stack = NULL, automatically set up */
+            if (stack) assert(0);
+            ptr_t user_stack_top = USER_STACK_ADDR;
+
+            /* spawn num is very essential, we can't allocate the same addr to two different children */
+            /* things can be complicated when many children are spawned */
+            // current_running->spawn_num++;
+            // for (uint j = 1; j < NUM_MAX_TASK; j++)
+            //     if (pcb[j].pid == current_running->pid)
+            //         pcb[j].spawn_num = current_running->spawn_num;
+
+            log(0, "spawn_num: %d", current_running->spawn_num);
+            // ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + PAGES_PER_USER_STACK * (current_running->spawn_num) * NORMAL_PAGE_SIZE;
             log(0, "child process usp top is %lx", user_stack_top);
-            for (uint64_t i = 0; i < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; i++)
-                alloc_page_helper(user_stack_top - (i+1)*NORMAL_PAGE_SIZE, current_running->pgdir, _PAGE_READ|_PAGE_WRITE);
 
             // pgdir
-            pcb_underinit->pgdir = current_running->pgdir;
-           
-            // prepare stack
-            copy_parent_all_and_set_sp(pcb_underinit, kernel_stack_top, user_stack_top);
+            uint64_t pgdir = allocPage();
+            clear_pgdir(pgdir);
+            share_pgtable(pgdir, pa2kva(PGDIR_PA));
 
-            // return 0 if child
-            regs_context_t *pt_regs =
-                (regs_context_t *)(kernel_stack_top - sizeof(regs_context_t));
-            pt_regs->regs[10] = 0;
+            /* user low space */
+            for (uint64_t i = current_running->elf.text_begin; i < current_running->edata; i += NORMAL_PAGE_SIZE){
+                if (probe_kva_of(i, current_running->pgdir)){
+                    /* copy it */
+                    log(0, "copy %lx", i);
+                    uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_ALL_MOD);
+                    memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
+                    log(0, "copy success to %lx", clone_page_kva);
+                }
+            }
+            /* user high space (including stack) */
+            for (uint64_t i = get_user_addr_top(current_running); i < USER_STACK_ADDR; i += NORMAL_PAGE_SIZE){
+                if (probe_kva_of(i, current_running->pgdir)){
+                    log(0, "copy %lx", i);
+                    uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_READ|_PAGE_WRITE);
+                    memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
+                    log(0, "copy success");
+                }
+            }
 
-            // prepare switch context under user context
-            pcb_underinit->kernel_sp -= sizeof(switchto_context_t);
-            switchto_context_t *switch_to_reg = 
-                (switchto_context_t *)(pcb_underinit->kernel_sp);
-            // kernel stack should be different
-            switch_to_reg->regs[0] = &ret_from_exception;
+            /* set up pcb */
+            init_clone_pcb(pgdir, pcb_underinit, kernel_stack_top, user_stack_top, flag);
 
             // add to ready queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
             log(0, "child process usp is %lx", pcb_underinit->user_sp);
             log(0, "child process usp base is %lx", pcb_underinit->user_stack_base);
-            log(0, "child process ra is %lx", pt_regs->regs[1]);
+            log(0, "ret is %d", pcb_underinit->tid);
             return pcb_underinit->tid;
         }
     return -1;
 }
 
-pid_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
+int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
     debug();
     uint64_t status_ker_va = NULL;
     if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
-    pid_t ret = -1;
-    for (uint i = 1; i < NUM_MAX_TASK; ++i)
+    log(0, "kva is %lx", status_ker_va);
+    int64_t ret = -10;
+    for (uint i = 0; i < NUM_MAX_TASK; ++i)
     {
         if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
             // confirm pid
-            if (pcb[i].status == TASK_READY){
-                current_running->status = TASK_BLOCKED;
-                list_add_tail(&current_running->list, &pcb[i].wait_list);
-                ret = pcb[i].pid;
+            if (pcb[i].status == TASK_READY || pcb[i].status == TASK_RUNNING){
+                do_block(&current_running->list, &pcb[i].wait_list);
+                ret = pcb[i].tid;
                 do_scheduler();
+                log(0, "exit status %d", pcb[i].exit_status);
                 if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
-                i = 1; // start from beginning when wake up
+                // i = 0; // start from beginning when wake up
+                log(0, "ret is %ld", ret);
+                return ret;
             }
-            else
-                ret = pcb[i].pid;
         }
     }
+    log(0, "ret is %ld", ret);
     return ret;
 }
 
@@ -403,9 +405,14 @@ pid_t do_getpid()
 pid_t do_getppid()
 {
     debug();
-    if (current_running->parent.parent == NULL)
+    if (current_running->parent.parent == NULL){
+        log(0, "no parent");
         return 1;
-    return current_running->parent.parent->pid;
+    }
+    else{
+        log(0, "parent id is %d", current_running->parent.parent->pid);
+        return current_running->parent.parent->pid;
+    }
 }
 
 /* return 0 */
@@ -439,7 +446,7 @@ pid_t do_getegid()
 pid_t do_set_tid_address(int *tidptr)
 {
     debug();
-    return current_running->pid;
+    return current_running->tid;
 }
 
 pid_t do_gettid()

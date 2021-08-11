@@ -15,7 +15,7 @@
 #ifdef K210
     #define INIT_KERNEL_STACK 0xffffffff80400000lu
 #else
-    #define INIT_KERNEL_STACK 0xffffffff80800000lu
+    #define INIT_KERNEL_STACK 0xffffffff80b00000lu
 #endif
 
 #define FREEMEM (INIT_KERNEL_STACK+4*PAGE_SIZE)
@@ -25,7 +25,8 @@
 #define MEM_FOR_PROC 0xffffffff80150000lu
 
 #define KERNEL_STACK_SIZE NORMAL_PAGE_SIZE
-#define USER_STACK_INIT_SIZE 2*NORMAL_PAGE_SIZE
+#define PAGES_PER_USER_STACK 2
+#define USER_STACK_INIT_SIZE (PAGES_PER_USER_STACK * NORMAL_PAGE_SIZE)
 
 /* Rounding; only works for n = power of two */
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))

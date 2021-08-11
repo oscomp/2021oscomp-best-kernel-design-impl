@@ -18,11 +18,12 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
 {
     debug();
     log(0, "fd:%d, count:%d", fd, count);
-    uint8 fd_index = get_fd_index(fd, current_running);
+    int32_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
+    log(0, "fd_index:%d, dev:%d", fd_index, current_running->fd[fd_index].dev);
 
-    if (current_running->fd[fd_index].dev == STDOUT){        
+    if (current_running->fd[fd_index].dev == STDOUT){    
         return write_ring_buffer(&stdout_buf, buff, count);
     }
     else if (current_running->fd[fd_index].dev == STDERR)
@@ -80,7 +81,7 @@ int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
 {
     debug();
     log(0, "fd:%d, iovcnt:%d", fd, iovcnt);
-    uint8 fd_index = get_fd_index(fd, current_running);
+    int32_t fd_index = get_fd_index(fd, current_running);
     if (fd_index < 0) return -1;
 
     size_t count = 0;

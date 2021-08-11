@@ -1,38 +1,6 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * *
- *            Copyright (C) 2018 Institute of Computing Technology, CAS
- *               Author : Han Shukai (email : hanshukai@ict.ac.cn)
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * *
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * * */
 
 #ifndef INCLUDE_REGS_H_
 #define INCLUDE_REGS_H_
-
-/* This is for struct TrapFrame in scheduler.h
- * Stack layout for all exceptions:
- *
- * ptrace needs to have all regs on the stack. If the order here is changed,
- * it needs to be updated in include/asm-mips/ptrace.h
- *
- * The first PTRSIZE*5 bytes are argument save space for C subroutines.
- */
 
 #define OFFSET_REG_ZERO         0
 
@@ -90,6 +58,12 @@
 
 /* Size of stack frame, word/double word alignment */
 #define OFFSET_SIZE             296
+#ifndef KERNEL_STACK_SIZE
+    #define KERNEL_STACK_SIZE 4096
+#endif
+#ifndef KERNEL_STACK_ALIGN
+    #define KERNEL_STACK_ALIGN 0xfffffffffffff000lu
+#endif
 
 #define PCB_KERNEL_SP          0
 #define PCB_USER_SP            8
@@ -110,7 +84,8 @@
 #define SWITCH_TO_S9     88
 #define SWITCH_TO_S10    96
 #define SWITCH_TO_S11    104
+#define SWITCH_TO_SATP   112
 
-#define SWITCH_TO_SIZE   112
+#define SWITCH_TO_SIZE   120
 
 #endif
