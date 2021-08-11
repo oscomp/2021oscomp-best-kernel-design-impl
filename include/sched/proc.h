@@ -44,8 +44,6 @@ struct tms {
 	uint64 stime;		// system time 
 	uint64 cutime;		// user time of children 
 	uint64 cstime;		// system time of children 
-	uint64 ikstmp;		// the last moment when entering kernel
-	uint64 okstmp;		// the last moment when leaving kernel
 };
 
 // Process Control Block 
@@ -69,6 +67,8 @@ struct proc {
 
 	// times for process performance 
 	struct tms proc_tms;
+	uint64 ikstmp;			// the last moment when entering kernel
+	uint64 okstmp;			// the last moment when leaving kernel
 	int64 vswtch;			// voluntary context switches
 	int64 ivswtch;			// involuntary context switches
 

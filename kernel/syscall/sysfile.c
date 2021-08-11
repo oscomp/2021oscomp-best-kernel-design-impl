@@ -1020,6 +1020,7 @@ sys_statfs(void)
 uint64
 sys_sync(void)
 {
+	syncfs();
 	extern void	bsync(void);
 	bsync();
 	return 0;

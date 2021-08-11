@@ -540,7 +540,7 @@ writebig(char *s)
   for(i = 0; i < MAXFILE; i++){
     ((int*)buf)[0] = i;
     if(write(fd, buf, BSIZE) != BSIZE){
-      printf("%s: error: write big file failed\n", i);
+      printf("%s: error: write big file failed\n", s);
       exit(1);
     }
   }
@@ -557,18 +557,18 @@ writebig(char *s)
   for(;;){
     i = read(fd, buf, BSIZE);
     if(i == 0){
-      if(n == MAXFILE - 1){
-        printf("%s: read only %d blocks from big", n);
+      if(n < MAXFILE){
+        printf("%s: read only %d blocks from big", s, n);
         exit(1);
       }
       break;
     } else if(i != BSIZE){
-      printf("%s: read failed %d\n", i);
+      printf("%s: read failed %d\n", s, i);
       exit(1);
     }
     if(((int*)buf)[0] != n){
       printf("%s: read content of block %d is %d\n",
-             n, ((int*)buf)[0]);
+             s, n, ((int*)buf)[0]);
       exit(1);
     }
     n++;

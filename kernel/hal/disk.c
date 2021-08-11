@@ -71,6 +71,16 @@ void disk_intr(void)
 	__debug_info("disk_intr", "leave\n");
 }
 
+int disk_write_no_block(struct buf *b)
+{
+	#ifdef QEMU
+	return virtio_disk_write_no_block(b);
+	#else 
+	// sdcard_write_sector(b->data, sector);
+	return -1;
+	#endif
+}
+
 // int disk_read_multi_blk(struct buf *bufs[], int nbuf)
 // {
 // 	#ifdef QEMU

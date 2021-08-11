@@ -628,3 +628,17 @@ end:
 		iunlockput(inew);
 	return ret;
 }
+
+void syncfs(void)
+{
+	struct superblock *sb;
+	acquire(&rootfs.cache_lock);
+	for (sb = rootfs.next; sb != NULL; sb = sb->next) {
+		if (sb->op.sync) {
+			release(&rootfs.cache_lock);
+			sb->op.sync(sb);
+			acquire(&rootfs.cache_lock);
+		}
+	}
+	release(&rootfs.cache_lock);
+}

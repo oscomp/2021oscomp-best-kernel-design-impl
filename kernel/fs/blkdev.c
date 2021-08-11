@@ -108,16 +108,16 @@ int disk_write_block(struct superblock *sb, int usr, char *src, uint64 sectorno,
 	
 	int ret = either_copyin_nocheck(b->data + off, usr, (uint64)src, len);
 
-	if (ret < 0) {		// fail to write
-		b->valid = 0;	// invalidate the buf
-	} else {
-		ret = len;
-		bwrite(b, BWRITE_BACK);
-	}
-
-	// if (ret == 0)
+	// if (ret < 0) {		// fail to write
+	// 	b->valid = 0;	// invalidate the buf
+	// } else {
 	// 	ret = len;
-	// bwrite(b, BWRITE_BACK);
+	// 	bwrite(b, BWRITE_BACK);
+	// }
+
+	if (ret == 0)
+		ret = len;
+	bwrite(b, BWRITE_BACK);
 
 	brelse(b);
 
@@ -206,6 +206,7 @@ struct superblock *fs_install(struct inode *dev)
 	sb->op.alloc_inode = fat_alloc_inode;
 	sb->op.destroy_inode = fat_destroy_inode;
 	sb->op.statfs = fat_stat_fs;
+	sb->op.sync = fat32_sync_sb;
 	if (isdev) {
 		sb->op.read = disk_read_block;
 		sb->op.write = disk_write_block;
@@ -272,6 +273,8 @@ static void fs_clean_dentry(struct superblock *sb, struct dentry *de)
 void fs_uninstall(struct superblock *sb)
 {
 	iput(sb->dev);
+	if (sb->op.sync)
+		sb->op.sync(sb);
 	fs_clean_dentry(sb, sb->root);
 	fat32_kill_sb(sb);
 }

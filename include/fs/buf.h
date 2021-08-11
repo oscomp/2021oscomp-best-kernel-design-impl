@@ -31,6 +31,9 @@ struct buf*     bread(uint, uint);
 void            brelse(struct buf*);
 void			bwrite(struct buf *, int through);
 void			bsync(void);
+void			bclean(struct buf *b);
+struct buf*		bdirty(void);
+void			bhalt(struct buf *b);
 void            bprint();
 
 #endif

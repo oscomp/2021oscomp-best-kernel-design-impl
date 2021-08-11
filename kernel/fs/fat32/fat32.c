@@ -105,11 +105,13 @@ struct inode *fat32_init(struct superblock *sb)
 		goto end;
 	}
 
-	fat->free_count = *(uint32*)(buf + 488);
-	fat->next_free = *(uint32*)(buf + 492);
+	fat->free_count = *(uint32*)(buf + FAT_FREE_CNT_OFF);
+	fat->next_free = *(uint32*)(buf + FAT_NEXT_FREE_OFF);
 	__debug_info("fat32_init", "free_count: %d\n", fat->free_count);
 	__debug_info("fat32_init", "next_free: %d\n", fat->next_free);
 
+	if (fat_cache_init(sb) < 0)
+		goto end;
 
 	struct fat32_entry *root = kmalloc(sizeof(struct fat32_entry));
 	if (root == NULL)
@@ -168,7 +170,15 @@ struct superblock *fat32_get_sb(void)
 void fat32_kill_sb(struct superblock *sb)
 {
 	struct fat32_sb *fat = sb2fat(sb);
+	fat_cache_free(sb);
 	kfree(fat);
+}
+
+void fat32_sync_sb(struct superblock *sb)
+{
+	acquiresleep(&sb->sb_lock);
+	fat_cache_sync(sb);
+	releasesleep(&sb->sb_lock);
 }
 
 void __alert_fs_err(const char *func)
@@ -190,7 +200,7 @@ uint fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user, uin
 	uint16 const bps = fat->bpb.byts_per_sec;
 	uint sec = first_sec_of_clus(fat, cluster) + off / bps;
 
-	__debug_info("fat_rw_clus", "clus:%d off:%d len:%d\n", cluster, off, n);
+	// __debug_info("fat_rw_clus", "clus:%d off:%d len:%d\n", cluster, off, n);
 	for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
 		m = bps - off % bps;
 		if (n - tot < m) {
@@ -217,7 +227,7 @@ uint fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user, uin
 	// } else {
 	// 	tot = sb->op.read(sb, user, (char*)data, sec, off % bps, n);
 	// }
-	__debug_info("fat_rw_clus", "done: tot:%d\n", tot);
+	// __debug_info("fat_rw_clus", "done: tot:%d\n", tot);
 	return tot;
 }
 
@@ -271,7 +281,7 @@ int fat_read_file(struct inode *ip, int user_dst, uint64 dst, uint off, uint n)
 		n = entry->file_size - off;
 	}
 
-	__debug_info("fat_read_file", "file:%s off:%d len:%d\n", ip->entry->filename, off, n);
+	// __debug_info("fat_read_file", "file:%s off:%d len:%d\n", ip->entry->filename, off, n);
 
 	uint tot, m;
 	uint32 const bpc = sb2fat(ip->sb)->byts_per_clus;
@@ -288,7 +298,7 @@ int fat_read_file(struct inode *ip, int user_dst, uint64 dst, uint off, uint n)
 			break;
 		}
 	}
-	__debug_info("fat_read_file", "done  read:%d\n", tot);
+	// __debug_info("fat_read_file", "done  read:%d\n", tot);
 	return tot;
 }
 
@@ -357,7 +367,7 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 		ip->size = entry->file_size = off;
 		ip->state |= I_STATE_DIRTY;
 	}
-	__debug_info("fat_write_file", "file:%s off:%d len:%d written:%d\n", ip->entry->filename, off, n, tot);
+	// __debug_info("fat_write_file", "file:%s off:%d len:%d written:%d\n", ip->entry->filename, off, n, tot);
 	return tot;
 }
 
@@ -493,7 +503,7 @@ struct fat32_entry *fat_lookup_dir_ent(struct inode *dir, char *filename, uint *
 	if (dir->state & I_STATE_FREE)
 		return NULL;
 
-	__debug_info("fat_lookup_dir_ent", "in\n");
+	// __debug_info("fat_lookup_dir_ent", "in\n");
 	struct inode *ip = fat_alloc_inode(dir->sb);
 	if (ip == NULL)
 		return NULL;

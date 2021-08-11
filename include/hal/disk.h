@@ -7,5 +7,6 @@ void disk_init(void);
 void disk_read(struct buf *b);
 void disk_write(struct buf *b, uint sector);
 void disk_intr(void);
+int disk_write_no_block(struct buf *b);
 
 #endif

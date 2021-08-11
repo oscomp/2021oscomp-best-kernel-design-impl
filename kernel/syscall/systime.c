@@ -26,10 +26,10 @@ uint64 sys_times(void) {
 	}
 
 	struct proc *p = myproc();
-	if (tms && copyout2(tms, (char*)&(p->proc_tms), sizeof(p->proc_tms)) < 0) {
-		return -1;
+	if (copyout2(tms, (char*)&(p->proc_tms), sizeof(p->proc_tms)) < 0) {
+		return -EFAULT;
 	}
-	return ticks;
+	return readtime();
 }
 
 typedef struct timeval TimeVal;

@@ -49,6 +49,7 @@ struct fs_op {
 	int (*read)(struct superblock *sb, int usr, char *dst, uint64 blockno, uint64 off, uint64 len);
 	int (*clear)(struct superblock *sb, uint64 blockno, uint64 blockcnt);
 	int (*statfs)(struct superblock *sb, struct statfs *stat);
+	void (*sync)(struct superblock *sb);
 };
 
 struct inode_op {
@@ -178,5 +179,6 @@ static inline void iunlockput(struct inode *ip)
 	iput(ip);
 }
 
+void syncfs(void);
 
 #endif

@@ -14,7 +14,7 @@
 #include "utils/rbtree.h"
 #include "utils/debug.h"
 
-
+/*
 uint32 alloc_clus(struct superblock *sb)
 {
 	// should we keep a free cluster list? instead of searching fat every time.
@@ -47,6 +47,34 @@ end:
 	kfree(buf);
 	return clus;
 	// panic("no clusters");
+}
+*/
+
+uint32 alloc_clus(struct superblock *sb)
+{
+	struct fat32_sb *fat = sb2fat(sb);
+	uint32 newclus;
+
+	acquiresleep(&sb->sb_lock);
+	newclus = fat->next_free;
+	if (newclus == 0) {
+		if (fat->free_count == 0) {
+			releasesleep(&sb->sb_lock);
+			return 0;
+		}
+		__alert_fs_err("alloc_clus");
+		panic("alloc_clus: no next free but free count is not zero");
+	}
+	if (fat->free_count == 0) {
+		__alert_fs_err("alloc_clus");
+		panic("alloc_clus: got next free but free count is zero");
+	}
+
+	fat_update_next_free(sb);
+	releasesleep(&sb->sb_lock);
+
+	sb->op.clear(sb, first_sec_of_clus(fat, newclus), fat->bpb.sec_per_clus);
+	return newclus;
 }
 
 int free_clus(struct superblock *sb, uint32 cluster)

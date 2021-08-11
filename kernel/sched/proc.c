@@ -765,13 +765,13 @@ void sched(void) {
 		w_sstatus_fs(SSTATUS_FS_CLEAN);
 	}
 	
-	p->proc_tms.stime += readtime() - p->proc_tms.ikstmp;
+	p->proc_tms.stime += readtime() - p->ikstmp;
 
 	intena = mycpu()->intena;
 	swtch(&p->context, &mycpu()->context);
 	mycpu()->intena = intena;
 
-	p->proc_tms.ikstmp = readtime();
+	p->ikstmp = readtime();
 
 	// On k210, sstatus.fs seems to be hardwired to dirty(11b).
 	// if (r_sstatus_fs() == SSTATUS_FS_DIRTY)
@@ -818,7 +818,7 @@ void forkret(void) {
 		myproc()->cwd = namei("/home");
 	}
 
-	myproc()->proc_tms.ikstmp = readtime();
+	myproc()->ikstmp = readtime();
 	usertrapret();
 }
 

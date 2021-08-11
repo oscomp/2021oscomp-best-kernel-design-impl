@@ -158,25 +158,31 @@ sys_sleep(void)
 {
 	int n;
 	int ret = 0;
-	uint ticks0;
+	uint64 now, expire;
+	argint(0, &n);
 
-	if(argint(0, &n) < 0)
-		return -1;
 	struct proc *p = myproc();
-	int mask = p->tmask;// & (1 << (SYS_sleep - 1));
+	int mask = p->tmask;
 	if (mask) {
 		printf(") ...\n");
 	}
-	acquire(&p->lk);
-	ticks0 = ticks;
-	while(ticks - ticks0 < n){
-		if(p->killed){
-			ret = -1;
-			break;
-		}
-		sleep(&ticks, &p->lk);
+
+	now = readtime();
+	// ont tick is 0.1s in xv6
+	expire = now + n * (CLK_FREQ / 10);
+
+	if (expire > now) {
+		acquire(&p->lk);
+		p->sleep_expire = expire;
+		do {
+			sleep(&p->sleep_expire, &p->lk);
+			if (p->killed) {
+				ret = -1;
+				break;
+			}
+		} while (p->sleep_expire != 0);
+		release(&p->lk);
 	}
-	release(&p->lk);
 
 	if (mask) {
 		printf("pid %d: return from sleep(%d", p->pid, n);
@@ -185,36 +191,53 @@ sys_sleep(void)
 }
 
 uint64 sys_nanosleep(void) {
-	uint64 addr_sec, addr_usec;
+	uint64 ureq, urem;
+	struct timespec req, rem;
 
-	if (argaddr(0, &addr_sec) < 0) 
-		return -1;
-	if (argaddr(1, &addr_usec) < 0) 
-		return -1;
+	argaddr(0, &ureq);
+	argaddr(1, &urem);
+	if (copyin2((char*)&req, ureq, sizeof(struct timespec)) < 0) 
+		return -EFAULT;
+	if (req.nsec > 999999999L)
+		return -EINVAL;
 
+	int ret = 0;
 	struct proc *p = myproc();
-	uint64 sec, usec;
-	if (copyin2((char*)&sec, addr_sec, sizeof(sec)) < 0) 
-		return -1;
-	if (copyin2((char*)&usec, addr_usec, sizeof(usec)) < 0) 
-		return -1;
-	int n = sec * 20 + usec / 50000000;
-
 	int mask = p->tmask;
 	if (mask) {
 		printf(") ...\n");
 	}
-	acquire(&p->lk);
-	uint64 tick0 = ticks;
-	while (ticks - tick0 < n) {
-		if (p->killed) {
-			return -1;
-		}
-		sleep(&ticks, &p->lk);
-	}
-	release(&p->lk);
+	
+	uint64 now, expire;
+	now = readtime();
+	expire = now + convert_from_timespec(&req);
 
-	return 0;
+	if (expire > now) {
+		acquire(&p->lk);
+		p->sleep_expire = expire;
+		do {
+			sleep(&p->sleep_expire, &p->lk);
+			if (p->killed) {	// or signal pending with -EINTR
+				ret = -1;
+				break;
+			}
+		} while (p->sleep_expire != 0);
+		release(&p->lk);
+	}
+
+	if (mask) {
+		printf("pid %d: return from nanosleep(", p->pid);
+	}
+
+	if (ret < 0 && urem) {
+		now = readtime();
+		if (now < expire) {
+			convert_to_timespec(expire - now, &rem);
+			copyout2(urem, (char *)&rem, sizeof(struct timespec));
+		}
+	}
+
+	return ret;
 }
 
 uint64

@@ -32,6 +32,24 @@
 #define FAT32_MAX_PATH      260
 
 
+/**
+ * Some frequently used parameter
+ */
+#define FAT_FREE_CNT_OFF	488			// offset in the fs info sector
+#define FAT_NEXT_FREE_OFF	492			// the same meaning
+
+
+/**
+ * FAT region cache
+ */
+#ifndef BSIZE
+#define SECSZ				512
+#else
+#define SECSZ				BSIZE
+#endif
+
+#define FAT_CACHE_NSEC		(PGSIZE / SECSZ)
+
 /* FAT32 superblock */
 struct fat32_sb {
 	uint32		first_data_sec;
@@ -40,7 +58,8 @@ struct fat32_sb {
 	uint32		byts_per_clus;
 	uint32		free_count;		// of cluster
 	uint32		next_free;		// clus
-	uint16		fs_info;
+	uint16		fs_info;		// fs info sector
+	uint32		next_free_fat;	// the next fat sec that has room
 	struct {
 		uint16	byts_per_sec;
 		uint8	sec_per_clus;
@@ -51,6 +70,13 @@ struct fat32_sb {
 		uint32	fat_sz;			// count of sectors for a FAT region
 		uint32	root_clus;
 	} bpb;
+	struct {
+		char	*page;
+		int		allocidx;
+		uint32	fatsec[FAT_CACHE_NSEC];	// assume that sector size is 512 byte
+		uint32	lrucnt[FAT_CACHE_NSEC];
+		int8	dirty[FAT_CACHE_NSEC];	// whether the alloc sec dirty
+	} fatcache;
 	struct superblock vfs_sb;
 };
 
@@ -108,6 +134,10 @@ int 				free_clus(struct superblock *sb, uint32 cluster);
 uint32				reloc_clus(struct inode *ip, uint off, int alloc);
 void				free_clus_cache(struct fat32_entry *entry);
 // fat.c
+int					fat_cache_init(struct superblock *sb);
+void				fat_cache_free(struct superblock *sb);
+void				fat_cache_sync(struct superblock *sb);
+uint32				fat_update_next_free(struct superblock *sb);
 uint32				read_fat(struct superblock *sb, uint32 cluster);
 int					write_fat(struct superblock *sb, uint32 cluster, uint32 content);
 // dirent.c
@@ -122,6 +152,7 @@ int					fat_rename_entry(struct inode *ip, struct inode *dp, char *name);
 // fat32.c
 struct superblock*	fat32_get_sb(void);
 void				fat32_kill_sb(struct superblock *sb);
+void				fat32_sync_sb(struct superblock *sb);
 struct inode*		fat32_init(struct superblock *sb);
 int					fat_stat_fs(struct superblock *sb, struct statfs *stat);
 uint				fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user,

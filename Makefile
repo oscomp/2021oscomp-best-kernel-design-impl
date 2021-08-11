@@ -2,6 +2,7 @@
 platform	:= qemu
 mode 		:= debug
 # mode		:= release
+bio			:= wt
 
 K := kernel
 U := xv6-user
@@ -34,6 +35,10 @@ endif
 
 ifeq ($(platform), qemu)
 CFLAGS += -D QEMU
+endif
+
+ifeq ($(bio), wb)
+CFLAGS += -D BIO_WRITE_BACK
 endif
 
 LDFLAGS = -z max-page-size=4096
@@ -259,7 +264,7 @@ fs:
 	@if [ ! -f "fs.img" ]; then \
 		echo "making fs image..."; \
 		dd if=/dev/zero of=fs.img bs=512k count=512; \
-		mkfs.vfat -F 32 fs.img; fi
+		mkfs.vfat -F 32 -s 4 fs.img; fi
 	@sudo mount fs.img $(dst)
 	@make sdcard dst=$(dst)
 	@sudo umount $(dst)

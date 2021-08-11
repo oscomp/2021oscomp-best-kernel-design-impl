@@ -86,8 +86,8 @@ usertrap(void)
 	struct proc *p = myproc();
 
 	uint64 timestamp = readtime();
-	p->proc_tms.ikstmp = timestamp;
-	p->proc_tms.utime += timestamp - p->proc_tms.okstmp;
+	p->ikstmp = timestamp;
+	p->proc_tms.utime += timestamp - p->okstmp;
 
 	// save user program counter.
 	p->trapframe->epc = r_sepc();
@@ -145,8 +145,8 @@ usertrapret(void) {
 	intr_off();
 
 	uint64 timestamp = readtime();
-	p->proc_tms.okstmp = timestamp;
-	p->proc_tms.stime += timestamp - p->proc_tms.ikstmp;
+	p->okstmp = timestamp;
+	p->proc_tms.stime += timestamp - p->ikstmp;
 
 	// send syscalls, interrupts, and exceptions to trampoline.S
 	w_stvec(TRAMPOLINE + (uservec - trampoline));

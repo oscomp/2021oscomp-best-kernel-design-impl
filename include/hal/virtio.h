@@ -102,5 +102,6 @@ struct virtio_blk_req {
 void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *b, uint sector, int write);
 void            virtio_disk_intr(void);
+int             virtio_disk_write_no_block(struct buf *b);
 
 #endif 
