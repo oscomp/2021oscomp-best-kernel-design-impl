@@ -1,1 +1,4 @@
 fat32_close不能重复
+如果有多核，exec释放内核栈后，需要加锁
+df fail
+search和search2算法是对的，但可以明显加快E5的判断

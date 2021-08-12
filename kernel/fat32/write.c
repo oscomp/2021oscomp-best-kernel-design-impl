@@ -32,20 +32,22 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
     }
     else{
         // 如果是管道，就调用pipe_write
-        if (current_running->fd[fd_index].piped == FD_PIPED)
+        if (current_running->fd[fd_index].piped == FD_PIPED){
             return pipe_write(buff, current_running->fd[fd_index].pip_num, count);
+        }
 
         size_t mycount = 0;
         size_t realcount = count; // write as many as possible
         uchar *tempbuff = kalloc();
         ientry_t now_clus = get_clus_from_len(current_running->fd[fd_index].first_clus_num, current_running->fd[fd_index].pos);
-        isec_t now_sec = get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE);
-        now_sec -= (now_sec - first_sec_of_clus(now_clus)) % READ_BUF_CNT; /* bufsize aligned */
+        isec_t now_sec = BUFF_ALIGN( get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE) );
+        log(0, "sec is %d", now_sec);
         ientry_t old_clus = now_clus;
 
         while (mycount < realcount){
             size_t pos_offset_in_buf = current_running->fd[fd_index].pos % BUFSIZE;
             size_t writesize = min(BUFSIZE - pos_offset_in_buf, realcount - mycount);
+            log(0, "this time pos is %d, writesize is %d", current_running->fd[fd_index].pos, writesize);
             sd_read(tempbuff,now_sec);
             memcpy(tempbuff + pos_offset_in_buf, buff, writesize);
             sd_write(tempbuff,now_sec);
@@ -55,7 +57,7 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
             if (current_running->fd[fd_index].pos % CLUSTER_SIZE == 0){
                 old_clus = now_clus;
                 now_clus = get_next_cluster(now_clus);
-                if (now_clus == 0x0fffffffu){
+                if (now_clus == LAST_CLUS_OF_FILE){
                     // new clus should be assigned
                     now_clus = search_empty_clus(tempbuff);
                     write_fat_table(old_clus, now_clus, tempbuff);
@@ -65,7 +67,19 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
             else
                 now_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
         }
-        current_running->fd[fd_index].length = max(current_running->fd[fd_index].pos, current_running->fd[fd_index].length);
+        if (current_running->fd[fd_index].pos > current_running->fd[fd_index].length){
+            fd_t *fdp = &current_running->fd[fd_index];
+            fdp->length = fdp->pos;
+            /* update dentry */
+            log(0, "dir info: sec :%d, offset: %lx, len: %d", fdp->dir_pos.sec, fdp->dir_pos.offset, fdp->dir_pos.len);
+            printk_port("tid:%d, is_piped:%d\n", current_running->tid, fdp->piped);
+            sd_read(tempbuff, fdp->dir_pos.sec);
+            dentry_t *p = tempbuff + fdp->dir_pos.offset;
+            log(0, "filename: %s, new length is %d", p->filename, fdp->length);
+            set_dentry_from_fd(p, fdp);
+            log(0, "dentry new length is %d", p->length);
+            sd_write(tempbuff, fdp->dir_pos.sec);
+        }
 
         kfree(tempbuff);
 

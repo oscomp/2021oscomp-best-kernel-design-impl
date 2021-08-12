@@ -15,7 +15,6 @@
 #define FD_PIPED 1
 
 typedef struct pipe{
-    fd_num_t fd[2]; // fd_num, not index. 0 out, 1 in
     struct ring_buffer rbuf;
     pid_t pid; // parent id
     list_head wait_list;
@@ -25,6 +24,8 @@ typedef struct pipe{
 }pipe_t;
 
 void init_pipe();
+int16 close_pipe_read(pipe_num_t pip_num);
+int16 close_pipe_write(pipe_num_t pip_num);
 int16 fat32_pipe2(fd_num_t *fd, int32 mode);
 int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count);
 int64 pipe_write(uchar *buf, pipe_num_t pip_num, size_t count);

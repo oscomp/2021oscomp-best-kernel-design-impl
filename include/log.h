@@ -22,8 +22,11 @@ static const char *log_level_str[] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 		printk_port("%s: " fmt "\n", level_str, ##__VA_ARGS__);
 #endif
 
-// #define DEBUG_ON 1
-// #define LOG_ON 1
+#define DEBUG_ON 1
+#define LOG_ON 1
+
+#define DEBUG_ON2 1
+#define LOG_ON2 1
 
 #ifdef LOG_ON
 #define log(level, fmt, ...) \
@@ -46,6 +49,32 @@ static const char *log_level_str[] = { "DEBUG", "INFO", "WARNING", "ERROR" };
     } while (0)
 #else
 #define debug() \
+	do { \
+		; \
+	} while (0)
+#endif
+
+#ifdef LOG_ON2
+#define log2(level, fmt, ...) \
+	do { \
+		if (level < this_log_level) \
+			break; \
+		log_it(fmt, log_level_str[level], ##__VA_ARGS__); \
+	} while (0)
+#else
+#define log2(level, fmt, ...) \
+	do { \
+		; \
+	} while (0)
+#endif
+
+#ifdef DEBUG_ON2
+#define debug2() \
+    do { \
+        printk_port("TRACE:%s in %s:%d\n",__FUNCTION__,__FILE__,__LINE__); \
+    } while (0)
+#else
+#define debug2() \
 	do { \
 		; \
 	} while (0)

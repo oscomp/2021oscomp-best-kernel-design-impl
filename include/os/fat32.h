@@ -19,7 +19,7 @@
 
 #define BUFSIZE (min(NORMAL_PAGE_SIZE, CLUSTER_SIZE))
 #define READ_BUF_CNT (BUFSIZE/SECTOR_SIZE)
-
+#define BUFF_ALIGN(sec) (sec - (sec - first_sec_of_clus(clus_of_sec(sec))) % READ_BUF_CNT)
 
 typedef struct fat{
     uint32_t  first_data_sec;
@@ -42,6 +42,7 @@ typedef struct fat{
 
 /* first cluster numer of cwd */
 typedef uint32_t ientry_t;
+#define LAST_CLUS_OF_FILE 0x0fffffffu
 
 #define SHORT_DENTRY_FILENAME_LEN 8
 #define SHORT_DENTRY_EXTNAME_LEN 3
@@ -91,6 +92,8 @@ struct kstat {
 }kstat_t;
 
 #define S_IFDIR 0x4000
+#define S_IFREG 0x8000
+
 struct stat {
     dev_t     st_dev;         /* ID of device containing file */
     ino_t     st_ino;         /* Inode number */
@@ -208,11 +211,14 @@ enum{
 
 #define FD_CLOEXEC 1
 
-
 /* lseek */
 #define SEEK_SET 0x0
 #define SEEK_CUR 0x1
 #define SEEK_END 0x2
+
+/* getdents64 */
+#define DT_DIR 4
+#define DT_REG 8
 
 extern fat_t fat;
 extern ientry_t cwd_first_clus;
@@ -240,7 +246,7 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use);
 
 int16 fat32_fstat(fd_num_t fd, struct kstat *kst);
 
-int64 fat32_getdent(fd_num_t fd, char *buf, uint32_t len);
+int64 fat32_getdents64(fd_num_t fd, char *buf, uint32_t len);
 
 int16 fat32_pipe2(fd_num_t fd[], int32 mode);
 
@@ -272,7 +278,7 @@ void init_pipe();
 
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos);
 dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos);
-uchar *search_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
+uchar *get_filename_from_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *buf);
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_clus(uchar *buf);
 

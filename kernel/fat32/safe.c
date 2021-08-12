@@ -18,7 +18,7 @@ int64 fat32_readmy(uchar *buf, size_t count)
     assert(count < (1lu << 63)); /* cannot be too large */
 
     int64_t realcount = min((int64_t)count, (int64_t)(fdp->length) - (int64_t)(fdp->pos));
-    log(0, "realcount :%lx", realcount);
+    // log(0, "realcount :%lx", realcount);
     if (realcount <= 0)
         return 0;
 
@@ -27,7 +27,7 @@ int64 fat32_readmy(uchar *buf, size_t count)
     ientry_t now_clus = get_clus_from_len(fdp->first_clus_num, fdp->pos);
     isec_t now_sec = get_sec_from_clus_and_offset(now_clus, fdp->pos % CLUSTER_SIZE);
     now_sec -= (now_sec - first_sec_of_clus(now_clus)) % READ_BUF_CNT; /* bufsize aligned */
-    log(0, "pos %x, now_clus:%d, now_sec:%d", fdp->pos, now_clus, now_sec);
+    // log(0, "pos %x, now_clus:%d, now_sec:%d", fdp->pos, now_clus, now_sec);
 
     while (mycount < realcount){
         size_t pos_offset_in_buf = fdp->pos % BUFSIZE;

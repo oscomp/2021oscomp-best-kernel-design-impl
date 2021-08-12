@@ -335,6 +335,7 @@ void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base)
 {
     // make sure no page fault
     set_satp(SATP_MODE_SV39,0,PGDIR_PA >> NORMAL_PAGE_SHIFT);
+    local_flush_tlb_all();
     // free page
     for (uint32_t i = 0; i < NUM_PTE_ENTRY; ++i)
     {
@@ -360,8 +361,6 @@ void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base)
         }
     }
     freePage(pgdir);
-    // uint64_t kernel_stack_page = (kernel_stack%NORMAL_PAGE_SIZE)? 
-    //         kernel_stack-(kernel_stack % NORMAL_PAGE_SIZE) : kernel_stack - NORMAL_PAGE_SIZE;
     freePage(kernel_stack_base);
 }
 

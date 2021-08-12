@@ -37,10 +37,11 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     /* file descriptors */
     // number, piped
     for (int i = 0; i < NUM_FD; ++i){
+        memset(&pcb_underinit->fd[i], 0, sizeof(fd_t));
         pcb_underinit->fd[i].fd_num = i;
-        pcb_underinit->fd[i].redirected = FD_UNREDIRECTED;
-        pcb_underinit->fd[i].piped = FD_UNPIPED;
-        pcb_underinit->fd[i].poll_status = 0;
+        // pcb_underinit->fd[i].redirected = FD_UNREDIRECTED;
+        // pcb_underinit->fd[i].piped = FD_UNPIPED;
+        // pcb_underinit->fd[i].poll_status = 0;
     }
     // open stdin , stdout and stderr
     pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
@@ -364,26 +365,22 @@ static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_sta
         memcpy(&pcb_underinit->fd[i], &current_running->fd[i], sizeof(fd_t));
         if (current_running->fd[i].piped == FD_PIPED){
             pipe_num_t pip_num = current_running->fd[i].pip_num;
-            if (current_running->fd[i].fd_num == pipes[pip_num].fd[0]){
-                log(0, "pipe %d r_valid++ = %d", pip_num, pipes[pip_num].r_valid + 1);
+            assert(current_running->fd[i].is_pipe_read || current_running->fd[i].is_pipe_write);
+            if (current_running->fd[i].is_pipe_read){
                 pipes[pip_num].r_valid++;
             }
-            else if (current_running->fd[i].fd_num == pipes[pip_num].fd[1]){
-                log(0, "pipe %d w_valid++ = %d", pip_num, pipes[pip_num].w_valid + 1);
+            else if (current_running->fd[i].is_pipe_write){
                 pipes[pip_num].w_valid++;
             }
-            else
+            else{
                 assert(0);
+            }
         }
     }
     memcpy(&pcb_underinit->elf, &current_running->elf, sizeof(struct ELF_info));
     memcpy(&pcb_underinit->myelf_fd, &current_running->myelf_fd, sizeof(fd_t));
     for (int i = 0; i < NUM_PHDR_IN_PCB; i++)
         memcpy(&pcb_underinit->phdr[i], &current_running->phdr[i], sizeof(Elf64_Phdr));
-
-    for (uint8 i = 0; i < NUM_PHDR_IN_PCB; i++){
-        log(0, "v_addr:%lx, filesz: %lx, memsz: %lx", pcb_underinit->phdr[i].p_vaddr, pcb_underinit->phdr[i].p_filesz, pcb_underinit->phdr[i].p_memsz);
-    }
 }
 
 static void init_clone_pcb_prop(pcb_t *pcb_underinit, uint32_t flag)
@@ -416,6 +413,4 @@ void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_
     // kernel stack should be different
     switch_to_reg->regs[0] = &ret_from_exception;
     switch_to_reg->satp = pt_regs->satp;
-
-    log(0, "%lx, %lx, %lx", pt_regs->sepc, pt_regs->satp, switch_to_reg->satp);
 }

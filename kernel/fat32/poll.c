@@ -27,7 +27,6 @@ int32_t do_ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, 
     nfds_t ret = 0;
     for (int i = 0; i < nfds; ++i)
     {
-        log(0, "fd is %d, events is %lx", fds->fd, fds->events);
         if (fds->fd < 0){
             /* ignore this fds */
             fds->revents = 0lu;
@@ -53,17 +52,15 @@ int32_t do_ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, 
                     uint8_t timer = 0;
                     for (; timer < 100; timer++)
                         if(ring_buffer_empty(rbuf)){
-                            log(0, "poll failed %d times", i);
+                            // log(0, "poll failed %d times", timer);
                             do_scheduler();
                         }
                         else
                             break;
                     if (timer == 100){
-                        log(0, "poll finally failed");
                         fds->revents = POLLHUP;
                     }
                     else{
-                        log(0, "poll successed %d times", ++cnt);
                         ret++;
                         /* poll success */
                         fds->revents = get_revents(&current_running->fd[fd_index], POLLIN);
@@ -74,6 +71,5 @@ int32_t do_ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, 
 
         fds++;
     }
-    log(0, "ret %d", ret);
     return ret;
 }

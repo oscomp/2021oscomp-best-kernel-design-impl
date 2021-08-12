@@ -22,12 +22,12 @@ int32_t do_utimensat(fd_num_t dirfd, const char *pathname, const struct timespec
         fdp->ctime_sec = 1383584112;
         fdp->ctime_nsec = 0;
         fat32_close(fd);
-        log(0, "success");
+        log(0, "success utimenat");
         return SYSCALL_SUCCESSED;
     }
     else{
         log(0, "file not exist");
-        fd = fat32_open(dirfd, pathname, O_RDWR|O_CREATE, 0);
+        fd = fat32_open(dirfd, pathname, O_RDWR|O_CREAT, 0);
         assert(fat32_close(fd) == 0);
         return SYSCALL_SUCCESSED;
     }

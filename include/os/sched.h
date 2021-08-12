@@ -65,11 +65,13 @@ typedef struct dir_pos{
 }dir_pos_t;
 
 /* file discriptor */
-#define O_RDONLY 1 /* read only open */
-#define O_WRONLY 2 /* write only open */
-#define O_RDWR 3 /* read/write open */
-#define O_CREATE 0x40 /* create new */
-#define O_DIRECTORY 0x200000 /* open directory */
+#define O_RDONLY 1 /* read only */
+#define O_WRONLY 2 /* write only */
+#define O_RDWR 3 /* read/write */
+#define O_CREAT 0x40 /* create new */
+#define O_APPEND 0x400 /* append */
+#define O_LARGEFILE 0x8000 /* is large file */
+#define O_DIRECTORY 0x200000 /* directory */
 
 #define NUM_FD 16
 #define NUM_PHDR_IN_PCB 2
@@ -82,6 +84,8 @@ typedef struct fd{
     uint8 dev;
     /* first clus number */
     uint32 first_clus_num;
+    /* file mode */
+    uint32 mode;
     /* open flags */
     uint8 flags;
     /* position */
@@ -105,6 +109,8 @@ typedef struct fd{
     uint8 piped;
     /* pipes[pip_num] is the pipe */
     pipe_num_t pip_num;
+    uint8 is_pipe_read;
+    uint8 is_pipe_write;
 
     /* poll status */
     poll_status_t poll_status;

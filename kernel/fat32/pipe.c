@@ -11,6 +11,30 @@ void init_pipe()
     }
 }
 
+/* close read end of this pipe */
+/* actually, just decrease the "valid" value */
+/* the other end could still be PIPE_VALID */
+int16 close_pipe_read(pipe_num_t pip_num)
+{
+    if (pipes[pip_num].r_valid == PIPE_INVALID)
+        return SYSCALL_FAILED;
+    log(0, "is pipe close, thread %d is closing", current_running->tid);
+    log(0, "pipe %d r_valid-- and is %d", pip_num, pipes[pip_num].r_valid - 1);
+    pipes[pip_num].r_valid--;
+    return SYSCALL_SUCCESSED;
+}
+
+/* close read end of this pipe */
+/* actually, just decrease the "valid" value */
+/* the other end could still be PIPE_VALID */
+int16 close_pipe_write(pipe_num_t pip_num){
+    if (pipes[pip_num].w_valid == PIPE_INVALID)
+        return SYSCALL_FAILED;
+    log(0, "is pipe close, thread %d is closing", current_running->tid);
+    log(0, "pipe %d w_valid-- and is %d", pip_num, pipes[pip_num].w_valid - 1);
+    pipes[pip_num].w_valid--;
+    return SYSCALL_SUCCESSED;
+}
 /* create pipe */
 /* success return 0, fail return -1; */
 /* fd[2] is fd num, should be transmitted to fd_index */
@@ -36,8 +60,6 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
     for (pip_num = 0; pip_num < NUM_PIPE; ++pip_num)
     {
         if ((pipes[pip_num].r_valid | pipes[pip_num].w_valid) == PIPE_INVALID){
-            pipes[pip_num].fd[0] = fd[0];
-            pipes[pip_num].fd[1] = fd[1];
             pipes[pip_num].pid = current_running->pid;
             init_ring_buffer(&pipes[pip_num].rbuf);
             init_list_head(&pipes[pip_num].wait_list);
@@ -57,6 +79,8 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
         current_running->fd[fd_index[i]].used = FD_USED;
         current_running->fd[fd_index[i]].piped = FD_PIPED;
         current_running->fd[fd_index[i]].pip_num = pip_num;
+        if (i == 0) current_running->fd[fd_index[i]].is_pipe_read = 1;
+        else current_running->fd[fd_index[i]].is_pipe_write = 1;
     }
     log(0, "return fd1:%d, fd2:%d", *fd, *(fd+1));
     return SYSCALL_SUCCESSED;
@@ -73,10 +97,16 @@ int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
         log(0, "dangerous pipe read, more than 1 outlet");
     size_t readsize;
     while ((readsize = read_ring_buffer(&pipes[pip_num].rbuf, buf_kva, count)) <= 0){
-        do_block(&current_running->list, &pipes[pip_num].wait_list);
-        do_scheduler();
+        if (pipes[pip_num].w_valid >= PIPE_VALID){
+            do_block(&current_running->list, &pipes[pip_num].wait_list);
+            do_scheduler();
+        }
+        else{
+            readsize = 0;
+            break;
+        }
     }
-    log(0, "pipe read %d", readsize);
+    log(0, "pipe[%d] read %d", pip_num, readsize);
     return readsize;
 }
 
@@ -93,6 +123,6 @@ ssize_t pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
     if (writesize > 0 && !list_empty(&pipes[pip_num].wait_list))
         do_unblock(pipes[pip_num].wait_list.next);
     /* someone maybe polling */
-    log(0, "pipe write %d", writesize);
+    log(0, "pipe[%d] write %d", pip_num, writesize);
     return writesize; // write count
 }

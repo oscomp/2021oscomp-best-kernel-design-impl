@@ -147,14 +147,14 @@ void do_scheduler(void)
 pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid, void *nouse)
 {
     debug();
-    log(0, "flag: %d, stack: %lx, ptid: %lx", flag, stack, ptid);
-    log(0, "tls: %lx, ctid: %lx, nouse: %lx", tls, ctid, nouse);
+    // log(0, "flag: %d, stack: %lx, ptid: %lx", flag, stack, ptid);
+    // log(0, "tls: %lx, ctid: %lx, nouse: %lx", tls, ctid, nouse);
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
         if (pcb[i].status == TASK_EXITED)
         {
             pcb_t *pcb_underinit = &pcb[i];
             init_pcb_default(pcb_underinit, USER_THREAD);
-            log(0, "new tid is %d, pid_on_exec %d", pcb_underinit->tid, pcb_underinit->pid_on_exec);
+            // log(0, "new tid is %d, pid_on_exec %d", pcb_underinit->tid, pcb_underinit->pid_on_exec);
             /* set some special properties */
             pcb_underinit->pid = current_running->pid; /* pid is current_running->pid before exec */
 
@@ -171,9 +171,7 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
             //     if (pcb[j].pid == current_running->pid)
             //         pcb[j].spawn_num = current_running->spawn_num;
 
-            log(0, "spawn_num: %d", current_running->spawn_num);
             // ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + PAGES_PER_USER_STACK * (current_running->spawn_num) * NORMAL_PAGE_SIZE;
-            log(0, "child process usp top is %lx", user_stack_top);
 
             // pgdir
             uint64_t pgdir = allocPage();
@@ -184,19 +182,15 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
             for (uint64_t i = current_running->elf.text_begin; i < current_running->edata; i += NORMAL_PAGE_SIZE){
                 if (probe_kva_of(i, current_running->pgdir)){
                     /* copy it */
-                    log(0, "copy %lx", i);
                     uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_ALL_MOD);
                     memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
-                    log(0, "copy success to %lx", clone_page_kva);
                 }
             }
             /* user high space (including stack) */
             for (uint64_t i = get_user_addr_top(current_running); i < USER_STACK_ADDR; i += NORMAL_PAGE_SIZE){
                 if (probe_kva_of(i, current_running->pgdir)){
-                    log(0, "copy %lx", i);
                     uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_READ|_PAGE_WRITE);
                     memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
-                    log(0, "copy success");
                 }
             }
 
@@ -206,9 +200,9 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
             // add to ready queue
             list_del(&pcb_underinit->list);
             list_add_tail(&pcb_underinit->list,&ready_queue);
-            log(0, "child process usp is %lx", pcb_underinit->user_sp);
-            log(0, "child process usp base is %lx", pcb_underinit->user_stack_base);
-            log(0, "ret is %d", pcb_underinit->tid);
+            // log(0, "child process usp is %lx", pcb_underinit->user_sp);
+            // log(0, "child process usp base is %lx", pcb_underinit->user_stack_base);
+            // log(0, "ret is %d", pcb_underinit->tid);
             return pcb_underinit->tid;
         }
     return -1;
@@ -241,28 +235,6 @@ int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
     return ret;
 }
 
-/* success return 0 */
-uint8 do_nanosleep(struct timespec *ts)
-{
-    debug();
-    // 1. block the current_running
-    // 2. create a timer which calls `do_unblock` when timeout
-    // 3. reschedule because the current_running is blocked.
-    do_block(&current_running->list,&general_block_queue);
-    uint64_t sleep_ticks = 0, nsec = ts->tv_nsec;
-
-    // printk_port("time: %d, %d\n", ts->tv_sec, ts->tv_nsec);
-    for (uint i = 0; i < NANO; ++i){
-        sleep_ticks = (sleep_ticks / 10)+ time_base * (nsec % 10);
-        nsec /= 10;
-    }
-
-    sleep_ticks += ts->tv_sec * time_base;
-    timer_create(&do_unblock, &current_running->list, sleep_ticks);
-    do_scheduler();
-    return 0;
-}
-
 void do_block(list_node_t *list, list_head *queue)
 {
     debug();
@@ -281,6 +253,16 @@ void do_unblock(void *pcb_node)
     pcb_t *pcb = (pcb_t *)((list_node_t *)pcb_node)->ptr;
     pcb->status = TASK_READY;
     list_add_tail(pcb_node,&ready_queue);
+}
+
+static void freeproc(pcb_t *pcb)
+{
+    pcb->status = TASK_EXITED;
+    pcb->parent.parent = NULL;
+    free_all_pages(pcb->pgdir, PAGE_ALIGN(pcb->kernel_sp));
+    for (uint8_t i = 0; i < NUM_FD; i++)
+        fat32_close(pcb->fd[i].fd_num);
+    list_add_tail(&pcb->list,&available_queue);
 }
 
 /* exit a program */
@@ -306,21 +288,17 @@ void do_exit(int32_t exit_status)
 
     current_running->exit_status = exit_status;
     // decide terminal state by mode
-    if (current_running->type == USER_THREAD || current_running->mode == ENTER_ZOMBIE_ON_EXIT)
+    if (current_running->type == USER_THREAD || current_running->mode == ENTER_ZOMBIE_ON_EXIT){
         current_running->status = TASK_ZOMBIE;
+    }
     else if (current_running->mode == AUTO_CLEANUP_ON_EXIT)
     {
         /* check if there are child process who is terminated and its source is waiting to be free */
         for (int i = 0; i < NUM_MAX_TASK; ++i)
             if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
-                pcb[i].status = TASK_EXITED;
-                pcb[i].parent.parent = NULL;
-                list_add_tail(&pcb[i].list,&available_queue);
-                free_all_pages(pcb[i].pgdir, PAGE_ALIGN(pcb[i].kernel_sp));
+                freeproc(&pcb[i]);
             }
-        current_running->status = TASK_EXITED;
-        list_add_tail(&current_running->list,&available_queue);
-        free_all_pages(current_running->pgdir, PAGE_ALIGN(current_running->kernel_sp));
+        freeproc(current_running);
     }
     do_scheduler();
 }

@@ -19,7 +19,7 @@
 /* success: no return value */
 /* fail: return -1 */
 static const char *fixed_envp[] = {"SHELL=/bin/bash",
-                     "PWD=/",
+                     "PWD=/root",
                      "LOGNAME=root",
                      "MOTD_SHOWN=pam",
                      "HOME=/root",
@@ -80,8 +80,6 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
     // init pcb
     pcb_t *pcb_underinit = current_running;
     ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE; /* just 1 page */
-    /* now we can set spawn num to 0, as no address collision will occur */
-    pcb_underinit->spawn_num = 0;
     ptr_t user_stack = USER_STACK_ADDR;
     log(0, "exec pid is %d", pcb_underinit->pid_on_exec);
     init_pcb_exec(pcb_underinit);
@@ -111,7 +109,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 
     // #endif
 
-    uintptr_t pgdir = allocPage();
+    uintptr_t pgdir = allocPage(), prev_pgdir = pcb_underinit->pgdir, prev_ker_stack_base = PAGE_ALIGN(pcb_underinit->kernel_sp);
     clear_pgdir(pgdir);
     share_pgtable(pgdir,pa2kva(PGDIR_PA)); /* 只有内核高地址段才存在PGDIR_PA */
     for (uintptr_t j = 0; j < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; j++)
@@ -138,7 +136,11 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
     // remember to close this temp fd
     // already done in lazy load
 
-    current_running->exec = 1;
+    /* free all previous pages */
+    /* if multiple cores are open, need to lock 'prev_ker_stack_base' until switch to another process */
+    free_all_pages(prev_pgdir, prev_ker_stack_base);
+    /* tell scheduler that I am a ecex-on process */
+    pcb_underinit->exec = 1;
     do_scheduler();
     /* this return never happens */
     return current_running->pid; // no need but do

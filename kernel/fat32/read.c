@@ -23,14 +23,14 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     if (current_running->fd[fd_index].dev == STDIN){
         log(0, "it's STDIN");
         ssize_t ret = read_ring_buffer(&stdin_buf, buf, count);
-        log(0, "ret is %lx %c", ret, buf[0]);
+        log(0, "ret is %d %c", ret, buf[0]);
         return ret;
     }
     // 如果是管道，就读取管道输出
     if (current_running->fd[fd_index].piped == FD_PIPED){
         log(0, "it's a pipe fd");
         ssize_t ret = pipe_read(buf, current_running->fd[fd_index].pip_num, count);
-        log(0, "ret is %lx %c", ret, buf[0]);
+        log(0, "ret is %d %c", ret, buf[0]);
         return ret;
     }
 
@@ -43,7 +43,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
         get_elf_file("code", &mybuff, &length);
     else if (cnt >= 1){
         length = 14;
-        char temp[20] = "echo 1\necho 2\n";
+        char temp[20] = "echo \"aaaaa\" >> test.txt\n";
         memcpy(mybuff, temp, length);
         // get_elf_file("cmd", &mybuff, &length);
     }
@@ -63,13 +63,13 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     assert(count < (1lu << 63)); /* cannot be too large */
     fd_t *fdp = &current_running->fd[fd_index];
     int64_t realcount = min((int64_t)count, (int64_t)(fdp->length) - (int64_t)(fdp->pos));
+    log(0, "realcount is %d, length is %d, pos is %d", realcount, fdp->length, fdp->pos);
     if (realcount <= 0)
         return 0;
     uchar *buff = kalloc();
 
     ientry_t now_clus = get_clus_from_len(current_running->fd[fd_index].first_clus_num, current_running->fd[fd_index].pos);
-    isec_t now_sec = get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE);
-    now_sec -= now_sec % READ_BUF_CNT; /* bufsize aligned */
+    isec_t now_sec = BUFF_ALIGN( get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE) );
     // log(0, "now_clus:%d, now_sec:%d", now_clus, now_sec);
 
     while (mycount < realcount){
@@ -133,7 +133,7 @@ int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt)
     }
     else{
         for (uint32_t i = 0; i < iovcnt; i++){
-            if ((this_count = fat32_write(fd, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
+            if ((this_count = fat32_read(fd, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
                 return SYSCALL_FAILED;
             count += this_count;
             log(0, "count is %d", count);
