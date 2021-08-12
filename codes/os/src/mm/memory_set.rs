@@ -361,13 +361,13 @@ impl MemorySet {
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
         user_stack_top -= PAGE_SIZE;
-        let user_stack_bottom: usize = user_stack_top - USER_STACK_SIZE;
-        // memory_set.push(MapArea::new(
-        //     user_stack_bottom.into(),
-        //     user_stack_top.into(),
-        //     MapType::Framed,
-        //     MapPermission::R | MapPermission::W | MapPermission::U,
-        // ), None);
+        let user_stack_bottom: usize = user_stack_top - PAGE_SIZE * 4; 
+        memory_set.push(MapArea::new(
+            user_stack_bottom.into(),
+            user_stack_top.into(),
+            MapType::Framed,
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        ), None);
 
         (memory_set, user_stack_top, user_heap_bottom, elf.header.pt2.entry_point() as usize, auxv)
     }

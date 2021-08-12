@@ -102,6 +102,12 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
+            // println!(
+            //     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+            //     scause.cause(),
+            //     stval,
+            //     current_trap_cx().sepc,
+            // );
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
@@ -112,7 +118,7 @@ pub fn trap_handler() -> ! {
             let heap_pt = current_task().unwrap().acquire_inner_lock().heap_pt;
             let stack_top = current_task().unwrap().acquire_inner_lock().base_size;
             let stack_bottom = stack_top - USER_STACK_SIZE;
-            // println!{"The base of the user heap: {:X}", heap};
+            // println!{"The base of the user stack: {:X} ~ {:X}", stack_bottom, stack_top};
             // println!{"============================{:?}", vpn}
             let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
             let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
@@ -124,6 +130,7 @@ pub fn trap_handler() -> ! {
             } else if va.0 >= heap_base && va.0 <= heap_pt {
                 current_task().unwrap().acquire_inner_lock().lazy_alloc_heap(vpn);
             } else if va.0 >= stack_bottom && va.0 <= stack_top {
+                println!{"lazy_stack_page: {:?}", va}
                 current_task().unwrap().acquire_inner_lock().lazy_alloc_stack(vpn);
             } else {
                 // get the PageTableEntry that faults
