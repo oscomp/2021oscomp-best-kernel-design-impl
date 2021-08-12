@@ -397,10 +397,10 @@ impl ArgMachine{
 
     pub fn auto_run_lmbench(){
         println!("!!!!!!!!!AUTORUN!!!!!!!!!");
-        // mkdir("/var");
-        // mkdir("/var/tmp");
-        // open("/var/tmp/lmbench", OpenFlags::CREATE);
-        // ls("/");
+        mkdir("/var");
+        mkdir("/var/tmp");
+        open("/var/tmp/lmbench", OpenFlags::CREATE);
+        //ls("/");
         println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("lmbench_all lat_syscall -P 1 null");
@@ -411,16 +411,16 @@ impl ArgMachine{
         // testsuits.push("lmbench_all lat_syscall -P 1 stat /var/tmp/lmbench");
         // testsuits.push("lmbench_all lat_syscall -P 1 fstat /var/tmp/lmbench");
         // testsuits.push("lmbench_all lat_syscall -P 1 open /var/tmp/lmbench");
-        testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
-        testsuits.push("lmbench_all lat_sig -P 1 install");
-        testsuits.push("lmbench_all lat_sig -P 1 catch");
+        //testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
+        //testsuits.push("lmbench_all lat_sig -P 1 install");
+        //testsuits.push("lmbench_all lat_sig -P 1 catch");
         // testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
         // testsuits.push("lmbench_all lat_pipe -P 1");
-        testsuits.push("lmbench_all lat_proc -P 1 fork");
-        testsuits.push("lmbench_all lat_proc -P 1 exec");
+        //testsuits.push("lmbench_all lat_proc -P 1 fork");
+        //testsuits.push("lmbench_all lat_proc -P 1 exec");
         // testsuits.push("busybox cp hello /tmp");
-        testsuits.push("lmbench_all lat_proc -P 1 shell");
-        // testsuits.push("lmbench_all lmdd label=\"File /var/tmp/XXX write bandwidth:\" of=/var/tmp/XXX move=645m");
+        //testsuits.push("lmbench_all lat_proc -P 1 shell");
+        testsuits.push("lmbench_all lmdd label=\"File /var/tmp/XXX write bandwidth:\" of=/var/tmp/XXX move=645m");
         // testsuits.push("lmbench_all lat_pagefault -P 1 /var/tmp/XXX");
         // testsuits.push("lmbench_all lat_mmap -P 1 512k /var/tmp/XXX");
         // testsuits.push("busybox echo file system latency");
