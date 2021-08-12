@@ -32,7 +32,7 @@ use crate::task::{
     get_kernel_runtime_usec
 };
 use crate::timer::set_next_trigger;
-use crate::config::{TRAP_CONTEXT, TRAMPOLINE};
+use crate::config::{TRAP_CONTEXT, TRAMPOLINE, USER_STACK_SIZE};
 use crate::gdb_print;
 use crate::monitor::*;
 
@@ -141,7 +141,6 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
-            // println!{"pinLoadPageFault"}
             // println!(
             //     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
             //     scause.cause(),
@@ -154,35 +153,48 @@ pub fn trap_handler() -> ! {
                 panic!("VirtAddr out of range!");
             }
             let vpn: VirtPageNum = va.floor();
+            let heap_base = current_task().unwrap().acquire_inner_lock().heap_start;
+            let heap_pt = current_task().unwrap().acquire_inner_lock().heap_pt;
+            let stack_top = current_task().unwrap().acquire_inner_lock().base_size;
+            let stack_bottom = stack_top - USER_STACK_SIZE;
+            // println!{"The base of the user stack: {:X} ~ {:X}", stack_bottom, stack_top};
             // println!{"============================{:?}", vpn}
-            // Get the task inner of current
-            // let mut pcb_inner = current_task().unwrap().acquire_inner_lock();
-            // get the PageTableEntry that faults
-            let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
-            // println!{"PageTableEntry: {}", pte.bits};
-            // if the virtPage is a CoW
-            if pte.is_some() && pte.unwrap().is_cow() {
-                let former_ppn = pte.unwrap().ppn();
-                //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                // println!("cow addr = {:X} from pid{}", stval, current_task().unwrap().pid.0);
-                // print_free_pages();
-                current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
-                unsafe {
-                    //llvm_asm!("sfence.vma" :::: "volatile");
-                }
-                // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                // println!{"cow_alloc returned..."}
-                // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
-                // println!{"PageTableEntry: {}", pte.bits};
+            let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
+            let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
+            // println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
+            if va >= mmap_start && va < mmap_end {
+                // println!{"where is the lazy_mmap_page!!!!!!!!"}
+                // exit_current_and_run_next(-2);
+                current_task().unwrap().lazy_mmap(va.0);
+            } else if va.0 >= heap_base && va.0 <= heap_pt {
+                current_task().unwrap().acquire_inner_lock().lazy_alloc_heap(vpn);
+            } else if va.0 >= stack_bottom && va.0 <= stack_top {
+                println!{"lazy_stack_page: {:?}", va}
+                current_task().unwrap().acquire_inner_lock().lazy_alloc_stack(vpn);
             } else {
-                println!(
-                    "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-                    scause.cause(),
-                    stval,
-                    current_trap_cx().sepc,
-                );
-                // page fault exit code
-                exit_current_and_run_next(-2);
+                // get the PageTableEntry that faults
+                let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
+                // println!{"PageTableEntry: {}", pte.bits};
+                // if the virtPage is a CoW
+                if pte.is_some() && pte.unwrap().is_cow() {
+                    let former_ppn = pte.unwrap().ppn();
+                    //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                    // println!("cow addr = {:X}", stval);
+                    current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                    // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
+                    // println!{"cow_alloc returned..."}
+                    // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
+                    // println!{"PageTableEntry: {}", pte.bits};
+                } else {
+                    println!(
+                        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                        scause.cause(),
+                        stval,
+                        current_trap_cx().sepc,
+                    );
+                    // page fault exit code
+                    exit_current_and_run_next(-2);
+                }
             }
             // println!{"Trap solved..."}
         }
