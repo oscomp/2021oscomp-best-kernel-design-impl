@@ -964,8 +964,12 @@ pub fn sys_pselect(
     let mut rfd_vec = Vec::new();
     let mut wfd_vec = Vec::new();
 
+    drop(task);
+
     while !time_up {
         /* handle read fd set */
+
+        let task = current_task().unwrap();
         let inner = task.acquire_inner_lock();
         let fd_table = &inner.fd_table;
         if readfds as usize != 0 && !r_all_ready{
@@ -1088,7 +1092,9 @@ pub fn sys_pselect(
             //println!("timer = {}", timer );
             let time_remain = get_timeval() - timer;
             if time_remain.is_zero() { // not reach timer (now < timer)
+                drop(fd_table);
                 drop(inner);
+                drop(task);
                 suspend_current_and_run_next();
             } else {
                 time_up = true;

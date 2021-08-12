@@ -4,7 +4,7 @@ use super::{TaskControlBlock, RUsage};
 use alloc::sync::Arc;
 use core::{borrow::Borrow, cell::RefCell};
 use lazy_static::*;
-use super::{fetch_task, TaskStatus};
+use super::{fetch_task, TaskStatus, Signals, SIG_DFL};
 use super::__switch;
 use crate::timer::get_time_us;
 use crate::trap::TrapContext;
@@ -224,14 +224,6 @@ pub fn get_kernel_runtime_usec() -> usize{
     return get_time_us() - PROCESSOR_LIST[core_id].get_kernel_clock();
 }
 
-// if there is unhandled signal, it will automatic change trap_cx which makes it unseen in codes outside the func
-pub fn perform_signal_handler(){
-    let current_task = current_task().unwrap();
-    // mask all the signals when processing signal handler
-    if !current_task.is_signal_execute(){
-        current_task.scan_signal_handler();
-    }
-}
 
 pub fn schedule(switched_task_cx_ptr2: *const usize) {
     let core_id: usize = get_core_id();

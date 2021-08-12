@@ -19,6 +19,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use manager::fetch_task;
 use lazy_static::*;
+use crate::utils::log2;
 pub use context::TaskContext;
 
 pub use processor::{
@@ -40,25 +41,33 @@ pub use pid::{PidHandle, pid_alloc, KernelStack};
 pub use task::AuxHeader;
 
 
-pub fn suspend_current_and_run_next() {
+pub fn suspend_current_and_run_next() -> isize{
     // There must be an application running.
     let task = current_task().unwrap();
+    if task.has_signal(Signals::SIGKILL){
+        drop(task);
+        return -1;
+    }
+    else{
+        // ---- hold current PCB lock
+        let mut task_inner = task.acquire_inner_lock();
+        let task_cx_ptr2 = task_inner.get_task_cx_ptr2();
+        drop(task_inner);
+        drop(task);
 
-    // ---- hold current PCB lock
-    let mut task_inner = task.acquire_inner_lock();
-    let task_cx_ptr2 = task_inner.get_task_cx_ptr2();
-    drop(task_inner);
-    
-    // jump to scheduling cycle
-    // push back to ready queue while scheduling
-    schedule(task_cx_ptr2);
+        // jump to scheduling cycle
+        // push back to ready queue while scheduling
+        schedule(task_cx_ptr2);
+        return 0;
+    }
 }
 
 pub fn exit_current_and_run_next(exit_code: i32) {
-    println!("exit 1");
+    // println!("exit 1");
     // Forbid more than one process exit (by acquiring lock of INITPROC)
     let mut initproc_inner = INITPROC.acquire_inner_lock();
     let task = take_current_task().unwrap();
+    // println!("strong count of pid{} = {}", task.pid.0, Arc::strong_count(&task));
     //send signal SIGCHLD to parent
     {
         let parent_task = task.get_parent().unwrap(); // this will acquire inner of current task
@@ -66,7 +75,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         parent_inner.add_signal(Signals::SIGCHLD);
     }
     let mut inner = task.acquire_inner_lock();
-    println!("exit 2");
+    // println!("exit 2");
     // reset user tid area
     let clear_child_tid = inner.address.clear_child_tid;
     if clear_child_tid != 0{
@@ -81,7 +90,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
         initproc_inner.children.push(child.clone());
     }
 
-    println!("exit 3");
+    // println!("exit 3");
     // recycle all the data of task
     inner.children.clear();
     // deallocate user space
@@ -197,6 +206,20 @@ pub fn add_initproc() {
     add_task(INITPROC.clone());
 }
 
+// if there is unhandled signal, it will automatic change trap_cx which makes it unseen in codes outside the func
 pub fn perform_signal_handler(){
-    perform_signal_handler();
+    let current_task = current_task().unwrap();
+    // if current_task.pid.0 == 4{print!("[pid 4 1]");}
+    // mask all the signals when processing signal handler
+    if !current_task.is_signal_execute(){
+        // if current_task.pid.0 == 4{print!("[pid 4 2]");}
+        if let Some((signal, handler)) = current_task.scan_signal_handler(){
+            // if current_task.pid.0 == 4{print!("[pid 4 3]");}
+            if (signal == Signals::SIGTERM || signal == Signals::SIGKILL) && handler == SIG_DFL {
+                // if current_task.pid.0 == 4{print!("[pid 4 4]");}
+                drop(current_task);
+                exit_current_and_run_next(log2(signal.bits()) as i32);
+            }
+        }
+    }
 }

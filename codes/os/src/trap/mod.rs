@@ -39,6 +39,7 @@ use crate::gdb_print;
 use crate::monitor::*;
 
 global_asm!(include_str!("trap.S"));
+global_asm!(include_str!("trap_signal.S"));
 
 pub fn init() {
     set_kernel_trap_entry();
@@ -106,12 +107,14 @@ pub fn trap_handler() -> ! {
             // page fault exit code
             let current_task = current_task().unwrap();
             if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                drop(current_task);
                 exit_current_and_run_next(-2);
             }
         }
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
+            // println!("page fault 1");
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
@@ -124,8 +127,10 @@ pub fn trap_handler() -> ! {
             // println!{"============================{:?}", vpn}
             let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
             let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
+            // println!("page fault 2");
             // println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
-            if va >= mmap_start && va < mmap_end {
+            // if va >= mmap_start && va < mmap_end {
+            if false { // disable lazy mmap
                 // println!{"where is the lazy_mmap_page!!!!!!!!"}
                 // exit_current_and_run_next(-2);
                 current_task().unwrap().lazy_mmap(va.0);
@@ -153,9 +158,9 @@ pub fn trap_handler() -> ! {
                         current_trap_cx().sepc,
                     );
                     // page fault exit code
-                    
                     let current_task = current_task().unwrap();
                     if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                        drop(current_task);
                         exit_current_and_run_next(-2);
                     }
                 }
@@ -198,6 +203,7 @@ pub fn trap_return() -> ! {
     // let ru_stime = get_kernel_runtime_usec();
     // current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
     perform_signal_handler();
+    // println!("after perform_signal_handler");
     set_user_trap_entry();
 
     // println!("core:{} trap return ",get_core_id());
@@ -219,12 +225,15 @@ pub fn trap_return() -> ! {
     extern "C" {
         fn __alltraps();
         fn __restore();
+        fn __signal_trampoline();
     }
+    // println!("__signal_trampoline is at 0x{:X}", __signal_trampoline as usize);
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
     // println!{"restore_va: {}", restore_va}
     unsafe {
         // llvm_asm!("fence.i" :::: "volatile");
-        llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp) :: "volatile");
+        // WARNING: here, we make a2 = __signal_trampoline, because otherwise the "__signal_trampoline" func will be optimized to DEATH
+        llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp), "{a2}"(__signal_trampoline as usize) :: "volatile");
     }
     panic!("Unreachable in back_to_user!");
 }

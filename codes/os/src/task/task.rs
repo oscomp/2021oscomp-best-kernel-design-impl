@@ -171,14 +171,15 @@ impl TaskControlBlock {
         {
             let itimer = inner.itimer.clone();
             let now = get_timeval();
-            if (itimer.it_value - now).is_zero(){ // now > timer ( time up)
+            // itimer is set && now > timer ( time up)
+            if  !inner.itimer.it_value.is_zero() && (itimer.it_value - now).is_zero(){
                 inner.siginfo.signal_pending.push(Signals::SIGALRM);
-            }
-            if !inner.itimer.it_interval.is_zero() && !inner.itimer.it_value.is_zero(){
-                inner.itimer.it_value = inner.itimer.it_value + inner.itimer.it_interval;
-            }
-            else{
-                inner.itimer.it_value = TimeVal::new();
+                if !inner.itimer.it_interval.is_zero(){
+                    inner.itimer.it_value = inner.itimer.it_value + inner.itimer.it_interval;
+                }
+                else{
+                    inner.itimer.it_value = TimeVal::new();
+                }
             }
         }
         // find unhandled signal and exec it
@@ -193,14 +194,23 @@ impl TaskControlBlock {
                     let trap_cx = inner.get_trap_cx().clone();
                     inner.trapcx_backup = trap_cx;          // backup
                 }
-                let trap_cx = inner.get_trap_cx();
-                trap_cx.set_sp(USER_SIGNAL_STACK);      // sp->signal_stack
-                trap_cx.x[10] = log2(signum.bits());    // a0=signum
-                trap_cx.x[1] = USER_SIGNAL_STACK;       // ra-> signal_stack
-                trap_cx.sepc = sigaction.sa_handler;    // sepc-> sa_handler
-                gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=0x{:X})", signum, signum, sigaction.sa_handler);
+                {
+                    let trap_cx = inner.get_trap_cx();
+                    trap_cx.set_sp(USER_SIGNAL_STACK);      // sp-> signal_stack
+                    trap_cx.x[10] = log2(signum.bits());    // a0=signum
+                    trap_cx.x[1] = SIGNAL_TRAMPOLINE;       // ra-> signal_trampoline
+                    trap_cx.sepc = sigaction.sa_handler;    // sepc-> sa_handler
+                    gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=0x{:X})", signum, signum, sigaction.sa_handler);   
+                }
+                inner.siginfo.is_signal_execute = true;
                 return Some((signum, sigaction.sa_handler));
             }   
+            else{// check SIGTERM independently
+                if signum == Signals::SIGTERM || signum == Signals::SIGKILL{
+                    gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=SIG_DFL)", signum, signum);   
+                    return Some((signum, SIG_DFL));
+                }
+            }
         }
         None
     }
@@ -219,12 +229,15 @@ impl TaskControlBlock {
                 let trap_cx = inner.get_trap_cx().clone();
                 inner.trapcx_backup = trap_cx;          // backup
             }
-            let trap_cx = inner.get_trap_cx();
-            trap_cx.set_sp(USER_SIGNAL_STACK);      // sp->signal_stack
-            trap_cx.x[10] = log2(signal.bits());    // a0=signum
-            trap_cx.x[1] = USER_SIGNAL_STACK;       // ra-> signal_stack
-            trap_cx.sepc = sigaction.sa_handler;    // sepc-> sa_handler
-            gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=0x{:X})", signal, signal, sigaction.sa_handler);
+            {
+                let trap_cx = inner.get_trap_cx();
+                trap_cx.set_sp(USER_SIGNAL_STACK);      // sp-> signal_stack
+                trap_cx.x[10] = log2(signal.bits());    // a0=signum
+                trap_cx.x[1] = SIGNAL_TRAMPOLINE;       // ra-> signal_trampoline
+                trap_cx.sepc = sigaction.sa_handler;    // sepc-> sa_handler
+                gdb_println!(SIGNAL_ENABLE, " --- {:?} (si_signo={:?}, si_code=UNKNOWN, si_addr=0x{:X})", signal, signal, sigaction.sa_handler);    
+            }
+            inner.siginfo.is_signal_execute = true;
             true
         }   
         else{
@@ -234,6 +247,18 @@ impl TaskControlBlock {
 
     pub fn is_signal_execute(&self) -> bool {
         return self.acquire_inner_lock().siginfo.is_signal_execute;
+    }
+
+    /// Checks if has signal 
+    pub fn has_signal(&self, signal: Signals) -> bool {
+        let mut inner = self.acquire_inner_lock();
+        for signal_pending in inner.siginfo.signal_pending.clone(){
+            if signal_pending == signal{
+                gdb_println!(SIGNAL_ENABLE, " --- has signal {:?} ", signal);   
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -570,6 +595,7 @@ impl TaskControlBlock {
     }
 
     pub fn lazy_mmap(&self, stval: usize) {
+        // println!("lazy_mmap");
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();
         let token = inner.get_user_token();
@@ -612,10 +638,12 @@ impl TaskControlBlock {
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin1"}
-            inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            // inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin2"}
-            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            // inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
             // println!{"pin3"}
             va_top.0
         }

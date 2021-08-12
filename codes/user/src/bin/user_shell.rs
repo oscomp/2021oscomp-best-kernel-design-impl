@@ -409,7 +409,7 @@ impl ArgMachine{
         // testsuits.push("syscalltest");
         // testsuits.push("syscalltest");
         // testsuits.push("syscalltest");
-        testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
+        // testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
         // testsuits.push("lmbench_all lat_syscall -P 1 null");
         // testsuits.push("lmbench_all lat_syscall -P 1 null");
         // testsuits.push("lmbench_all lat_syscall -P 1 null");
@@ -438,7 +438,7 @@ impl ArgMachine{
         // testsuits.push("busybox echo file system latency");
         // testsuits.push("lmbench_all lat_fs /var/tmp");
         // testsuits.push("busybox echo Bandwidth measurements");
-        // testsuits.push("lmbench_all bw_pipe -P 1");
+        testsuits.push("lmbench_all bw_pipe -P 1");
         // testsuits.push("lmbench_all bw_file_rd -P 1 512k io_only /var/tmp/XXX");
         // testsuits.push("lmbench_all bw_file_rd -P 1 512k open2close /var/tmp/XXX");
         // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX");

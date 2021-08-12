@@ -132,12 +132,12 @@ impl PageTable {
         let mut result: Option<&PageTableEntry> = None;
         for i in 0..3 {
             let pte = &ppn.get_pte_array()[idxs[i]];
+            if !pte.is_valid() {
+                return None;
+            }
             if i == 2 {
                 result = Some(pte);
                 break;
-            }
-            if !pte.is_valid() {
-                return None;
             }
             ppn = pte.ppn();
         }
@@ -294,7 +294,9 @@ pub fn translated_ref<T>(token: usize, ptr: *const T) -> &'static T {
 pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let page_table = PageTable::from_token(token);
     let va = ptr as usize;
-    page_table.translate_va(VirtAddr::from(va)).unwrap().get_mut()
+    let pa = page_table.translate_va(VirtAddr::from(va));
+    // print!("[translated_refmut pa:{:?}]",pa);
+    pa.unwrap().get_mut()
 }
 
 /* 获取用户数组内各元素的引用 */
