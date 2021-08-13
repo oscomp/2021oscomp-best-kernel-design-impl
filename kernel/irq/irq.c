@@ -118,7 +118,7 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     //     printk_port("sepc: %lx\n", regs->sepc);
     //     printk_port("ra: %lx", regs->regs[1]);
     // }
-    // printk_port("pgfault stval:%lx, cause:%d\n", stval, cause);
+    printk_port("pgfault stval:%lx, cause:%d\n", stval, cause);
     // printk_port("current pid is %d, tid is %d\n", current_running->pid, current_running->tid);
     // printk_port("pgdir: %lx", current_running->pgdir);
     /* if not valid address, go handle other */
