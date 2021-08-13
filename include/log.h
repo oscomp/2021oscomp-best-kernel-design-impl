@@ -22,11 +22,11 @@ static const char *log_level_str[] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 		printk_port("%s: " fmt "\n", level_str, ##__VA_ARGS__);
 #endif
 
-// #define DEBUG_ON 1
-// #define LOG_ON 1
+#define DEBUG_ON 1
+#define LOG_ON 1
 
-// #define DEBUG_ON2 1
-// #define LOG_ON2 1
+#define DEBUG_ON2 1
+#define LOG_ON2 1
 
 #ifdef LOG_ON
 #define log(level, fmt, ...) \
