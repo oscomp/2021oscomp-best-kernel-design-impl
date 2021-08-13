@@ -96,8 +96,8 @@ static void init_syscall(void)
     syscall[SYS_wait4] = &do_wait4;
     syscall[SYS_getppid] = &do_getppid;
     syscall[SYS_nanosleep] = &do_nanosleep;
-    syscall[SYS_mkdirat] = &fat32_mkdir;
-    syscall[SYS_openat] = &fat32_open;
+    syscall[SYS_mkdirat] = &fat32_mkdirat;
+    syscall[SYS_openat] = &fat32_openat;
     syscall[SYS_close] = &fat32_close;
     syscall[SYS_chdir] = &fat32_chdir;
     syscall[SYS_getcwd] = &fat32_getcwd;
@@ -111,7 +111,7 @@ static void init_syscall(void)
     syscall[SYS_pipe2] = &fat32_pipe2;
 
     syscall[SYS_linkat] = &fat32_link;
-    syscall[SYS_unlinkat] = &fat32_unlink;
+    syscall[SYS_unlinkat] = &fat32_unlinkat;
     syscall[SYS_mount] = &fat32_mount;
     syscall[SYS_umount2] = &fat32_umount;
     syscall[SYS_mmap] = &do_mmap;
@@ -146,6 +146,7 @@ static void init_syscall(void)
     syscall[SYS_gettid] = &do_gettid;
     syscall[SYS_ppoll] = &do_ppoll;
     syscall[SYS_sendfile] = &do_sendfile;
+    syscall[SYS_renameat2] = &fat32_renameat2;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~

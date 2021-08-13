@@ -19,7 +19,7 @@
 /* success: no return value */
 /* fail: return -1 */
 static const char *fixed_envp[] = {"SHELL=/bin/bash",
-                     "PWD=/root",
+                     "PWD=/",
                      "LOGNAME=root",
                      "MOTD_SHOWN=pam",
                      "HOME=/root",
@@ -91,7 +91,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 
     // #ifdef K210
 
-    if ((fd = fat32_open(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
+    if ((fd = fat32_openat(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
         return -1;
     }
     // length = current_running->fd[fd].length;

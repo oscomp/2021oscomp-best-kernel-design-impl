@@ -129,7 +129,8 @@ uintptr_t lazy_load_elf(
     unsigned char *ptr_sh_table = NULL;
 
     /* read ELF header */
-    uint8_t fd_index = get_fd_index(fd, current_running);
+    int16_t fd_index = get_fd_index(fd, current_running);
+    assert(fd_index >= 0);
     memcpy(&pcb->myelf_fd, &current_running->fd[fd_index], sizeof(fd_t));
     fat32_close(fd);
 

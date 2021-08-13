@@ -72,7 +72,6 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
             fdp->length = fdp->pos;
             /* update dentry */
             log(0, "dir info: sec :%d, offset: %lx, len: %d", fdp->dir_pos.sec, fdp->dir_pos.offset, fdp->dir_pos.len);
-            printk_port("tid:%d, is_piped:%d\n", current_running->tid, fdp->piped);
             sd_read(tempbuff, fdp->dir_pos.sec);
             dentry_t *p = tempbuff + fdp->dir_pos.offset;
             log(0, "filename: %s, new length is %d", p->filename, fdp->length);

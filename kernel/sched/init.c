@@ -244,6 +244,7 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
     // 6. copy argv strings
     if (argv){        
         for (uint i = 0; i < argc; ++i){
+            // log(0, "argv[%d] is :%s", i, argv[i]);
             memcpy(sp_kva, argv[i], strlen(argv[i]) + 1);
             *argv_start = sp_kva - start_sp_kva + sp_uva;
             sp_kva += strlen(argv[i]) + 1;
@@ -357,7 +358,7 @@ static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_sta
     pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size; /* for user context */
     pcb_underinit->user_sp = user_stack_top - user_stack_size; /* no need to be aligned with user_sp */
     pcb_underinit->user_stack_base = user_stack_top - USER_STACK_INIT_SIZE;
-    memcpy(pcb_underinit->kernel_sp + sizeof(switchto_context_t), PAGE_ALIGN(current_running->kernel_sp) + NORMAL_PAGE_SIZE - sizeof(regs_context_t), sizeof(regs_context_t));
+    memcpy(pcb_underinit->kernel_sp + sizeof(switchto_context_t), PAGE_ALIGNUP(current_running->kernel_sp) - sizeof(regs_context_t), sizeof(regs_context_t));
     // memcpy(pcb_underinit->user_sp, current_running->user_sp, user_stack_size); /* copy tp, very essential */
 
     // copy fd

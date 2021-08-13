@@ -18,9 +18,11 @@
 #define LARGE_PAGE_SIZE (1lu << LARGE_PAGE_SHIFT)
 
 #define PAGE_OFFSET(ptr) \
-    ( ptr & (NORMAL_PAGE_SIZE - 1lu) )
+    ( (ptr) & (NORMAL_PAGE_SIZE - 1lu) )
 #define PAGE_ALIGN(ptr) \
-    ( ptr & ~(NORMAL_PAGE_SIZE - 1lu) )
+    ( (ptr) & ~(NORMAL_PAGE_SIZE - 1lu) )
+#define PAGE_ALIGNUP(ptr) \
+    ( ((ptr) + NORMAL_PAGE_SIZE - 1lu) & ~(NORMAL_PAGE_SIZE - 1lu) )
 
 #define START_ENTRYPOINT 0xffffffff80000000lu
 

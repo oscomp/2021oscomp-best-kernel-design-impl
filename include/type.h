@@ -46,7 +46,7 @@ typedef int64_t intptr_t;
 typedef uint64_t size_t;
 typedef int64_t ssize_t;
 
-typedef int32_t fd_num_t;
+typedef uint32_t fd_num_t;
 typedef uint16_t unicode_t;
 typedef uint32_t spawn_num_t;
 

@@ -157,6 +157,7 @@ struct iovec{
 typedef enum{
     SEARCH_FILE,
     SEARCH_DIR,
+    SEARCH_ALL,
 }search_mode_t;
 
 typedef enum{
@@ -174,6 +175,15 @@ enum{
     FD_USED,
 };
 
+/* file discriptor */
+#define O_RDONLY 1 /* read only */
+#define O_WRONLY 2 /* write only */
+#define O_RDWR 3 /* read/write */
+#define O_CREAT 0x40 /* create new */
+#define O_APPEND 0x400 /* append */
+#define O_LARGEFILE 0x8000 /* is large file */
+#define O_DIRECTORY 0x200000 /* directory */
+
 #define SECTOR_SIZE (fat.bpb.byts_per_sec)
 #define CLUSTER_SIZE (fat.byts_per_clus)
 #define READ_PAGE_CNT (NORMAL_PAGE_SIZE/fat.bpb.byts_per_sec)
@@ -185,10 +195,10 @@ enum{
 #define FILE_ATTRIBUTE_SYS 0x04
 #define FILE_ATTRIBUTE_VOL 0x08
 #define FILE_ATTRIBUTE_CHDIR 0x10
-#define FILE_ATTRIBUTE_GDIR 0x20
+#define FILE_ATTRIBUTE_ARCH 0x20
 #define FILE_ATTRIBUTE_LONG 0x0f
 
-#define AT_FDCWD 0xffffff9c
+#define AT_FDCWD 0xffffff9clu
 
 #define STDIN 0
 #define STDOUT 1
@@ -220,6 +230,13 @@ enum{
 #define DT_DIR 4
 #define DT_REG 8
 
+/* AT */
+#define AT_SYMLINK_NOFOLLOW 0x100
+#define AT_REMOVEDIR 0x200
+#define AT_SYMLINK_FOLLOW 0x400
+#define AT_NO_AUTOMOUNT 0x800
+#define AT_EMPTY_PATH 0x1000
+
 extern fat_t fat;
 extern ientry_t cwd_first_clus;
 extern ientry_t cwd_clus, root_clus, root_first_clus;
@@ -228,15 +245,15 @@ extern pipe_t pipes[NUM_PIPE];
 
 int8 fat32_read_test(const char *filename);
 
-int16 fat32_open(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
-int16 fat32_close(fd_num_t fd);
+int fat32_openat(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
+int64 fat32_close(fd_num_t fd);
 
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
 int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt);
 int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count);
 int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt);
 
-int16 fat32_mkdir(fd_num_t dirfd, const uchar *path, uint32_t mode);
+int16 fat32_mkdirat(fd_num_t dirfd, const uchar *path, uint32_t mode);
 int16 fat32_chdir(const char* path_t);
 
 uchar *fat32_getcwd(uchar *buf, size_t size);
@@ -253,7 +270,7 @@ int16 fat32_pipe2(fd_num_t fd[], int32 mode);
 int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence);
 
 int16 fat32_link();
-int16 fat32_unlink(fd_num_t dirfd, const char* path, uint32_t flags);
+int32_t fat32_unlinkat(fd_num_t dirfd, const char* path, uint32_t flags);
 
 int16 fat32_mount();
 int16 fat32_umount();
@@ -262,9 +279,11 @@ int64 fat32_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off
 int64 fat32_munmap(void *start, size_t len);
 
 size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t bufsiz);
-int32 fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags);
+int fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags);
 int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flags);
 int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg);
+
+int fat32_renameat2(fd_num_t olddirfd, const char *oldpath, fd_num_t newdirfd, const char *newpath, unsigned int flags);
 
 int64 fat32_readmy(uchar *buf, size_t count);
 int64_t fat32_lseekmy(size_t off, uint32_t whence);
@@ -282,7 +301,8 @@ uchar *get_filename_from_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *
 dentry_t *search_empty_entry(uint32_t dir_first_clus, uchar *buf, uint32_t demand, uint32_t *sec);
 uint32_t search_empty_clus(uchar *buf);
 
-ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, file_type_t mode);
+ientry_t _create_new_file(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, file_type_t mode);
+ientry_t _create_new_dentry(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, dentry_t *p);
 
 dentry_t *get_next_dentry(dentry_t *p, uchar *dirbuff, ientry_t *now_clus, isec_t *now_sec);
 uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint32_t flags);
@@ -299,6 +319,9 @@ uint8 is_zero_dentry(dentry_t *p);
 uint8_t filenamecmp(const char *name1, const char *name2);
 void redirect_fd(fd_t *new, fd_num_t old_fd_index);
 void clear_all_valid(fd_t *fdp);
+void handle_windows_switch_line(char *str);
+int32_t parse_filepath_init(char *path, fd_num_t dirfd, ientry_t *now_clus, char **temp1, char **temp2);
+void clear_all_garbage_clus_from_table(ientry_t cluster);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -307,7 +330,14 @@ static inline uint32 first_sec_of_clus(uint32 cluster)
 }
 
 /* get the sector num of this cluster in TABLE 1*/
-static inline uint32 fat_sec_of_clus(uint32 cluster)
+static inline uint32 fat1_sec_of_clus(uint32 cluster)
+{
+    return fat.bpb.rsvd_sec_cnt + fat.bpb.hidd_sec + \
+        (cluster * 4) / fat.bpb.byts_per_sec;
+}
+
+/* get the sector num of this cluster in TABLE 2*/
+static inline uint32 fat2_sec_of_clus(uint32 cluster)
 {
     return fat.bpb.rsvd_sec_cnt + fat.bpb.hidd_sec + \
         (cluster * 4) / fat.bpb.byts_per_sec + fat.bpb.fat_sz;
@@ -354,6 +384,12 @@ static inline uint32_t get_clus_from_len(uint32_t cluster, uint32_t length)
     for (uint64_t i = CLUSTER_SIZE; i <= length; i += CLUSTER_SIZE)
         cluster = get_next_cluster(cluster);
     return cluster;
+}
+
+static inline void set_clusnum_of_dentry(dentry_t *p, ientry_t clus)
+{
+    p->HI_clusnum = (clus >> 16) & ((1lu << 16) - 1);      //21:20
+    p->LO_clusnum = clus & ((1lu << 16) - 1);      //27:26
 }
 
 #endif

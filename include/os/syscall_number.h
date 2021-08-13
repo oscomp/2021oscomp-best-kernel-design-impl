@@ -93,6 +93,8 @@
 
 #define SYS_wait4 260
 
+#define SYS_renameat2 276
+
 #define SYSCALL_TESTDISK 500
 #define SYSCALL_TEST 501
 

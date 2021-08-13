@@ -214,7 +214,7 @@ int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
     uint64_t status_ker_va = NULL;
     if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
     log(0, "kva is %lx", status_ker_va);
-    int64_t ret = -10;
+    int64_t ret;
     for (uint i = 0; i < NUM_MAX_TASK; ++i)
     {
         if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
@@ -232,7 +232,7 @@ int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
         }
     }
     log(0, "ret is %ld", ret);
-    return ret;
+    return -1;
 }
 
 void do_block(list_node_t *list, list_head *queue)

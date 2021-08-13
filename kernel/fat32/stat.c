@@ -36,19 +36,18 @@ int16 fat32_fstat(fd_num_t fd, struct kstat *kst)
 /* show file status using pathname */
 /* FOR NOW pathname is a file, not a directory */
 /* success return 0, fail return -1 */
-int32 fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags)
+int fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags)
 {
     debug();
-    debug2();
     log(0, "dirfd: %lx", dirfd);
-    log2(0, "pathname: %lx", pathname);
-    fd_num_t fd;
+    log(0, "pathname: %s", pathname);
+    int32_t fd;
     fd_t *fdp = NULL;
-    if ((fd = fat32_open(dirfd, pathname, O_RDONLY, flags)) == SYSCALL_FAILED ){
+    if ((fd = fat32_openat(dirfd, pathname, O_RDONLY, flags)) < 0 ){
         log(0, "is not a file");
-        if ((fd = fat32_open(dirfd, pathname, O_DIRECTORY, flags)) == SYSCALL_FAILED ){
+        if ((fd = fat32_openat(dirfd, pathname, O_DIRECTORY, flags)) < 0 ){
             log(0, "is not a directory either, open failed");
-            return SYSCALL_FAILED;
+            return fd;
         }
         else{
             log(0, "is a directory %d", fd);

@@ -64,15 +64,6 @@ typedef struct dir_pos{
     isec_t sec;
 }dir_pos_t;
 
-/* file discriptor */
-#define O_RDONLY 1 /* read only */
-#define O_WRONLY 2 /* write only */
-#define O_RDWR 3 /* read/write */
-#define O_CREAT 0x40 /* create new */
-#define O_APPEND 0x400 /* append */
-#define O_LARGEFILE 0x8000 /* is large file */
-#define O_DIRECTORY 0x200000 /* directory */
-
 #define NUM_FD 16
 #define NUM_PHDR_IN_PCB 2
 
@@ -447,7 +438,7 @@ static inline void set_edata(pcb_t *pcb, uint64_t edata)
 
 static inline void set_pcb_edata(pcb_t *pcb_underinit)
 {
-    pcb_underinit->edata = PAGE_ALIGN(pcb_underinit->elf.edata) + NORMAL_PAGE_SIZE;
+    pcb_underinit->edata = PAGE_ALIGNUP(pcb_underinit->elf.edata);
 }
 
 /* copy parent thread's both stack to child thread */

@@ -110,7 +110,7 @@ int8 fat32_read_test(const char *filename)
     //     return 1;
     // }
     // not rw-able
-    // if (p->attribute != FILE_ATTRIBUTE_GDIR){ 
+    // if (p->attribute != FILE_ATTRIBUTE_ARCH){ 
     //     // printk_port("<cause 2>\n");
     //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
     //     return 1;
@@ -197,149 +197,19 @@ int8 fat32_read_test(const char *filename)
     assert(0);
 }
 
-
-/* get directory entry */
-/* return readsize if success, -1 fail */
-/* make sure buf is enough */
-int64 fat32_getdents64(fd_num_t fd, char *outbuf, uint32_t len)
-{
-    debug();
-    log(0, "fd:%d, outbuf:%lx, len:%x", fd, outbuf, len);
-    return 0; /* FOR NOW */
-
-    int32_t fd_index;
-    if ((fd_index = get_fd_index(fd, current_running)) == -1)
-        return -1;
-
-    ientry_t now_clus = current_running->fd[fd_index].first_clus_num;
-    isec_t now_sec = first_sec_of_clus(now_clus);
-    uchar *buf = kalloc();
-    sd_read(buf, now_sec); /* read full buff*/
-
-    dentry_t *p = buf;
-    uint32_t readsize = 0;
-
-    // uint32_t basic_size = sizeof(uint64) + sizeof(int64) + sizeof(unsigned short) + sizeof(unsigned char);
-    uint32_t basic_size = sizeof(struct linux_dirent64);
-
-    /* for output */
-    uchar *filename = kalloc();// :d_name
-    /* end for output */
-
-    /* similar to search */
-    while (!is_zero_dentry(p) && readsize < len){
-        
-        /* for output */
-        uint8 item_num_copy; // :=d_reclen, d_offset
-        ientry_t now_clus_copy; //:=d_ino
-        /* end for output */
-
-        while (0xE5 == p->filename[0]){
-            p = get_next_dentry(p, buf, &now_clus, &now_sec);
-        }
-
-        /* now we are at a real dirent */
-        now_clus_copy = now_clus; // record first clus, not last
-
-        long_dentry_t *q = (long_dentry_t *)p;
-        // if long dentry
-        if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
-
-            uint8 item_num = q->sequence & 0x0f; // entry num
-            item_num_copy = item_num + 1;
-
-            /* get filename */
-            uint8 isbreak = 0;
-            uint16_t unich; // unicode
-
-            while (item_num--){
-                uint8 name_cnt = 0;
-                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
-                    // name1
-                    unich = q->name1[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
-                        break;
-                    }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
-                    name_cnt++;           
-                }
-                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
-                    // name1
-                    unich = q->name2[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
-                        break;
-                    }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
-                    name_cnt++;            
-                }
-                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
-                    // name1
-                    unich = q->name3[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
-                        break;
-                    }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);  
-                    name_cnt++;             
-                }
-                p = get_next_dentry(p, buf, &now_clus, &now_sec);
-                q = (long_dentry_t *)p;
-            }
-        }
-        // short dentry
-        else{
-            item_num_copy + 1;
-            /* filename */
-            uint8 name_cnt = 0;
-            for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
-            {
-                if (p->filename[i] == ' ') break;
-                else filename[name_cnt++] = p->filename[i];
-            }
-            if (p->extname[0] != ' ') filename[name_cnt++] = '.';
-            for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
-            {
-                if (p->extname[i] == ' ') break;
-                else filename[name_cnt++] = p->extname[i];
-            }
-            filename[name_cnt++] = 0;
-        }
-
-        if (readsize + basic_size + strlen(filename) + 1 > len)
-            break;
-
-        /* output */
-        struct linux_dirent64 *now = (struct linux_dirent64 *)(outbuf + readsize);
-
-        uint32_t oldsize = readsize;
-        readsize += basic_size + strlen(filename) + 1;
-        readsize += 64 - (readsize % 64);
-
-        now->d_ino = now_clus_copy;
-        now->d_off = oldsize;
-        // now->d_reclen = item_num_copy*sizeof(dentry_t);
-        now->d_reclen = readsize - oldsize;
-        now->d_type = (p->attribute & FILE_ATTRIBUTE_CHDIR)? DT_DIR : DT_REG;
-        memcpy(now->d_name, filename, strlen(filename) + 1); 
-
-        p = get_next_dentry(p, buf, &now_clus, &now_sec);
-    }
-    kfree(filename);
-    kfree(buf);
-    return readsize;
-}
-
-
 /* write count bytes from buff to file in fd */
 /* return fd_num: success
           -1: fail
         */
-int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
+int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
     debug();
-    log(0, "fd:%d path:%s, len:%d, flags:%lx", fd, path_const, strlen(path_const), flags);
+    log(0, "fd:%d path:%s, len:%d, flags:%lx %d", fd, path_const, strlen(path_const), flags, flags & O_CREAT);
+    assert(fd == AT_FDCWD);
+    /* O_CREAT | O_DIRECTORY is not defined */
+    if ((flags & (O_CREAT | O_DIRECTORY)) == (O_CREAT | O_DIRECTORY))
+        return SYSCALL_FAILED;
+
     #ifndef K210
     for (int i = 0; i < NUM_FD; ++i)
         if (!current_running->fd[i].used){
@@ -349,44 +219,22 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
         return -1;
     #endif
 
-    int fd_index = get_fd_index(fd, current_running);
-    if (fd != AT_FDCWD && fd_index < 0) return -1;
-
     /* for const */
     uint32 path_len = strlen(path_const);
     uchar path[path_len+1];
     strcpy(path, path_const);
     /* handle \r */
-    if (path[path_len - 1] == '\r'){
-        assert(0);
-        log(0, "handle r");
-        path[path_len - 1] = 0;
-    }
-
-    uint8 isend = 0;
+    handle_windows_switch_line(path);
 
     uchar *temp1, *temp2; // for path parse
     uint32_t now_clus; // now cluster num
-    uchar *buf = kalloc(); // for search
+    if (parse_filepath_init(path, fd, &now_clus, &temp1, &temp2) == SYSCALL_FAILED)
+        return SYSCALL_FAILED;
 
+    uint8 isend = 0;
+    uchar *buf = kalloc(); // for search
     dentry_t *p = (dentry_t *)buf; // for loop
 
-    if (path[0] == '/'){
-        now_clus = fat.bpb.root_clus;
-        temp2 = &path[1], temp1 = &path[1];
-    }
-    else{
-        if (fd == AT_FDCWD)
-            now_clus = cwd_first_clus;
-        else
-        {
-            if (current_running->fd[fd_index].used)
-                now_clus = current_running->fd[fd_index].first_clus_num;
-            else
-                return -1;
-        }
-        temp2 = path, temp1 = path;
-    }
 
     while (1)
     {
@@ -399,19 +247,21 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
         if (isend){
             // success
             search_mode_t search_mode = (!strcmp(temp1, "."))? SEARCH_DIR :
-                                        ((O_DIRECTORY & flags) == 0) ? SEARCH_FILE : 
-                                        SEARCH_DIR;
+                                        ((O_DIRECTORY & flags) != 0) ? SEARCH_DIR : 
+                                        SEARCH_ALL;
             if (search_mode == SEARCH_DIR)
                 log(0, "open dir");
             else
-                log(0, "open file");
+                log(0, "open any file");
             dir_pos_t dir_pos;
             // 1. found
             if ((p = search(temp1, now_clus, buf, search_mode, &ignore, &dir_pos)) != NULL || ignore == 1){
                 if (ignore){
-                    // use buf to non-null
+                    /* now clus is root clus, and this time is searching for "." or ".." */
+                    assert(now_clus == root_clus);
                     p = buf;
                     set_dentry_cluster(p, now_clus);
+                    p->attribute = FILE_ATTRIBUTE_CHDIR;
                     p->length = 0;
                     p->create_time_ms = 0;
                     p->create_time = 0x53D4; //10:30:40
@@ -430,39 +280,25 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
                     }
                 }
                 // no available fd
-                kfree(buf);
-                return -1;
             }
             // 2.create
-            else{
-                if (search_mode == SEARCH_DIR || (flags & O_CREAT) == 0){
-                    kfree(buf);
-                    return -1;
-                }// you cant mkdir here! BUT you can create a file
-                else{
-                    ientry_t new_clus = _create_new(temp1, now_clus, buf, &dir_pos, FILE_FILE);
-                    p = buf;
-                    set_dentry_cluster(p, new_clus);
-                    p->length = 0;
-                    p->create_time_ms = 0;
-                    p->create_time = 0x53D4; //10:30:40
-                    p->create_date = 0x52BB; // 2021/5/27
-                    p->last_visited = 0x52BB;
-                    p->last_modified_time = 0x53D3;   //23:22
-                    p->last_modified_date = 0x52BB;     //25:24
+            else if ((flags & O_CREAT) != 0){
+                ientry_t new_clus = _create_new_file(temp1, now_clus, buf, &dir_pos, FILE_FILE);
+                assert(dir_pos.sec == BUFF_ALIGN(dir_pos.sec));
+                sd_read(buf, dir_pos.sec);
+                p = (dentry_t *)((void*)buf + dir_pos.offset);
 
-                    for (uint8 i = 0; i < NUM_FD; ++i)
-                    {
-                        if (!set_fd(current_running, i, p, &dir_pos, flags)){ //new file length = 0
-                            kfree(buf);
-                            return current_running->fd[i].fd_num; // use i as index
-                        }
+                for (uint8 i = 0; i < NUM_FD; ++i)
+                {
+                    if (!set_fd(current_running, i, p, &dir_pos, flags)){ //new file length = 0
+                        kfree(buf);
+                        return current_running->fd[i].fd_num; // use i as index
                     }
-                    // no available fd
-                    kfree(buf);
-                    return -1;
                 }
+                // no available fd
             }
+            kfree(buf);
+            return (int32_t)(-ENOENT);
         }
         else{
             // printk_port("dirname: %s\n", temp1);
@@ -474,7 +310,7 @@ int16 fat32_open(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode
                 continue ;
             }
             kfree(buf);
-            return -1;
+            return (int32_t)(-ENOENT);
         }
     }
 }
@@ -488,15 +324,15 @@ int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flag
     return -1;
     #endif
 
-    fd_num_t fd;
+    int32_t fd;
     // int32_t ret;
-    if ((fd = fat32_open(dirfd, pathname, flags, mode)) != -1)
+    if ((fd = fat32_openat(dirfd, pathname, flags, mode)) >= 0)
     {
         fat32_close(fd);
-        return 0;
+        return SYSCALL_SUCCESSED;
     }
     else
-        return -1;
+        return fd;
 }
 
 /* FOR NOW return 0 */
@@ -737,8 +573,11 @@ int16 fat32_chdir(const char* path_t)
 
 /* make a directory */
 /* success 0, fail -1 */
-int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
+int16 fat32_mkdirat(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
 {
+    debug();
+    log(0, "path_const is %s, mode is %lx", path_const, mode);
+
     uchar *tempbuf = kalloc(); // for search
 
     uchar path[strlen(path_const)+1]; strcpy(path, path_const);
@@ -782,12 +621,12 @@ int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
             // already exists
             if (search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL)){
                 kfree(tempbuf);
-                return 0;
+                return SYSCALL_FAILED;
             }
-            _create_new(temp1, now_clus, tempbuf, NULL, FILE_DIR);
+            _create_new_file(temp1, now_clus, tempbuf, NULL, FILE_DIR);
 
             kfree(tempbuf);
-            return 0;
+            return SYSCALL_SUCCESSED;
         }
         else{
             // search dir until fail or goto search file
@@ -798,7 +637,7 @@ int16 fat32_mkdir(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
                 continue ;
             }
             kfree(tempbuf);
-            return -1;
+            return SYSCALL_FAILED;
         }
     }
 
@@ -812,26 +651,26 @@ void write_fat_table(uint32_t old_clus, uint32_t new_clus, uchar *buff)
     uint32_t *clusat;
     if (old_clus){
         /* TABLE 1*/
-        sd_read(buff, fat_sec_of_clus(old_clus));
+        sd_read(buff, fat1_sec_of_clus(old_clus));
         clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(old_clus));
         *clusat = 0xffffffffu & new_clus;
-        sd_write(buff, fat_sec_of_clus(old_clus));
+        sd_write(buff, fat1_sec_of_clus(old_clus));
         /* TABLE 0*/
-        sd_read(buff, fat_sec_of_clus(old_clus) - fat.bpb.fat_sz);
+        sd_read(buff, fat2_sec_of_clus(old_clus));
         clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(old_clus));
         *clusat = 0xffffffffu & new_clus;
-        sd_write(buff, fat_sec_of_clus(old_clus) - fat.bpb.fat_sz);
+        sd_write(buff, fat2_sec_of_clus(old_clus));
     }
     /* TABLE 1*/
-    sd_read(buff, fat_sec_of_clus(new_clus));
+    sd_read(buff, fat1_sec_of_clus(new_clus));
     clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(new_clus));
     *clusat = LAST_CLUS_OF_FILE;
-    sd_write(buff, fat_sec_of_clus(new_clus));
+    sd_write(buff, fat1_sec_of_clus(new_clus));
     /* TABLE 0*/
-    sd_read(buff, fat_sec_of_clus(new_clus) - fat.bpb.fat_sz);
+    sd_read(buff, fat2_sec_of_clus(new_clus));
     clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(new_clus));
     *clusat = LAST_CLUS_OF_FILE;
-    sd_write(buff, fat_sec_of_clus(new_clus) - fat.bpb.fat_sz);
+    sd_write(buff, fat2_sec_of_clus(new_clus));
 }
 
 /* get current working dir name */
@@ -917,7 +756,7 @@ uchar *fat32_getcwd(uchar *buf, size_t size)
 
 /* close fd */
 /* success return 0, fail return 1*/
-int16 fat32_close(fd_num_t fd)
+int64 fat32_close(fd_num_t fd)
 {
     debug();
     log(0, "thread %d is closing %d", current_running->tid, fd);

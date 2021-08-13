@@ -29,7 +29,7 @@ int32_t do_sysinfo(struct sysinfo *info)
 
     info->sharedram = 0;
 
-    info->bufferram = 0;
+    info->bufferram = 0x10000;
 
     info->totalswap = 0;
 

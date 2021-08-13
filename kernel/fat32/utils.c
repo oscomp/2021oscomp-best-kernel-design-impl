@@ -34,7 +34,7 @@ uint32_t get_next_cluster(uint32_t cluster)
 {
     uchar *buf2 = kalloc();
     // printk_port("buf2 is %lx\n", buf2);
-    sd_read(buf2, fat_sec_of_clus(cluster));
+    sd_read(buf2, fat1_sec_of_clus(cluster));
     uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
     kfree(buf2);
     return ret;
@@ -47,6 +47,11 @@ uint32_t get_next_cluster(uint32_t cluster)
 /* pos赋值为最后一条目录 */
 dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos)
 {
+    /* if name[0] == 0, this time the file operation is for "/" */
+    if (name[0] == 0){
+        *ignore = 1;
+        return NULL;
+    }
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
     uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
     sd_read(buf, now_sec);
@@ -56,12 +61,15 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 
     *ignore = 0;
 
-    // dont care deleted dir
     while (!is_zero_dentry(p)){
 
+        /* don't care for deleted dentry */
         while (0xE5 == p->filename[0]){
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
         }
+        /* zero after deleted, nothing to search */
+        if (is_zero_dentry(p))
+            break;
 
         long_dentry_t *q = (long_dentry_t *)p;
         uint8 item_num; /* dentry length */
@@ -129,7 +137,11 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
             filename[name_cnt++] = 0;
         }
 
-        if ((p->attribute & FILE_ATTRIBUTE_CHDIR) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
+        int32_t cmp_result = filenamecmp(filename, name);
+        if ( ((p->attribute & FILE_ATTRIBUTE_CHDIR) != 0 && mode == SEARCH_DIR && !cmp_result) || 
+             ((p->attribute & FILE_ATTRIBUTE_CHDIR) == 0 && mode == SEARCH_FILE && !cmp_result) ||
+             (mode == SEARCH_ALL && !cmp_result)
+        ){
             if (pos){
                 pos->offset = (void*)p - (void*)buf;
                 pos->len = item_num + 1;
@@ -137,18 +149,7 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
                 log(0, "nowsec: %d aligned:%d", now_sec, first_sec_of_clus(clus_of_sec(now_sec)));
                 pos->sec = BUFF_ALIGN(now_sec);
                 log(0, "result sec: %d", pos->sec);
-            }
-            kfree(filename);
-            return p;
-        }
-        else if ((p->attribute & FILE_ATTRIBUTE_CHDIR) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
-            if (pos){
-                pos->offset = (void*)p - (void*)buf;
-                pos->len = item_num + 1;
-                log(0, "offset %lx, len %d", pos->offset, pos->len);
-                log(0, "nowsec: %d aligned:%d", now_sec, first_sec_of_clus(clus_of_sec(now_sec)));
-                pos->sec = BUFF_ALIGN(now_sec);
-                log(0, "result sec: %d", pos->sec);
+                log(0, "now clus is %d", now_clus);
             }
             kfree(filename);
             return p;
@@ -157,9 +158,13 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
     }
     
-    if (mode == FILE_DIR && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus){
-        *ignore = 1;
+    if (ignore){
+        if (mode != FILE_FILE && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus)
+            *ignore = 1;
+        else 
+            *ignore = 0;
     }
+    log(0, "search not found");  
 
     kfree(filename);
     return NULL;
@@ -172,6 +177,11 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 /* pos赋值为第一条目录 */
 dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_mode_t mode, uint8 *ignore, struct dir_pos *pos)
 {
+    /* if name[0] == 0, this time the file operation is for "/" */
+    if (name[0] == 0){
+        *ignore = 1;
+        return NULL;
+    }
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
     uint32_t now_clus = dir_first_clus, now_sec = first_sec_of_clus(dir_first_clus);
     sd_read(buf, now_sec);
@@ -185,12 +195,15 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
     isec_t top_sec;
     size_t top_len;
 
-    // dont care deleted dir
     while (!is_zero_dentry(p)){
 
+        /* don't care for deleted dentry */
         while (0xE5 == p->filename[0]){
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
         }
+        /* zero after deleted, nothing to search */
+        if (is_zero_dentry(p))
+            break;
 
         top_pt = p;
         top_sec = now_sec;
@@ -259,25 +272,20 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
             filename[name_cnt++] = 0;
         }
 
-        if ((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !filenamecmp(filename, name)){
-            pos->offset = (void*)top_pt - (void*)buf;
-            log(0, "offset is %lx", pos->offset);
-            log(0, "sec is %d, first sec of this clus is %d", top_sec, first_sec_of_clus(clus_of_sec(top_sec)));
-            pos->sec = BUFF_ALIGN(top_sec);
-            log(0, "buf-aligned sec is %d", pos->sec);
-            pos->len = top_len;
-            log(0, "len is %d", top_len);
-            kfree(filename);
-            return p;
-        }
-        else if ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !filenamecmp(filename, name)){
-            pos->offset = (void*)top_pt - (void*)buf;
-            log(0, "offset is %lx", pos->offset);
-            log(0, "sec is %d, first sec of this clus is %d", top_sec, first_sec_of_clus(clus_of_sec(top_sec)));
-            pos->sec = BUFF_ALIGN(top_sec);
-            log(0, "buf-aligned sec is %d", pos->sec);
-            pos->len = top_len;
-            log(0, "len is %d", top_len);
+        int32_t cmp_result = filenamecmp(filename, name);
+        if (((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !cmp_result) || 
+            ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !cmp_result) || 
+            (mode == SEARCH_ALL && !cmp_result)
+            ){
+            if (pos){
+                pos->offset = (void*)top_pt - (void*)buf;
+                log(0, "offset is %lx", pos->offset);
+                log(0, "sec is %d, first sec of this clus is %d", top_sec, first_sec_of_clus(clus_of_sec(top_sec)));
+                pos->sec = BUFF_ALIGN(top_sec);
+                log(0, "buf-aligned sec is %d", pos->sec);
+                log(0, "now clus is %d", now_clus);
+                pos->len = top_len;
+            }
             kfree(filename);
             return p;
         }
@@ -285,9 +293,13 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
     }
     
-    if (mode == FILE_DIR && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus){
-        *ignore = 1;
+    if (ignore){
+        if (mode != FILE_FILE && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus)
+            *ignore = 1;
+        else 
+            *ignore = 0;
     }
+    log(0, "search2 not found");  
 
     kfree(filename);
     return NULL;
@@ -307,7 +319,7 @@ uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint3
     pcb_under->fd[i].first_clus_num = get_cluster_from_dentry(p);
 
     pcb_under->fd[i].mode = (p->attribute & FILE_ATTRIBUTE_CHDIR)? S_IFDIR:
-                            (p->attribute & FILE_ATTRIBUTE_GDIR)? S_IFREG:
+                            (p->attribute & FILE_ATTRIBUTE_ARCH)? S_IFREG:
                             0;
     
     pcb_under->fd[i].flags = flags;
@@ -435,7 +447,7 @@ void clear_all_valid(fd_t *fdp)
 /* now_clus : now dir cluster */
 /* dir_pos could be NULL, and if it's not NULL, it is set to be the BOTTOM dentry */
 /* mode: FILE_FILE is creating file, FILE_DIR is making new directory */
-ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, file_type_t mode)
+ientry_t _create_new_file(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, file_type_t mode)
 {
     int noextname = 1;
     uchar *temp3 = temp1;
@@ -458,7 +470,8 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
 
     /* never move temp1 */
 
-    uint32_t demand, sec;
+    uint32_t demand;
+    isec_t sec;
     if (filename_length <= 8)
         demand = 1;
     else
@@ -505,12 +518,16 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
     if (mode == FILE_DIR)
         new_dentry.attribute = FILE_ATTRIBUTE_CHDIR;
     else
-        new_dentry.attribute = FILE_ATTRIBUTE_GDIR;
+        new_dentry.attribute = FILE_ATTRIBUTE_ARCH;
     // reserved
-    if (mode == FILE_DIR || demand > 1)
+    if (demand > 1){
+        log(0, "reserved is 0, because demand is %d", demand);
         new_dentry.reserved = 0;
-    else
-        new_dentry.reserved = 0x18;
+    }
+    else{
+        new_dentry.reserved = (mode == FILE_FILE)? 0x18 : 0x08; /* dir is 0x08, file is 0x18 */
+        log(0, "reserved is %x", new_dentry.reserved);
+    }
     // create time
     new_dentry.create_time_ms = 0;
     new_dentry.create_time = 0x53D4; //10:30:20
@@ -579,7 +596,7 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
         dir_pos->offset = (void*)p - (void*)tempbuf;
         dir_pos->len = demand;
         dir_pos->sec = sec;
-        log(0, "create, offset:%lx, len:%d, sec:%d", dir_pos->offset, dir_pos->len, dir_pos->sec);
+        log(0, "create file(directory), offset:%lx, len:%d, sec:%d", dir_pos->offset, dir_pos->len, dir_pos->sec);
     }
     else
         log(0, "dir_pos is NULL");
@@ -636,18 +653,175 @@ ientry_t _create_new(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t 
     return new_clus;
 }
 
+/* create new dentry, when the file exists */
+/* temp1: filename */
+/* now_clus : now dir first cluster */
+/* dir_pos could be NULL, and if it's not NULL, return value is of no sense */
+/* p contents dentry information */
+/* return file first clus */
+ientry_t _create_new_dentry(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_pos_t *dir_pos, dentry_t *old_dentry)
+{
+    int noextname = 1;
+    uchar *temp3 = temp1;
+    file_type_t mode = (old_dentry->attribute & FILE_ATTRIBUTE_CHDIR)? FILE_DIR : FILE_FILE;
+    log(0, "mode is %d", mode);
+    log(0, "filename is %s", temp1);
+
+    while (*temp3 != '.' && *temp3 != '\0') temp3++;
+    if (*temp3 == '.' && mode == FILE_FILE){
+        noextname = 0; *temp3 = '\0';temp3++;
+    }
+
+    /* filename length, ext name length and total length */
+
+    uint32_t filename_length = strlen(temp1);
+    uint32_t extname_length = strlen(temp3);
+    if (!noextname)
+        *(temp3 - 1) = '.';
+    uint32_t length = strlen(temp1);
+    
+    ientry_t parent_first_clus = now_clus, file_first_clus = get_cluster_from_dentry(old_dentry);
+    log(0, "parent_first_clus is %d, file_first_clus is %d", parent_first_clus, file_first_clus);
+    /* never move temp1 */
+
+    uint32_t demand;
+    isec_t sec;
+    if (filename_length <= 8)
+        demand = 1;
+    else
+        demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for div operation round, 1 for short entry
+
+    // 1. prepare short entry
+    dentry_t new_dentry;
+    /* copy all informations to this new_dentry */
+    memcpy(&new_dentry, old_dentry, sizeof(new_dentry));
+    /* nodify filename */
+    if (demand == 1){
+        // only short
+        for (uint i = 0; i < filename_length; ++i)
+            new_dentry.filename[i] = (*(temp1+i) <= 'z' && *(temp1+i) >= 'a')? *(temp1+i) - 'a' + 'A' : *(temp1+i);
+        for (uint i = filename_length; i < 8; ++i)
+            new_dentry.filename[i] = ' ';
+    }
+    else{
+        for (uint i = 0; i < 6; ++i)
+            new_dentry.filename[i] = (*(temp1+i) <= 'z' && *(temp1+i) >= 'a')? *(temp1+i) - 'a' + 'A' : *(temp1+i);
+        new_dentry.filename[6] = '~'; new_dentry.filename[7] = '1'; // dont think about 2 or more
+    }
+
+    // extname:
+    if (noextname)
+        for (uint i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
+            new_dentry.extname[i] = ' ';
+    else{
+        for (uint i = 0; i < extname_length; ++i)
+            new_dentry.extname[i] = (*(temp3+i) <= 'z' && *(temp3+i) >= 'a')? *(temp3+i) - 'a' + 'A' : *(temp3+i);
+        for (uint i = extname_length; i < 3; ++i)
+            new_dentry.extname[i] = ' ';
+    }
+
+    // 2. prepare long entry
+    long_dentry_t long_entries[demand - 1];
+    if (demand > 1){
+        uint now_len;
+        for (uint j = 0; j < demand - 1; ++j)
+        {
+            // name
+            for (uint i = 0; i < LONG_DENTRY_NAME1_LEN; ++i)
+            {
+                now_len = j*LONG_DENTRY_NAME_LEN + i;
+                long_entries[j].name1[i] = (now_len < length)? char2unicode(*(temp1+now_len)) :
+                                            (now_len == length)? 0x0000 :
+                                            0xffffu;
+            }
+            for (uint i = 0; i < LONG_DENTRY_NAME2_LEN; ++i)
+            {
+                now_len = j*LONG_DENTRY_NAME_LEN + LONG_DENTRY_NAME1_LEN + i;
+                long_entries[j].name2[i] = (now_len < length)? char2unicode(*(temp1+now_len)) :
+                                            (now_len == length)? 0x0000 :
+                                            0xffffu;
+            }
+            for (uint i = 0; i < LONG_DENTRY_NAME3_LEN; ++i)
+            {
+                now_len = j*LONG_DENTRY_NAME_LEN + LONG_DENTRY_NAME1_LEN + LONG_DENTRY_NAME2_LEN + i;
+                long_entries[j].name3[i] = (now_len < length)? char2unicode(*(temp1+now_len)) :
+                                            (now_len == length)? 0x0000 :
+                                            0xffffu;
+            }
+            long_entries[j].sequence = (j == demand - 2)? (0x40 | (j + 1)) & 0x4f : (j + 1) & 0x0f;   
+            long_entries[j].attribute = FILE_ATTRIBUTE_LONG;
+            long_entries[j].reserved = 0;
+            // checksum
+            uint8 sum = 0; uchar *fcb = &new_dentry;
+            for (int i = 0; i < 11; ++i)
+                sum = (sum & 0x1 ? 0x80 : 0) + (sum >> 1) + *fcb++;
+            long_entries[j].checksum = sum;
+            long_entries[j].reserved2 = 0lu;
+        }
+    }
+    /* 3. find empty entry */
+    dentry_t *p = search_empty_entry(now_clus, tempbuf, demand, &sec);
+    now_clus = clus_of_sec(sec);
+    assert(sec == first_sec_of_clus(now_clus));
+
+    /* 4. write entry */
+    sd_read(tempbuf, sec); // if no sec then p is meaningless
+    for (uint i = 0; i < demand - 1; ++i)
+    {
+        memcpy(p, &long_entries[demand - 2 - i], sizeof(dentry_t));
+
+        if (p + 1 == tempbuf + BUFSIZE) // boundary
+            sd_write(tempbuf, sec);
+        p = get_next_dentry(p, tempbuf, &now_clus, &sec);
+    }
+    memcpy(p, &new_dentry, sizeof(new_dentry));
+    sd_write(tempbuf, sec);
+    /* 5. dir pos */
+    if (dir_pos){
+        dir_pos->offset = (void*)p - (void*)tempbuf;
+        dir_pos->len = demand;
+        dir_pos->sec = sec;
+        log(0, "create dentry, offset:%lx, len:%d, sec:%d", dir_pos->offset, dir_pos->len, dir_pos->sec);
+    }
+    else
+        log(0, "dir_pos is NULL");
+
+    /* 6. if it is a directory, ".." should point to new parent */
+    if (mode == FILE_DIR){
+        /* use parent_first_clus and file_first_clus */
+        sec = first_sec_of_clus(file_first_clus);
+        struct dir_pos pos;
+        uint8 ignore;
+        
+        // there must be ".."
+        assert((p = search("..", file_first_clus, tempbuf, FILE_DIR, &ignore, &pos)) != NULL);
+        log(0, "p is at clus %d, previous clus is %d, now clus set to %d", clus_of_sec(pos.sec), get_cluster_from_dentry(p), parent_first_clus);
+        log(0, "test p: filename:%s, attribute:%x", p->filename, p->attribute);
+        set_clusnum_of_dentry(p, parent_first_clus);
+        assert(pos.sec == BUFF_ALIGN(pos.sec));
+        /* already read to tempbuf in search, just write */
+        sd_write(tempbuf, pos.sec);
+    }
+
+    return file_first_clus;
+}
+
+
 /* return empty clus num */
 uint32_t search_empty_clus(uchar *buf)
 {
-    uint32_t now_sec = fat.first_data_sec - fat.bpb.fat_sz;
+    uint32_t now_sec = fat.first_data_sec - 2*fat.bpb.fat_sz;
+    log(0, "now_sec is %d", now_sec);
     sd_read(buf, now_sec);
     uint j = 0;
     while (1){
         uint i;
         for (i = 0; i < 4; ++i)
         {
-            if (*(buf + i + (j % BUFSIZE)))
+            if (*(buf + i + (j % BUFSIZE))){
+                // log2(0, "i is %d, j is %d, val is %x", i,j,*(buf + i + (j % BUFSIZE)));
                 break;
+            }
         }
         if (i == 4) break;
         else j += 4;
@@ -808,4 +982,78 @@ uchar *get_filename_from_clus(ientry_t cluster, uint32_t dir_first_clus, uchar *
     kfree(filename);
 
     return NULL;
+}
+
+void handle_windows_switch_line(char *str)
+{
+    size_t len = strlen(str);
+    if (str[len - 1] == '\r')
+    {
+        assert(0);
+        log(0, "handle r");
+        str[len - 1] = 0;
+    }
+}
+
+/* before any file operation, parsing the path is the first thing to do */
+/* if success, return 0, else (dirfd is invalid) return -1 */
+int32_t parse_filepath_init(char *path, fd_num_t dirfd, ientry_t *now_clus, char **temp1, char **temp2)
+{
+    if (path[0] == '/'){
+        *now_clus = fat.bpb.root_clus;
+        *temp2 = &path[1], *temp1 = &path[1];
+    }
+    else{
+        if (dirfd == AT_FDCWD)
+            *now_clus = cwd_first_clus;
+        else
+        {
+            int16 fd_index = get_fd_index(dirfd, current_running);
+            if (fd_index >= 0 && current_running->fd[fd_index].used)
+                *now_clus = current_running->fd[fd_index].first_clus_num;
+            else
+                return SYSCALL_FAILED;
+        }
+        *temp2 = path, *temp1 = path;
+    }
+    return SYSCALL_SUCCESSED;
+}
+
+/* clear garbage clusters from fat32 table */
+/* from cluster to the end of the chain */
+void clear_all_garbage_clus_from_table(ientry_t cluster)
+{
+    assert(cluster != 0 && cluster != LAST_CLUS_OF_FILE);
+    uchar *buf = kalloc();
+
+    ientry_t *clusat;
+    ientry_t next_clus, now_clus = cluster;
+
+    do {
+        next_clus = get_next_cluster(now_clus);
+
+        isec_t sec = fat1_sec_of_clus(now_clus);
+        /* table 1 */
+        sd_read(buf, sec);
+        clusat = (uint32_t *)((char*)buf + fat_offset_of_clus(now_clus));
+        *clusat = 0;
+        sd_write(buf, sec);
+        /* table 2 */
+        sd_read(buf, sec + fat.bpb.fat_sz);
+        *clusat = 0;
+        sd_write(buf, sec + fat.bpb.fat_sz);
+
+        // uchar *testbuf = kalloc();
+        // sd_read(testbuf, sec);
+
+        // for (uint64_t i = 0; i < BUFSIZE; i++)
+        //     if (*(testbuf + i) != *(buf + i)){
+        //         log2(0, "i is %d", i);
+        //         assert(0);
+        //     }
+        // kfree(testbuf);
+        now_clus = next_clus;
+    } while (now_clus != LAST_CLUS_OF_FILE);
+
+    kfree(buf);
 }
