@@ -122,9 +122,9 @@ pub fn trap_handler() -> ! {
             cx.x[10] = result as usize;
             // println!{"cx written..."}
         }
+        
         Trap::Exception(Exception::InstructionFault) |
-        Trap::Exception(Exception::InstructionPageFault) |
-        Trap::Exception(Exception::LoadFault) => {
+        Trap::Exception(Exception::InstructionPageFault) => {
             let task = current_task().unwrap();
             // println!{"pinLoadFault"}
             //println!("prev syscall = {}", G_SATP.lock().get_syscall());
@@ -135,9 +135,11 @@ pub fn trap_handler() -> ! {
                 stval,
                 current_trap_cx().sepc,
             );
+            drop(task);
             // page fault exit code
             exit_current_and_run_next(-2);
         }
+        Trap::Exception(Exception::LoadFault) |
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
@@ -269,7 +271,7 @@ pub fn trap_return() -> ! {
     //    }
     //};
     unsafe {
-        //llvm_asm!("fence.i" :::: "volatile");
+        llvm_asm!("fence.i" :::: "volatile");
         llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp) /*, "{a2}"(sched)*/ :: "volatile");
     }
     panic!("Unreachable in back_to_user!");

@@ -448,15 +448,18 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
         //println!("[sys_mmap]:adjust_len = {}",adjust_len);
     }
     
-    //println!("[{}][insert_mmap_area]: len 0x{:X} start 0x{:X}", task.pid.0, start, len);
+    //println!("[{}][insert_mmap_area]: start 0x{:X} len 0x{:X}", task.pid.0, start, len);
     let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
     gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
     return result_addr as isize;
 }
 
+//use crate::mm::HEAP_ALLOCATOR;
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     let task = current_task().unwrap();
-    task.munmap(start, len)
+    let ret = task.munmap(start, len);
+    //println!("after munmap, heap size = {}", HEAP_ALLOCATOR.lock(  );
+    ret
 }
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{

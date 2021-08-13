@@ -62,7 +62,7 @@ __restore:
     #csrw 0x180, t0
     #.word 0x10400073
     #beqz a2, nsfvma
-    #sfence.vma zero, zero
+    sfence.vma zero, zero
 nsfvma:
     csrw sscratch, a0
     mv sp, a0

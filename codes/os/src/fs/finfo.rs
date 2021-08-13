@@ -253,13 +253,20 @@ impl Kstat {
 #[derive(Debug)]
 #[repr(C)]
 pub struct NewStat{
-    //st_mode: u32,
-    //st_ino:  u64,
-    //st_dev:  u64,
-    //st_nlink: u64,
+
+    /* the edition that can pass bw_test */
+    //st_dev  :u64,   /* ID of device containing file */
+    ////__pad1  :u32,
+    //st_ino  :u64,   /* Inode number */
+    //st_mode :u32,   /* File type and mode */
+    //st_nlink:u32,   /* Number of hard links */
     //st_uid  :u32,
     //st_gid  :u32,
-    //pub st_size :u64, 
+    ////st_rdev :u64,   /* Device ID (if special file) */
+    ////__pad2  :u32,
+    //st_blksize   :u64,    /* Block size for filesystem I/O */
+    //st_blocks    :u64,    /* Number of 512B blocks allocated */
+    //pub st_size  :u64,         /* Total size, in bytes */ //????????????
     //st_atime_sec :i64,    
     //st_atime_nsec:i64,  
     //st_mtime_sec :i64,  
@@ -278,7 +285,7 @@ pub struct NewStat{
     //__pad2  :u32,
     st_blksize   :u64,    /* Block size for filesystem I/O */
     st_blocks    :u64,    /* Number of 512B blocks allocated */
-    pub st_size  :u64,         /* Total size, in bytes */
+    pub st_size  :u64,         /* Total size, in bytes */ //????????????
     st_atime_sec :i64,    
     st_atime_nsec:i64,  
     st_mtime_sec :i64,  
@@ -286,24 +293,6 @@ pub struct NewStat{
     st_ctime_sec :i64,  
     st_ctime_nsec:i64,  
 
-    //st_dev  :u64,   /* ID of device containing file */
-    //__pad1  :u32,
-    //st_ino  :u64,   /* Inode number */
-    //st_mode :u32,   /* File type and mode */
-    //st_nlink:u64,   /* Number of hard links */
-    //st_uid  :u32,
-    //st_gid  :u32,
-    //st_rdev :u64,   /* Device ID (if special file) */
-    //__pad2  :u32,
-    //st_blksize   :u32,    /* Block size for filesystem I/O */
-    //st_blocks    :u64,    /* Number of 512B blocks allocated */
-    //pub st_size :u64,         /* Total size, in bytes */
-    //st_atime_sec :i64,    
-    //st_atime_nsec:i64,  
-    //st_mtime_sec :i64,  
-    //st_mtime_nsec:i64,   
-    //st_ctime_sec :i64,  
-    //st_ctime_nsec:i64,  
 
 }
 
@@ -358,6 +347,7 @@ impl NewStat {
             //__pad1  :0,
             st_ino ,
             st_mode,
+            //st_nlink:st_nlink as u32,
             st_nlink,
             st_uid  :0,
             st_gid  :0,
@@ -366,7 +356,7 @@ impl NewStat {
             st_size : st_size as u64,
             st_blksize :self.st_blksize, //TODO:real blksize
             st_blocks ,
-            st_atime_sec , 
+            st_atime_sec, 
             st_atime_nsec:0,  
             st_mtime_sec ,  
             st_mtime_nsec:0,   

@@ -467,7 +467,7 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
             DiskInodeType::Directory
         ) {
             file.get_fstat(&mut kstat);
-            gdb_println!(SYSCALL_ENABLE,"syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
+            gdb_println!(SYSCALL_ENABLE, "syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
             userbuf.write(kstat.as_bytes());
             return 0
         } else {
@@ -483,10 +483,12 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
                 FileClass::File(f) => {
                     f.get_fstat(&mut kstat);
                     userbuf.write(kstat.as_bytes());
+                    gdb_println!(SYSCALL_ENABLE, "syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
                     return 0
                 },
                 _ => {
                     userbuf.write(Kstat::new_abstract().as_bytes());
+                    gdb_println!(SYSCALL_ENABLE, "syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
                     return 0 //warning
                 },
             }
@@ -519,7 +521,7 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
         ) {
             file.get_newstat(&mut stat);
             //file.get_fstat(&mut stat);
-            gdb_println!(SYSCALL_ENABLE,"syscall_fstatat(fd:{}, path = {:?}, [size = {}]) ", fd, path, stat.st_size );
+            gdb_println!(SYSCALL_ENABLE, "syscall_fstatat(fd:{}, path = {:?}, buff addr = 0x{:X},  [size = {}]) ", fd, path, buf as usize, stat.st_size );
             userbuf.write(stat.as_bytes());
             return 0;
             //let buf = [0o41777u32; 32];

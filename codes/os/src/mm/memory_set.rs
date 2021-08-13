@@ -361,7 +361,7 @@ impl MemorySet {
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
         user_stack_top -= PAGE_SIZE;
-        let user_stack_bottom: usize = user_stack_top - PAGE_SIZE * 4; 
+        let user_stack_bottom: usize = user_stack_top - PAGE_SIZE * 35; 
         memory_set.push(MapArea::new(
             user_stack_bottom.into(),
             user_stack_top.into(),
@@ -556,7 +556,7 @@ impl MemorySet {
     }
 
     pub fn lazy_mmap (&mut self, stval: VirtAddr) -> usize {
-        println!{"performing lazy mmap on {:?}", stval}
+        //println!{"performing lazy mmap on {:?}", stval}
         for mmap_chunk in self.mmap_chunks.iter() {
             if stval >= mmap_chunk.mmap_start && stval < mmap_chunk.mmap_end {
                 self.push_chunk(stval.floor());
