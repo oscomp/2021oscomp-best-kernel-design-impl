@@ -7,7 +7,7 @@ int main()
 
     char *argv[7], *envp[4];
 
-    int argc = 5;
+    int argc = 3;
 
     char str1[20] = "./busybox";
     char str2[20] = "sh";

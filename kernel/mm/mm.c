@@ -52,7 +52,7 @@ ptr_t allocPage()
     }
     else
         assert(0);
-    // log(DEBUG, "alloc: %lx\n",ret);
+    log2(DEBUG, "alloc: %lx\n",ret);
     return ret;
 }
 

@@ -47,7 +47,6 @@ int64 fat32_getdents64(fd_num_t fd, char *outbuf, uint32_t len)
         if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
 
             uint8 item_num = q->sequence & 0x0f; // entry num
-            log(0, "item_num is %d", q->sequence);
 
             /* get filename */
             uint16_t unich; // unicode
