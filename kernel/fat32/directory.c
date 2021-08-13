@@ -129,6 +129,7 @@ int64 fat32_getdents64(fd_num_t fd, char *outbuf, uint32_t len)
         memcpy(now->d_name, filename, strlen(filename) + 1);
         log(0, "ino is %d, off is %lx, reclen is %d, type is %d", now->d_ino, now->d_off, now->d_reclen, now->d_type);
         log(0, "filename is %s, len %d", now->d_name, strlen(now->d_name));
+        assert(now->d_name[0]);
 
         p = get_next_dentry(p, buf, &now_clus, &now_sec);
         current_running->fd[fd_index].pos += sizeof(dentry_t);
