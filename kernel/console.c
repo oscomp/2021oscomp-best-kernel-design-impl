@@ -27,6 +27,7 @@
 #include "sched/proc.h"
 #include "sbi.h"
 #include "mm/kmalloc.h"
+#include "mm/pm.h"
 #include "fs/buf.h"
 #include "printf.h"
 #include "mm/vm.h"
@@ -242,6 +243,9 @@ consoleintr(int c)
 		break;
 	case C('B'):  // Print mem-alloc list.
 		bprint();
+		break;
+	case C('Q'):  // Print physical memory status
+		pm_dump();
 		break;
 	case C('U'):  // Kill line.
 		while(cons.e != cons.w &&
