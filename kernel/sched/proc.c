@@ -127,7 +127,10 @@ static void freeproc(struct proc *p) {
 		proc_freepagetable(p->pagetable, p->segment);
 
 	// free trapframe 
-	freepage(p->trapframe);
+	kfree(p->trapframe);
+
+	// free kernel stack 
+	freepage((void*)p->kstack);
 
 	// parenting is handled in exit() 
 
@@ -153,13 +156,6 @@ proc_pagetable(struct proc *p)
   if(pagetable == 0)
 	return NULL;
 
-  // map the trapframe just below TRAMPOLINE, for trampoline.S.
-  if(mappages(pagetable, TRAPFRAME, PGSIZE,
-			(uint64)(p->trapframe), PTE_R | PTE_W) < 0){
-	kvmfree(pagetable, 1);
-	return NULL;
-  }
-
   return pagetable;
 }
 
@@ -168,11 +164,7 @@ proc_pagetable(struct proc *p)
 void
 proc_freepagetable(pagetable_t pagetable, struct seg *head)
 {
-	// __debug_info("proc_freepagetable", "enter\n");
-  unmappages(pagetable, TRAPFRAME, 1, 0);
-//   __debug_info("proc_freepagetable", "leave\n");
   delsegs(pagetable, head);
-//   __debug_info("proc_freepagetable", "leave 2\n");
   uvmfree(pagetable);
   kvmfree(pagetable, 1);
 }
@@ -207,11 +199,19 @@ static struct proc *allocproc(void) {
 	p->ivswtch = 0;
 
 	// allocate a page trapframe 
-	p->trapframe = (struct trapframe*)allocpage();
+	p->trapframe = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	if (NULL == p->trapframe) {
 		__debug_warn("allocproc", "fail to alloc trapframe\n");
 		kfree(p);
 		return NULL;
+	}
+
+	// proc's kernel stack 
+	p->kstack = (uint64)allocpage();
+	if (NULL == p->kstack) {
+		__debug_warn("allocproc", "fail to alloc kstack\n");
+		kfree(p->trapframe);
+		kfree(p);
 	}
 
 	// pagetable 
@@ -225,8 +225,6 @@ static struct proc *allocproc(void) {
 	// init fds 
 	memset(&p->fds, 0, sizeof(p->fds));
 
-	// user kernel stack 
-	p->kstack = VKSTACK;
 
 	p->context.ra = (uint64)forkret;
 	p->context.sp = p->kstack + PGSIZE;
@@ -248,7 +246,7 @@ int fork_cow(void) {
 	// copy parent's memory layout 
 	np->segment = copysegs(p->pagetable, p->segment, np->pagetable);
 	if (np->segment == NULL) {
-		__debug_warn("fork", "fail to copy segments\n");
+		__debug_warn("fork_cow", "fail to copy segments\n");
 		freeproc(np);
 		return -1;
 	}
@@ -299,7 +297,7 @@ int fork_cow(void) {
 	__insert_runnable(PRIORITY_NORMAL, np);
 	__leave_proc_cs 
 
-	__debug_info("fork_cow", "leave %d -> %d\n", p->pid, pid);
+	__debug_info("fork_cow", "%d -> %d\n", p->pid, pid);
 
 	return pid;
 }
@@ -477,7 +475,6 @@ int wait4(int pid, uint64 status, uint64 options) {
 		np = proc_zombie;
 		while (NULL != np) {
 			if (__is_child_no_lock(pid, p, np)) {
-				__debug_info("wait", "%d picks up %d\n", p->pid, np->pid);
 				// find one 
 				int child_pid = np->pid;
 				// remove child from parent's child list 
@@ -496,7 +493,13 @@ int wait4(int pid, uint64 status, uint64 options) {
 				}
 				__remove(np);
 				__leave_proc_cs 
+
+				#ifdef DEBUG
+				int __whatever_pid = np->pid;
+				#endif
 				freeproc(np);
+
+				__debug_info("wait4", "%d buries %d\n", p->pid, __whatever_pid);
 				return child_pid;
 			}
 			else {
@@ -1041,20 +1044,4 @@ int procnum(void) {
 	__leave_proc_cs 
 
 	return num;
-}
-
-void reg_info(void) {
-	printf("register info: {\n");
-	printf("sstatus: %p\n", r_sstatus());
-	printf("sip: %p\n", r_sip());
-	printf("sie: %p\n", r_sie());
-	printf("sepc: %p\n", r_sepc());
-	printf("stvec: %p\n", r_stvec());
-	printf("satp: %p\n", r_satp());
-	printf("scause: %p\n", r_scause());
-	printf("stval: %p\n", r_stval());
-	printf("sp: %p\n", r_sp());
-	printf("tp: %p\n", r_tp());
-	printf("ra: %p\n", r_ra());
-	printf("}\n");
 }

@@ -89,7 +89,9 @@ void *allocpage_n(uint64 n) {
 
 	#ifdef DEBUG
 	// fill the memory with junk, so bugs may lead to a faster panic. 
-	memset(pa, 5, n * PGSIZE);
+	if (NULL != pa) {
+		memset(pa, 5, n * PGSIZE);
+	}
 	#endif 
 
 	__debug_info("allocpage_n", "%p, %d\n", pa, n);

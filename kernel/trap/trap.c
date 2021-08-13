@@ -154,8 +154,7 @@ usertrapret(void) {
 	// set up trapframe values that uservec will need when
 	// the process next re-enters the kernel.
 	p->trapframe->kernel_satp = r_satp();         // kernel page table
-	//p->trapframe->kernel_sp = p->kstack + PGSIZE; // process's kernel stack
-	p->trapframe->kernel_sp = VKSTACK + PGSIZE;
+	p->trapframe->kernel_sp = p->kstack + PGSIZE;	// process's kernel stack 
 	p->trapframe->kernel_trap = (uint64)usertrap;
 	p->trapframe->kernel_hartid = r_tp();         // hartid for cpuid()
 
@@ -181,7 +180,8 @@ usertrapret(void) {
 	// switches to the user page table, restores user registers,
 	// and switches to user mode with sret.
 	uint64 fn = TRAMPOLINE + (userret - trampoline);
-	((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+	// ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+	((void (*)(uint64, uint64))fn)((uint64)(p->trapframe), satp);
 }
 
 // interrupts and exceptions from kernel code go here via kernelvec,
@@ -326,21 +326,6 @@ int handle_excp(uint64 scause) {
 	default: return -1;
 	}
 }
-
-/*static inline int is_page_fault(uint64 scause)*/
-/*{*/
-  /*switch (scause) {*/
-	/*#ifndef QEMU*/
-	  /*case EXCP_LOAD_ACCESS:*/
-	  /*case EXCP_STORE_ACCESS:*/
-	/*#else*/
-	  /*case EXCP_LOAD_PAGE:*/
-	  /*case EXCP_STORE_PAGE:*/
-	/*#endif*/
-		/*return 1;*/
-  /*}*/
-  /*return 0;*/
-/*}*/
 
 void trapframedump(struct trapframe *tf)
 {

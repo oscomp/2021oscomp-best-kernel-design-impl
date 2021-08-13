@@ -81,6 +81,7 @@ struct proc {
 
 	// memory 
 	uint64 kstack;					// virtual address of kernel stack 
+	uint64 badaddr;					// bad address for page fault 
 	//uint64 sz;						// size of process memory 
 	pagetable_t pagetable;			// user pagetable 
 	struct trapframe *trapframe;	// data page for trampoline.S 
@@ -194,7 +195,6 @@ int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 
 /* Display content of all registers */
-void reg_info(void);
 void procdump(void);
 int procnum(void);
 
