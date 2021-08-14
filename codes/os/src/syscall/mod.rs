@@ -241,24 +241,4 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     }
 }
 
-use crate::timer::get_timeval;
-
-pub fn test() {
-    if sys_getpid() == 1{
-        let start = get_timeval();
-        // println!("test: run sys_getppid 1000000 times, start {:?}",start);
-        for _ in 0..1000000{
-            syscall(SYSCALL_GETPPID,[0,0,0,0,0,0]);
-            unsafe{
-                //llvm_asm!("fence.i" :::: "volatile");
-                //asm!(
-                //    "sfence.vma",
-                //);
-            }
-        }
-        let end = get_timeval();
-        // println!("test: run sys_getppid 1000000 times, end {:?}",end);
-        println!("test: run sys_getppid + sfence.vma 1000000 times, spent {:?}",end-start);
-    }
-}
 

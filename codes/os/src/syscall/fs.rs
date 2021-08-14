@@ -1177,6 +1177,7 @@ pub fn sys_pselect(
             break;
         }
     }
+    let task = current_task().unwrap();
     gdb_println!(SYSCALL_ENABLE, "sys_pselect( nfds: {}, readfds: {:?}, writefds: {:?}, exceptfds: {:?}, timeout: {:?}) = {}, pid-{}",
                  nfds, rfd_vec, wfd_vec, rfd_vec, timer_interval, r_ready_count + w_ready_count + e_ready_count, task.pid.0);
     return r_ready_count + w_ready_count + e_ready_count
