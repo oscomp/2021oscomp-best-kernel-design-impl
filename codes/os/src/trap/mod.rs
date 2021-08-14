@@ -151,15 +151,15 @@ pub fn trap_handler() -> ! {
                     // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
                     // println!{"PageTableEntry: {}", pte.bits};
                 } else {
-                    println!(
-                        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-                        scause.cause(),
-                        stval,
-                        current_trap_cx().sepc,
-                    );
                     // page fault exit code
                     let current_task = current_task().unwrap();
                     if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                        println!(
+                            "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                            scause.cause(),
+                            stval,
+                            current_trap_cx().sepc,
+                        );
                         drop(current_task);
                         exit_current_and_run_next(-2);
                     }
