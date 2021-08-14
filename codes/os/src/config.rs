@@ -26,9 +26,10 @@ pub const MAP_FAILED: isize = -1;
 // Memory management
 pub const PAGE_SIZE: usize = 0x1000;//should not change
 pub const PAGE_SIZE_BITS: usize = 0xc;
-pub const USER_STACK_SIZE: usize = PAGE_SIZE * 20;
+pub const USER_STACK_SIZE_MIN: usize = PAGE_SIZE * 4;
+pub const USER_STACK_SIZE: usize = PAGE_SIZE * 35;
 pub const SIGNAL_STACK_SIZE: usize = PAGE_SIZE;
-pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 128;
+pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 64;
 // pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 4;
 pub const KERNEL_STACK_SIZE: usize = PAGE_SIZE * 2;
 pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x80;

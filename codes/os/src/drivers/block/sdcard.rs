@@ -15,7 +15,7 @@ use k210_soc::{
 };
 use spin::Mutex;
 use lazy_static::*;
-use crate::println;
+use crate::{println, timer::get_time};
 
 use super::BlockDevice;
 use core::convert::TryInto;
@@ -743,7 +743,21 @@ pub struct SDCardWrapper(Mutex<SDCard<SPIImpl<SPI0>>>);
 
 impl SDCardWrapper {
     pub fn new() -> Self {
-        Self(Mutex::new(init_sdcard()))
+        let sd = Self(Mutex::new(init_sdcard()));
+        //sd.wtest();
+        sd
+    }
+
+    pub fn wtest(&self){
+        let mut buf = [0u8;512];
+        self.read_block(0, &mut buf);
+        let start = get_time();
+        for i in 1..1000 {
+            //println!("wtest");
+            self.write_block(0, &buf);
+        }
+        let end = get_time();
+        println!("[SD_Card writing test]: {}", end - start);
     }
 }
 
@@ -757,6 +771,7 @@ impl BlockDevice for SDCardWrapper {
         }
     }
     fn write_block(&self, block_id: usize, buf: &[u8]) {
+        //println!("blk_id = {}", block_id);
         self.0.lock().write_sector(buf,block_id as u32).unwrap();
     }
 }

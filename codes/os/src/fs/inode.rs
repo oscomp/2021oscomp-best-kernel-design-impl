@@ -14,18 +14,27 @@ use simple_fat32::{ATTRIBUTE_ARCHIVE, ATTRIBUTE_DIRECTORY, FAT32Manager, VFile};
 //use crate::config::*;
 //use crate::gdb_println;
 
+pub const SEEK_SET:i32 = 0;  /* set to offset bytes.  */
+pub const SEEK_CUR:i32 = 1;  /* set to its current location plus offset bytes.  */
+pub const SEEK_END:i32 = 2;  /* set to the size of the file plus offset bytes.  */
+/*  Adjust the file offset to the next location in the file
+    greater than or equal to offset containing data.  If
+    offset points to data, then the file offset is set to
+    offset */
+pub const SEEK_DATA:i32 = 3;
+/*  Adjust the file offset to the next hole in the file
+    greater than or equal to offset.  If offset points into
+    the middle of a hole, then the file offset is set to
+    offset.  If there is no hole past offset, then the file
+    offset is adjusted to the end of the file (i.e., there is
+    an implicit hole at the end of any file). */
+pub const SEEK_HOLE:i32 = 4;  
+
 
 #[derive(PartialEq,Copy,Clone,Debug)]
 pub enum DiskInodeType {
     File,
     Directory,
-}
-
-#[derive(PartialEq,Copy,Clone)]
-pub enum SeekWhence{
-    SeekSet, // 将offset设为新的读写位置 
-    SeekCur, // 将当前读写位置往后增加offset个偏移量
-    SeekEnd, // 将读写位置设为末尾，然后增加offset偏移量(此时offset可以<0)
 }
 
 // 此inode实际被当作文件
@@ -156,6 +165,7 @@ impl OSInode {
             } else {
                 d_type = DT_UNKNOWN;
             }
+            //println!("name = {}", name.as_str());
             dirent.fill_info(
                 name.as_str(), 
                 first_clu as usize, 
@@ -176,10 +186,18 @@ impl OSInode {
         let vfile = inner.inode.clone();
         let (size, atime, mtime, ctime, ino) = vfile.stat();
         //println!("info = {:?}", (size, atime, mtime, ctime));
+        let st_mod:u32 = {
+            if vfile.is_dir() {
+                //println!("is dir");
+                finfo::S_IFDIR | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
+            } else {
+                finfo::S_IFREG | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
+            }
+        };
         kstat.fill_info(
             0, 
             ino, 
-            0, 
+            st_mod, 
             1, 
             size, 
             atime, 
@@ -195,6 +213,7 @@ impl OSInode {
         //println!("info = {:?}", (size, atime, mtime, ctime));
         let st_mod:u32 = {
             if vfile.is_dir() {
+                //println!("is dir");
                 finfo::S_IFDIR | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
             } else {
                 finfo::S_IFREG | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
@@ -287,31 +306,33 @@ impl OSInode {
         inner.offset = off;
     }
 
-    // pub fn lseek(&self, offset: isize, whence: SeekWhence)->isize{
-    //     let inner = self.inner.lock();
-    //     if whence == SeekWhence::SEEK_END {
-    //         if inner.offset as isize - offset < 0 {
-    //             return -1;
-    //         }
-    //     } else {
-    //         if offset < 0{
-    //             return -1;
-    //         }
-    //     }
-    //     match whence{
-    //         SeekWhence::SEEK_CUR=>{
-    //             inner.offset += offset as usize;
-    //         }   
-    //         SeekWhence::SEEK_END=>{
-    //             let size = inner.inode.get_size();
-    //             inner.offset = (size as isize + offset - 1) as usize;
-    //         }
-    //         SeekWhence::SEEK_SET=>{
-    //             inner.offset = offset as usize;
-    //         }
-    //     }
-    //     inner.offset as isize
-    // }
+    pub fn lseek(&self, offset: isize, whence: i32)->isize{
+        let mut inner = self.inner.lock();
+        if whence == SEEK_END {
+            if inner.offset as isize - offset < 0 {
+                return -1;
+            }
+        } else {
+            if offset < 0{
+                return -1;
+            }
+        }
+        
+        match whence{
+            SEEK_CUR=>{
+                inner.offset += offset as usize;
+            },   
+            SEEK_END=>{
+                let size = inner.inode.get_size();
+                inner.offset = (size as isize + offset - 1) as usize;
+            },
+            SEEK_SET=>{
+                inner.offset = offset as usize;
+            },
+            _ => return -1,
+        }
+        inner.offset as isize
+    }
 }
 
 lazy_static! {

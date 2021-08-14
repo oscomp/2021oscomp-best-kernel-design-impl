@@ -5,6 +5,7 @@ mod manager;
 mod processor;
 mod pid;
 mod info;
+mod resource;
 
 use crate::fs::{open, OpenFlags, DiskInodeType, File};
 use crate::mm::{UserBuffer, add_free, translated_refmut};
@@ -15,6 +16,7 @@ use crate::monitor::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskControlBlockInner, TaskStatus, FdTable};
 pub use info::*;
+pub use resource::*;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use manager::fetch_task;
@@ -36,7 +38,7 @@ pub use processor::{
     get_user_runtime_usec, 
     get_kernel_runtime_usec,
 };
-pub use manager::add_task;
+pub use manager::{add_task, find_task};
 pub use pid::{PidHandle, pid_alloc, KernelStack};
 pub use task::AuxHeader;
 
@@ -139,7 +141,19 @@ pub fn add_initproc_into_fs() {
         DiskInodeType::File
     ){
         println!("Already have init proc in FS");
-        return;
+        //return;
+        inode.delete();
+    }
+
+    if let Some(inode) = open(
+        "/",
+        "user_shell",
+        OpenFlags::RDONLY,
+        DiskInodeType::File
+    ){
+        println!("Already have init proc in FS");
+        //return;
+        inode.delete();
     }
 
 

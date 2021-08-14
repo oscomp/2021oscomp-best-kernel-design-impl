@@ -7,7 +7,7 @@ use super::{
     PhysAddr,
     StepByOne,
 };
-use crate::task::current_user_token;
+use crate::task::{current_user_token, current_task};
 use alloc::vec::Vec;
 use alloc::vec;
 use alloc::string::String;
@@ -253,10 +253,17 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     while start < end {
         let start_va = VirtAddr::from(start);
         let mut vpn = start_va.floor();
+        // println!("vpn = 0x{:X}", vpn.0);
+        // let ppn: PhysPageNum;
+        if page_table.translate(vpn).is_none() {
+            println!{"preparing into checking lazy..."}
+            current_task().unwrap().check_lazy(start_va);
+        }
         let ppn = page_table
             .translate(vpn)
             .unwrap()
             .ppn();
+        //println!("vpn = {} ppn = {}", vpn.0, ppn.0);
         vpn.step();
         let mut end_va: VirtAddr = vpn.into();
         end_va = end_va.min(VirtAddr::from(end));
@@ -294,7 +301,12 @@ pub fn translated_ref<T>(token: usize, ptr: *const T) -> &'static T {
 pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let page_table = PageTable::from_token(token);
     let va = ptr as usize;
-    let pa = page_table.translate_va(VirtAddr::from(va));
+    let vaddr = VirtAddr::from(va);
+    if page_table.translate_va(vaddr).is_none() {
+        println!{"preparing into checking lazy..."}
+        current_task().unwrap().check_lazy(vaddr);
+    }
+    let pa = page_table.translate_va(VirtAddr::from(vaddr));
     // print!("[translated_refmut pa:{:?}]",pa);
     pa.unwrap().get_mut()
 }
@@ -384,6 +396,12 @@ impl UserBuffer {
         Self { buffers }
     }
 
+    pub fn empty()->Self{
+        Self {
+            buffers:Vec::new(),
+        }
+    }
+     
     pub fn len(&self) -> usize {
         let mut total: usize = 0;
         for b in self.buffers.iter() {
@@ -418,19 +436,46 @@ impl UserBuffer {
         }
     }
 
-    pub fn write_at(&mut self, offset:usize, char:u8)->isize{
-        if offset > self.len() {
+    pub fn write_at(&mut self, offset:usize, buff: &[u8])->isize{
+        let len = buff.len();
+        if offset + len > self.len() {
             return -1
         }
-        let mut head = 0;
-        for b in self.buffers.iter_mut() {
-            if offset > head && offset < head + b.len() {
-                (**b)[offset - head] = char;
-                //b.as_mut_ptr()
-            } else {
-                head += b.len();
+        let mut head = 0; // offset of slice in UBuffer
+        let mut current = 0; // current offset of buff
+    
+        for sub_buff in self.buffers.iter_mut() {
+            let sblen = (*sub_buff).len();
+            if head + sblen < offset {
+                continue;
+            } else if head < offset {
+                for j in (offset - head)..sblen {
+                    (*sub_buff)[j] = buff[current];
+                    current += 1;
+                    if current == len {
+                        return len as isize;
+                    }
+                }
+            } else {  //head + sblen > offset and head > offset
+                for j in 0..sblen {
+                    (*sub_buff)[j] = buff[current];
+                    current += 1;
+                    if current == len {
+                        return len as isize;
+                    }
+                }
             }
+            head += sblen;
         }
+    
+        //for b in self.buffers.iter_mut() {
+        //    if offset > head && offset < head + b.len() {
+        //        (**b)[offset - head] = char;
+        //        //b.as_mut_ptr()
+        //    } else {
+        //        head += b.len();
+        //    }
+        //}
         0
     }
 

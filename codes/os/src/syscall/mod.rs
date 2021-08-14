@@ -14,6 +14,7 @@ const SYSCALL_OPENAT: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
 const SYSCALL_GETDENTS64: usize = 61;
+const SYSCALL_LSEEK: usize = 62;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_WRITEV: usize = 66;
@@ -22,6 +23,7 @@ const SYSCALL_PSELECT6: usize = 72;
 const SYSCALL_READLINKAT: usize = 78;
 const SYSCALL_NEW_FSTATAT: usize = 79;
 const SYSCALL_FSTAT:usize = 80;
+const SYSCALL_FSYNC:usize = 82;
 const SYSCALL_UTIMENSAT:usize = 88;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_EXIT_GRUOP: usize = 94;
@@ -53,6 +55,7 @@ const SYSCALL_EXEC: usize = 221;
 const SYSCALL_MMAP: usize = 222;
 const SYSCALL_MPROTECT: usize = 226;
 const SYSCALL_WAIT4: usize = 260;
+const SYSCALL_PRLIMIT: usize = 261;
 const SYSCALL_RENAMEAT2: usize = 276;
 
 // Not standard POSIX sys_call
@@ -91,14 +94,15 @@ pub fn test() {
 }
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
-    if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
-        gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
-    } else {
-        if args[0] != 0 && args[0] != 1 && args[0] != 2{
-            // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
-        }
-    }
-
+    gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+    //if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
+    //    gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+    //    //println!("syscallid-{}", syscall_id);
+    //} else {
+    //    if args[0] != 0 && args[0] != 1 && args[0] != 2{
+    //        // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+    //    }
+    //}
     
     // if sys_getpid() == 1{
     //     test();
@@ -129,25 +133,46 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_PIPE => sys_pipe(args[0] as *mut u32, args[1] as usize),
         
         SYSCALL_GETDENTS64 => sys_getdents64(args[0] as isize, args[1] as *mut u8, args[2] as usize),
+        SYSCALL_LSEEK=> sys_lseek(args[0] as usize, args[1] as isize, args[2] as i32),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITEV => sys_writev(args[0], args[1], args[2]),
         SYSCALL_SENDFILE=> sys_sendfile(args[0] as isize, args[1] as isize, args[2] as *mut usize, args[3] as usize),
-        SYSCALL_PSELECT6=> sys_pselect(
+        SYSCALL_PSELECT6=> {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_pselect(
             args[0] as usize, args[1] as *mut u8, 
             args[2] as *mut u8, args[3] as *mut u8, 
             args[4] as *mut usize
-        ),
+        )},
         SYSCALL_READLINKAT=> sys_readlinkat(args[0] as isize, args[1] as *const u8, args[2] as *mut u8, args[3] as usize),
         SYSCALL_NEW_FSTATAT => sys_newfstatat(args[0] as isize, args[1] as *const u8, args[2] as *mut u8, args[3] as u32),
         SYSCALL_FSTAT=> sys_fstat(args[0] as isize, args[1] as *mut u8),
+        SYSCALL_FSYNC=> 0,//panic!("not support fsync yet"),
         SYSCALL_UTIMENSAT => sys_utimensat(args[0], args[1] as *const u8, args[2], args[3] as u32),
 
         SYSCALL_SET_TID_ADDRESS => sys_set_tid_address(args[0] as usize),
-        SYSCALL_EXIT => sys_exit(args[0] as i32),
-        SYSCALL_EXIT_GRUOP => sys_exit(args[0] as i32),
+        SYSCALL_EXIT => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_exit(args[0] as i32)
+        },
+        SYSCALL_EXIT_GRUOP => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_exit(args[0] as i32)
+        },
         SYSCALL_NANOSLEEP => sys_sleep(args[0] as *mut u64, args[1] as *mut u64),
-        SYSCALL_CLOCK_GETTIME => sys_clock_get_time(args[0] as usize, args[1] as *mut u64),
+        SYSCALL_CLOCK_GETTIME => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_clock_get_time(args[0] as usize, args[1] as *mut u64)
+        },
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_KILL => sys_kill(args[0] as isize, args[1] as isize),
         SYSCALL_SIGACTION => sys_sigaction(args[0] as isize, args[1] as *mut usize, args[2] as *mut usize),
@@ -166,9 +191,26 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_GETEGID => sys_getegid(),
         SYSCALL_GETTID => sys_gettid(),
 
-        SYSCALL_CLONE => sys_fork(args[0] as usize, args[1] as  usize, args[2] as  usize, args[3] as  usize, args[4] as usize),
-        SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),
-        SYSCALL_WAIT4 => sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize),
+        SYSCALL_CLONE => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_fork(args[0] as usize, args[1] as  usize, args[2] as  usize, args[3] as  usize, args[4] as usize)
+        },
+        SYSCALL_EXEC => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_exec(args[0] as *const u8, args[1] as *const usize)
+        },
+        SYSCALL_WAIT4 => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_wait4(args[0] as isize, args[1] as *mut i32, args[2] as isize)
+        },
+        SYSCALL_PRLIMIT => 0,
+        
         SYSCALL_RENAMEAT2 => sys_renameat2(
             args[0] as isize, args[1] as *const u8,
             args[2] as isize, args[3] as *const u8, args[4] as u32
@@ -176,17 +218,27 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         
         // SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
         SYSCALL_MMAP => {
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
             sys_mmap(args[0] as usize, args[1] as usize, args[2] as usize, 
             args[3] as usize, args[4] as isize, args[5] as usize)
         },
-        SYSCALL_MUNMAP => { sys_munmap(args[0] as usize, args[1] as usize) },
+        SYSCALL_MUNMAP => { 
+            unsafe {
+                //llvm_asm!("sfence.vma" :::: "volatile");
+            }
+            sys_munmap(args[0] as usize, args[1] as usize) 
+        },
         SYSCALL_MPROTECT => {sys_mprotect(args[0] as usize, args[1] as usize, args[2] as isize)},
         SYSCALL_LS => sys_ls(args[0] as *const u8),
         SYSCALL_SHUTDOWN => shutdown(),
         SYSCALL_CLEAR => sys_clear(args[0] as *const u8),
-         _ => 0
-        //_ => {println!("Unsupported syscall_id: {}", syscall_id); 0}
+        _ => 0
+        //_ => {println!("Unsupported syscall_id:{}, arg0={} arg1={}", syscall_id, args[0], args[1]); 0}
         //_ => panic!("Unsupported syscall_id: {}", syscall_id),
+
     }
 }
+
 

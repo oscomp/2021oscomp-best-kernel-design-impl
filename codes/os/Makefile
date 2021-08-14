@@ -6,8 +6,14 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
 U_FAT32_DIR := ../fat32-fuse
-#U_FAT32 := /dev/sdb1
-U_FAT32 := ${U_FAT32_DIR}/fat32.img
+ifeq ($(BOARD), k210)
+	U_FAT32 := /dev/sdb1
+else 
+	U_FAT32 := ${U_FAT32_DIR}/fat32.img
+endif
+
+
+
 SDCARD := /dev/sdb
 APPS := ../user/src/bin/*
 TOP := ../../k210.bin
@@ -15,8 +21,11 @@ TOP := ../../k210.bin
 # BOARD
 BOARD ?= qemu
 SBI ?= rustsbi
-# BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
-BOOTLOADER := default
+ifeq ($(BOARD), qemu)
+	BOOTLOADER := default
+else ifeq ($(BOARD), k210)
+	BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
+endif
 K210_BOOTLOADER_SIZE := 131072
 
 # KERNEL ENTRY
@@ -58,7 +67,7 @@ sdcard:
 
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
-#	@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
+	@$(OBJDUMP) -S $(KERNEL_ELF) > $(KERNEL_ELF).S
 
 $(APPS):
 
@@ -90,7 +99,6 @@ ifeq ($(BOARD),qemu)
         -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0\
 		-smp threads=2
 else
-	BOOTLOADER := ../bootloader/$(SBI)-$(BOARD).bin
 	(which $(K210-BURNER)) || (cd .. && git clone https://github.com/sipeed/kflash.py.git && mv kflash.py tools)
 	@cp $(BOOTLOADER) $(BOOTLOADER).copy
 	@dd if=$(KERNEL_BIN) of=$(BOOTLOADER).copy bs=$(K210_BOOTLOADER_SIZE) seek=1
@@ -113,7 +121,7 @@ gdb:
 	@qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,\
 	file=target/riscv64imac-unknown-none-elf/release/os,addr=0x80200000 -drive \
 	file=$(U_FAT32),if=none,format=raw,id=x0 \
-	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=2 -S -s
+	-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 -smp threads=1 -S -s
 
 runsimple:
 	@qemu-system-riscv64 \

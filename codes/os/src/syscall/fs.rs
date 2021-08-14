@@ -1,6 +1,6 @@
 use core::{ usize};
 use core::mem::{size_of};
-
+use crate::lang_items::Bytes;
 use crate::timer::get_timeval;
 use crate::{fs::{Dirent, FdSet, File, FileClass, FileDescripter, IoVec, IoVecs, Kstat, MNT_TABLE, NewStat, TTY, NullZero}, gdb_print, gdb_println, 
         mm::{UserBuffer, translated_byte_buffer, translated_ref, translated_refmut, translated_str, print_free_pages},
@@ -19,7 +19,9 @@ use spin::mutex::*;
 
 //use easy_fs::DiskInodeType;
 const AT_FDCWD:isize = -100;
-const FD_LIMIT:usize = 128;
+pub const FD_LIMIT:usize = 128;
+
+// TODO: change FD_LIMIT to task_inner.resource_list[RLIMIT_NOFILE].get_cur()
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     //if fd == 6 || fd == 5 {
@@ -125,7 +127,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
     let token = current_user_token();
     // 这里传入的地址为用户的虚地址，因此要使用用户的虚地址进行映射
     let path = translated_str(token, path);
-    //gdb_println!(SYSCALL_ENABLE, "openat: path = {}", path);
+    gdb_println!(SYSCALL_ENABLE, "sys_openat: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     
     /////////////////////////////// WARNING ////////////////////////////////
@@ -177,6 +179,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             ));
             fd as isize
         } else {
+            //panic!("open failed");
             -1
         }
     } else {    
@@ -185,13 +188,12 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
             return -1
         }
         if let Some(file) = &inner.fd_table[fd_usz] {
-            // TODO
             match &file.fclass {
                 FileClass::File(f) => {
                     //let oflags = OpenFlags::from_bits(flags).unwrap();
                     // 需要新建文件
                     if oflags.contains(OpenFlags::CREATE){ 
-                        if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ //TODO
+                        if let Some(tar_f) = f.create(path.as_str(), DiskInodeType::File){ 
                             let fd = inner.alloc_fd();
                             inner.fd_table[fd] = Some( FileDescripter::new(
                                 oflags.contains(OpenFlags::CLOEXEC),
@@ -199,6 +201,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                             ));
                             return fd as isize
                         }else{
+                            //panic!("open failed");
                             return -1;
                         }
                     }
@@ -211,6 +214,7 @@ pub fn sys_open_at(dirfd: isize, path: *const u8, flags: u32, mode: u32) -> isiz
                         ));
                         fd as isize
                     }else{
+                        //panic!("open failed");
                         return -1;
                     }
                 },
@@ -259,6 +263,7 @@ pub fn sys_pipe(pipe: *mut u32, flags: usize) -> isize {
     ));
     *translated_refmut(token, pipe) = read_fd as u32;
     *translated_refmut(token, unsafe { pipe.add(1) }) = write_fd as u32;
+    gdb_println!(SYSCALL_ENABLE, "sys_pipe() = [{}, {}]", read_fd, write_fd);
     0
 }
 
@@ -290,7 +295,6 @@ pub fn sys_chdir(path: *const u8) -> isize{
     //println!("new inode id = {}", new_ino_id);
     if new_ino_id >= 0 {
         //inner.current_inode = new_ino_id as u32;
-        // TODO:修改current_path
         if path.chars().nth(0).unwrap() == '/' {
             inner.current_path = path.clone();
         } else {
@@ -385,10 +389,14 @@ pub fn sys_dup3( old_fd: usize, new_fd: usize )->isize{
 
 pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
     //return 0;
+    //println!("=====================================");
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
     let buf_vec = translated_byte_buffer(token, buf, len);
+    let dent_len = size_of::<Dirent>();
+    //let max_num = len / dent_len;
+    let mut total_len:usize = 0;
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut dirent = Dirent::empty();
@@ -400,10 +408,19 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
             OpenFlags::RDONLY,
             DiskInodeType::Directory
         ) {
-            let len = file.getdirent(&mut dirent);
-            userbuf.write(dirent.as_bytes());
-            return 0; //warning
+            loop {
+                if total_len + dent_len > len {break;}
+                if file.getdirent(&mut dirent) > 0 {
+                    userbuf.write_at( total_len, dirent.as_bytes());
+                    total_len += dent_len;
+                } else {
+                    break;
+                }
+            }
+            gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}, len:{}) = {}", fd, len, total_len );
+            return total_len as isize; //warning
         } else {
+            gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}, len:{}) = {}", fd, len, -1 );
             return -1
         }
     } else {
@@ -414,11 +431,22 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
         if let Some(file) = &inner.fd_table[fd_usz] {
             match &file.fclass {
                 FileClass::File(f) => {
-                    let len = f.getdirent(&mut dirent);
-                    userbuf.write(dirent.as_bytes());
-                    return 0; //warning
+                    loop {
+                        if total_len + dent_len > len {break;}
+                        if f.getdirent(&mut dirent) > 0 {
+                            userbuf.write_at( total_len, dirent.as_bytes());
+                            total_len += dent_len;
+                        } else {
+                            break;
+                        }
+                    }
+                    gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}, len:{}) = {}", fd, len, total_len );
+                    return total_len as isize; //warning
                 },
-                _ => return -1,
+                _ => {
+                    gdb_println!(SYSCALL_ENABLE,"sys_getdents64(fd:{}) = {}", fd, -1 );
+                    return -1;
+                }
             }
         } else {
             return -1
@@ -443,6 +471,7 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
             DiskInodeType::Directory
         ) {
             file.get_fstat(&mut kstat);
+            gdb_println!(SYSCALL_ENABLE, "syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
             userbuf.write(kstat.as_bytes());
             return 0
         } else {
@@ -458,10 +487,12 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
                 FileClass::File(f) => {
                     f.get_fstat(&mut kstat);
                     userbuf.write(kstat.as_bytes());
+                    gdb_println!(SYSCALL_ENABLE, "syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
                     return 0
                 },
                 _ => {
                     userbuf.write(Kstat::new_abstract().as_bytes());
+                    gdb_println!(SYSCALL_ENABLE, "syscall_fstat(fd:{}, [size = {}]) ", fd, kstat.st_size );
                     return 0 //warning
                 },
             }
@@ -471,14 +502,17 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
     }
 }   
 
+
 pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
+    //println!("size = {}", size_of::<NewStat>());
     let mut buf_vec = translated_byte_buffer(token, buf, size_of::<NewStat>());
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut stat = NewStat::empty();
+    //let mut stat = Kstat::empty();
     let path = translated_str(token, path);
     
     if fd == AT_FDCWD {
@@ -490,8 +524,19 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
             DiskInodeType::Directory
         ) {
             file.get_newstat(&mut stat);
+            //file.get_fstat(&mut stat);
+            gdb_println!(SYSCALL_ENABLE, "syscall_fstatat(fd:{}, path = {:?}, buff addr = 0x{:X},  [size = {}]) ", fd, path, buf as usize, stat.st_size );
             userbuf.write(stat.as_bytes());
-            return 0
+            return 0;
+            //let buf = [0o41777u32; 32];
+            //unsafe {
+            //    let bytes = core::slice::from_raw_parts(
+            //        &buf as *const _ as usize as *const u8,
+            //        buf.len(),
+            //    );
+            //    userbuf.write( bytes );
+            //    return 0
+            //}
         } else {
             return -2
         }
@@ -504,6 +549,7 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
             match &file.fclass {
                 FileClass::File(f) => {
                     f.get_newstat(&mut stat);
+                    //f.get_fstat(&mut stat);
                     userbuf.write(stat.as_bytes());
                     return 0
                 },
@@ -515,7 +561,6 @@ pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize
     }
 }   
 
-// TODO: mode需要研究
 pub fn sys_mkdir(dirfd:isize, path: *const u8, mode:u32)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
@@ -567,7 +612,6 @@ pub fn sys_mount( p_special:*const u8, p_dir:*const u8, p_fstype: *const u8, fla
 
 pub fn sys_umount( p_special:*const u8, flags:usize )->isize{
     // TODO
-    // println!("sys umount");
     let token = current_user_token();
     let special = translated_str(token, p_special);
     MNT_TABLE.lock().umount(special, flags as u32)
@@ -607,7 +651,7 @@ pub fn sys_unlinkat(fd:i32, path:*const u8, flags:u32)->isize{
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
 
-    if let Some(file) = get_file_discpt(fd as isize, path, &inner, OpenFlags::from_bits(flags).unwrap()){
+    if let Some(file) = get_file_discpt(fd as isize, & path, &inner, OpenFlags::from_bits(flags).unwrap()){
         match file {
             FileClass::File(f)=>{
                 f.delete();
@@ -729,7 +773,7 @@ pub fn sys_utimensat(fd:usize, path:*const u8, time:usize, flags:u32)->isize{
     //println!("unlink: path = {}", path);
     let mut inner = task.acquire_inner_lock();
     //println!("openat: fd = {}", dirfd);
-    if let Some(file) = get_file_discpt(fd as isize, path, &inner,  OpenFlags::from_bits(flags).unwrap() ){
+    if let Some(file) = get_file_discpt(fd as isize, & path, &inner,  OpenFlags::from_bits(flags).unwrap() ){
         match file {
             FileClass::File(f)=>{
                 return 0
@@ -756,7 +800,7 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
     //let mut inner = task.acquire_inner_lock();
     if let Some(old_file_class) = get_file_discpt(
         old_dirfd, 
-        oldpath, 
+        & oldpath, 
         & inner, 
         OpenFlags::RDWR   
     ){
@@ -773,13 +817,12 @@ pub fn sys_renameat2( old_dirfd:isize, old_path:*const u8, new_dirfd:isize, new_
                 
                 if let Some(new_file_class) = get_file_discpt(
                     new_dirfd, 
-                    newpath, 
+                    & newpath, 
                     & inner, 
                     oflags
                 ){
                     // copy
                     let first_cluster = oldfile.get_head_cluster();
-                    // TODO:
                     match new_file_class {
                         FileClass::File(newfile)=>{
                             newfile.set_head_cluster(first_cluster);
@@ -879,7 +922,7 @@ pub fn sys_readlinkat(dirfd: isize, pathname: *const u8, buf: *mut u8, bufsiz: u
     
 }
 
-fn get_file_discpt(fd: isize, path:String, inner: &MutexGuard<TaskControlBlockInner>, oflags: OpenFlags) -> Option<FileClass>{
+fn get_file_discpt(fd: isize, path:&String, inner: &MutexGuard<TaskControlBlockInner>, oflags: OpenFlags) -> Option<FileClass>{
     let type_ = {
         if oflags.contains(OpenFlags::DIRECTROY) {
             DiskInodeType::Directory
@@ -964,8 +1007,35 @@ pub fn sys_pselect(
     let mut rfd_vec = Vec::new();
     let mut wfd_vec = Vec::new();
 
-    drop(task);
 
+
+    let mut rfd_set = FdSet::new();
+    let mut wfd_set = FdSet::new();
+
+    let mut ubuf_rfds = {
+        if readfds as usize != 0 {
+            UserBuffer::new(
+                translated_byte_buffer(token, readfds, size_of::<FdSet>())
+            )
+        } else {
+            UserBuffer::empty()
+        }
+    };
+    ubuf_rfds.read(rfd_set.as_bytes_mut());
+
+    let mut ubuf_wfds = {
+        if writefds as usize != 0 {
+            UserBuffer::new(
+                translated_byte_buffer(token, writefds, size_of::<FdSet>())
+            )
+        } else {
+            UserBuffer::empty()
+        }
+
+    };
+    ubuf_wfds.read(wfd_set.as_bytes_mut());
+    
+    drop(task);
     while !time_up {
         /* handle read fd set */
 
@@ -973,11 +1043,10 @@ pub fn sys_pselect(
         let inner = task.acquire_inner_lock();
         let fd_table = &inner.fd_table;
         if readfds as usize != 0 && !r_all_ready{
-            let mut ubuf_rfds = UserBuffer::new(
-                translated_byte_buffer(token, readfds, size_of::<FdSet>())
-            );
-            let mut rfd_set = FdSet::new();
-            ubuf_rfds.read(rfd_set.as_bytes_mut());
+            //let mut ubuf_rfds = UserBuffer::new(
+            //    translated_byte_buffer(token, readfds, size_of::<FdSet>())
+            //);
+            
             if rfd_vec.len() == 0 {
                 rfd_vec = rfd_set.get_fd_vec();
                 if rfd_vec[ rfd_vec.len() - 1 ] >= nfds {
@@ -1018,17 +1087,17 @@ pub fn sys_pselect(
             }
             if !r_has_nready {
                 r_all_ready = true;
+                ubuf_rfds.write(rfd_set.as_bytes());
             }
-            ubuf_rfds.write(rfd_set.as_bytes());
         }
 
         /* handle write fd set */
         if writefds as usize != 0 && !w_all_ready {
-            let mut ubuf_wfds = UserBuffer::new(
-                translated_byte_buffer(token, writefds, size_of::<FdSet>())
-            );
-            let mut wfd_set = FdSet::new();
-            ubuf_wfds.read(wfd_set.as_bytes_mut());
+            //let mut ubuf_wfds = UserBuffer::new(
+            //    translated_byte_buffer(token, writefds, size_of::<FdSet>())
+            //);
+            //let mut wfd_set = FdSet::new();
+            //ubuf_wfds.read(wfd_set.as_bytes_mut());
             
             if wfd_vec.len() == 0{
                 wfd_vec = wfd_set.get_fd_vec();
@@ -1069,8 +1138,8 @@ pub fn sys_pselect(
             }
             if !w_has_nready { 
                 w_all_ready = true;
-            }
-            ubuf_wfds.write(wfd_set.as_bytes());             
+                ubuf_wfds.write(wfd_set.as_bytes()); 
+            }           
         }    
 
         /* Cannot handle exceptfds for now */
@@ -1085,6 +1154,8 @@ pub fn sys_pselect(
             ubuf_efds.write(efd_set.as_bytes()); 
         }
 
+        // return anyway
+        //return r_ready_count + w_ready_count + e_ready_count;
         // if there are some fds not ready, just wait until time up
         if r_has_nready || w_has_nready {
             r_has_nready = false;
@@ -1098,12 +1169,38 @@ pub fn sys_pselect(
                 suspend_current_and_run_next();
             } else {
                 time_up = true;
+                ubuf_rfds.write(rfd_set.as_bytes());
+                ubuf_wfds.write(wfd_set.as_bytes()); 
+                break;
             }
         } else {
             break;
         }
     }
-    gdb_println!(SYSCALL_ENABLE, "sys_pselect( nfds: {}, readfds: {:?}, writefds: {:?}, exceptfds: {:?}, timeout: {:?}) = {}",
-                 nfds, rfd_vec, wfd_vec, rfd_vec, timer_interval, r_ready_count + w_ready_count + e_ready_count);
+    let task = current_task().unwrap();
+    gdb_println!(SYSCALL_ENABLE, "sys_pselect( nfds: {}, readfds: {:?}, writefds: {:?}, exceptfds: {:?}, timeout: {:?}) = {}, pid-{}",
+                 nfds, rfd_vec, wfd_vec, rfd_vec, timer_interval, r_ready_count + w_ready_count + e_ready_count, task.pid.0);
     return r_ready_count + w_ready_count + e_ready_count
+}
+
+pub fn sys_lseek(fd: usize, offset: isize, whence: i32)->isize{
+    let task = current_task().unwrap();
+    let token = current_user_token();
+    let inner = task.acquire_inner_lock();
+
+    if fd > inner.fd_table.len() {
+        return -1
+    }
+
+    if let Some(fdes) = &inner.fd_table[fd] {
+        let fclass = &fdes.fclass;
+        match fclass {
+            FileClass::File(inode)=>{
+                return inode.lseek(offset as isize, whence)
+            },
+            _ => return -1,
+        }
+    } else {
+        return -1
+    }
 }

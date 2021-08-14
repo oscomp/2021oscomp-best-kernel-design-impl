@@ -592,6 +592,7 @@ impl VFile{
         let mut offset = off;
         let mut name = String::new(); 
         let mut is_long = false;
+        //let mut order:u8 = 0;
         loop {
             let read_sz = self.read_short_dirent(|curr_ent:&ShortDirEntry|{
                 curr_ent.read_at(
@@ -605,7 +606,11 @@ impl VFile{
             if read_sz != DIRENT_SZ || long_ent.is_empty() { 
                 return None;
             }
-            if long_ent.is_deleted() { offset += DIRENT_SZ; is_long = false; continue; }
+            if long_ent.is_deleted() { //if meet delete ent, search should be restart
+                offset += DIRENT_SZ; 
+                name.clear();
+                is_long = false; continue; 
+            }
             // 名称拼接
             if long_ent.attribute() != ATTRIBUTE_LFN {
                 let (_, se_array, _) = unsafe{
@@ -615,13 +620,16 @@ impl VFile{
                 if !is_long {
                     name = short_ent.get_name_lowercase();
                 } 
+                //println!("---{}", short_ent.get_name_lowercase());
                 let attribute = short_ent.attribute();
                 let first_cluster = short_ent.first_cluster();
                 offset += DIRENT_SZ;
                 return Some((name, offset as u32, first_cluster,attribute))
             } else {
                 is_long = true;
+                //order += 1;
                 name.insert_str(0, long_ent.get_name_format().as_str());
+                //println!("--{}", long_ent.get_name_format().as_str());
             }
             offset += DIRENT_SZ; 
         }

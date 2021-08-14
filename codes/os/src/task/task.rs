@@ -14,16 +14,16 @@ use crate::{console::print, mm::{
     MmapArea,
     MapPermission,
     // PTEFlags,
-}};
+}, syscall::FD_LIMIT, task::RLIMIT_NOFILE};
 use crate::trap::{TrapContext, trap_handler};
 use crate::config::*;
 use crate::gdb_println;
 use crate::monitor::*;
 use crate::utils::*;
 use crate::timer::get_timeval;
-use super::TaskContext;
-use super::{PidHandle, pid_alloc, KernelStack};
 use super::info::*;
+use super::{RLimit, TaskContext};
+use super::{PidHandle, pid_alloc, KernelStack, RUsage, ITimerVal};
 use alloc::sync::{Weak, Arc};
 use alloc::vec;
 use alloc::vec::Vec;
@@ -78,10 +78,12 @@ pub struct TaskControlBlockInner {
     pub current_path: String,
     // info
     pub address: ProcAddress,
-    pub rusage:RUsage,
+    pub rusage: RUsage,
     pub itimer: ITimerVal, // it_value if not remaining time but the time to alarm
     pub siginfo: SigInfo,
     pub trapcx_backup: TrapContext,
+    // resource
+    pub resource_list: [RLimit;17],
 }
 
 impl ProcAddress {
@@ -142,8 +144,16 @@ impl TaskControlBlockInner {
         self.siginfo.signal_pending.push(signal);
     }
     
-    pub fn lazy_alloc(&mut self, vpn: VirtPageNum) -> usize {
-        self.memory_set.lazy_alloc(vpn)
+    pub fn init_rlimits(&mut self){
+        let r_nofile = &mut self.resource_list[RLIMIT_NOFILE as usize];
+        r_nofile.set_cur(FD_LIMIT as i64);
+        r_nofile.set_max(FD_LIMIT as i64);
+    }
+    pub fn lazy_alloc_heap(&mut self, vpn: VirtPageNum) -> usize {
+        self.memory_set.lazy_alloc_heap(vpn)
+    }
+    pub fn lazy_alloc_stack(&mut self, vpn: VirtPageNum) -> usize {
+        self.memory_set.lazy_alloc_stack(vpn)
     }
 }
 
@@ -321,8 +331,17 @@ impl TaskControlBlock {
                     )),
                 ],
                 current_path: String::from("/"), // 只有initproc在此建立，其他进程均为fork出
+                resource_list: [RLimit::new();17],
             }),
         };
+
+
+        // [WARNING] init resource for proc
+        //let file_limit = &mut task_control_block.acquire_inner_lock().resource_list[RLIMIT_NOFILE as usize];
+        //file_limit.set_cur(FD_LIMIT as i64);
+        //file_limit.set_cur(FD_LIMIT as i64);
+        task_control_block.acquire_inner_lock().init_rlimits();
+
         // prepare TrapContext in user space
         let trap_cx = task_control_block.acquire_inner_lock().get_trap_cx();
         *trap_cx = TrapContext::app_init_context(
@@ -334,6 +353,7 @@ impl TaskControlBlock {
         );
         task_control_block
     }
+
     
     // exec will push following arguments to user stack:
     // STACK TOP
@@ -570,6 +590,7 @@ impl TaskControlBlock {
                 exit_code: 0,
                 fd_table: new_fd_table,
                 current_path: parent_inner.current_path.clone(),
+                resource_list: parent_inner.resource_list.clone(),
             }),
         });
         // println!("[fork] parent_inner.siginfo {:?}",parent_inner.siginfo);
@@ -592,6 +613,43 @@ impl TaskControlBlock {
 
     pub fn gettgid(&self) -> usize {
         self.tgid
+    }
+    
+    pub fn check_lazy(&self, va: VirtAddr) -> isize {
+        println!{"into check lazy..."}
+        println!{"The checking addr is {:?}", va};
+        let vpn: VirtPageNum = va.floor();
+        let heap_base = self.acquire_inner_lock().heap_start;
+        let heap_pt = self.acquire_inner_lock().heap_pt;
+        let stack_top = self.acquire_inner_lock().base_size;
+        let stack_bottom = stack_top - USER_STACK_SIZE;
+        // println!{"The base of the user stack: {:X} ~ {:X}", stack_bottom, stack_top};
+        // println!{"============================{:?}", vpn}
+        let mmap_start = self.acquire_inner_lock().mmap_area.mmap_start;
+        let mmap_end = self.acquire_inner_lock().mmap_area.mmap_top;
+
+        if va >= mmap_start && va < mmap_end {
+        // if false { // disable lazy mmap
+            self.lazy_mmap(va.0)
+        } else if va.0 >= heap_base && va.0 <= heap_pt {
+            self.acquire_inner_lock().lazy_alloc_heap(vpn);
+            return 0;
+        } else if va.0 >= stack_bottom && va.0 <= stack_top {
+            //println!{"lazy_stack_page: {:?}", va}
+            self.acquire_inner_lock().lazy_alloc_stack(vpn);
+            0
+        } else {
+            // get the PageTableEntry that faults
+            let pte = self.acquire_inner_lock().enquire_vpn(vpn);
+            // if the virtPage is a CoW
+            if pte.is_some() && pte.unwrap().is_cow() {
+                let former_ppn = pte.unwrap().ppn();
+                self.acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                0
+            } else {
+                -1
+            }
+        }
     }
 
     pub fn lazy_mmap(&self, stval: usize) -> isize {
@@ -635,7 +693,7 @@ impl TaskControlBlock {
             return start;
         }
         else{ // "Start" va not mapped
-            println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
+            //println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
             // println!("[insert_mmap_area]: flags 0x{:X}",flags);
             // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
