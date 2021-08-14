@@ -39,7 +39,8 @@ __alltraps:
     csrr t2, sscratch
     sd t2, 2*8(sp)
     #fsd fs1, 34*8(sp)
-    .half 0xba26
+    .half 0xba22
+    .half 0xbe26
     # load kernel_satp into t0
     ld t0, 34*8(sp)
     # load trap_handler into t1
@@ -58,7 +59,7 @@ __restore:
     # switch to user space
     csrw satp, a1
     # sfence.vma
-    # sfence.vma zero, zero
+    sfence.vma zero, zero
     csrw sscratch, a0
     mv sp, a0
     # now sp points to TrapContext in user space, start restoring based on it
@@ -66,7 +67,8 @@ __restore:
     ld t0, 32*8(sp)
     ld t1, 33*8(sp)
     #fld fs1, 34*8(sp)
-    .half 0x34d2
+    .half 0x3452
+    .half 0x34f2
     csrw sstatus, t0
     csrw sepc, t1
     # restore general purpose registers except x0/sp/tp

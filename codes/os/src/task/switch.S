@@ -34,6 +34,5 @@ __switch:
     # pop TaskContext
     addi sp, sp, 13*8
     fence.i
-    #sfence.vma
     ret
 

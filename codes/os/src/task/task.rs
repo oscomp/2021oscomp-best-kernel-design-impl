@@ -178,20 +178,20 @@ impl TaskControlBlock {
     pub fn scan_signal_handler(&self) -> Option<(Signals,usize)>{
         let mut inner = self.acquire_inner_lock();
         // timer signal check
-        {
-            let itimer = inner.itimer.clone();
-            let now = get_timeval();
-            // itimer is set && now > timer ( time up)
-            if  !inner.itimer.it_value.is_zero() && (itimer.it_value - now).is_zero(){
-                inner.siginfo.signal_pending.push(Signals::SIGALRM);
-                if !inner.itimer.it_interval.is_zero(){
-                    inner.itimer.it_value = inner.itimer.it_value + inner.itimer.it_interval;
-                }
-                else{
-                    inner.itimer.it_value = TimeVal::new();
-                }
-            }
-        }
+        // {
+        //     let itimer = inner.itimer.clone();
+        //     let now = get_timeval();
+        //     // itimer is set && now > timer ( time up)
+        //     if  !inner.itimer.it_value.is_zero() && (itimer.it_value - now).is_zero(){
+        //         inner.siginfo.signal_pending.push(Signals::SIGALRM);
+        //         if !inner.itimer.it_interval.is_zero(){
+        //             inner.itimer.it_value = inner.itimer.it_value + inner.itimer.it_interval;
+        //         }
+        //         else{
+        //             inner.itimer.it_value = TimeVal::new();
+        //         }
+        //     }
+        // }
         // find unhandled signal and exec it
         let signal_handler = inner.siginfo.signal_handler.clone();
         while !inner.siginfo.signal_pending.is_empty() {

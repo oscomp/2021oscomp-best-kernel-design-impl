@@ -183,7 +183,7 @@ impl</*'a,*/ X: SPI> SDCard</*'a,*/ X> {
     }
 
     fn HIGH_SPEED_ENABLE(&self) {
-        self.spi.set_clk_rate(10000000);
+        self.spi.set_clk_rate(10000000);//10000000
     }
 
     fn lowlevel_init(&self) {
@@ -608,7 +608,7 @@ impl</*'a,*/ X: SPI> SDCard</*'a,*/ X> {
         }
         let mut error = false;
         //let mut dma_chunk = [0u32; SEC_LEN];
-        let mut tmp_chunk= [0u8; SEC_LEN];
+        //let mut tmp_chunk= [0u8; SEC_LEN];
         for chunk in data_buf.chunks_mut(SEC_LEN) {
             if self.get_response() != SD_START_DATA_SINGLE_BLOCK_READ {
                 error = true;
@@ -617,12 +617,12 @@ impl</*'a,*/ X: SPI> SDCard</*'a,*/ X> {
             /* Read the SD block data : read NumByteToRead data */
             //self.read_data_dma(&mut dma_chunk);
             //*可优化
-            self.read_data(&mut tmp_chunk);
+            self.read_data(chunk);
             /* Place the data received as u32 units from DMA into the u8 target buffer */
-            for (a, b) in chunk.iter_mut().zip(/*dma_chunk*/tmp_chunk.iter()) {
-                //*a = (b & 0xff) as u8;
-                *a = *b;
-            }
+            //for (a, b) in chunk.iter_mut().zip(/*dma_chunk*/tmp_chunk.iter()) {
+            //    //*a = (b & 0xff) as u8;
+            //    *a = *b;
+            //}
             /* Get CRC bytes (not really needed by us, but required by SD) */
             let mut frame = [0u8; 2];
             self.read_data(&mut frame);
@@ -673,17 +673,17 @@ impl</*'a,*/ X: SPI> SDCard</*'a,*/ X> {
             return Err(());
         }
         //let mut dma_chunk = [0u32; SEC_LEN];
-        let mut tmp_chunk = [0u8; SEC_LEN];
+        //let mut tmp_chunk = [0u8; SEC_LEN];
         for chunk in data_buf.chunks(SEC_LEN) {
             /* Send the data token to signify the start of the data */
             self.write_data(&frame);
             /* Write the block data to SD : write count data by block */
-            for (a, &b) in /*dma_chunk*/tmp_chunk.iter_mut().zip(chunk.iter()) {
-                //*a = b.into();
-                *a = b;
-            }
+            //for (a, &b) in /*dma_chunk*/tmp_chunk.iter_mut().zip(chunk.iter()) {
+            //    //*a = b.into();
+            //    *a = b;
+            //}
             //self.write_data_dma(&mut dma_chunk);
-            self.write_data(&mut tmp_chunk);
+            self.write_data(chunk);
             /* Put dummy CRC bytes */
             self.write_data(&[0xff, 0xff]);
             /* Read data response */

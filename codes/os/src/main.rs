@@ -103,7 +103,7 @@ pub fn rust_main() -> ! {
     let core = id();
     // println!("get id = {}", core);
     if core != 0 {
-        println!("other core");
+        //println!("other core: {}", core);
         loop{}
         //mm::init_othercore();
         //trap::init();

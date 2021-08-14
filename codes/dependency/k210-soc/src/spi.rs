@@ -163,7 +163,8 @@ impl<IF: SPI01> SPI for SPIImpl<IF> {
         let clock_freq: u32 = sysctl::clock_get_freq(sysctl::clock::SPI0);
         let spi_baudr = clock_freq / spi_clk;
         // Clamp baudrate divider to valid range
-        let spi_baudr = cmp::min(cmp::max(spi_baudr, 2), 65534);
+        //panic!("{} / {} = {}", clock_freq, spi_clk, spi_baudr);
+        let mut spi_baudr = cmp::min(cmp::max(spi_baudr, 2), 65534);
         unsafe {
             self.spi.baudr.write(|w| w.bits(spi_baudr));
         }

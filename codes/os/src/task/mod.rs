@@ -225,7 +225,7 @@ pub fn perform_signal_handler(){
     let current_task = current_task().unwrap();
     // if current_task.pid.0 == 4{print!("[pid 4 1]");}
     // mask all the signals when processing signal handler
-    if !current_task.is_signal_execute(){
+    if !current_task.is_signal_execute() && !current_task.acquire_inner_lock().siginfo.signal_pending.is_empty(){
         // if current_task.pid.0 == 4{print!("[pid 4 2]");}
         if let Some((signal, handler)) = current_task.scan_signal_handler(){
             // if current_task.pid.0 == 4{print!("[pid 4 3]");}
