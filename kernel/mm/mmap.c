@@ -7,15 +7,19 @@
 int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 {
     debug();
-    log(0, "start %lx, len %lx, fd %d", start, len, fd);
+    log(0, "mmap start %lx, len %lx, fd %d %lx", start, len, fd, flags & MAP_SHARED);
     if (len <= 0)
-        return -1;
+        return SYSCALL_FAILED;
     /* just for page allocate */
     if (fd == MMAP_ALLOC_PAGE_FD){
         if (flags & MAP_ANONYMOUS == 0)
-            return -1;
+            return SYSCALL_FAILED;
         if (!start){
-            start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
+            uintptr_t probe = USER_STACK_ADDR - NORMAL_PAGE_SIZE;
+            uintptr_t user_addr_top = get_user_addr_top(current_running);
+            // while (probe >= user_addr_top && probe_kva_of(probe, current_running->pgdir) != 0)
+            //     probe -= NORMAL_PAGE_SIZE;
+            start = PAGE_ALIGN(user_addr_top - len);
             set_user_addr_top(current_running, start);
         }
         for (uint64_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
@@ -59,11 +63,15 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 int64 do_munmap(void *start, size_t len)
 {
     debug();
-    log(0, "start %lx, len %lx", start, len);
+    uint64_t start_uva = start;
+    if (((start_uva % NORMAL_PAGE_SIZE) != 0) || ((len % NORMAL_PAGE_SIZE) != 0))
+        assert(0);
+    log(0, "munmap start %lx, len %lx", start, len);
 #ifndef K210
     return 0;
 #endif
-    for (int i = 0; i < NUM_FD; ++i)
+    int i;
+    for (i = 0; i < NUM_FD; ++i)
     {
         /* used, shared, not anonymous, start point is correct */
         if (current_running->fd[i].used == FD_USED && (current_running->fd[i].mmap.flags & MAP_SHARED)
@@ -75,5 +83,12 @@ int64 do_munmap(void *start, size_t len)
             return 0;
         }
     }
-    return -1;
+    if (i == NUM_FD){
+        for (uintptr_t ptr = 0; ptr < len; ptr += NORMAL_PAGE_SIZE){
+            assert(probe_kva_of(start + ptr, current_running->pgdir) != 0);
+            free_page_helper(start + ptr, current_running->pgdir);
+            assert(probe_kva_of(start + ptr, current_running->pgdir) == 0);
+        }
+    }
+    return SYSCALL_SUCCESSED;
 }

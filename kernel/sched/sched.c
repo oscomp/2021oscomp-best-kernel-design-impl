@@ -140,6 +140,64 @@ void do_scheduler(void)
 }
 
 
+int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
+{
+    debug();
+    uint64_t status_ker_va = NULL;
+    if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
+    log(0, "kva is %lx", status_ker_va);
+    int64_t ret;
+    for (uint i = 0; i < NUM_MAX_TASK; ++i)
+    {
+        if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
+            // confirm pid
+            if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE){
+                do_block(&current_running->list, &pcb[i].wait_list);
+                ret = pcb[i].tid;
+                do_scheduler();
+                log(0, "exit status %d", pcb[i].exit_status);
+                if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
+                // i = 0; // start from beginning when wake up
+                log(0, "ret is %ld", ret);
+                return ret;
+            }
+        }
+    }
+    log(0, "ret is %ld", ret);
+    return -1;
+}
+
+void do_block(list_node_t *list, list_head *queue)
+{
+    debug();
+    pcb_t *pcb = list_entry(list, pcb_t, list);
+
+    pcb->status = TASK_BLOCKED;
+    list_add_tail(list,queue);   
+}
+
+/* pcb_node is of type list_node_t */
+void do_unblock(void *pcb_node)
+{
+    debug();
+    // unblock the `pcb` from the block queue   
+    list_del(pcb_node);
+    pcb_t *pcb = (pcb_t *)((list_node_t *)pcb_node)->ptr;
+    pcb->status = TASK_READY;
+    list_add_tail(pcb_node,&ready_queue);
+}
+
+static void freeproc(pcb_t *pcb)
+{
+    pcb->status = TASK_EXITED;
+    // pcb->parent.parent = NULL;
+    free_all_pages(pcb->pgdir, PAGE_ALIGN(pcb->kernel_sp));
+    for (uint8_t i = 0; i < NUM_FD; i++)
+        fat32_close(pcb->fd[i].fd_num);
+    handle_memory_leak(pcb);
+    list_add_tail(&pcb->list,&available_queue);
+}
+
 /* clone a child thread for current thread */
 /* FOR NOW, use tls as entry point */
 /* stack : ADDR OF CHILD STACK POINT */
@@ -208,63 +266,6 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
     return -1;
 }
 
-int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
-{
-    debug();
-    uint64_t status_ker_va = NULL;
-    if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
-    log(0, "kva is %lx", status_ker_va);
-    int64_t ret;
-    for (uint i = 0; i < NUM_MAX_TASK; ++i)
-    {
-        if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
-            // confirm pid
-            if (pcb[i].status == TASK_READY || pcb[i].status == TASK_RUNNING){
-                do_block(&current_running->list, &pcb[i].wait_list);
-                ret = pcb[i].tid;
-                do_scheduler();
-                log(0, "exit status %d", pcb[i].exit_status);
-                if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
-                // i = 0; // start from beginning when wake up
-                log(0, "ret is %ld", ret);
-                return ret;
-            }
-        }
-    }
-    log(0, "ret is %ld", ret);
-    return -1;
-}
-
-void do_block(list_node_t *list, list_head *queue)
-{
-    debug();
-    pcb_t *pcb = list_entry(list, pcb_t, list);
-
-    pcb->status = TASK_BLOCKED;
-    list_add_tail(list,queue);   
-}
-
-/* pcb_node is of type list_node_t */
-void do_unblock(void *pcb_node)
-{
-    debug();
-    // unblock the `pcb` from the block queue   
-    list_del(pcb_node);
-    pcb_t *pcb = (pcb_t *)((list_node_t *)pcb_node)->ptr;
-    pcb->status = TASK_READY;
-    list_add_tail(pcb_node,&ready_queue);
-}
-
-static void freeproc(pcb_t *pcb)
-{
-    pcb->status = TASK_EXITED;
-    pcb->parent.parent = NULL;
-    free_all_pages(pcb->pgdir, PAGE_ALIGN(pcb->kernel_sp));
-    for (uint8_t i = 0; i < NUM_FD; i++)
-        fat32_close(pcb->fd[i].fd_num);
-    list_add_tail(&pcb->list,&available_queue);
-}
-
 /* exit a program */
 void do_exit(int32_t exit_status)
 {
@@ -289,6 +290,7 @@ void do_exit(int32_t exit_status)
     current_running->exit_status = exit_status;
     // decide terminal state by mode
     if (current_running->type == USER_THREAD || current_running->mode == ENTER_ZOMBIE_ON_EXIT){
+        log(0, "tid %d is entering ZOMBIE\n", current_running->tid);
         current_running->status = TASK_ZOMBIE;
     }
     else if (current_running->mode == AUTO_CLEANUP_ON_EXIT)
@@ -296,6 +298,7 @@ void do_exit(int32_t exit_status)
         /* check if there are child process who is terminated and its source is waiting to be free */
         for (int i = 0; i < NUM_MAX_TASK; ++i)
             if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
+                log(0, "tid %d is ZOMBIE freed\n", pcb[i].tid);
                 freeproc(&pcb[i]);
             }
         freeproc(current_running);

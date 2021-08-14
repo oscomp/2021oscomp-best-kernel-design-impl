@@ -33,6 +33,22 @@ struct tms
     clock_t tms_cstime; 
 };
 
+#pragma pack(1)
+
+/* nanosecond precison timespec */
+struct timespec {
+    time_t tv_sec; // seconds
+    time_t tv_nsec; // and nanoseconds
+};
+#pragma pack
+/* microsecond precison timeval */
+struct timeval {
+    time_t  tv_sec;   
+    time_t  tv_usec;
+};
+
+#define CLOCK_REALTIME 0x0
+
 #define SECONDS_PER_MIN 60
 #define MIN_PER_HOUR 60
 #define HOUR_PER_DAY 24
@@ -49,20 +65,15 @@ struct regular_time{
     uint64_t nano_seconds;
 };
 
-#pragma pack(1)
-/* for gettimeofday */
-struct timespec {
-    time_t tv_sec; // seconds
-    time_t tv_nsec; // and nanoseconds
+/* itimer */
+#define ITIMER_REAL 0 /* Timers run in real time */
+#define ITIMER_VIRTUAL 1 /* Timers run only when the process is executing */
+#define ITIMER_PROF 2 /* Timers run when the process is executing and 
+                        when the system is executing on behanlf of the process */
+struct itimerval {
+    struct timeval it_interval; /* Interval for periodic timer */
+    struct timeval it_value;    /* Time until next expiration */
 };
-#pragma pack
-
-struct timeval {
-    time_t  tv_sec;   
-    time_t  tv_usec;
-};
-
-#define CLOCK_REALTIME 0x0
 
 extern uint32_t time_base;
 extern uint64_t time_elapsed;
@@ -77,6 +88,7 @@ void user_time_count();
 uint64_t do_times(struct tms *tms);
 int8_t do_gettimeofday(struct timespec *ts);
 int32_t do_clock_gettime(uint64_t clock_id, struct timespec *tp);
+int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
 
 extern uint64_t get_time_base();
 

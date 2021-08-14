@@ -19,6 +19,7 @@ static LIST_HEAD(shmPageList);
 static LIST_HEAD(freePagebackupList);
 LIST_HEAD(swapPageList);
 LIST_HEAD(availableSwapSpace);
+static LIST_HEAD(waitPageList);
 
 static uint64_t swap_page();
 static uint64_t find_swap_page_kva(uint64_t pgdir);
@@ -28,31 +29,60 @@ list_node_t pageRecyc[NUM_REC];
 
 void init_recyc()
 {
-    for (uint32 i = 0; i < NUM_REC; ++i)
-        list_add_tail(&pageRecyc[i], &freePagebackupList);
+    for (uint32 i = 0; i < NUM_REC; ++i){
+        pageRecyc[i].ptr = FREEMEM + i * NORMAL_PAGE_SIZE;
+        pageRecyc[i].tid = 0;
+        list_add_tail(&pageRecyc[i], &freePageList);
+    }
+}
+
+void handle_memory_leak(void *pcb_void)
+{
+    pcb_t *pcb = (pcb_t *)pcb_void;
+    assert(pcb->status == TASK_EXITED);
+    uint64_t freemem = 0, allocatedmem = 0, mymem = 0;
+    // for (list_node_t *temp = freePageList.next; temp != &freePageList; temp = temp->next){
+    //     freemem += NORMAL_PAGE_SIZE;
+    // }
+    for (list_node_t *temp = freePagebackupList.next, *temp2 = freePagebackupList.next->next; 
+        temp != &freePagebackupList; temp = temp2, temp2 = temp2->next){
+        if (temp->tid == pcb->tid){
+            // printk_port("memory at %lx is not released\n", temp->ptr);
+            list_del(temp);
+            list_add(temp, &freePageList);
+            // mymem += NORMAL_PAGE_SIZE;
+        }
+        // allocatedmem += NORMAL_PAGE_SIZE;
+    }
+    // printk_port("free memsize is %lx\n", mem);
+    // printk_port("tid %d leek memsize is %lx\n", current_running->tid, mymem);
 }
 
 ptr_t allocPage()
 {
     // log(0, "memCurr %lx, memalloc %lx", memCurr, memalloc);
-    ptr_t ret;
-    // memCurr += NORMAL_PAGE_SIZE;
-    // ret = memCurr - NORMAL_PAGE_SIZE;
-    if (!list_empty(&freePageList)){
-        list_node_t *tmp = freePageList.next;
-        // prints("666 %lx\n",freePageList.next);
-        list_del(tmp);
-        list_add_tail(tmp, &freePagebackupList);
-        // printk_port("777\n");
-        ret = tmp->ptr;
+    ptr_t ret = 0;
+    while (!ret){
+        if (!list_empty(&freePageList)){
+            list_node_t *tmp = freePageList.next;
+            tmp->tid = current_running->tid;
+            list_del(tmp);
+            list_add(tmp, &freePagebackupList);
+            ret = tmp->ptr;
+        }
+        // else if (memCurr < memalloc){
+        //     memCurr += NORMAL_PAGE_SIZE;
+        //     ret = memCurr - NORMAL_PAGE_SIZE;
+        // }
+        else{
+            log2(0, "I'm pid %d tid %d and I'm blocked\n", current_running->pid, current_running->tid);
+            do_block(&current_running->list, &waitPageList);
+            do_scheduler();
+        }
     }
-    else if (memCurr < memalloc){
-        memCurr += NORMAL_PAGE_SIZE;
-        ret = memCurr - NORMAL_PAGE_SIZE;
-    }
-    else
-        assert(0);
-    log2(DEBUG, "alloc: %lx\n",ret);
+    // log(DEBUG, "alloc: %lx by tid %d\n",ret, current_running->tid);
+    if (ret == 0xffffffff804d1000lu)
+        printk_port("tid %d is allocating this address\n", current_running->tid);
     return ret;
 }
 
@@ -186,7 +216,8 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
 
 void freePage(ptr_t baseAddr)
 {   
-    // printk_port("free :%lx\n", baseAddr);
+    if (baseAddr == 0xffffffff804d1000lu)
+        printk_port("tid %d is releasing this address\n", current_running->tid);
     uint8_t clear = 1;
     for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
     {
@@ -202,20 +233,43 @@ void freePage(ptr_t baseAddr)
         }
     }
     if (clear){
+        int cnt = 0;
         for (list_node_t *test = freePageList.next; test != &freePageList; test = test->next)
-            if (test->ptr == baseAddr)
-                assert(0);
-        // printk_port("sizeof : %d\n", sizeof(list_node_t));
-        list_node_t *tmp = freePagebackupList.next;
-        assert(tmp != &freePagebackupList);
-        // printk_port("free: %lx\n", baseAddr);
-        tmp->ptr = baseAddr;
-        list_del(tmp);
-        list_add_tail(tmp,&freePageList);
+            if (test->ptr == baseAddr){
+                printk_port("now tid %d is releasing, but %lx has been released by %d\n",   
+                    current_running->tid, baseAddr, test->tid);
+                cnt++;
+            }
+        if (cnt){
+            printk_port("cnt is %d\n", cnt);
+            assert(0);
+        }
+        list_node_t *temp = NULL;
+        for (temp = freePagebackupList.next; temp != &freePagebackupList; temp = temp->next)
+            if (temp->ptr == baseAddr){
+                list_del(temp);
+                list_add(temp,&freePageList);
+                break;
+            }
+        assert(temp != &freePagebackupList && temp != NULL);
+        /* unblock the process whose pid is the smallest in the list */
+        /* threads have the same pid, but it will be blocked to list end (see do_block) */
+        /* so here we choose the first one, if several processes are blocked */
+        pcb_t *blocked_proc = NULL, *smallest_pid_blocked_proc = NULL;
+        pid_t smallest_pid = 0; /* every process has pid larger than 0 */
+        list_for_each_entry(blocked_proc, &waitPageList, list){
+            if (smallest_pid == 0 || smallest_pid > blocked_proc->pid){
+                smallest_pid = blocked_proc->pid;
+                smallest_pid_blocked_proc = blocked_proc;
+            }
+        }
+        if (smallest_pid_blocked_proc){
+            log2(0, "pid %d tid %d is to be unblocked", smallest_pid_blocked_proc->pid, smallest_pid_blocked_proc->tid);
+            do_unblock(smallest_pid_blocked_proc);
+        }
     }
-    else assert(0);
-    // vt100_move_cursor(1,10);
-    // printk("Free:%x",baseAddr);
+    else
+        assert(0);
 }
 
 void *kmalloc(size_t size)
@@ -391,7 +445,7 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
     uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
     PTE *ptr = pgdir + vpn2*sizeof(PTE);
     // 2  
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_PRESENT))
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
     {
         uintptr_t pgdir2 = allocPage();
         clear_pgdir(pgdir2);
@@ -403,7 +457,7 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
     else
         ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
     // 1
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_PRESENT))
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
     {
         uintptr_t pgdir2 = allocPage();
         clear_pgdir(pgdir2);
@@ -416,7 +470,7 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
         ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
     // 0
     uint64_t ret;
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_PRESENT))
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
     {
         uintptr_t pgdir2 = allocPage();
         clear_pgdir(pgdir2);
@@ -427,6 +481,35 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
     }
     else
         ret = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT);
+    local_flush_tlb_all();
+    return ret;
+}
+
+/* free page using page user addr */
+uintptr_t free_page_helper(uintptr_t va, uintptr_t pgdir)
+{
+    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
+    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
+    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
+    PTE *ptr = pgdir + vpn2*sizeof(PTE);
+    uintptr_t ret = 0;
+    // 2  
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+        return ret;
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
+    // 1
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+        return ret;
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
+    // 0
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+        return ret;
+    else{
+        ret = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT);
+        *ptr = 0;
+    }
     local_flush_tlb_all();
     return ret;
 }

@@ -360,6 +360,7 @@ extern void __global_pointer$();
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type);
 void init_pcb_stack(ptr_t pgdir, ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,unsigned char *argv[], 
     unsigned char *envp[], aux_elem_t *aux_vec, pcb_t *pcb);
+uint64_t get_argc_from_argv(char *argv[]);
 void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_top, uint64_t user_stack_top, uint32_t flag);
 extern void ret_from_exception();
 extern void switch_to(pcb_t *prev, pcb_t *next);
@@ -387,8 +388,6 @@ pid_t do_gettid();
 pid_t do_set_tid_address(int *tidptr);
 
 int do_taskset(uint32_t pid,uint32_t mask);
-
-void do_exit();
 
 pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid, void *nouse);
 int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options);

@@ -21,7 +21,7 @@ void sys_reflush();
 long sys_get_timebase();
 long sys_get_tick();
 void sys_move_cursor(int x, int y);
-void sys_exit();
+void sys_exit(int status);
 
 void sys_testdisk();
 int8_t sys_exec(const char* file_name, char* argv[], char *const envp[]);

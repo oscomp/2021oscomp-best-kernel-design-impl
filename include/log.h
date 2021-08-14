@@ -25,8 +25,8 @@ static const char *log_level_str[] = { "DEBUG", "INFO", "WARNING", "ERROR" };
 // #define DEBUG_ON 1
 // #define LOG_ON 1
 
-#define DEBUG_ON2 1
-#define LOG_ON2 1
+// #define DEBUG_ON2 1
+// #define LOG_ON2 1
 
 #ifdef LOG_ON
 #define log(level, fmt, ...) \

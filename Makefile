@@ -21,7 +21,7 @@ ifeq ($(TARGET), qemu)
 	CFLAGS += -Iqemu
 	USER_CFLAGS += -Iqemu
 endif
-K210_SERIALPORT	= /dev/ttyUSB1
+K210_SERIALPORT	= /dev/ttyUSB0
 
 START_QEMU_ENTRY = 0x80200000
 
@@ -42,7 +42,7 @@ SRC_DRIVER	= ./drivers/screen.c
 SRC_INIT 	= ./init/main.c
 SRC_INT		= ./kernel/irq/irq.c
 SRC_LOCK	= ./kernel/locking/lock.c ./kernel/locking/futex.c
-SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/time.c ./kernel/sched/init.c ./kernel/sched/exec.c ./kernel/sched/signal.c
+SRC_SCHED	= ./kernel/sched/sched.c ./kernel/sched/init.c ./kernel/sched/exec.c ./kernel/sched/signal.c
 SRC_MM		= ./kernel/mm/mm.c ./kernel/mm/ioremap.c ./kernel/mm/mman.c ./kernel/mm/pgtable.c ./kernel/mm/mmap.c
 SRC_FILE	= ./kernel/user_programs.c
 SRC_SYSCALL	= ./kernel/syscall/syscall.c
@@ -52,6 +52,7 @@ SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mount.c ./kernel/fat32/read.c 
 				./kernel/fat32/safe.c ./kernel/fat32/link.c ./kernel/fat32/stat.c ./kernel/fat32/directory.c
 SRC_IO		= ./kernel/io/io.c
 SRC_SYSTEM	= ./kernel/system/system.c ./kernel/system/uname.c
+SRC_TIME	= ./kernel/time/timer.c ./kernel/time/utils.c ./kernel/time/system_time.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
 SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S
@@ -68,7 +69,7 @@ ifeq ($(TARGET), qemu)
 endif
 
 SRC_MAIN	= ${SRC_ARCH} ${SRC_INIT} ${SRC_INT} ${SRC_DRIVER} ${SRC_LOCK} ${SRC_SCHED} ${SRC_MM} ${SRC_SYSCALL} ${SRC_LIBS} \
-				${SRC_FAT32} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO} ${SRC_SYSTEM}
+				${SRC_FAT32} ${SRC_ELF} ${SRC_SDCARD} ${SRC_IO} ${SRC_SYSTEM} ${SRC_TIME}
 SRC_IMAGE	= ./tools/createimage.c
 SRC_GENMAP	= ./tools/generateMapping.c
 SRC_ELF2CHAR = ./tools/elf2char.c

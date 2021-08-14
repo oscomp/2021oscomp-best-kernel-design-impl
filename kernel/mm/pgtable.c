@@ -82,7 +82,7 @@ int32_t reset_va_page_attribute(uintptr_t va, uintptr_t pgdir_kva, uint64_t mask
     if (!get_attribute(*ptr,_PAGE_PRESENT)){
         return -1;
     }
-    else if (!get_attribute(*ptr,_PAGE_READ)&!get_attribute(*ptr,_PAGE_WRITE)&!get_attribute(*ptr,_PAGE_EXEC))
+    else if (!get_attribute(*ptr,_PAGE_READ)&&!get_attribute(*ptr,_PAGE_WRITE)&&!get_attribute(*ptr,_PAGE_EXEC))
         ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
     else{
         clear_attribute(ptr, _PAGE_READ|_PAGE_WRITE|_PAGE_EXEC);
@@ -94,7 +94,7 @@ int32_t reset_va_page_attribute(uintptr_t va, uintptr_t pgdir_kva, uint64_t mask
     if (!get_attribute(*ptr,_PAGE_PRESENT)){
         return -1;
     }
-    else if (!get_attribute(*ptr,_PAGE_READ)&!get_attribute(*ptr,_PAGE_WRITE)&!get_attribute(*ptr,_PAGE_EXEC))
+    else if (!get_attribute(*ptr,_PAGE_READ)&&!get_attribute(*ptr,_PAGE_WRITE)&&!get_attribute(*ptr,_PAGE_EXEC))
         ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
     else{
         clear_attribute(ptr, _PAGE_READ|_PAGE_WRITE|_PAGE_EXEC);
@@ -105,7 +105,7 @@ int32_t reset_va_page_attribute(uintptr_t va, uintptr_t pgdir_kva, uint64_t mask
     if (!get_attribute(*ptr,_PAGE_PRESENT)){
         return -1;
     }
-    else if (!get_attribute(*ptr,_PAGE_READ)&!get_attribute(*ptr,_PAGE_WRITE)&!get_attribute(*ptr,_PAGE_EXEC)){
+    else if (!get_attribute(*ptr,_PAGE_READ)&&!get_attribute(*ptr,_PAGE_WRITE)&&!get_attribute(*ptr,_PAGE_EXEC)){
         return -1;
     }
     else{

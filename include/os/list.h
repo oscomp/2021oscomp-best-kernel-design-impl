@@ -9,6 +9,7 @@ typedef struct list_node
 {
     struct list_node *next, *prev;
     ptr_t ptr;
+    pid_t tid;
 } list_node_t;
 
 typedef list_node_t list_head;

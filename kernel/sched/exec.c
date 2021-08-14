@@ -74,6 +74,16 @@ static void set_aux_vec(aux_elem_t *aux_vec, ELF_info_t *elf)
 #undef NEW_AUX_ENT
 }
 
+static int is_sh(char *file_name)
+{
+    size_t len = strlen(file_name);
+    log(0, "len is %d", len);
+    if (len > 3 && file_name[len-3] == '.' && file_name[len-2] == 's' && file_name[len-1] == 'h')
+        return 1;
+    else
+        return 0;
+}
+
 int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 {
     debug();
@@ -88,26 +98,85 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
     unsigned char *_elf_binary = NULL;
     int length;
     int32 fd;
-
-    // #ifdef K210
-
-    if ((fd = fat32_openat(AT_FDCWD ,file_name, O_RDWR, 0)) == -1){
-        return -1;
+    
+    if ((fd = fat32_openat(AT_FDCWD ,file_name, O_RDWR, 0)) < 0){
+        assert(0);
+        return SYSCALL_FAILED;
     }
-    // length = current_running->fd[fd].length;
-    // _elf_binary = (char *)allocproc();
-    // if ((uintptr_t)(_elf_binary + length) > (uintptr_t)pa2kva(PGDIR_PA)){
-    //     printk_port("%lx\n%lx\n", kva2pa(_elf_binary + length), PGDIR_PA);
-    //     assert(0);
-    // }
-    // // log(DEBUG,"length: %d\n", length);
-    // fat32_read(fd, _elf_binary, length);
+    uchar *new_argv = NULL;
+    if (is_sh(file_name)){
+        unsigned char *file_start = kalloc();
+        fat32_read(fd, file_start, NORMAL_PAGE_SIZE);
+        if (memcmp(file_start, "#!", 2)){
+            log(0, "file not start with #!");
+            return SYSCALL_FAILED;
+        }
+        else{
+            uchar *temp = &file_start[2], *temp1;
+            uint32_t add_argc = 0;
+            // 0. get added argc
+            while (*temp != '\n'){
+                if (*temp == ' ')
+                    add_argc++;
+                temp++;
+            }
+            add_argc++;
+            log(0, "add_argc:%d", add_argc);
 
-    // #else
-
-    // get_elf_file("busybox", &_elf_binary, &length);
-
-    // #endif
+            // 1. alloc argv space
+            new_argv = kalloc();
+            uint32_t argc = get_argc_from_argv(argv);
+            uint64_t *argv_start = new_argv;
+            uintptr_t strings = new_argv + (argc + add_argc + 1) * sizeof(uintptr_t);
+            // 2. copy #!
+            temp = &file_start[2];
+            temp1 = &file_start[2];
+            while (*temp1 != '\n'){
+                if (*temp1 == ' '){
+                    *temp1 = 0;
+                    memcpy(strings, temp, strlen(temp) + 1);
+                    *argv_start = strings;
+                    strings += strlen(temp) + 1;
+                    argv_start++;
+                    temp = temp1 + 1;
+                }
+                temp1++;
+            }
+            *temp1 = 0;
+            memcpy(strings, temp, strlen(temp) + 1);
+            *argv_start = strings;
+            strings += strlen(temp) + 1;
+            argv_start++;
+            // 3. copy original argv
+            for (uint i = 0; i < argc; ++i){
+                // log(0, "argv[%d] is :%s", i, argv[i]);
+                memcpy(strings, argv[i], strlen(argv[i]) + 1);
+                *argv_start = strings;
+                strings += strlen(argv[i]) + 1;
+                argv_start++;
+            }
+            // 4. end with NULL
+            *argv_start = 0;
+            // 5. test
+            unsigned char **test_argv = new_argv;
+            uint8_t cnt = 0;
+            while (test_argv[cnt]){
+                log(0, "test argv[%d] is %s", cnt, test_argv[cnt]);
+                cnt++;
+            }
+        }
+        kfree(file_start);
+        fat32_close(fd);
+    }
+    if (new_argv){
+        log(0, "old argv is %lx, new argv is %lx", argv, new_argv);
+        argv = new_argv;
+        log(0, "new argv[0] is %s", argv[0]);
+        if ((fd = fat32_openat(AT_FDCWD, argv[0], O_RDWR, 0)) < 0){
+            assert(0);
+            return SYSCALL_FAILED;
+        }
+    }
 
     uintptr_t pgdir = allocPage(), prev_pgdir = pcb_underinit->pgdir, prev_ker_stack_base = PAGE_ALIGN(pcb_underinit->kernel_sp);
     clear_pgdir(pgdir);
@@ -116,29 +185,24 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
         alloc_page_helper(user_stack - (j + 1)*NORMAL_PAGE_SIZE, pgdir, _PAGE_READ|_PAGE_WRITE);
     set_user_addr_top(pcb_underinit, user_stack - USER_STACK_INIT_SIZE);
 
-    // #ifndef K210
-    // uintptr_t test_elf = (uintptr_t)load_elf(_elf_binary, length, pgdir, alloc_page_helper, &pcb_underinit->elf);
-    // #else
+
     uintptr_t test_elf = (uintptr_t)lazy_load_elf(fd, pgdir, alloc_page_helper, pcb_underinit);
-    // #endif
     set_pcb_edata(pcb_underinit);
 
-    // prepare stack(argv,envp,aux)
-    aux_elem_t aux_vec[MAX_AUX_ARG+1];
     /* init_aux_vec(&aux_vec) */
+    aux_elem_t aux_vec[MAX_AUX_ARG+1];
     set_aux_vec(&aux_vec, &pcb_underinit->elf);
-    // init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
+    /* init kernel and user stack */
     init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, argv, fixed_envp, &aux_vec, pcb_underinit);
     // no need to add to ready_queue
-    // list_del(&pcb_underinit->list);
-    // list_add_tail(&pcb_underinit->list,&ready_queue);
-
     // remember to close this temp fd
     // already done in lazy load
 
     /* free all previous pages */
     /* if multiple cores are open, need to lock 'prev_ker_stack_base' until switch to another process */
     free_all_pages(prev_pgdir, prev_ker_stack_base);
+    if (new_argv)
+        kfree(new_argv);
     /* tell scheduler that I am a ecex-on process */
     pcb_underinit->exec = 1;
     do_scheduler();

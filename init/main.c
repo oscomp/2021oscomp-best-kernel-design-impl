@@ -152,6 +152,9 @@ static void init_syscall(void)
 // The beginning of everything >_< ~~~~~~~~~~~~~~
 int main()
 {
+    // // init Memory Allocation (*_*!)
+    init_recyc();
+    sbi_console_putstr("> [INIT] Memory initialization succeeded.\n\r");
     // // init Process Control Block (-_-!)
     init_pcb();
     printk_port("> [INIT] PCB initialization succeeded.\n\r");
@@ -163,8 +166,6 @@ int main()
     // init system call table (0_0)
     init_syscall();
     printk_port("> [INIT] System call initialized successfully.\n\r");
-    init_recyc();
-    printk_port("> [INIT] Memory initialization succeeded.\n\r");
     init_timers();
     printk_port("> [INIT] Timers initialization succeeded.\n\r");
 

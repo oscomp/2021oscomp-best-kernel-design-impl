@@ -25,7 +25,7 @@
 #define MEM_FOR_PROC 0xffffffff80150000lu
 
 #define KERNEL_STACK_SIZE NORMAL_PAGE_SIZE
-#define PAGES_PER_USER_STACK 2
+#define PAGES_PER_USER_STACK 5
 #define USER_STACK_INIT_SIZE (PAGES_PER_USER_STACK * NORMAL_PAGE_SIZE)
 
 /* Rounding; only works for n = power of two */
@@ -57,6 +57,7 @@ extern void freePage(ptr_t baseAddr);
 extern void* kmalloc(size_t size);
 extern void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
 extern uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask);
+uintptr_t free_page_helper(uintptr_t va, uintptr_t pgdir);
 uintptr_t shm_page_get(int key);
 void shm_page_dt(uintptr_t addr);
 uintptr_t directmap(uintptr_t kva, uintptr_t pgdir);
@@ -81,5 +82,6 @@ void *allocproc();
 void allocfree();
 
 void init_recyc();
+void handle_memory_leak(void *pcb);
 
 #endif /* MM_H */

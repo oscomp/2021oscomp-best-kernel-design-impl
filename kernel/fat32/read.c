@@ -55,6 +55,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     log(0, "retcount: %d, %d", length, min(length, count));
     memcpy(buf, mybuff + current_running->fd[fd_index].pos, min(length, count));
     current_running->fd[fd_index].pos += min(length, count);
+    kfree(mybuff);
     return min(length, count);
 
 #endif

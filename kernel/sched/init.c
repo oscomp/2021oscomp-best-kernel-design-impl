@@ -99,14 +99,6 @@ static uint64_t get_offset_from_random(unsigned char *random)
     return 8;
 }
 
-static uint64_t get_argc_from_argv(char *argv[])
-{
-    uint64_t argc = 0;
-    if (argv)
-        while (argv[argc]) argc++;
-    return argc;
-}
-
 static uint64_t get_envc_from_envp(char *envp[])
 {
     uint64_t envc = 0;
@@ -284,6 +276,14 @@ static uintptr_t copy_above_user_stack(uintptr_t sp_kva, unsigned char* argv[], 
     // for (uint64_t i = start_sp_kva; i < sp_kva; i += 1)
     //     printk_port("%lx:%lx\n", i, *((unsigned char*)i));
     return sp_uva; //user sp
+}
+
+uint64_t get_argc_from_argv(char *argv[])
+{
+    uint64_t argc = 0;
+    if (argv)
+        while (argv[argc]) argc++;
+    return argc;
 }
 
 /* prepare pcb stack for ready process */

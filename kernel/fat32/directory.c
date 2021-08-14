@@ -50,6 +50,7 @@ int64 fat32_getdents64(fd_num_t fd, char *outbuf, uint32_t len)
 
             /* get filename */
             uint16_t unich; // unicode
+            uint8 item_num_copy = item_num; // for filename
 
             while (item_num--){
                 uint8 name_cnt = 0;
@@ -89,6 +90,9 @@ int64 fat32_getdents64(fd_num_t fd, char *outbuf, uint32_t len)
                 p = get_next_dentry(p, buf, &now_clus, &now_sec);
                 q = (long_dentry_t *)p;
                 current_running->fd[fd_index].pos += sizeof(dentry_t);
+                if (item_num == 0 && name_cnt == LONG_DENTRY_NAME_LEN){
+                    filename[item_num_copy*LONG_DENTRY_NAME_LEN] = 0;
+                }
             }
         }
         // short dentry
@@ -104,7 +108,7 @@ int64 fat32_getdents64(fd_num_t fd, char *outbuf, uint32_t len)
             for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
             {
                 if (p->extname[i] == ' ') break;
-                else filename[name_cnt++] = (p->filename[i] >= 'A' && p->filename[i] <= 'Z')? p->filename[i] - 'A' + 'a' : p->filename[i];
+                else filename[name_cnt++] = (p->extname[i] >= 'A' && p->extname[i] <= 'Z')? p->extname[i] - 'A' + 'a' : p->extname[i];
             }
             filename[name_cnt++] = 0;
         }

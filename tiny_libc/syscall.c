@@ -18,9 +18,9 @@ void sys_move_cursor(int x, int y)
     invoke_syscall(SYSCALL_CURSOR, x, y, IGNORE, IGNORE, IGNORE);
 }
 
-void sys_exit()
+void sys_exit(int status)
 {
-    invoke_syscall(SYS_exit, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
+    invoke_syscall(SYS_exit, status, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
 int8_t sys_test(const char* filename)

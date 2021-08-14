@@ -73,13 +73,13 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 
         long_dentry_t *q = (long_dentry_t *)p;
         uint8 item_num; /* dentry length */
-
+        
         // if long dentry
         if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
             item_num = q->sequence & 0x0f; // entry num
 
             /* get filename */
-            uint8 isbreak = 0;
+            uint8 item_num_copy = item_num;
             uint16_t unich; // unicode
 
             while (item_num--){
@@ -116,6 +116,10 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
                 }
                 p = get_next_dentry(p, buf, &now_clus, &now_sec);
                 q = (long_dentry_t *)p;
+                if (item_num == 0 && name_cnt == LONG_DENTRY_NAME_LEN){
+                    /* need to give a 0 in the end */
+                    filename[item_num_copy*LONG_DENTRY_NAME_LEN] = 0;
+                }
             }
         }
         // short dentry
@@ -214,7 +218,6 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
             uint8 item_num = q->sequence & 0x0f; // entry num
             top_len = item_num + 1;
             /* get filename */
-            uint8 isbreak = 0;
             uint16_t unich; // unicode
 
             while (item_num--){
@@ -251,6 +254,10 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
                 }
                 p = get_next_dentry(p, buf, &now_clus, &now_sec);
                 q = (long_dentry_t *)p;
+                if (item_num == 0 && name_cnt == LONG_DENTRY_NAME_LEN){
+                    /* need to give a 0 in the end */
+                    filename[(top_len - 1)*LONG_DENTRY_NAME_LEN] = 0;
+                }
             }
         }
         // short dentry
@@ -464,6 +471,7 @@ ientry_t _create_new_file(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_p
     if (!noextname)
         *(temp3 - 1) = '.';
     uint32_t length = strlen(temp1);
+    assert(length > 0);
     
     uint32_t parent_first_clus = now_clus;
     dentry_t *p;
@@ -475,7 +483,7 @@ ientry_t _create_new_file(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir_p
     if (filename_length <= 8)
         demand = 1;
     else
-        demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for div operation round, 1 for short entry
+        demand = (length - 1) / LONG_DENTRY_NAME_LEN + 2; // 1 for div operation round, 1 for short entry
 
     // find empty entry
     p = search_empty_entry(now_clus, tempbuf, demand, &sec);
@@ -679,6 +687,7 @@ ientry_t _create_new_dentry(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir
     if (!noextname)
         *(temp3 - 1) = '.';
     uint32_t length = strlen(temp1);
+    assert(length > 0);
     
     ientry_t parent_first_clus = now_clus, file_first_clus = get_cluster_from_dentry(old_dentry);
     log(0, "parent_first_clus is %d, file_first_clus is %d", parent_first_clus, file_first_clus);
@@ -689,7 +698,7 @@ ientry_t _create_new_dentry(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir
     if (filename_length <= 8)
         demand = 1;
     else
-        demand = length / LONG_DENTRY_NAME_LEN + 2; // 1 for div operation round, 1 for short entry
+        demand = (length - 1) / LONG_DENTRY_NAME_LEN + 2; // 1 for div operation round, 1 for short entry
 
     // 1. prepare short entry
     dentry_t new_dentry;

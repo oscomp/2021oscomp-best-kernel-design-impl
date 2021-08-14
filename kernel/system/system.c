@@ -65,6 +65,7 @@ static void set_timeval_from_ticks(time_t time, struct timeval *tv)
 int32_t do_getrusage(int32_t who, struct rusage *usage)
 {
     debug();
+    log(0, "self? %d, children? :%d", who == RUSAGE_SELF, who == RUSAGE_CHILDREN);
     if (who == RUSAGE_SELF){
         log(0, "utime %ld, stime %ld", current_running->utime, current_running->stime);
         set_timeval_from_ticks(current_running->utime, &usage->ru_utime);

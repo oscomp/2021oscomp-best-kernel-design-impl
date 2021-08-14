@@ -151,7 +151,6 @@ int fat32_renameat2(fd_num_t olddirfd, const char *oldpath_const, fd_num_t newdi
             return -ENOENT;
         }
     }
-    log(0, "dentry filename: %s", old_dentry.filename);
 }
 
 
@@ -217,5 +216,7 @@ size_t do_sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
     }
     if (offset)
         *offset += mycount;
+
+    kfree(buff);
     return mycount;
 }

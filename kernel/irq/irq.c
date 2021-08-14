@@ -180,7 +180,6 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
                     if (phdr->p_filesz < phdr->p_memsz && stval >= PAGE_ALIGN(data_top)){
                         /* should pad 0 for bss */                        
                         if (PAGE_ALIGN(stval) == PAGE_ALIGN(data_top)){ 
-                            log(0, "%lx", PAGE_OFFSET(data_top));                           
                             for (uint64_t pos = PAGE_OFFSET(data_top); pos < NORMAL_PAGE_SIZE; pos++)
                                 stval_page_uva[pos] = 0; /* just pad part of this page */
                         }

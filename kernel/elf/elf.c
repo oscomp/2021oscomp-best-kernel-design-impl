@@ -168,6 +168,7 @@ uintptr_t lazy_load_elf(
         }
         phdr++;
     }
+    kfree(elf_binary);
 
     return pcb->elf.entry;
 }
