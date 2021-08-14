@@ -260,7 +260,14 @@ int handle_intr(uint64 scause) {
 	#ifdef QEMU 
 	else if (INTR_EXTERNAL == scause) 
 	#else 
-	else if (INTR_SOFTWARE == scause && 9 == r_stval()) 
+	/* I'm afraid that we couldn't use stval as a token,
+	because when an intr is pending during critical section
+	where the intr is disabled, an exception may occur and
+	overwrite the stval register. So is the same on the
+	other way, when an S-exception is happening, an M-intr
+	setting the stval might cover the real original stval. */
+	// else if (INTR_SOFTWARE == scause && 9 == r_stval()) 
+	else if (INTR_SOFTWARE == scause)
 	#endif 
 	{
 		int irq = plic_claim();

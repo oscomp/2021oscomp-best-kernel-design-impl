@@ -2,7 +2,6 @@
 platform	:= qemu
 mode 		:= debug
 # mode		:= release
-bio			:= wt
 
 K := kernel
 U := xv6-user
@@ -35,10 +34,6 @@ endif
 
 ifeq ($(platform), qemu)
 CFLAGS += -D QEMU
-endif
-
-ifeq ($(bio), wb)
-CFLAGS += -D BIO_WRITE_BACK
 endif
 
 LDFLAGS = -z max-page-size=4096

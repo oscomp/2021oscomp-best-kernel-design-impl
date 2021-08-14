@@ -604,7 +604,7 @@ void spi_receive_data_no_cmd_dma(dmac_channel_number_t dma_receive_channel_num,
 
 void spi_send_data_no_cmd_dma(dmac_channel_number_t channel_num,
 							spi_device_num_t spi_num, spi_chip_select_t chip_select,
-							uint8 const *tx_buff, uint64 tx_len)
+							uint8 const *tx_buff, uint64 tx_len, int wait)
 {
 	volatile spi_t *spi_handle = spi[spi_num];
 
@@ -616,13 +616,34 @@ void spi_send_data_no_cmd_dma(dmac_channel_number_t channel_num,
 	dmac_set_single_mode(channel_num, tx_buff, (void *)(&spi_handle->dr[0]), DMAC_ADDR_INCREMENT, DMAC_ADDR_NOCHANGE,
 						 DMAC_MSIZE_4, DMAC_TRANS_WIDTH_32, tx_len);
 	spi_handle->ser = 1U << chip_select;
-	dmac_wait_done(channel_num);
+	
+	if (wait) {
+		dmac_wait_done(channel_num);
 
+		while((spi_handle->sr & 0x05) != 0x04)
+			;
+		spi_handle->ser = 0x00;
+		spi_handle->ssienr = 0x00;
+	}
+}
+
+void spi_send_data_dma_clean_up(spi_device_num_t spi_num)
+{
+	volatile spi_t *spi_handle = spi[spi_num];
 	while((spi_handle->sr & 0x05) != 0x04)
 		;
 	spi_handle->ser = 0x00;
 	spi_handle->ssienr = 0x00;
+}
 
+void spi_set_baudr(spi_device_num_t spi_num, uint32 baudr)
+{
+	if (baudr < 2)
+		baudr = 2;
+	else if (baudr > 65534)
+		baudr = 65534;
+	volatile spi_t *spi_adapter = spi[spi_num];
+	spi_adapter->baudr = baudr;
 }
 
 /*

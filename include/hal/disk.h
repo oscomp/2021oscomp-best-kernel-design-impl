@@ -4,9 +4,10 @@
 #include "fs/buf.h"
 
 void disk_init(void);
-void disk_read(struct buf *b);
-void disk_write(struct buf *b, uint sector);
+int disk_read(struct buf *b);
+void disk_write(struct buf *b);
+int disk_submit(struct buf *b);
+void disk_write_start(void);
 void disk_intr(void);
-int disk_write_no_block(struct buf *b);
 
 #endif

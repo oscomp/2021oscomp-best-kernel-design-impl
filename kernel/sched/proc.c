@@ -487,15 +487,14 @@ int wait4(int pid, uint64 status, uint64 options) {
 				// add child's tms time 
 				p->proc_tms.cstime += np->proc_tms.stime + np->proc_tms.cstime;
 				p->proc_tms.cutime += np->proc_tms.utime + np->proc_tms.cutime;
+				__remove(np);
+				__leave_proc_cs 
 				// copyout child's xstate 
 				np->xstate <<= 8;
 				if (status && copyout2(status, (char*)&np->xstate, sizeof(np->xstate))) {
-					__leave_proc_cs 
 					__debug_error("wait", "fail to copy out xstate\n");
-					panic("panic!\n");
+					// panic("panic!\n");
 				}
-				__remove(np);
-				__leave_proc_cs 
 				freeproc(np);
 				return child_pid;
 			}
@@ -814,6 +813,8 @@ void forkret(void) {
 		// cannot be run from main() 
 		__debug_info("forkret", "hart%d enter here\n", cpuid());
 		first = 0;
+		// extern void disk_test(void);
+		// disk_test();
 		rootfs_init();
 		myproc()->cwd = namei("/home");
 	}

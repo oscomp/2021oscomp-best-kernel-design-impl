@@ -492,8 +492,10 @@ void spi_receive_data_no_cmd_dma(dmac_channel_number_t dma_receive_channel_num,
 
 void spi_send_data_no_cmd_dma(dmac_channel_number_t channel_num,
 							spi_device_num_t spi_num, spi_chip_select_t chip_select,
-							uint8 const *tx_buff, uint64 tx_len);
+							uint8 const *tx_buff, uint64 tx_len, int wait);
 
+void spi_send_data_dma_clean_up(spi_device_num_t spi_num);
+void spi_set_baudr(spi_device_num_t spi_num, uint32 baudr);
 
 #ifdef __cplusplus
 }

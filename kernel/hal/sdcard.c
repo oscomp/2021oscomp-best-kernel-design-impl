@@ -7,6 +7,8 @@
 #include "errno.h"
 #include "fs/buf.h"
 #include "sync/spinlock.h"
+#include "sync/waitqueue.h"
+#include "sched/proc.h"
 
 #include "hal/riscv.h"
 #include "hal/gpiohs.h"
@@ -26,11 +28,13 @@ void SD_CS_LOW(void) {
 
 void SD_HIGH_SPEED_ENABLE(void) {
     // spi_set_clk_rate(SPI_DEVICE_0, 10000000);
+	// spi_set_baudr(SPI_DEVICE_0, 38);
 }
 
 static void sd_lowlevel_init(uint8 spi_index) {
     gpiohs_set_drive_mode(7, GPIO_DM_OUTPUT);
     // spi_set_clk_rate(SPI_DEVICE_0, 200000);     /*set clk rate*/
+	// spi_set_baudr(SPI_DEVICE_0, 1900);
 }
 
 static void sd_write_data(uint8 const *data_buff, uint32 length) {
@@ -53,7 +57,12 @@ static void sd_write_data_dma(uint8 const *data_buff, uint32 length) {
 	 * ... Perhaps it's the spi FIFO's problem, whose data width is 32-bit.
 	 */
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
-	spi_send_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4);
+	spi_send_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4, 1);
+}
+
+static void sd_write_data_dma_no_wait(uint8 const *data_buff, uint32 length) {
+    spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
+	spi_send_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4, 0);
 }
 
 static void sd_read_data_dma(uint8 *data_buff, uint32 length) {
@@ -62,18 +71,6 @@ static void sd_read_data_dma(uint8 *data_buff, uint32 length) {
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
 	spi_receive_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4);
 }
-
-// static int sd_read_multiple_data_dma(uint8 *bufs[], uint32 lens[], uint32 nbuf)
-// {
-// 	spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
-// 	return spi_receive_multiple_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, bufs, lens, nbuf);
-// }
-
-// static int sd_write_multiple_data_dma(uint8 *bufs[], uint32 lens[], uint32 nbuf)
-// {
-// 	spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
-// 	return spi_send_multiple_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, bufs, lens, nbuf);
-// }
 
 /*
  * @brief  Send 5 bytes command to the SD card.
@@ -346,9 +343,25 @@ static int sd_init(void) {
 
 static struct sleeplock sdcard_lock;
 
+// Protected by sdcard_lock above.
+static struct {
+	int busy;
+	int rpending;
+	int wpending;
+} sd_status;
+
+// Protected by their own locks.
+static struct wait_queue sd_rqueue;
+static struct wait_queue sd_wqueue;
+
 void sdcard_init(void) {
 	int result = sd_init();
 	initsleeplock(&sdcard_lock, "sdcard");
+	wait_queue_init(&sd_rqueue, "sdrq");
+	wait_queue_init(&sd_wqueue, "sdwq");
+	sd_status.busy = 0;
+	sd_status.rpending = 0;
+	sd_status.wpending = 0;
 
 	if (0 != result) {
 		panic("sdcard_init failed");
@@ -550,3 +563,345 @@ end:
 	return ret;
 }
 */
+
+// for interrupt handler
+#define BUSY_READ	1
+#define BUSY_WRITE	2
+
+
+static void sdcard_read_wait(struct buf *b)
+{
+	acquire(&sd_rqueue.lock);
+	// Register to read queue, add to tail.
+	dlist_add_before(&sd_rqueue.head, &b->list);
+	// whether we are the first one
+	while (&b->list != sd_rqueue.head.next)
+		// sleep on list to get wakened orderly, unlike sleeplock
+		sleep(&b->list, &sd_rqueue.lock);
+	
+	// watch out the sequence
+	acquire(&sdcard_lock.lk);
+	release(&sd_rqueue.lock);
+
+	// Check sdcard working status.
+	while (sd_status.busy) {
+		if (sd_status.busy != BUSY_WRITE)
+			panic("sdcard_read_wait: status");
+		// let writers see us
+		sd_status.rpending = 1;
+		sleep(&sd_status.rpending, &sdcard_lock.lk);
+	}
+	sd_status.rpending = 0;
+	sd_status.busy = BUSY_READ;
+	release(&sdcard_lock.lk);
+}
+
+
+static int sdcard_read_done(struct buf *b)
+{
+	acquire(&sd_rqueue.lock);
+	if (&b->list != sd_rqueue.head.next)
+		panic("sdcard_read_done: wrong order");
+	
+	dlist_del(&b->list);
+
+	struct d_list *dl = sd_rqueue.head.next;
+	int done = 0;
+	// more readers?
+	acquire(&sdcard_lock.lk);
+	sd_status.busy = 0;
+	if (dl != &sd_rqueue.head) {
+		wakeup(dl);
+		sd_status.rpending = 1;
+	}
+	else if (sd_status.wpending)
+		done = 1;
+
+	release(&sd_rqueue.lock);
+	release(&sdcard_lock.lk);
+	return done;
+}
+
+
+int sdcard_read(struct buf *b)
+{
+	int ret = -EIO;
+	uint8 dummy_crc[2];
+	uint8 result = 0xff;
+	uint32 address = is_standard_sd ?
+						b->sectorno << 9 :
+						b->sectorno;
+
+	// wait our turn
+	sdcard_read_wait(b);
+
+	sd_send_cmd(SD_CMD17, address, 0);
+	if (sd_get_response_R1() != 0) {
+		printf(__ERROR("sdcard")" CMD17 fail\n");	// we'd better print it
+		goto end;
+	}
+
+	for (int timeout = 0xffff; timeout > 0 && result != 0xfe; timeout--)
+		sd_read_data(&result, 1);
+		
+	if (result != 0xfe) {
+		printf(__ERROR("sdcard")" CMD17 read fail\n");
+		goto end;
+	}
+
+	sd_read_data_dma(b->data, BSIZE);
+	sd_read_data(dummy_crc, 2);
+	ret = 0;
+
+end:
+	sd_end_cmd();
+	if (sdcard_read_done(b))
+		sdcard_write_start();
+	return ret;
+}
+
+
+static void sdcard_multiple_write(struct buf *b)
+{
+	// uint8 start_token = 0xfe;
+	uint8 start_token = 0xfc;
+	sd_write_data(&start_token, 1);
+
+	// we don't block inside
+	sd_write_data_dma_no_wait(b->data, BSIZE);
+}
+
+
+// Caller must hold the control before calling to here
+static int sdcard_write(struct buf *b)
+{
+	uint32 address = is_standard_sd ?
+						b->sectorno << 9 :
+						b->sectorno;
+
+	// sd_send_cmd(SD_CMD24, address, 0);
+	sd_send_cmd(SD_CMD25, address, 0);
+	if (sd_get_response_R1() != 0) {
+		sd_end_cmd();
+		return -EIO;
+	}
+
+	sdcard_multiple_write(b);
+
+	// see you in the interrupt handler	
+	return 0;
+}
+
+
+// clean up last write
+static void sdcard_multiple_write_wait(void)
+{
+	dmac_ch_clear_intr(DMAC_CHANNEL0, 0);
+	spi_send_data_dma_clean_up(SPI_DEVICE_0);
+
+	uint8 dummy_crc[2] = {0xff, 0xff};
+	sd_write_data(dummy_crc, 2);
+
+	// waiting sdcard programming, dma can't do this
+	uint8 result = 0xff;
+	int timeout;
+	for (timeout = 0xfffff; timeout >= 0 && (result & 0x1f) != 0x5; timeout--)
+		sd_read_data(&result, 1);
+	if (timeout < 0)
+		panic("sdcard_intr: response 1");	// really don't know what to do
+	
+	for (timeout = 0xfffff, result = 0; timeout >= 0 && result == 0; timeout--)
+		sd_read_data(&result, 1);
+	if (timeout < 0)
+		panic("sdcard_intr: response 2");	// really don't know what to do
+}
+
+
+static void sdcard_multiple_write_stop(void)
+{
+	uint8 token = 0xfd;		// stop token
+	sd_write_data(&token, 1);
+
+	for (int timeout = 0xffff; timeout >= 0 && token != 0xff; timeout--)
+		sd_read_data(&token, 1);
+	
+	sd_end_cmd();
+
+	// check writing result
+	sd_send_cmd(SD_CMD13, 0, 0);
+	if (sd_get_response_R1() != 0)
+		panic("sdcard_intr: CMD13 bad response");
+
+	uint8 error = 0xff;
+	sd_read_data(&error, 1);
+	sd_end_cmd();
+	if (error) {
+		printf(__ERROR("sdcard_intr")" write error %x\n", error);
+		panic("sdcard_intr");
+	}
+}
+
+
+void sdcard_write_start(void)
+{
+	acquire(&sd_wqueue.lock);
+
+	struct d_list *dl = sd_wqueue.head.next;
+	// is the queue empty?
+	if (dl == &sd_wqueue.head) {
+		release(&sd_wqueue.lock);
+		return;
+	}
+
+	acquire(&sdcard_lock.lk);
+	// check sdcard status
+	if (sd_status.busy || sd_status.rpending) {
+		/**
+		 * If we enter here where busy == 0 and rpending is non-zero,
+		 * it means this rpending is set in sdcard_read_done(), where
+		 * the proc there will waken the next reader. Thus, we don't
+		 * need to do a wake up.
+		 */
+		sd_status.wpending = 1;
+		release(&sdcard_lock.lk);
+		release(&sd_wqueue.lock);
+		return;
+	}
+
+	// we get the control now
+	sd_status.busy = BUSY_WRITE;
+	release(&sdcard_lock.lk);
+
+	struct buf *b = container_of(dl, struct buf, list);
+	if (b->disk)
+		panic("sdcard_write_start: sd not busy with on-flight buf");
+	
+	b->disk = 1;
+	b->dirty = 0;
+	release(&sd_wqueue.lock);
+
+	if (sdcard_write(b) < 0) {
+		// unset status
+		acquire(&sd_wqueue.lock);
+		b->disk = 0;
+		b->dirty = 1;
+
+		acquire(&sdcard_lock.lk);
+		release(&sd_wqueue.lock);
+
+		sd_status.busy = 0;
+		sd_status.wpending = 1;
+		if (sd_status.rpending)
+			/**
+			 * We enter here because rpending is non-zero.
+			 * But this case is different, since the busy
+			 * flag was set by us. So this rpending is set
+			 * in sdcard_read(), where there is a reader
+			 * waiting for the control, and only us can
+			 * wake him up.
+			 */
+			wakeup(&sd_status.rpending);
+		release(&sdcard_lock.lk);
+	}
+
+}
+
+
+int sdcard_submit(struct buf *b)
+{
+	int res = 0;
+	acquire(&sd_wqueue.lock);
+
+	if (b->dirty == 0 && b->disk == 0) {
+		dlist_add_before(&sd_wqueue.head, &b->list);
+		res = 0x1;
+	}
+	b->dirty = 1;
+
+	acquire(&sdcard_lock.lk);
+	release(&sd_wqueue.lock);
+	sd_status.wpending = 1;
+	if (sd_status.busy)	// tell the caller that transmission is on
+		res |= 0x2;
+	release(&sdcard_lock.lk);
+	return res;
+}
+
+
+// Called by dmac_intr(), if it is a read done,
+// tell him to wake up the relative proc.
+void sdcard_intr(void)
+{
+	// acquire(&sdcard_lock.lk);
+	if (sd_status.busy == BUSY_READ) {
+		// release(&sdcard_lock.lk);
+		dmac_ch_clear_intr(DMAC_CHANNEL0, 1);
+		// reader is waiting out there
+		// him will do the clean work himself
+		return;
+	} else if (sd_status.busy != BUSY_WRITE)
+		panic("sdcard_intr: unknown busy");
+	
+	// but writer doesn't wait, so we need to clean up for him
+	// release(&sdcard_lock.lk);
+
+	// waiting for programming
+	sdcard_multiple_write_wait();
+
+	acquire(&sd_wqueue.lock);
+	struct d_list *dl = sd_wqueue.head.next;
+	struct buf *b = container_of(dl, struct buf, list);
+	struct buf *bnext;
+	int redo = 0;
+	
+	dlist_del(dl);
+	b->disk = 0;
+	// whether some one wrote this buf when we transmitting it
+	if (b->dirty) {
+		redo = 1;
+		dlist_add_before(&sd_wqueue.head, dl);
+	}
+
+	dl = sd_wqueue.head.next;
+	bnext = (dl == &sd_wqueue.head) ? NULL :
+			container_of(dl, struct buf, list);
+	
+	// race read
+	if (sd_status.rpending || bnext == NULL) {
+		release(&sd_wqueue.lock);
+		sdcard_multiple_write_stop();
+	} else {
+		bnext->dirty = 0;
+		bnext->disk = 1;
+		release(&sd_wqueue.lock);
+
+		if (bnext->sectorno == b->sectorno + 1) {
+			sdcard_multiple_write(bnext);
+		} else {
+			sdcard_multiple_write_stop();
+
+			if (sdcard_write(bnext) < 0) {
+				// unset status
+				acquire(&sd_wqueue.lock);
+				bnext->dirty = 1;
+				bnext->disk = 0;
+				release(&sd_wqueue.lock);
+				goto stop_out;
+			}
+		}
+		goto out;
+	}
+
+stop_out:
+	acquire(&sdcard_lock.lk);
+	sd_status.busy = 0;
+	if (sd_status.rpending)
+		wakeup(&sd_status.rpending);
+	if (bnext)
+		sd_status.wpending = 1;
+	release(&sdcard_lock.lk);
+
+out:
+	if (!redo)
+		bput(b);
+}

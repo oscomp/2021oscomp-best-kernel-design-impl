@@ -1532,6 +1532,7 @@ void dmac_channel_disable(dmac_channel_number_t channel_num);
 void dmac_channel_enable(dmac_channel_number_t channel_num);
 
 void dmac_intr(dmac_channel_number_t channel_num);
+void dmac_ch_clear_intr(dmac_channel_number_t channel_num, int waken);
 
 #ifdef __cplusplus
 }

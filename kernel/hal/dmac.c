@@ -357,6 +357,13 @@ void dmac_intr(dmac_channel_number_t channel_num)
 	wakeup(dmac_chan);
 }
 
+void dmac_ch_clear_intr(dmac_channel_number_t channel_num, int waken)
+{
+	dmac_channel_interrupt_clear(channel_num);
+	if (waken)
+		wakeup(dmac_chan);
+}
+
 /*
 // This is only for I/O between sd and mem. The items are always mem.
 void dmac_set_single_multiple(dmac_channel_number_t channel_num, int src_multi,
