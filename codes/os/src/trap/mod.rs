@@ -152,58 +152,30 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
             // println!("page fault 1");
+            let is_load: bool;
+            if scause.cause() == Trap::Exception(Exception::LoadFault) || scause.cause() == Trap::Exception(Exception::LoadPageFault) {
+                is_load = true;
+            } else {
+                is_load = false;
+            }
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
                 panic!("VirtAddr out of range!");
             }
-            let vpn: VirtPageNum = va.floor();
-            let heap_base = current_task().unwrap().acquire_inner_lock().heap_start;
-            let heap_pt = current_task().unwrap().acquire_inner_lock().heap_pt;
-            let stack_top = current_task().unwrap().acquire_inner_lock().base_size;
-            let stack_bottom = stack_top - USER_STACK_SIZE;
-            // println!{"The base of the user stack: {:X} ~ {:X}", stack_bottom, stack_top};
-            // println!{"============================{:?}", vpn}
-            let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
-            let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
-            // println!("page fault 2");
-            // println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
-            if va >= mmap_start && va < mmap_end {
-                //println!{"where is the lazy_mmap_page!!!!!!!!"}
-                // exit_current_and_run_next(-2);
-                current_task().unwrap().lazy_mmap(va.0);
-            } else if va.0 >= heap_base && va.0 <= heap_pt {
-                current_task().unwrap().acquire_inner_lock().lazy_alloc_heap(vpn);
-            } else if va.0 >= stack_bottom && va.0 <= stack_top {
-                //println!{"lazy_stack_page: {:?}", va}
-                current_task().unwrap().acquire_inner_lock().lazy_alloc_stack(vpn);
-            } else {
-                // get the PageTableEntry that faults
-                let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
-                // println!{"PageTableEntry: {}", pte.bits};
-                // if the virtPage is a CoW
-                if pte.is_some() && pte.unwrap().is_cow() {
-                    let former_ppn = pte.unwrap().ppn();
-                    //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                    // println!("cow addr = {:X}", stval);
-                    current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
-                    // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                    // println!{"cow_alloc returned..."}
-                    // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
-                    // println!{"PageTableEntry: {}", pte.bits};
-                } else {
-                    // page fault exit code
-                    let current_task = current_task().unwrap();
-                    if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
-                        println!(
-                            "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-                            scause.cause(),
-                            stval,
-                            current_trap_cx().sepc,
-                        );
-                        drop(current_task);
-                        exit_current_and_run_next(-2);
-                    }
+            let lazy = current_task().unwrap().check_lazy(va, is_load);
+            if lazy != 0 {
+                // page fault exit code
+                let current_task = current_task().unwrap();
+                if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                    println!(
+                        "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
+                        scause.cause(),
+                        stval,
+                        current_trap_cx().sepc,
+                    );
+                    drop(current_task);
+                    exit_current_and_run_next(-2);
                 }
             }
             // println!{"Trap solved..."}

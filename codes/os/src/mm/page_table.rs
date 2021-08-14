@@ -7,7 +7,7 @@ use super::{
     PhysAddr,
     StepByOne,
 };
-use crate::task::current_user_token;
+use crate::task::{current_user_token, current_task};
 use alloc::vec::Vec;
 use alloc::vec;
 use alloc::string::String;
@@ -253,6 +253,12 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     while start < end {
         let start_va = VirtAddr::from(start);
         let mut vpn = start_va.floor();
+        // println!("vpn = 0x{:X}", vpn.0);
+        // let ppn: PhysPageNum;
+        if page_table.translate(vpn).is_none() {
+            // println!{"preparing into checking lazy..."}
+            current_task().unwrap().check_lazy(start_va, true);
+        }
         let ppn = page_table
             .translate(vpn)
             .unwrap()
@@ -295,7 +301,12 @@ pub fn translated_ref<T>(token: usize, ptr: *const T) -> &'static T {
 pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let page_table = PageTable::from_token(token);
     let va = ptr as usize;
-    let pa = page_table.translate_va(VirtAddr::from(va));
+    let vaddr = VirtAddr::from(va);
+    if page_table.translate_va(vaddr).is_none() {
+        // println!{"preparing into checking lazy..."}
+        current_task().unwrap().check_lazy(vaddr,true);
+    }
+    let pa = page_table.translate_va(VirtAddr::from(vaddr));
     // print!("[translated_refmut pa:{:?}]",pa);
     pa.unwrap().get_mut()
 }

@@ -614,14 +614,54 @@ impl TaskControlBlock {
     pub fn gettgid(&self) -> usize {
         self.tgid
     }
+    
+    pub fn check_lazy(&self, va: VirtAddr, is_load: bool) -> isize {
+        // println!{"into check lazy..."}
+        // println!{"The checking addr is {:?}", va};
+        let vpn: VirtPageNum = va.floor();
+        let heap_base = self.acquire_inner_lock().heap_start;
+        let heap_pt = self.acquire_inner_lock().heap_pt;
+        let stack_top = self.acquire_inner_lock().base_size;
+        let stack_bottom = stack_top - USER_STACK_SIZE;
+        // println!{"The base of the user stack: {:X} ~ {:X}", stack_bottom, stack_top};
+        // println!{"============================{:?}", vpn}
+        let mmap_start = self.acquire_inner_lock().mmap_area.mmap_start;
+        let mmap_end = self.acquire_inner_lock().mmap_area.mmap_top;
 
-    pub fn lazy_mmap(&self, stval: usize) {
+        if va >= mmap_start && va < mmap_end {
+        // if false { // disable lazy mmap
+            self.lazy_mmap(va.0, is_load)
+        } else if va.0 >= heap_base && va.0 <= heap_pt {
+            self.acquire_inner_lock().lazy_alloc_heap(vpn);
+            return 0;
+        } else if va.0 >= stack_bottom && va.0 <= stack_top {
+            //println!{"lazy_stack_page: {:?}", va}
+            self.acquire_inner_lock().lazy_alloc_stack(vpn);
+            0
+        } else {
+            // get the PageTableEntry that faults
+            let pte = self.acquire_inner_lock().enquire_vpn(vpn);
+            // if the virtPage is a CoW
+            if pte.is_some() && pte.unwrap().is_cow() {
+                let former_ppn = pte.unwrap().ppn();
+                self.acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                0
+            } else {
+                -1
+            }
+        }
+    }
+
+    pub fn lazy_mmap(&self, stval: usize, is_load: bool) -> isize {
         // println!("lazy_mmap");
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();
         let token = inner.get_user_token();
-        inner.memory_set.lazy_mmap(stval.into());
-        inner.mmap_area.lazy_map_page(stval, fd_table, token);
+        let lazy_result = inner.memory_set.lazy_mmap(stval.into());
+        if lazy_result == 0 || is_load {
+            inner.mmap_area.lazy_map_page(stval, fd_table, token);
+        }
+        return lazy_result;
     }
 
     pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: isize, off: usize) -> usize {
@@ -659,12 +699,12 @@ impl TaskControlBlock {
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin1"}
-            inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
-            // inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            // inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin2"}
-            inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
-            // inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            // inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
             // println!{"pin3"}
             va_top.0
         }
