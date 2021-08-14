@@ -81,8 +81,6 @@ ptr_t allocPage()
         }
     }
     // log(DEBUG, "alloc: %lx by tid %d\n",ret, current_running->tid);
-    if (ret == 0xffffffff804d1000lu)
-        printk_port("tid %d is allocating this address\n", current_running->tid);
     return ret;
 }
 
@@ -216,8 +214,6 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
 
 void freePage(ptr_t baseAddr)
 {   
-    if (baseAddr == 0xffffffff804d1000lu)
-        printk_port("tid %d is releasing this address\n", current_running->tid);
     uint8_t clear = 1;
     for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
     {
