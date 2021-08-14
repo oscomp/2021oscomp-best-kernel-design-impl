@@ -70,14 +70,15 @@ use crate::sbi::shutdown;
 //use crate::fs::Dirent;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
-    if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
-        gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
-        //println!("syscallid-{}", syscall_id);
-    } else {
-        if args[0] != 0 && args[0] != 1 && args[0] != 2{
-            // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
-        }
-    }
+    gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+    //if syscall_id != 64 && syscall_id != 63 && syscall_id != 61 {
+    //    gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+    //    //println!("syscallid-{}", syscall_id);
+    //} else {
+    //    if args[0] != 0 && args[0] != 1 && args[0] != 2{
+    //        // gdb_print!(SYSCALL_ENABLE,"syscall-({}) arg0 = {}, arg1 = {}\n",syscall_id, args[0] as isize, args[1] as isize);
+    //    }
+    //}
     
     match syscall_id {
         SYSCALL_GETCWD=> sys_getcwd(args[0] as *mut u8, args[1] as usize),

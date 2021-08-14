@@ -257,6 +257,7 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
             .translate(vpn)
             .unwrap()
             .ppn();
+        //println!("vpn = {} ppn = {}", vpn.0, ppn.0);
         vpn.step();
         let mut end_va: VirtAddr = vpn.into();
         end_va = end_va.min(VirtAddr::from(end));

@@ -143,12 +143,12 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
-            // println!(
-            //     "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
-            //     scause.cause(),
-            //     stval,
-            //     current_trap_cx().sepc,
-            // );
+            //println!(
+            //    "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}.",
+            //    scause.cause(),
+            //    stval,
+            //    current_trap_cx().sepc,
+            //);
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
@@ -165,13 +165,13 @@ pub fn trap_handler() -> ! {
             let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
             // println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
             if va >= mmap_start && va < mmap_end {
-                // println!{"where is the lazy_mmap_page!!!!!!!!"}
+                //println!{"where is the lazy_mmap_page!!!!!!!!"}
                 // exit_current_and_run_next(-2);
                 current_task().unwrap().lazy_mmap(va.0);
             } else if va.0 >= heap_base && va.0 <= heap_pt {
                 current_task().unwrap().acquire_inner_lock().lazy_alloc_heap(vpn);
             } else if va.0 >= stack_bottom && va.0 <= stack_top {
-                println!{"lazy_stack_page: {:?}", va}
+                //println!{"lazy_stack_page: {:?}", va}
                 current_task().unwrap().acquire_inner_lock().lazy_alloc_stack(vpn);
             } else {
                 // get the PageTableEntry that faults
@@ -279,7 +279,7 @@ pub fn trap_return() -> ! {
 
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
-    panic!("a trap {:?} from kernel! Stvec:{:x}", scause::read().cause(), stvec::read().bits());
+    panic!("a trap {:?} from kernel! Stvec:{:x}, Stval:{:X}", scause::read().cause(), stvec::read().bits(), stval::read());
 }
 
 pub use context::{TrapContext};

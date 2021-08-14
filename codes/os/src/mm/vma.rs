@@ -136,7 +136,8 @@ impl MmapSpace{
     }
 
     pub fn lazy_map_page(&mut self, page_start: VirtAddr, fd_table: FdTable, token: usize) {
-        let offset: usize = self.offset + self.oaddr.0 - page_start.0;
+        let offset: usize = self.offset - self.oaddr.0 + page_start.0;
+        //println!("map file，0x{:X} = 0x{:X} - 0x{:X} + 0x{:X}", offset, self.offset, self.oaddr.0, page_start.0);
         self.map_file(page_start, PAGE_SIZE, offset, fd_table, token);
     }
 
@@ -157,8 +158,9 @@ impl MmapSpace{
                 FileClass::File(f)=>{
                     f.set_offset(offset);
                     if !f.readable() { return -1; }
-                    // println!{"The va_start is {}", self.oaddr.0};
-                    f.read(UserBuffer::new(translated_byte_buffer(token, self.oaddr.0 as *const u8, len)));
+                    println!{"The va_start is 0x{:X}, offset of file is {}", va_start.0, offset};
+                    let read_len = f.read(UserBuffer::new(translated_byte_buffer(token, va_start.0 as *const u8, len)));
+                    println!{"read {} bytes", read_len};
                 },
                 _ => { return -1; },
             };

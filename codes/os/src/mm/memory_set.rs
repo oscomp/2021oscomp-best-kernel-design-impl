@@ -115,9 +115,16 @@ impl MemorySet {
         ), None);
     }
     pub fn insert_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) {
-        let mut new_chunk_area = ChunkArea::new(MapType::Framed, permission,);
-        new_chunk_area.set_mmap_range(start_va, end_va);
-        self.mmap_chunks.push(new_chunk_area);
+        //let mut new_chunk_area = ChunkArea::new(MapType::Framed, permission,);
+        //new_chunk_area.set_mmap_range(start_va, end_va);
+        //self.mmap_chunks.push(new_chunk_area);
+
+        self.push_mmap(MapArea::new(
+            start_va,
+            (end_va.0).into(),  // bin lazy (X
+            MapType::Framed,
+            permission,
+        ), None);
     }
     fn push_mmap(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         // println!{"1"}
@@ -129,6 +136,16 @@ impl MemorySet {
             .find(|(_, area)| area.vpn_range.get_start() == start_vpn) {
             area.unmap(&mut self.page_table);
             self.areas.remove(idx);
+        }
+
+        let chunks_len = self.mmap_chunks.len();
+        for i in 0..chunks_len {
+            let chunk = &self.mmap_chunks[i];
+            if (chunk.mmap_start.0 >> 12) == start_vpn.0 {
+                //println!("remove mmap_chunk 0x{:X}", chunk.mmap_start.0);
+                self.mmap_chunks.remove(i);
+                break;
+            }
         }
     }
     fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
