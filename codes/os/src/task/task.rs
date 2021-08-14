@@ -594,13 +594,16 @@ impl TaskControlBlock {
         self.tgid
     }
 
-    pub fn lazy_mmap(&self, stval: usize) {
+    pub fn lazy_mmap(&self, stval: usize) -> isize {
         // println!("lazy_mmap");
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();
         let token = inner.get_user_token();
-        inner.memory_set.lazy_mmap(stval.into());
-        inner.mmap_area.lazy_map_page(stval, fd_table, token);
+        let lazy_result = inner.memory_set.lazy_mmap(stval.into());
+        if lazy_result == 0 {
+            inner.mmap_area.lazy_map_page(stval, fd_table, token);
+        }
+        return lazy_result;
     }
 
     pub fn mmap(&self, start: usize, len: usize, prot: usize, flags: usize, fd: isize, off: usize) -> usize {
@@ -638,12 +641,12 @@ impl TaskControlBlock {
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin1"}
-            inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
-            // inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            // inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin2"}
-            inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
-            // inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            // inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
             // println!{"pin3"}
             va_top.0
         }

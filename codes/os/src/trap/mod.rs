@@ -127,42 +127,38 @@ pub fn trap_handler() -> ! {
             // println!{"============================{:?}", vpn}
             let mmap_start = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_start;
             let mmap_end = current_task().unwrap().acquire_inner_lock().mmap_area.mmap_top;
-            // println!("page fault 2");
-            // println!{"start: {:?} end: {:?}", mmap_start, mmap_end};
-            // if va >= mmap_start && va < mmap_end {
-            if false { // disable lazy mmap
-                // println!{"where is the lazy_mmap_page!!!!!!!!"}
-                // exit_current_and_run_next(-2);
-                current_task().unwrap().lazy_mmap(va.0);
-            } else if va.0 >= heap_base && va.0 <= heap_pt {
-                current_task().unwrap().acquire_inner_lock().lazy_alloc(vpn);
-            } else {
-                // get the PageTableEntry that faults
-                let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
-                // println!{"PageTableEntry: {}", pte.bits};
-                // if the virtPage is a CoW
-                if pte.is_some() && pte.unwrap().is_cow() {
-                    let former_ppn = pte.unwrap().ppn();
-                    //println!{"1---{}: {:?}", current_task().unwrap().pid.0, current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                    // println!("cow addr = {:X}", stval);
-                    current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
-                    // println!{"2---{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
-                    // println!{"cow_alloc returned..."}
-                    // let pte = current_task().unwrap().acquire_inner_lock().translate_vpn(vpn);
-                    // println!{"PageTableEntry: {}", pte.bits};
+            let lazy = {
+                if va >= mmap_start && va < mmap_end {
+                // if false { // disable lazy mmap
+                    current_task().unwrap().lazy_mmap(va.0)
+                } else if va.0 >= heap_base && va.0 <= heap_pt {
+                    current_task().unwrap().acquire_inner_lock().lazy_alloc(vpn);
+                    0
                 } else {
+                    // get the PageTableEntry that faults
+                    let pte = current_task().unwrap().acquire_inner_lock().enquire_vpn(vpn);
+                    // if the virtPage is a CoW
+                    if pte.is_some() && pte.unwrap().is_cow() {
+                        let former_ppn = pte.unwrap().ppn();
+                        current_task().unwrap().acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                        0
+                    } else {
+                        -1
+                    }
+                }
+            };
+            if lazy != 0 {
+                // page fault exit code
+                let current_task = current_task().unwrap();
+                if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
                     println!(
                         "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                         scause.cause(),
                         stval,
                         current_trap_cx().sepc,
                     );
-                    // page fault exit code
-                    let current_task = current_task().unwrap();
-                    if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
-                        drop(current_task);
-                        exit_current_and_run_next(-2);
-                    }
+                    drop(current_task);
+                    exit_current_and_run_next(-2);
                 }
             }
             // println!{"Trap solved..."}

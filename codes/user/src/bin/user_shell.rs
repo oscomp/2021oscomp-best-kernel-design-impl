@@ -426,7 +426,7 @@ impl ArgMachine{
         // testsuits.push("lmbench_all lat_select -n 100 -P 1 file");
         // testsuits.push("lmbench_all lat_sig -P 1 install");
         // testsuits.push("lmbench_all lat_sig -P 1 catch");
-        // testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
+        testsuits.push("lmbench_all lat_sig -P 1 prot lat_sig");
         // testsuits.push("lmbench_all lat_pipe -P 1");
         // testsuits.push("lmbench_all lat_proc -P 1 fork");
         // testsuits.push("lmbench_all lat_proc -P 1 exec");
@@ -438,7 +438,7 @@ impl ArgMachine{
         // testsuits.push("busybox echo file system latency");
         // testsuits.push("lmbench_all lat_fs /var/tmp");
         // testsuits.push("busybox echo Bandwidth measurements");
-        testsuits.push("lmbench_all bw_pipe -P 1");
+        // testsuits.push("lmbench_all bw_pipe -P 1");
         // testsuits.push("lmbench_all bw_file_rd -P 1 512k io_only /var/tmp/XXX");
         // testsuits.push("lmbench_all bw_file_rd -P 1 512k open2close /var/tmp/XXX");
         // testsuits.push("lmbench_all bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX");

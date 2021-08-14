@@ -562,10 +562,14 @@ impl MemorySet {
         0
     }
 
-    pub fn lazy_mmap (&mut self, stval: VirtAddr) -> usize {
+    pub fn lazy_mmap (&mut self, stval: VirtAddr) -> isize {
         println!{"performing lazy mmap on {:?}", stval}
         for mmap_chunk in self.mmap_chunks.iter() {
             if stval >= mmap_chunk.mmap_start && stval < mmap_chunk.mmap_end {
+                println!{"The map_perm of mmap_trunk is 0x{:X}", mmap_chunk.map_perm.bits};
+                if (mmap_chunk.map_perm & MapPermission::W).bits == 0 {
+                    return -1;
+                }
                 self.push_chunk(stval.floor());
                 return 0
             }
