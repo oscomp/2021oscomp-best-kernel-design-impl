@@ -27,6 +27,9 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     //if fd == 6 || fd == 5 {
     //    panic!("write 6/5");
     //}
+    if fd > 2 {
+        print!("\n");
+    }
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
@@ -51,6 +54,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
             gdb_println!(SYSCALL_ENABLE, "sys_write(fd: {}, buf: \"{}\", len: {}) = {}", fd, str, len, size);
         }
         else if fd > 2{
+            print!("\n");
             gdb_println!(SYSCALL_ENABLE, "sys_write(fd: {}, buf: ?, len: {}) = {}", fd, len, size);
         }
         size as isize
@@ -95,6 +99,9 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = current_user_token();
     let task = current_task().unwrap();
     let inner = task.acquire_inner_lock();
+    if fd > 2 {
+        print!("\n");
+    }
     if fd >= inner.fd_table.len() {
         return -1;
     }
@@ -113,6 +120,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
             UserBuffer::new(translated_byte_buffer(token, buf, len))
         );
         if fd > 2{
+            print!("\n");
             gdb_println!(SYSCALL_ENABLE, "sys_read(fd: {}, buf: ?, len: {}) = {}", fd, len, size);
         }
         size as isize

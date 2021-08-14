@@ -408,37 +408,40 @@ impl ArgMachine{
         let mut testsuits :Vec<&str>= Vec::new();
         //testsuits.push("busybox\0ls"); 
         //testsuits.push("syscalltest");
-        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0null");
-        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0read");
-        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0write");
+        testsuits.push("lmbench_all\0lat_syscall\0-P\01\0null");
+        testsuits.push("lmbench_all\0lat_syscall\0-P\01\0read");
+        testsuits.push("lmbench_all\0lat_syscall\0-P\01\0write");
         // testsuits.push("busybox mkdir -p /var/tmp");
         // testsuits.push("busybox touch /var/tmp/lmbench");
-        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0stat\0/var/tmp/lmbench");
-        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0fstat\0/var/tmp/lmbench");
-        //testsuits.push("lmbench_all\0lat_syscall\0-P\01\0open\0/var/tmp/lmbench");
-        //testsuits.push("lmbench_all\0lat_select\0-n\0100\0-P\01\0file");
-        //testsuits.push("lmbench_all\0lat_sig\0-P\01\0install");
-        //testsuits.push("lmbench_all\0lat_sig\0-P\01\0catch");
-        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
-        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
-        ////testsuits.push("busybox\0cp\0hello\0/tmp");                                            
-        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0shell");
-        ///* param move shoud > 512k*/
-        //testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
+        testsuits.push("lmbench_all\0lat_syscall\0-P\01\0stat\0/var/tmp/lmbench");
+        testsuits.push("lmbench_all\0lat_syscall\0-P\01\0fstat\0/var/tmp/lmbench");
+        testsuits.push("lmbench_all\0lat_syscall\0-P\01\0open\0/var/tmp/lmbench");
+        testsuits.push("lmbench_all\0lat_select\0-n\0100\0-P\01\0file");
+        testsuits.push("lmbench_all\0lat_sig\0-P\01\0install");
+        testsuits.push("lmbench_all\0lat_sig\0-P\01\0catch");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
+        //testsuits.push("busybox\0cp\0hello\0/tmp");                                            
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0shell");
+        /* param move shoud > 512k*/
+        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
         //
-        //testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
-        //testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
+        testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+
+        testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
 //
-        ////testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
-        //testsuits.push("lmbench_all\0lat_pipe\0-P\01");                                  // 需要SIGKILL
-        //// testsuits.push("busybox\0echo\0file\0system\0latency"); 
-        //testsuits.push("lmbench_all\0lat_fs\0/var/tmp");                                 // kernel accesses lazystack
-        //// testsuits.push("busybox\0echo\0Bandwidth\0measurements");
-        //testsuits.push("lmbench_all\0bw_pipe\0-P\01");                                   //需要SIGKILL
-        //testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0io_only\0/var/tmp/XXX");   //ok  
-        //testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok  
-        //testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0mmap_only\0/var/tmp/XXX"); //ok
-        //testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok
+        testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
+        testsuits.push("lmbench_all\0lat_pipe\0-P\01");                                  // 需要SIGKILL
+        // testsuits.push("busybox\0echo\0file\0system\0latency"); 
+        testsuits.push("lmbench_all\0lat_fs\0/var/tmp");                                 // kernel accesses lazystack
+        // testsuits.push("busybox\0echo\0Bandwidth\0measurements");
+        testsuits.push("lmbench_all\0bw_pipe\0-P\01");                                   //需要SIGKILL
+        testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0io_only\0/var/tmp/XXX");   //ok  
+        testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok  
+        testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0mmap_only\0/var/tmp/XXX"); //ok
+        testsuits.push("lmbench_all\0bw_mmap_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok
         // testsuits.push("busybox\0echo\0context\0switch\0overhead");
         testsuits.push("lmbench_all\0lat_ctx\0-P\01\0-s\032\02\04\08\016\024\032\064\096"); // wait for kill
         

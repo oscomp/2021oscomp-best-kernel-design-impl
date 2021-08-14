@@ -628,8 +628,8 @@ impl TaskControlBlock {
         let mmap_start = self.acquire_inner_lock().mmap_area.mmap_start;
         let mmap_end = self.acquire_inner_lock().mmap_area.mmap_top;
 
-        if va >= mmap_start && va < mmap_end {
-        // if false { // disable lazy mmap
+        //if va >= mmap_start && va < mmap_end {
+        if false { // disable lazy mmap
             self.lazy_mmap(va.0, is_load)
         } else if va.0 >= heap_base && va.0 <= heap_pt {
             self.acquire_inner_lock().lazy_alloc_heap(vpn);
@@ -699,12 +699,12 @@ impl TaskControlBlock {
             // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin1"}
-            // inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
-            inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
+            //inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
             // inner.memory_set.print_pagetable();
             // println!{"pin2"}
-            // inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
-            inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
+            //inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
             // println!{"pin3"}
             va_top.0
         }
