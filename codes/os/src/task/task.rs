@@ -615,9 +615,9 @@ impl TaskControlBlock {
         self.tgid
     }
     
-    pub fn check_lazy(&self, va: VirtAddr) -> isize {
-        println!{"into check lazy..."}
-        println!{"The checking addr is {:?}", va};
+    pub fn check_lazy(&self, va: VirtAddr, is_load: bool) -> isize {
+        // println!{"into check lazy..."}
+        // println!{"The checking addr is {:?}", va};
         let vpn: VirtPageNum = va.floor();
         let heap_base = self.acquire_inner_lock().heap_start;
         let heap_pt = self.acquire_inner_lock().heap_pt;
@@ -630,7 +630,7 @@ impl TaskControlBlock {
 
         if va >= mmap_start && va < mmap_end {
         // if false { // disable lazy mmap
-            self.lazy_mmap(va.0)
+            self.lazy_mmap(va.0, is_load)
         } else if va.0 >= heap_base && va.0 <= heap_pt {
             self.acquire_inner_lock().lazy_alloc_heap(vpn);
             return 0;
@@ -652,13 +652,13 @@ impl TaskControlBlock {
         }
     }
 
-    pub fn lazy_mmap(&self, stval: usize) -> isize {
+    pub fn lazy_mmap(&self, stval: usize, is_load: bool) -> isize {
         // println!("lazy_mmap");
         let mut inner = self.acquire_inner_lock();
         let fd_table = inner.fd_table.clone();
         let token = inner.get_user_token();
         let lazy_result = inner.memory_set.lazy_mmap(stval.into());
-        if lazy_result == 0 {
+        if lazy_result == 0 || is_load {
             inner.mmap_area.lazy_map_page(stval, fd_table, token);
         }
         return lazy_result;

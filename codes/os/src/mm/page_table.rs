@@ -256,8 +256,8 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
         // println!("vpn = 0x{:X}", vpn.0);
         // let ppn: PhysPageNum;
         if page_table.translate(vpn).is_none() {
-            println!{"preparing into checking lazy..."}
-            current_task().unwrap().check_lazy(start_va);
+            // println!{"preparing into checking lazy..."}
+            current_task().unwrap().check_lazy(start_va, true);
         }
         let ppn = page_table
             .translate(vpn)
@@ -303,8 +303,8 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let va = ptr as usize;
     let vaddr = VirtAddr::from(va);
     if page_table.translate_va(vaddr).is_none() {
-        println!{"preparing into checking lazy..."}
-        current_task().unwrap().check_lazy(vaddr);
+        // println!{"preparing into checking lazy..."}
+        current_task().unwrap().check_lazy(vaddr,true);
     }
     let pa = page_table.translate_va(VirtAddr::from(vaddr));
     // print!("[translated_refmut pa:{:?}]",pa);

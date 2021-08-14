@@ -152,12 +152,18 @@ pub fn trap_handler() -> ! {
         Trap::Exception(Exception::StorePageFault) |
         Trap::Exception(Exception::LoadPageFault) => {
             // println!("page fault 1");
+            let is_load: bool;
+            if scause.cause() == Trap::Exception(Exception::LoadFault) || scause.cause() == Trap::Exception(Exception::LoadPageFault) {
+                is_load = true;
+            } else {
+                is_load = false;
+            }
             let va: VirtAddr = (stval as usize).into();
             // The boundary decision
             if va > TRAMPOLINE.into() {
                 panic!("VirtAddr out of range!");
             }
-            let lazy = current_task().unwrap().check_lazy(va);
+            let lazy = current_task().unwrap().check_lazy(va, is_load);
             if lazy != 0 {
                 // page fault exit code
                 let current_task = current_task().unwrap();

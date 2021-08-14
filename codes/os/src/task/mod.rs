@@ -79,10 +79,10 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let mut inner = task.acquire_inner_lock();
     // println!("exit 2");
     // reset user tid area
-    let clear_child_tid = inner.address.clear_child_tid;
-    if clear_child_tid != 0{
-        *translated_refmut(inner.get_user_token(), clear_child_tid as *mut i32) = 0;
-    }
+    // let clear_child_tid = inner.address.clear_child_tid;
+    // if clear_child_tid != 0{
+    //     *translated_refmut(inner.get_user_token(), clear_child_tid as *mut i32) = 0;
+    // }
     gdb_print!(EXIT_ENABLE,"[exit{}]",task.pid.0);
     // Change status to Zombie
     inner.task_status = TaskStatus::Zombie;

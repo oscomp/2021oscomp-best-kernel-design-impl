@@ -229,18 +229,6 @@ pub fn sys_sigaction(signum: isize, act :*mut usize, oldact: *mut usize) -> isiz
     let mut task = current_task().unwrap();
     let token = current_user_token();
     let signum = Signals::from_bits(1 << (signum-1)).unwrap();
-    // act new
-    let handler = *translated_refmut(token, act);
-    let flags = *translated_refmut(token, unsafe{act.add(1)});
-    let mask = *translated_refmut(token, unsafe{act.add(2)});
-    let mut sigaction_new = SigAction{
-        sa_handler:handler,
-        sa_mask:Vec::new(),
-        sa_flags:SaFlags::SA_RESTART,
-    };
-    if mask != 0 {
-        sigaction_new.sa_mask.push(Signals::from_bits(mask).unwrap());
-    }
     // act old
     let mut task_inner = task.acquire_inner_lock();
     let mut sigaction_old = SigAction::new();
@@ -263,6 +251,22 @@ pub fn sys_sigaction(signum: isize, act :*mut usize, oldact: *mut usize) -> isiz
             *translated_refmut(token, unsafe{oldact.add(1)}) = 0;
             *translated_refmut(token, unsafe{oldact.add(2)}) = 0;
         }
+    }
+    // act new
+    if act as usize == 0{
+        gdb_println!(SYSCALL_ENABLE, "sys_sigaction(signum: {:?}, act: None, oldact: {:?} ) = {}", signum, sigaction_old, 0);
+        return 0;
+    }
+    let handler = *translated_refmut(token, act);
+    let flags = *translated_refmut(token, unsafe{act.add(1)});
+    let mask = *translated_refmut(token, unsafe{act.add(2)});
+    let mut sigaction_new = SigAction{
+        sa_handler:handler,
+        sa_mask:Vec::new(),
+        sa_flags:SaFlags::SA_RESTART,
+    };
+    if mask != 0 {
+        sigaction_new.sa_mask.push(Signals::from_bits(mask).unwrap());
     }
     // push to PCB
     let sigaction_new_copy = sigaction_new.clone();
