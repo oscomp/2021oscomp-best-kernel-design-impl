@@ -66,6 +66,7 @@ pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
     chunks: ChunkArea,
+    stack_chunks: ChunkArea,
     mmap_chunks: Vec<ChunkArea>,
 }
 
@@ -80,6 +81,8 @@ impl MemorySet {
             chunks: ChunkArea::new(MapType::Framed,
                                 MapPermission::R | MapPermission::W | MapPermission::U),
             mmap_chunks: Vec::new(),
+            stack_chunks: ChunkArea::new(MapType::Framed,
+                                MapPermission::R | MapPermission::W | MapPermission::U),
         }
     }
     pub fn set_cow(&mut self, vpn: VirtPageNum) {
@@ -116,6 +119,13 @@ impl MemorySet {
         let mut new_chunk_area = ChunkArea::new(MapType::Framed, permission,);
         new_chunk_area.set_mmap_range(start_va, end_va);
         self.mmap_chunks.push(new_chunk_area);
+
+        //self.push_mmap(MapArea::new(
+        //    start_va,
+        //    (end_va.0).into(),  // bin lazy (X
+        //    MapType::Framed,
+        //    permission,
+        //), None);
     }
     fn push_mmap(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         // println!{"1"}
@@ -127,6 +137,16 @@ impl MemorySet {
             .find(|(_, area)| area.vpn_range.get_start() == start_vpn) {
             area.unmap(&mut self.page_table);
             self.areas.remove(idx);
+        }
+
+        let chunks_len = self.mmap_chunks.len();
+        for i in 0..chunks_len {
+            let chunk = &self.mmap_chunks[i];
+            if (chunk.mmap_start.0 >> 12) == start_vpn.0 {
+                //println!("remove mmap_chunk 0x{:X}", chunk.mmap_start.0);
+                self.mmap_chunks.remove(i);
+                break;
+            }
         }
     }
     fn remap_cow(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, former_ppn: PhysPageNum) {
@@ -148,7 +168,9 @@ impl MemorySet {
         // self.chunks.map_one(&mut self.page_table, vpn);
         self.chunks.push_vpn(vpn, &mut self.page_table)
     }
-
+    fn push_stack_chunk(&mut self, vpn: VirtPageNum) {
+        self.stack_chunks.push_vpn(vpn, &mut self.page_table)
+    }
     fn push_with_offset(&mut self, mut map_area: MapArea, offset: usize, data: Option<&[u8]>){
         // println!{"3"}
         map_area.map(&mut self.page_table);
@@ -370,8 +392,8 @@ impl MemorySet {
         // maparea3: user_stack
         let max_top_va: VirtAddr = TRAP_CONTEXT.into();
         let mut user_stack_top: usize = TRAP_CONTEXT;
-        user_stack_top = USER_STACK;
-        let user_stack_bottom: usize = user_stack_top - USER_STACK_SIZE;
+        user_stack_top -= PAGE_SIZE;
+        let user_stack_bottom: usize = user_stack_top - USER_STACK_SIZE_MIN; 
         memory_set.push(MapArea::new(
             user_stack_bottom.into(),
             user_stack_top.into(),
@@ -419,13 +441,18 @@ impl MemorySet {
             let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
             dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
         }
+        for vpn in user_space.stack_chunks.vpn_table.iter() {
+            let vpn_copy: VirtPageNum = vpn.0.into();
+            memory_set.push_chunk(vpn_copy);
+            let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
+            let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
+            dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
+        }
         for mmap_chunk in user_space.mmap_chunks.iter() {
             let mut new_mmap_area = ChunkArea::new(mmap_chunk.map_type, mmap_chunk.map_perm);
             new_mmap_area.set_mmap_range(mmap_chunk.mmap_start, mmap_chunk.mmap_end);
             for vpn in mmap_chunk.vpn_table.iter() {
                 let vpn_copy: VirtPageNum = vpn.0.into();
-                // memory_set.chunks.vpn_table.push(vpn_copy);
-                // memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
                 new_mmap_area.push_vpn(vpn_copy, &mut memory_set.page_table);
                 let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
                 let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
@@ -505,6 +532,13 @@ impl MemorySet {
             let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
             dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
         }
+        for vpn in user_space.stack_chunks.vpn_table.iter() {
+            let vpn_copy: VirtPageNum = vpn.0.into();
+            memory_set.push_chunk(vpn_copy);
+            let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
+            let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
+            dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
+        }
         for mmap_chunk in user_space.mmap_chunks.iter() {
             let mut new_mmap_area = ChunkArea::new(mmap_chunk.map_type, mmap_chunk.map_perm);
             new_mmap_area.set_mmap_range(mmap_chunk.mmap_start, mmap_chunk.mmap_end);
@@ -554,7 +588,7 @@ impl MemorySet {
         0
     }
 
-    pub fn lazy_alloc (&mut self, vpn: VirtPageNum) -> usize {
+    pub fn lazy_alloc_heap (&mut self, vpn: VirtPageNum) -> usize {
         // println!{"performing lazy alloc on {:?}", vpn}
         self.push_chunk(vpn);
         // self.chunks.vpn_table.push(vpn);
@@ -562,8 +596,13 @@ impl MemorySet {
         0
     }
 
+    pub fn lazy_alloc_stack (&mut self, vpn: VirtPageNum) -> usize {
+        self.push_stack_chunk(vpn);
+        0
+    }
+
     pub fn lazy_mmap (&mut self, stval: VirtAddr) -> usize {
-        println!{"performing lazy mmap on {:?}", stval}
+        //println!{"performing lazy mmap on {:?}", stval}
         for mmap_chunk in self.mmap_chunks.iter() {
             if stval >= mmap_chunk.mmap_start && stval < mmap_chunk.mmap_end {
                 self.push_chunk(stval.floor());

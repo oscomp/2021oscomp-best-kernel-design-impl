@@ -1,3 +1,4 @@
+use crate::lang_items::Bytes;
 use crate::task::*;
 use crate::timer::*;
 use crate::mm::{
@@ -124,7 +125,7 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
         let cur_sec = get_time_s();
         let cur_usec = get_time_us();
         if compare_time(end_sec, end_usec, cur_sec, cur_usec) {
-            print!("\n");
+            //print!("\n");
             suspend_current_and_run_next();
         }
         else{
@@ -342,10 +343,12 @@ pub fn sys_getpid() -> isize {
 // For user, pid is tgid in kernel
 pub fn sys_getppid() -> isize {
     // let mut search_task_pid: usize = current_task().unwrap().pid.0;
+    
     let mut search_task: Arc<TaskControlBlock> = current_task().unwrap();
     search_task = search_task.get_parent().unwrap();
     gdb_println!(SYSCALL_ENABLE,"sys_getppid() = {}",search_task.tgid);
     search_task.tgid as isize
+
     // while search_task_pid != 0 {
     //     search_task = search_task.get_parent().unwrap();
     //     search_task_pid = search_task.pid.0;
@@ -589,15 +592,18 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
         //println!("[sys_mmap]:adjust_len = {}",adjust_len);
     }
     
-    println!("[{}][insert_mmap_area]: len 0x{:X} start 0x{:X}", task.pid.0, start, len);
+    //println!("[{}][insert_mmap_area]: start 0x{:X} len 0x{:X}", task.pid.0, start, len);
     let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
     gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
     return result_addr as isize;
 }
 
+//use crate::mm::HEAP_ALLOCATOR;
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     let task = current_task().unwrap();
-    task.munmap(start, len)
+    let ret = task.munmap(start, len);
+    //println!("after munmap, heap size = {}", HEAP_ALLOCATOR.lock(  );
+    ret
 }
 
 pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{
@@ -617,4 +623,59 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{
         }
     }
     0
+}
+
+
+use crate::task::RLimit;
+
+use super::FD_LIMIT;
+/* [WARNING] For now, we only support current proc or procs in ready_queue
+*            this might be wrong at Multi-Core state.
+*/
+/*
+* @ Param: 
+*   new_limit: If the new_limit argument is a not NULL, then the rlimit
+        structure to which it points is used to set new values for the
+        soft and hard limits for resource.
+*   old_limit: If the old_limit argument is
+        a not NULL, then a successful call to prlimit() places the
+        previous soft and hard limits for resource in the rlimit
+        structure pointed to by old_limit.
+*/
+pub fn sys_prlimit(pid:usize, resource:i32, new_limit: *const RLimit, old_limit: *mut RLimit)->isize {
+    /* check pid and fetch task*/
+    let task = {
+        if pid == 0 {
+            current_task().unwrap()
+        } else {
+            if let Some(tar_task) = find_task(pid) {
+                tar_task
+            } else {
+                return -1
+            }
+        }
+    };
+
+    let token = current_user_token();
+    let mut inner = task.acquire_inner_lock();
+    
+    if resource != RLIMIT_NOFILE {
+        panic!("[sys_prlimit64] resource {} has not been not supported yet!", resource);
+    }
+
+    let limit = &mut inner.resource_list[resource as usize];
+
+    /* copy old limit from proc's limit */
+    if old_limit as usize != 0 {
+        let mut olimit_buf = UserBuffer::new(translated_byte_buffer(token, old_limit as usize as *const u8, size_of::<RLimit>()));
+        olimit_buf.write( limit.as_bytes() );
+    }
+
+    /* set new limit to proc's limit */
+    if new_limit as usize != 0 {
+        let mut nlimit_buf = UserBuffer::new(translated_byte_buffer(token, new_limit as usize as *const u8, size_of::<RLimit>()));
+        nlimit_buf.read( limit.as_bytes_mut() );
+    }  
+
+    return 0
 }

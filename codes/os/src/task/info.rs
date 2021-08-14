@@ -3,6 +3,7 @@ use core::ops::{Add, Sub};
 use alloc::collections::{BTreeMap, BinaryHeap};
 use alloc::vec::Vec;
 use bitflags::*;
+use crate::lang_items::Bytes;
 use crate::timer::USEC_PER_SEC;
 
 // sys_clone
@@ -145,12 +146,12 @@ impl utsname{
             //version: utsname::str2u8("1.1"),
             //machine: utsname::str2u8("RISC-V64"),
             //domainname: utsname::str2u8("UltraTEAM/UltraOS"),
-            sysname: utsname::str2u8("UltraOS"),
-            nodename: utsname::str2u8("UltraOS"),
+            sysname: utsname::str2u8("Linux"),
+            nodename: utsname::str2u8("debian"),
             release: utsname::str2u8("5.10.0-7-riscv64"),
-            version: utsname::str2u8("1.1"),
-            machine: utsname::str2u8("RISC-V64"),
-            domainname: utsname::str2u8("UltraTEAM/UltraOS"),
+            version: utsname::str2u8("#1 SMP Debian 5.10.40-1 (2021-05-28)"),
+            machine: utsname::str2u8("riscv64"),
+            domainname: utsname::str2u8(""),
         }
     }
 

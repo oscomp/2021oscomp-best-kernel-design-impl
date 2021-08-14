@@ -257,6 +257,7 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
             .translate(vpn)
             .unwrap()
             .ppn();
+        //println!("vpn = {} ppn = {}", vpn.0, ppn.0);
         vpn.step();
         let mut end_va: VirtAddr = vpn.into();
         end_va = end_va.min(VirtAddr::from(end));
@@ -384,6 +385,12 @@ impl UserBuffer {
         Self { buffers }
     }
 
+    pub fn empty()->Self{
+        Self {
+            buffers:Vec::new(),
+        }
+    }
+     
     pub fn len(&self) -> usize {
         let mut total: usize = 0;
         for b in self.buffers.iter() {
@@ -418,19 +425,46 @@ impl UserBuffer {
         }
     }
 
-    pub fn write_at(&mut self, offset:usize, char:u8)->isize{
-        if offset > self.len() {
+    pub fn write_at(&mut self, offset:usize, buff: &[u8])->isize{
+        let len = buff.len();
+        if offset + len > self.len() {
             return -1
         }
-        let mut head = 0;
-        for b in self.buffers.iter_mut() {
-            if offset > head && offset < head + b.len() {
-                (**b)[offset - head] = char;
-                //b.as_mut_ptr()
-            } else {
-                head += b.len();
+        let mut head = 0; // offset of slice in UBuffer
+        let mut current = 0; // current offset of buff
+    
+        for sub_buff in self.buffers.iter_mut() {
+            let sblen = (*sub_buff).len();
+            if head + sblen < offset {
+                continue;
+            } else if head < offset {
+                for j in (offset - head)..sblen {
+                    (*sub_buff)[j] = buff[current];
+                    current += 1;
+                    if current == len {
+                        return len as isize;
+                    }
+                }
+            } else {  //head + sblen > offset and head > offset
+                for j in 0..sblen {
+                    (*sub_buff)[j] = buff[current];
+                    current += 1;
+                    if current == len {
+                        return len as isize;
+                    }
+                }
             }
+            head += sblen;
         }
+    
+        //for b in self.buffers.iter_mut() {
+        //    if offset > head && offset < head + b.len() {
+        //        (**b)[offset - head] = char;
+        //        //b.as_mut_ptr()
+        //    } else {
+        //        head += b.len();
+        //    }
+        //}
         0
     }
 

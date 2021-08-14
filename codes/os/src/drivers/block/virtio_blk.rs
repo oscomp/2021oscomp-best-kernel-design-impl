@@ -36,12 +36,28 @@ impl BlockDevice for VirtIOBlock {
     }
 }
 
+
+use crate::timer::get_time;
 impl VirtIOBlock {
     #[allow(unused)]
     pub fn new() -> Self {
-        Self(Mutex::new(VirtIOBlk::new(
+        let vb = Self(Mutex::new(VirtIOBlk::new(
             unsafe { &mut *(VIRTIO0 as *mut VirtIOHeader) }
-        ).unwrap()))
+        ).unwrap()));
+        //vb.wtest();
+        vb
+    }
+
+    pub fn wtest(&self){
+        let mut buf = [0u8;512];
+        self.read_block(0, &mut buf);
+        let start = get_time();
+        for i in 1..1000 {
+            //println!("wtest");
+            self.write_block(0, &buf);
+        }
+        let end = get_time();
+        println!("[vblk writing test]: {}", end - start);
     }
 }
 

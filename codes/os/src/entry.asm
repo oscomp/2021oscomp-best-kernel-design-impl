@@ -3,7 +3,7 @@
 _start:
     # tp:hart_id 
     # mv a0,tp
-    mv tp,a0
+    mv tp, a0
     la a1, boot_stack_top
     slli a0, a0, 15 # hart_id* stacksize
     add a0, a0, a1
