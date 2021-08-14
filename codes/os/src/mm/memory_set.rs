@@ -115,16 +115,16 @@ impl MemorySet {
         ), None);
     }
     pub fn insert_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) {
-        //let mut new_chunk_area = ChunkArea::new(MapType::Framed, permission,);
-        //new_chunk_area.set_mmap_range(start_va, end_va);
-        //self.mmap_chunks.push(new_chunk_area);
+        let mut new_chunk_area = ChunkArea::new(MapType::Framed, permission,);
+        new_chunk_area.set_mmap_range(start_va, end_va);
+        self.mmap_chunks.push(new_chunk_area);
 
-        self.push_mmap(MapArea::new(
-            start_va,
-            (end_va.0).into(),  // bin lazy (X
-            MapType::Framed,
-            permission,
-        ), None);
+        //self.push_mmap(MapArea::new(
+        //    start_va,
+        //    (end_va.0).into(),  // bin lazy (X
+        //    MapType::Framed,
+        //    permission,
+        //), None);
     }
     fn push_mmap(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         // println!{"1"}

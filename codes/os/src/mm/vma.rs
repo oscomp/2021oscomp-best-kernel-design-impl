@@ -158,9 +158,9 @@ impl MmapSpace{
                 FileClass::File(f)=>{
                     f.set_offset(offset);
                     if !f.readable() { return -1; }
-                    println!{"The va_start is 0x{:X}, offset of file is {}", va_start.0, offset};
+                    //println!{"The va_start is 0x{:X}, offset of file is {}", va_start.0, offset};
                     let read_len = f.read(UserBuffer::new(translated_byte_buffer(token, va_start.0 as *const u8, len)));
-                    println!{"read {} bytes", read_len};
+                    //println!{"read {} bytes", read_len};
                 },
                 _ => { return -1; },
             };
