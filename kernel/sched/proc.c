@@ -685,7 +685,6 @@ void scheduler(void) {
 			break;
 		}
 
-		__debug_info("scheduler", "hart %d fail\n", cpuid());
 		__leave_proc_cs 
 		intr_on();
 		__asm__ volatile("wfi");
@@ -730,7 +729,6 @@ void enter_user(uint64 old_kstack) {
 		__enter_proc_cs 
 		tmp = __get_runnable_no_lock();
 		if (NULL == tmp) {
-			__debug_info("enter_user", "hart %d fail\n", cpuid());
 			__leave_proc_cs 
 			intr_on();
 			__asm__ volatile("wfi");

@@ -253,7 +253,7 @@ int handle_intr(uint64 scause) {
 	#ifdef QEMU 
 	else if (INTR_EXTERNAL == scause) 
 	#else 
-	else if (INTR_SOFTWARE == scause && 9 == r_stval()) 
+	else if (INTR_SOFTWARE == scause && sbi_xv6_is_ext().value) 
 	#endif 
 	{
 		int irq = plic_claim();
@@ -286,6 +286,19 @@ int handle_intr(uint64 scause) {
 			}
 		}
 		#endif 
+
+		// send software interrupts to other harts to inform them 
+		for (int i = 0; i < NCPU; i ++) {
+			if (cpuid() != i) {
+				sbi_send_ipi(1 << i, 0);
+			}
+		}
+
+		return 0;
+	}
+	else if (INTR_SOFTWARE == scause) {		// the real software interrupt
+		// printf("hart %d receive software interrupt\n");
+		sbi_clear_ipi();
 
 		return 0;
 	}
