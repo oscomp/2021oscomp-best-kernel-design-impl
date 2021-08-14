@@ -8,6 +8,8 @@
 #undef DEBUG 
 #endif 
 
+#define __module_name__ 	"kmalloc"
+
 #include "types.h"
 #include "hal/riscv.h"
 #include "mm/pm.h"
@@ -334,110 +336,3 @@ void kmview(void)
 	release(&kmem_table_lock);
 	// leave critical section 
 }
-
-#ifdef DEBUG 
-
-#include "include/proc.h"
-#include "include/fs.h"
-#include "include/fat32.h"
-#include "include/buf.h"
-#include "include/file.h"
-
-void kmtest(void)
-{
-	__debug_info("kmemtest", "check point 1, hart %d\n", r_tp());
-	kmview();
-
-	struct proc *p0 = kmalloc(sizeof(struct proc));
-	struct proc *p1 = kmalloc(sizeof(struct proc));
-	struct proc *p2 = kmalloc(sizeof(struct proc));
-	struct proc *p3 = kmalloc(sizeof(struct proc));
-
-	struct fat32_entry *ep0 = kmalloc(sizeof(struct fat32_entry));
-	struct fat32_entry *ep1 = kmalloc(sizeof(struct fat32_entry));
-	struct fat32_entry *ep2 = kmalloc(sizeof(struct fat32_entry));
-	struct fat32_entry *ep3 = kmalloc(sizeof(struct fat32_entry));
-
-	struct buf *b0 = kmalloc(sizeof(struct buf));
-	struct buf *b1 = kmalloc(sizeof(struct buf));
-	struct buf *b2 = kmalloc(sizeof(struct buf));
-	struct buf *b3 = kmalloc(sizeof(struct buf));
-
-	struct file *f0 = kmalloc(sizeof(struct file));
-	struct file *f1 = kmalloc(sizeof(struct file));
-	struct file *f2 = kmalloc(sizeof(struct file));
-	struct file *f3 = kmalloc(sizeof(struct file));
-
-	__debug_info("kmemtest", "check point 2, hart %d\n", r_tp());
-	kmview();
-
-	struct proc **pn = (struct proc **) allocpage();
-	int num = PGSIZE / sizeof(struct proc *);
-	for (int i = 0; i < num; i++) {
-		pn[i] = (struct proc *) kmalloc(sizeof(struct proc));
-		pn[i]->pid = i;
-		pn[i]->lock.locked = i; // first field
-		pn[i]->tmask = i;       // last field
-	}
-
-	__debug_info("kmemtest", "check point 3, hart %d\n", r_tp());
-	kmview();
-
-	for (int i = 0; i < num; i++) {
-		if (pn[i]->pid != i ||
-			pn[i]->lock.locked != i ||
-			pn[i]->tmask != i)
-		{
-			printf(__ERROR("kmemtest")": something went wrong with struct %d\n", i);
-		}
-		kfree(pn[i]);
-	}
-	freepage(pn);
-
-	__debug_info("kmemtest", "check point 4, hart %d\n", r_tp());
-	kmview();
-
-	kfree(p0);
-	kfree(p1);
-	kfree(p2);
-	kfree(p3);
-
-	kfree(ep0);
-	kfree(ep1);
-	kfree(ep2);
-	kfree(ep3);
-
-	kfree(b0);
-	kfree(b1);
-	kfree(b2);
-	kfree(b3);
-
-	kfree(f0);
-	kfree(f1);
-	kfree(f2);
-	kfree(f3);
-
-	__debug_info("kmemtest", "check point 5, hart %d\n", r_tp());
-	kmview();
-
-	// Boarder cases 
-	void *mem_min = kmalloc(0);
-	void *mem_max = kmalloc(PGSIZE);
-	void *mem_max_around_border = kmalloc(4040);
-	void *mem_min_around_border = kmalloc(30);
-
-	__debug_info("kmemtest", "check point 5, hart %d\n", r_tp());
-	kmview();
-
-	kfree(mem_min);
-	if (NULL != mem_max) {
-		__debug_error("kmemtest", "mem_max wrong alloc\n");
-	}
-	kfree(mem_min_around_border);
-	kfree(mem_max_around_border);
-
-	__debug_info("kmemtest", "check point 6, hart %d\n", r_tp());
-	kmview();
-}
-
-#endif 

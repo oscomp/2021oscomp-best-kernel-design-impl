@@ -34,10 +34,16 @@ struct context {
 	uint64 s11;
 };
 
-enum procstate {
-	RUNNABLE, RUNNING, 
-	SLEEPING, ZOMBIE, 
-};
+#define RUNNABLE 		1
+#define RUNNING			2
+#define SLEEPING 		3
+#define ZOMBIE 			4
+
+#define __occupy(state) \
+	(((cpuid() + 1) << 8) | (state))
+#define __liberate(state) \
+	((state) & 0xff)
+
 
 struct tms {
 	uint64 utime;		// user time 
@@ -50,22 +56,21 @@ struct tms {
 
 // Process Control Block 
 struct proc {
-	// a useless lock 
-	struct spinlock lk;
-
 	// basic information 
 	// these fields MUST be protected by lk 
 	int killed;				// if non-zero, have been killed
 	int xstate;				// Exit status to be returned to parent's wait()
 	int pid;				// Process ID 
+	struct proc *hash_next;		// next proc on hash list 
+	struct proc **hash_pprev;	// previous 'struct proc*' field 
 
 	// next and prev are protected by proc_lock 
-	struct proc *next;		// point to next proc 
-	struct proc **prev;
-	int timer;				// timer 
-	enum procstate state;	// process state 
-	void *chan;				// the reason this proc is sleeping for 
-	uint64 sleep_expire;	// wake up time for sleeping
+	struct proc *sched_next;		// point to next proc 
+	struct proc **sched_pprev;
+	int timer;						// timer 
+	uint64 state;					// current state of proc 
+	void *chan;						// the reason this proc is sleeping for 
+	uint64 sleep_expire;			// wake up time for sleeping
 
 	// times for process performance 
 	struct tms proc_tms;
@@ -73,16 +78,15 @@ struct proc {
 	int64 ivswtch;			// involuntary context switches
 
 	// parenting
-	// these fields can only be operated by proc itself 
+	struct spinlock lk;				// lock to protect parenting of parent proc 
 	struct proc *child;				// point to first child 
 	struct proc *parent;			// point to its parent, NULL if it's `init`
 	struct proc *sibling_next;		// point to first sibling 
-	struct proc **sibling_prev;		// point to previous sibling->sibling_next 
+	struct proc **sibling_pprev;		// point to previous sibling->sibling_next 
 
 	// memory 
 	uint64 kstack;					// virtual address of kernel stack 
-	uint64 badaddr;					// bad address for page fault 
-	//uint64 sz;						// size of process memory 
+	uint64 badaddr;					// bad address after page fault 
 	pagetable_t pagetable;			// user pagetable 
 	struct trapframe *trapframe;	// data page for trampoline.S 
 	struct seg *segment;			// first seg list node 
@@ -104,11 +108,6 @@ struct proc {
 	char name[16];	// process name 
 	int tmask;		// trace mask 
 };
-
-/* Create a new process, copying the parent. 
-	Sets up child mem space to return as if from fork() system call 
-	`cow` means that fork implements 'Copy-On-Write' strategy */
-int fork_cow(void);
 
 /* Create a process-level thread, partly copying the parent. */
 int clone(uint64 flag, uint64 stack);
@@ -145,14 +144,8 @@ void sleep(void *chan, struct spinlock *lk);
 	Must be called without any p->lock. */
 void wakeup(void *chan);
 
-/* Return the next runnable process */
-struct proc const *get_runnable(void);
-
-/* Select next proc to run */
-void scheduler(void) __attribute__((noreturn));
-
-/* Return to schduler() */
-void sched(void);
+/* Jump into User Mode from Kernel */
+void enter_user(uint64 old_kstack) __attribute__((noreturn));
 
 
 /* Memory-Management Related */
@@ -161,26 +154,20 @@ void sched(void);
 	Return 0 on success, -1 on failure. */
 int growproc(uint64 newbrk);
 
-/* Create a user pagetable for a given process, 
-	with no user memory, but with trampoline pages. */
-pagetable_t proc_pagetable(struct proc *p);
-
-/* Free a process's pagetable, and free the physical 
-	memory it refers to. */
-void proc_freepagetable(pagetable_t pagetable, struct seg *head);
-
 
 /* CPU */
 
 /* Per-CPU state */
 struct cpu {
 	struct proc *proc;		// The process running on this cpu, or NULL 
-	struct context context;	// swtch() here to enter scheduler() 
+	// struct context context;	// swtch() here to enter scheduler() 
 	int noff;				// Depth of push_off() nesting 
 	int intena;				// Were interrupts enabled before push_off()?
 };
 
-int cpuid(void);
+static inline int cpuid(void) {
+	return r_tp();
+}
 struct cpu *mycpu(void);
 struct proc *myproc(void);
 

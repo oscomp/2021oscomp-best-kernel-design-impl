@@ -108,12 +108,8 @@ usertrap(void)
 	} 
 	else if (0 == handle_intr(cause)) {
 		// handle interrupt 
-		if (NULL != get_runnable())	{
-			p->ivswtch += 1;
-			__debug_info("usertrap", "yield()\n");
-			// if a new proc is woke up by intr, run it first 
-			yield();
-		}
+		p->ivswtch += 1;
+		yield();			// scheduler() will determine whether proc hangs 
 	}
 	else if (0 == handle_excp(cause)) {
 		// handle exception 
@@ -205,10 +201,7 @@ kerneltrap() {
 
 	//__debug_info("kerneltrap", "enter %d\n", scause);
 	if (0 == handle_intr(scause)) {
-		/*if (NULL != p && NULL != get_runnable()) {*/
-			/*__debug_info("kerneltrap", "yield()\n");*/
-			/*yield();*/
-		/*}*/
+		// handle interrupt
 	}
 	else if (0 == handle_excp(scause)) {
 		// handle exception 

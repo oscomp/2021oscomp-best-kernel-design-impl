@@ -84,5 +84,11 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		printf("hart 1 init done\n");
 	}
 	__debug_info("main", "hart %d enter main()...\n", hartid);
-	scheduler();
+
+	// shrink the boot stack
+	extern char boot_stack[];
+	uint64 kstack = (uint64)boot_stack + hartid * 4 * PGSIZE;
+	freepage_n(kstack + PGSIZE, 3);
+	// take a warp leap into user space!
+	enter_user(kstack);
 }

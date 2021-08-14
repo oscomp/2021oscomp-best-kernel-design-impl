@@ -49,7 +49,7 @@ void kpminit(void) {
 	initlock(&kmem.lock, "kmem");
 	kmem.freelist = NULL;
 	kmem.npage = 0;
-	freerange((uint64)kernel_end, (uint64)PHYSTOP);
+	freerange((uint64)kernel_end + 4 * 2 * PGSIZE, (uint64)PHYSTOP);
 	__debug_info("kpminit", "kernel_end: %p, phystop: %p, npage %d\n", 
 			kernel_end, (void*)PHYSTOP, kmem.npage);
 }
@@ -99,15 +99,11 @@ void *allocpage_n(uint64 n) {
 }
 
 void freepage_n(uint64 start, uint64 n) {
-	extern char boot_stack[];
-	extern char boot_stack_top[];
-
 	__debug_info("freepage_n", "start = %p, n = %d\n", start, n);
 
 	if (((uint64)start % PGSIZE) != 0 || n <= 0 || 
 		(	// memory range that could be freed 
-			!(start >= (uint64)kernel_end && (start + n * PGSIZE) <= PHYSTOP) && 
-			!(start >= (uint64)boot_stack && (start + n * PGSIZE) <= (uint64)boot_stack_top)
+			!(start >= (uint64)kernel_end && (start + n * PGSIZE) <= PHYSTOP) 
 		)
 	) {
 		panic("freepage");

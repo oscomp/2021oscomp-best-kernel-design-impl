@@ -84,9 +84,7 @@ sys_getppid(void) {
 uint64
 sys_fork(void)
 {
-	extern int fork_cow();
-	return fork_cow();
-	// return fork();
+	return clone(0, NULL);
 }
 
 uint64 

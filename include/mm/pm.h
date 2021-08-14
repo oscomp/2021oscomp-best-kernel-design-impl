@@ -17,15 +17,16 @@ void *allocpage_n(uint64 n);
 /* free n allocated physical page(s) */
 void freepage_n(uint64 start, uint64 n);
 
-/* allocate a physical page */
-static inline void *allocpage(void) {
-	return allocpage_n(1);
-}
+#define allocpage() ({\
+	void *page = allocpage_n(1);\
+	__debug_info("allocpage", "at %s: %d, %p\n", __FILE__, __LINE__, page);\
+	page;\
+})
 
-/* free an allocated physical page */
-static inline void freepage(void *start) {
-	freepage_n((uint64)start, 1);
-}
+#define freepage(start) do {\
+	__debug_info("freepage", "at %s: %d, %p\n", __FILE__, __LINE__, start);\
+	freepage_n((uint64)start, 1);\
+} while (0)
 
 uint64 idlepages(void);
 
