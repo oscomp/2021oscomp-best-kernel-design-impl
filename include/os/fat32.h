@@ -285,6 +285,7 @@ int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg);
 
 int fat32_renameat2(fd_num_t olddirfd, const char *oldpath, fd_num_t newdirfd, const char *newpath, unsigned int flags);
 
+/* elf loading */
 int64 fat32_readmy(uchar *buf, size_t count);
 int64_t fat32_lseekmy(size_t off, uint32_t whence);
 

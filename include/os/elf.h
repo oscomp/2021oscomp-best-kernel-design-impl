@@ -171,6 +171,8 @@ typedef struct ELF_info{
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+extern uint32_t this_elf_first_clus_num;
+
 uintptr_t load_elf(unsigned char elf_binary[], unsigned length, uintptr_t pgdir,
     uintptr_t (*prepare_page_for_va)(uintptr_t va, uintptr_t pgdir, uint64_t mask),
     ELF_info_t *elf);

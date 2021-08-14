@@ -5,7 +5,7 @@
 #include <os/mm.h>
 #include <os/sched.h>
 
-ientry_t this_clus_num = 0;
+uint32_t this_elf_first_clus_num = 0;
 
 /* prepare_page_for_kva should return a kernel virtual address */
 /* return entry point va of this elf */
