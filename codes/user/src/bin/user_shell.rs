@@ -424,7 +424,7 @@ impl ArgMachine{
         //testsuits.push("busybox\0cp\0hello\0/tmp");                                            
         testsuits.push("lmbench_all\0lat_proc\0-P\01\0shell");
         /* param move shoud > 512k*/
-        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
+        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=512k\0fsync=1\0print=3");
         //
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
