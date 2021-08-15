@@ -831,3 +831,10 @@ void sd_write(char *buf, uint32_t sec)
         sec++;
     }    
 }
+
+/* cache write back */
+int fat32_fsync(fd_num_t fd)
+{
+    debug();
+    return SYSCALL_SUCCESSED;
+}

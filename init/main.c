@@ -89,7 +89,7 @@ static void init_syscall(void)
     syscall[SYS_getpid] = &do_getpid;
     syscall[SYS_uname] = &do_uname;
 
-    syscall[SYS_sched_yield] = &do_scheduler;
+    syscall[SYS_sched_yield] = &do_yield;
     syscall[SYS_times] = &do_times;
     syscall[SYS_gettimeofday] = &do_gettimeofday;
     syscall[SYS_clone] = &do_clone;
@@ -147,6 +147,12 @@ static void init_syscall(void)
     syscall[SYS_ppoll] = &do_ppoll;
     syscall[SYS_sendfile] = &do_sendfile;
     syscall[SYS_renameat2] = &fat32_renameat2;
+    syscall[SYS_getrusage] = &do_getrusage;
+    syscall[SYS_pselect6] = &do_pselect6;
+    syscall[SYS_setitimer] = &do_setitimer;
+    syscall[SYS_msync] = &do_msync;
+    syscall[SYS_fsync] = &fat32_fsync;
+    syscall[SYS_prlimit64] = &do_prlimit;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~

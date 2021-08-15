@@ -92,3 +92,10 @@ int64 do_munmap(void *start, size_t len)
     }
     return SYSCALL_SUCCESSED;
 }
+
+/* put mmap back to file */
+int do_msync(void *addr, size_t length, int flags)
+{
+    debug();
+    return 0;
+}

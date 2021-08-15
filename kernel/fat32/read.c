@@ -100,9 +100,9 @@ size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t 
 {
     debug();
     log(0, "dirfd: %d; pathname: %s", dirfd, pathname);
-    char busybox_path[25] = "/root/static-bin/busybox";
+    char path[25] = "/lmbench_all";
     if (!strcmp(pathname, "/proc/self/exe")){
-        strcpy(buf, busybox_path);
+        strcpy(buf, path);
         return strlen(buf);
     }
     else

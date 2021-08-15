@@ -86,3 +86,17 @@ uint8 do_nanosleep(struct timespec *ts)
     return 0;
 }
 
+int do_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value)
+{
+    debug();
+    static int cnt = 0;
+    if (cnt == 0)
+        cnt++;
+    else{
+        old_value->it_interval.tv_sec = 0;
+        old_value->it_interval.tv_usec = 0;
+        old_value->it_value.tv_sec = 4;
+        old_value->it_value.tv_usec = 994897;
+    }
+    return 0;
+}

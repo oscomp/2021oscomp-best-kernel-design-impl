@@ -28,11 +28,11 @@ static const char *fixed_envp[] = {"SHELL=/bin/bash",
                      "TERM=vt220",
                      "USER=root",
                      "SHLVL=1",
-                     "JOURNAL_STREAM=8:9282",
+                     "JOURNAL_STREAM=8:9290",
                      "HUSHLOGIN=FALSE",
-                     "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                     "PATH=/",
                      "MAIL=/var/mail/root",
-                     "_=./busybox",
+                     "_=/usr/bin/bash",
                      "OLDPWD=/root",
                      0};
 
@@ -53,7 +53,7 @@ static void set_aux_vec(aux_elem_t *aux_vec, ELF_info_t *elf)
     NEW_AUX_ENT(0x2c, 0);
     NEW_AUX_ENT(0x2d, 0);
 
-    NEW_AUX_ENT(AT_SYSINFO_EHDR, 0x3fc2dee000);     // 0x21
+    // NEW_AUX_ENT(AT_SYSINFO_EHDR, 0x3fc2dee000);     // 0x21
     NEW_AUX_ENT(AT_HWCAP, 0x112d);                  // 0x10
     NEW_AUX_ENT(AT_PAGESZ, NORMAL_PAGE_SIZE);       // 0x06
     NEW_AUX_ENT(AT_CLKTCK, 0x64);                   // 0x11

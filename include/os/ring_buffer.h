@@ -17,6 +17,9 @@ struct ring_buffer {
 };
 #pragma pack()
 
+int wait_ring_buffer_read(struct ring_buffer *rbuf, time_t final_ticks);
+int wait_ring_buffer_write(struct ring_buffer *rbuf, time_t final_ticks);
+
 static inline void init_ring_buffer(struct ring_buffer *rbuf)
 {
 	// there is always one byte which should not be read or written

@@ -282,7 +282,7 @@ size_t fat32_readlinkat(fd_num_t dirfd, const char *pathname, char *buf, size_t 
 int fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, int32 flags);
 int32_t fat32_faccessat(fd_num_t dirfd, const char *pathname, int mode, int flags);
 int32_t fat32_fcntl(fd_num_t fd, int32_t cmd, int32_t arg);
-
+int fat32_fsync(fd_num_t fd);
 int fat32_renameat2(fd_num_t olddirfd, const char *oldpath, fd_num_t newdirfd, const char *newpath, unsigned int flags);
 
 /* elf loading */

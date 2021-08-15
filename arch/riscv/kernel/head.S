@@ -1,3 +1,4 @@
+#include <qemu.h>
 #include <asm.h>
 #include <csr.h>
 
@@ -34,10 +35,10 @@ clear_bss:
   add a3, a3, 4
   blt a3, a4, clear_bss
 clear_bss_done:
-  li sp, 0x802a0000
+  li sp, PHY_STACK1
   j boot_kernel
 secondary:
-  li sp, 0x802a8000
+  li sp, PHY_STACK2
   j boot_kernel
 
 loop:

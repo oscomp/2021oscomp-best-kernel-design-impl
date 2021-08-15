@@ -79,6 +79,7 @@ void do_scheduler(void)
     }
     /* kernel time count */
     kernel_time_count(); // kernel trans?
+    scheduler_switch_time_count();
     // choose next running
     /* priority schedule*/
     current_running = NULL;
@@ -139,6 +140,12 @@ void do_scheduler(void)
     switch_to(previous_running,current_running);
 }
 
+/* process give up the processor */
+void do_yield()
+{
+    yield_switch_time_count();
+    do_scheduler();
+}
 
 int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
@@ -149,7 +156,7 @@ int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
     int64_t ret;
     for (uint i = 0; i < NUM_MAX_TASK; ++i)
     {
-        if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].pid)){
+        if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].tid)){
             // confirm pid
             if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE){
                 do_block(&current_running->list, &pcb[i].wait_list);
@@ -157,7 +164,6 @@ int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
                 do_scheduler();
                 log(0, "exit status %d", pcb[i].exit_status);
                 if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
-                // i = 0; // start from beginning when wake up
                 log(0, "ret is %ld", ret);
                 return ret;
             }
@@ -375,65 +381,6 @@ void do_exit_group(int32_t exit_status)
     //         }
     //     }
     // }
-}
-
-pid_t do_getpid()
-{
-    debug();
-    return current_running->pid;
-}
-
-pid_t do_getppid()
-{
-    debug();
-    if (current_running->parent.parent == NULL){
-        log(0, "no parent");
-        return 1;
-    }
-    else{
-        log(0, "parent id is %d", current_running->parent.parent->pid);
-        return current_running->parent.parent->pid;
-    }
-}
-
-/* return 0 */
-pid_t do_getuid()
-{
-    debug();
-    return 0;
-}
-
-/* return 0 */
-pid_t do_geteuid()
-{
-    debug();
-    return 0;
-}
-
-/* return 0 */
-pid_t do_getgid()
-{
-    debug();
-    return 0;
-}
-
-/* return 0 */
-pid_t do_getegid()
-{
-    debug();
-    return 0;
-}
-
-pid_t do_set_tid_address(int *tidptr)
-{
-    debug();
-    return current_running->tid;
-}
-
-pid_t do_gettid()
-{
-    debug();
-    return current_running->tid;
 }
 
 /***************/

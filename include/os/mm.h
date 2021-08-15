@@ -25,12 +25,8 @@
 #define MEM_FOR_PROC 0xffffffff80150000lu
 
 #define KERNEL_STACK_SIZE NORMAL_PAGE_SIZE
-#define PAGES_PER_USER_STACK 5
+#define PAGES_PER_USER_STACK 10
 #define USER_STACK_INIT_SIZE (PAGES_PER_USER_STACK * NORMAL_PAGE_SIZE)
-
-/* Rounding; only works for n = power of two */
-#define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
-#define ROUNDDOWN(a, n) (((uint64_t)(a)) & ~((n)-1))
 
 typedef struct swappage
 {
@@ -70,9 +66,8 @@ void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base);
 #define MMAP_ALLOC_PAGE_FD -1
 int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off);
 int64 do_munmap(void *start, size_t len);
-
+int do_msync(void *addr, size_t length, int flags);
 int64_t do_brk(uintptr_t ptr);
-
 int do_mprotect(void *addr, size_t len, int prot);
 
 void *kalloc(void);

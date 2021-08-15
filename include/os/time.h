@@ -75,6 +75,25 @@ struct itimerval {
     struct timeval it_value;    /* Time until next expiration */
 };
 
+struct rusage {
+    struct timeval ru_utime; /* user CPU time used */
+    struct timeval ru_stime; /* system CPU time used */
+    long   ru_maxrss;        /* maximum resident set size */
+    long   ru_ixrss;         /* integral shared memory size */
+    long   ru_idrss;         /* integral unshared data size */
+    long   ru_isrss;         /* integral unshared stack size */
+    long   ru_minflt;        /* page reclaims (soft page faults) */
+    long   ru_majflt;        /* page faults (hard page faults) */
+    long   ru_nswap;         /* swaps */
+    long   ru_inblock;       /* block input operations */
+    long   ru_oublock;       /* block output operations */
+    long   ru_msgsnd;        /* IPC messages sent */
+    long   ru_msgrcv;        /* IPC messages received */
+    long   ru_nsignals;      /* signals received */
+    long   ru_nvcsw;         /* voluntary context switches */
+    long   ru_nivcsw;        /* involuntary context switches */
+};
+
 extern uint32_t time_base;
 extern uint64_t time_elapsed;
 extern uint64_t MHZ;
@@ -84,11 +103,15 @@ uint64_t get_timer(void);
 uint64_t get_ticks(void);
 void kernel_time_count();
 void user_time_count();
+uint64_t timespec_to_tick(struct timespec *ts);
+uint64_t timeval_to_tick(struct timeval *ts);
+void set_timeval_from_ticks(time_t time, struct timeval *tv);
 
 uint64_t do_times(struct tms *tms);
 int8_t do_gettimeofday(struct timespec *ts);
 int32_t do_clock_gettime(uint64_t clock_id, struct timespec *tp);
-int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
+int do_setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
+int32_t do_getrusage(int32_t who, struct rusage *usage);
 
 extern uint64_t get_time_base();
 

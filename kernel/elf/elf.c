@@ -161,7 +161,7 @@ uintptr_t lazy_load_elf(
     uint8_t is_first = 1;
 
     uint8_t phdr_info_cnt = 0;
-    assert(ph_entry_count > NUM_PHDR_IN_PCB);
+    assert(ph_entry_count >= NUM_PHDR_IN_PCB);
     while (ph_entry_count--) {
         if (phdr->p_type == PT_LOAD) {
             memcpy(&pcb->phdr[phdr_info_cnt++], phdr, sizeof(Elf64_Phdr));

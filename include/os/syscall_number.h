@@ -38,12 +38,15 @@
 #define SYS_writev 66
 
 #define SYS_sendfile 71
+#define SYS_pselect6 72
 #define SYS_ppoll 73
 
 #define SYS_readlinkat 78
 
 #define SYS_fstatat 79
 #define SYS_fstat 80
+
+#define SYS_fsync 82
 
 #define SYS_utimensat 88
 
@@ -53,6 +56,8 @@
 #define SYS_set_tid_address 96
 
 #define SYS_nanosleep 101
+
+#define SYS_setitimer 103
 
 #define SYS_clock_gettime 113
 
@@ -69,6 +74,7 @@
 #define SYS_times 153
 
 #define SYS_uname 160
+#define SYS_getrusage 165
 
 #define SYS_gettimeofday 169
 
@@ -89,9 +95,12 @@
 
 #define SYS_mmap 222
 
+#define SYS_msync 227
+
 #define SYS_mprotect 226
 
 #define SYS_wait4 260
+#define SYS_prlimit64 261
 
 #define SYS_renameat2 276
 

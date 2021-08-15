@@ -3,6 +3,7 @@
 
 #include <log.h>
 #include <os/time.h>
+#include <type.h>
 
 #define EPERM        1  /* Operation not permitted */
 #define ENOENT       2  /* No such file or directory */
@@ -169,30 +170,17 @@ struct sysinfo {
     char _f[20-2*sizeof(long)-sizeof(int)]; /* Padding to 64 bytes */
 };
 
+struct rlimit {
+    rlim_t rlim_cur;  /* Soft limit */
+    rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
+};
+
 #define RUSAGE_SELF 0
 #define RUSAGE_CHILDREN -1
 
-struct rusage {
-    struct timeval ru_utime; /* user CPU time used */
-    struct timeval ru_stime; /* system CPU time used */
-    long   ru_maxrss;        /* maximum resident set size */
-    long   ru_ixrss;         /* integral shared memory size */
-    long   ru_idrss;         /* integral unshared data size */
-    long   ru_isrss;         /* integral unshared stack size */
-    long   ru_minflt;        /* page reclaims (soft page faults) */
-    long   ru_majflt;        /* page faults (hard page faults) */
-    long   ru_nswap;         /* swaps */
-    long   ru_inblock;       /* block input operations */
-    long   ru_oublock;       /* block output operations */
-    long   ru_msgsnd;        /* IPC messages sent */
-    long   ru_msgrcv;        /* IPC messages received */
-    long   ru_nsignals;      /* signals received */
-    long   ru_nvcsw;         /* voluntary context switches */
-    long   ru_nivcsw;        /* involuntary context switches */
-};
-
+int do_prlimit(pid_t pid,   int resource,  const struct rlimit *new_limit, 
+    struct rlimit *old_limit);
 void do_syslog();
 int32_t do_sysinfo(struct sysinfo *info);
-int32_t do_getrusage(int32_t who, struct rusage *usage);
 
 #endif

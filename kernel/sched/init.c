@@ -51,12 +51,14 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
         pcb_underinit->fd[i].used = FD_UNUSED; // remember to set up other props when use it
         pcb_underinit->fd[i].dev = DEFAULT_DEV;
     }
-    /* my file descriptor */
-    pcb_underinit->myelf_fd.pos = 0;
-
-    // systime
+    /* systime */
     pcb_underinit->stime = 0;
     pcb_underinit->utime = 0;
+    /* my file descriptor */
+    pcb_underinit->myelf_fd.pos = 0;
+    /* context switch time */
+    pcb_underinit->scheduler_switch_time = 0;
+    pcb_underinit->yield_switch_time = 0;
 }
 
 void init_pcb_exec(pcb_t *pcb_underinit)
@@ -312,7 +314,7 @@ void init_pcb_stack(
     reg_t *regs = pt_regs->regs;    
     regs[3] = gp;  //gp
     regs[4] = 0; //tp
-    regs[10] = get_argc_from_argv(argv); //a0=argc
+    regs[10] = 0; // execve return 0
     // regs[11]= (ptr_t)argv; //a1=argv
     pt_regs->sstatus = SR_SUM | SR_FS; //enable supervisor-mode userpage access and float point instruction
 

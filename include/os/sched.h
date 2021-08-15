@@ -218,6 +218,10 @@ struct pcb
     fd_t myelf_fd;
     /* ELF program headers for load */
     Elf64_Phdr phdr[NUM_PHDR_IN_PCB];
+
+    /* context switch time */
+    uint64_t scheduler_switch_time;
+    uint64_t yield_switch_time;
 };
 #pragma pack()
 typedef struct pcb pcb_t;
@@ -365,7 +369,7 @@ void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_
 extern void ret_from_exception();
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
-
+void do_yield();
 pid_t do_spawn(task_info_t *task, void* arg, spawn_mode_t mode);
 void do_exit(int32_t exit_status);
 void do_exit_group(int32_t exit_status);
@@ -398,6 +402,9 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[]);
 int32_t do_rt_sigprocmask(int32_t how, const sigset_t *restrict set, sigset_t *restrict oldset, size_t sigsetsize);
 int32_t do_rt_sigaction(int32_t signum, struct sigaction *act, struct sigaction *oldact, size_t sigsetsize);
 void do_rt_sigreturn();
+
+void scheduler_switch_time_count();
+void yield_switch_time_count();
 
 /* scheduler counter */
 extern int FORMER_TICKS_COUNTER;

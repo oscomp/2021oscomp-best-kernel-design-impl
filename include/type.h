@@ -63,6 +63,8 @@ typedef uint32_t blksize_t;
 typedef uint64_t blkcnt_t;
 typedef uint64_t sigval_t;
 
+typedef uint64_t rlim_t;
+
 /* Minimum of signed integral types.  */
 # define INT8_MIN               (-128)
 # define INT16_MIN              (-32767-1)

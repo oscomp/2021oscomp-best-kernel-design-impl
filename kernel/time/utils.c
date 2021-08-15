@@ -24,6 +24,16 @@ void user_time_count()
     last_time = now_tick;
 }
 
+void scheduler_switch_time_count()
+{
+    if (!current_running->exec)
+        current_running->scheduler_switch_time++;
+}
+
+void yield_switch_time_count()
+{
+    current_running->yield_switch_time++;
+}
 
 uint64_t get_ticks()
 {
@@ -49,6 +59,41 @@ void latency(uint64_t time)
 
     while (get_timer() - begin_time < time);
     return;
+}
+
+uint64_t timespec_to_tick(struct timespec *ts)
+{
+    uint64_t nsec = ts->tv_nsec, nticks = 0;
+    for (uint8_t i = 0; i < NANO; i++){
+        nticks += time_base * (nsec % 10);
+        nticks /= 10;
+        nsec /= 10;
+    }
+    return nticks + ts->tv_sec * time_base;
+}
+
+uint64_t timeval_to_tick(struct timeval *tv)
+{
+    uint64_t usec = tv->tv_usec, uticks = 0;
+    for (uint8_t i = 0; i < MICRO; i++){
+        uticks += time_base * (usec % 10);
+        uticks /= 10;
+        usec /= 10;
+    }
+    return uticks + tv->tv_sec * time_base;
+}
+
+void set_timeval_from_ticks(time_t time, struct timeval *tv)
+{
+    tv->tv_sec = time / time_base; /* compute second */
+
+    uint64_t left = time % time_base; /* compute micro seconds */
+    tv->tv_usec = 0;
+    for (uint i = 0; i < MICRO; ++i)
+    {
+        tv->tv_usec = 10*tv->tv_usec + left * 10 / time_base;
+        left = (left * 10) % time_base;
+    }
 }
 
 void get_regular_time_from_spec(struct regular_time *mytp, struct timespec *tp)
