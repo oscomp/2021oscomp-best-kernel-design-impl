@@ -36,7 +36,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     if let Some(file) = &inner.fd_table[fd] {
         let f: Arc<dyn File + Send + Sync> = match &file.fclass {
             FileClass::Abstr(f)=> {f.clone()},
-            FileClass::File(f)=>{print!("\n");f.clone()},
+            FileClass::File(f)=>{/*print!("\n");*/f.clone()},
             _ => return -1,
         };
         if !f.writable() {
@@ -102,7 +102,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     if let Some(file) = &inner.fd_table[fd] {
         let file: Arc<dyn File + Send + Sync> = match &file.fclass {
             FileClass::Abstr(f)=> {f.clone()},
-            FileClass::File(f)=>{print!("\n");f.clone()},
+            FileClass::File(f)=>{/*print!("\n");*/f.clone()},
             _ => return -1,
         };
         if !file.readable() {

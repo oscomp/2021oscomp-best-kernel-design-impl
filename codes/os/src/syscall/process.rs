@@ -407,7 +407,7 @@ pub fn sys_brk(brk_addr: usize) -> isize{
 //    unsigned long newtls);
 pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls: usize) -> isize {
     // print_free_pages();
-    print!("\n");
+    //print!("\n");
     let current_task = current_task().unwrap();
     let new_task = current_task.fork(false);
     let tid = new_task.getpid();
