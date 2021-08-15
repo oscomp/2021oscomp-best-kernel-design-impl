@@ -32,7 +32,7 @@ pub const SIGNAL_STACK_SIZE: usize = PAGE_SIZE;
 pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 64;
 // pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 4;
 pub const KERNEL_STACK_SIZE: usize = PAGE_SIZE * 2;
-pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x80;
+pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x100;
 pub const MEMORY_END: usize = 0x80800000;
 
 pub const KMMAP_BASE: usize = 0x50000000;
