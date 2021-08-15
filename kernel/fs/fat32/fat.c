@@ -260,7 +260,7 @@ notfound:
 	asecdata = (uint32 *)&fat->fatcache.page[aidx * SECSZ];
 	max = fat->bpb.rsvd_sec_cnt + fat->bpb.fat_sz;	// last sector of fat region
 	sec = fat->next_free_fat;
-	cachesec[FAT_CACHE_NSEC] = 0;		// place a sentry in tail
+	cachesec[FAT_CACHE_NSEC] = fat->bpb.rsvd_sec_cnt;	// place a sentry in tail
 
 try:
 	for (idx = 0; cachesec[idx] < sec && idx < cnt; idx++);
@@ -270,7 +270,8 @@ try:
 			continue;
 		}
 		fat_cache_load(sb, sec, aidx);
-		for (fatoff = 0; fatoff < FAT_ENTRY_NUM; fatoff++) {
+		fatoff = (sec == cachesec[FAT_CACHE_NSEC]) ? 2 : 0;	// is the first fat sec?
+		for (; fatoff < FAT_ENTRY_NUM; fatoff++) {
 			if (asecdata[fatoff] == 0) {			// found
 				fat->next_free_fat = sec + 1;
 				fat->fatcache.allocidx = aidx;

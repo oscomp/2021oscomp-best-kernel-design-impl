@@ -7,7 +7,7 @@
 #include "sync/spinlock.h"
 #include "sync/sleeplock.h"
 
-#define PIPESIZE 512
+#define PIPESIZE 1024
 
 struct pipe {
 	struct spinlock		lock;

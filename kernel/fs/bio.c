@@ -31,8 +31,14 @@
 #include "utils/debug.h"
 #include "sched/proc.h"
 
-// #define BCACHE_TABLE_SIZE 233
+#if BNUM >= 2000
+#define BCACHE_TABLE_SIZE 233
+#elif BNUM >= 1000
+#define BCACHE_TABLE_SIZE 131
+#else
 #define BCACHE_TABLE_SIZE 47
+#endif
+
 #define __hash_idx(idx) ((idx) % BCACHE_TABLE_SIZE)
 
 /**

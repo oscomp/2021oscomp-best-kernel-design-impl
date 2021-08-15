@@ -102,48 +102,58 @@ int disk_multiple_read(struct buf *bufs[], int nbuf)
 /*
 #include "time.h"
 
-#define TEST_NBUF	500
+#define TEST_NBUF	10000
 #define CONSECUTIVE	1
+#define NBUFPRT		8
 
 void disk_test(void)
 {
-	struct buf *bufs[4];
+	struct buf *bufs[NBUFPRT];
 	struct buf *b;
-	int setcorno = 11420, i;
+	int setcorno = 60000000, i;
+	struct timeval t;
 	
 	uint64 t1 = readtime();
 
-	for (i = 0; i < BNUM; i++) {
+	for (i = 0; i < TEST_NBUF; i++) {
 		b = bget(ROOTDEV, setcorno + i * CONSECUTIVE);
 		b->data[0] = b->data[BSIZE - 1] = i + t1;
 		bwrite(b);
-	}
-
-	// race
-	for (i = 0; i < BNUM; i++) {
-		b = bget(ROOTDEV, setcorno + i * CONSECUTIVE);
-		while (b->dirty || b->disk) {	// not done
-			asm volatile("wfi");
+		if ((readtime() & 0x1ff) < 0x3) {
+			// printf("break!\n");
+			brelse(bread(ROOTDEV, setcorno + i - 500));
 		}
-		b->valid = 0;
-		brelse(b);
 	}
 
 	uint64 t2 = readtime();
-
-	struct timeval t;
 	convert_to_timeval(t2 - t1, &t);
-	printf("%d KB cost %d s %d us\n", BSIZE * BNUM / 1024, t.sec, t.usec);
+	printf("submit done! cost %d s %d us\n", t.sec, t.usec);
 
-	for (i = 0; i < BNUM; i += 4) {
-		for (int j = 0; j < 4; j++) {
+	// race
+	extern int sdcard_wqueue_empty(void);
+	while (!sdcard_wqueue_empty()) {
+		asm volatile("wfi");
+		// if ((readtime() & 0xff) < 0x3) {
+		// 	// printf("break!\n");
+		// 	brelse(bread(ROOTDEV, setcorno + i - 500));
+		// }
+	}
+
+	uint64 t3 = readtime();
+
+	convert_to_timeval(t3 - t1, &t);
+	printf("%d KB cost %d s %d us\n", BSIZE * TEST_NBUF / 1024, t.sec, t.usec);
+
+	t2 = readtime();
+	for (i = 0; i < TEST_NBUF; i += NBUFPRT) {
+		for (int j = 0; j < NBUFPRT; j++) {
 			bufs[j] = bget(ROOTDEV, setcorno + (j + i) * CONSECUTIVE);
 			bufs[j]->data[0] = bufs[j]->data[BSIZE - 1] = 0;
 		}
-		int ret = breads(bufs, 4);
+		int ret = breads(bufs, NBUFPRT);
 		if (ret < 0)
 			printf(__WARN("breads")" fail! errno %d\n", ret);
-		for (int j = 0; j < 4; j++) {
+		for (int j = 0; j < NBUFPRT; j++) {
 			uchar ans = i + j + t1;
 			b = bufs[j];
 			if (b->data[0] != ans || b->data[BSIZE - 1] != ans)
@@ -151,7 +161,10 @@ void disk_test(void)
 			brelse(b);
 		}
 	}
-	printf(__INFO("read")" read/write correct\n");
+
+	t3 = readtime();
+	convert_to_timeval(t3 - t2, &t);
+	printf(__INFO("read")" read done! cost %d s %d us\n", t.sec, t.usec);
 
 	for(;;) {
 		asm volatile("wfi");

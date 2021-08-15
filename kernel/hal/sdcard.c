@@ -28,13 +28,13 @@ void SD_CS_LOW(void) {
 
 void SD_HIGH_SPEED_ENABLE(void) {
     // spi_set_clk_rate(SPI_DEVICE_0, 10000000);
-	// spi_set_baudr(SPI_DEVICE_0, 38);
+	spi_set_baudr(SPI_DEVICE_0, 12);
 }
 
 static void sd_lowlevel_init(uint8 spi_index) {
     gpiohs_set_drive_mode(7, GPIO_DM_OUTPUT);
     // spi_set_clk_rate(SPI_DEVICE_0, 200000);     /*set clk rate*/
-	// spi_set_baudr(SPI_DEVICE_0, 1900);
+	spi_set_baudr(SPI_DEVICE_0, 1900);
 }
 
 static void sd_write_data(uint8 const *data_buff, uint32 length) {
@@ -47,18 +47,18 @@ static void sd_read_data(uint8 *data_buff, uint32 length) {
     spi_receive_data_standard(SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
 }
 
-static void sd_write_data_dma(uint8 const *data_buff, uint32 length) {
-    // spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
-	// spi_send_data_standard_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
-	/**
-	 * It is wired that the dmac only works with 32-bit data width.
-	 * So here we cast the uint8 buf into uint32 type, and divide the
-	 * length by 4 temporarily.
-	 * ... Perhaps it's the spi FIFO's problem, whose data width is 32-bit.
-	 */
-    spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
-	spi_send_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4, 1);
-}
+// static void sd_write_data_dma(uint8 const *data_buff, uint32 length) {
+//     // spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 8, 0);
+// 	// spi_send_data_standard_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, NULL, 0, data_buff, length);
+// 	/**
+// 	 * It is wired that the dmac only works with 32-bit data width.
+// 	 * So here we cast the uint8 buf into uint32 type, and divide the
+// 	 * length by 4 temporarily.
+// 	 * ... Perhaps it's the spi FIFO's problem, whose data width is 32-bit.
+// 	 */
+//     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
+// 	spi_send_data_no_cmd_dma(DMAC_CHANNEL0, SPI_DEVICE_0, SPI_CHIP_SELECT_3, data_buff, length / 4, 1);
+// }
 
 static void sd_write_data_dma_no_wait(uint8 const *data_buff, uint32 length) {
     spi_init(SPI_DEVICE_0, SPI_WORK_MODE_0, SPI_FF_STANDARD, 32, 1);
@@ -117,6 +117,7 @@ static void sd_end_cmd(void) {
 #define SD_CMD18 	18 		// READ_MULTIPLE_BLOCK
 #define SD_CMD25 	25 		// WRITE_MULTIPLE_BLOCK
 #define SD_CMD12 	12 		// STOP_TRANSMISSION
+#define SD_ACMD23 	23 		// SET_WR_BLK_ERASE_COUNT
 
 /*
  * Read sdcard response in R1 type. 
@@ -337,7 +338,7 @@ static int sd_init(void) {
 		return 0xff;
 	if (0 != check_block_size()) 
 		return 0xff;
-
+	SD_HIGH_SPEED_ENABLE();
 	return 0;
 }
 
@@ -348,6 +349,7 @@ static struct {
 	int busy;
 	int rpending;
 	int wpending;
+	int wcount;
 } sd_status;
 
 // Protected by their own locks.
@@ -362,6 +364,7 @@ void sdcard_init(void) {
 	sd_status.busy = 0;
 	sd_status.rpending = 0;
 	sd_status.wpending = 0;
+	sd_status.wcount = 0;
 
 	if (0 != result) {
 		panic("sdcard_init failed");
@@ -371,6 +374,7 @@ void sdcard_init(void) {
 	#endif
 }
 
+/*
 void sdcard_read_sector(uint8 *buf, int sectorno) {
 	uint8 result = 0xff;
 	uint32 address;
@@ -511,6 +515,7 @@ void test_sdcard(void) {
 
 	while (1) ;
 }
+*/
 
 
 // for interrupt handler
@@ -658,7 +663,7 @@ out:
 }
 
 
-static void sdcard_multiple_write(struct buf *b)
+static void sdcard_write(struct buf *b)
 {
 	// uint8 start_token = 0xfe;
 	uint8 start_token = 0xfc;
@@ -670,20 +675,38 @@ static void sdcard_multiple_write(struct buf *b)
 
 
 // Caller must hold the control before calling to here
-static int sdcard_write(struct buf *b)
+static int sdcard_multiple_write(struct buf *b, int nbuf)
 {
 	uint32 address = is_standard_sd ?
 						b->sectorno << 9 :
 						b->sectorno;
 
-	// sd_send_cmd(SD_CMD24, address, 0);
-	sd_send_cmd(SD_CMD25, address, 0);
-	if (sd_get_response_R1() != 0) {
-		sd_end_cmd();
+	int ret;
+	sd_send_cmd(SD_CMD55, 0, 0);
+	ret = sd_get_response_R1();
+	sd_end_cmd();
+	if (ret != 0) {
+		printf(__ERROR("CMD55")" error\n");
 		return -EIO;
 	}
 
-	sdcard_multiple_write(b);
+	sd_send_cmd(SD_ACMD23, nbuf, 0);
+	ret = sd_get_response_R1();
+	sd_end_cmd();
+	if (ret != 0) {
+		printf(__ERROR("ACMD23")" error\n");
+		return -EIO;
+	}
+
+	sd_send_cmd(SD_CMD25, address, 0);
+	if (sd_get_response_R1() != 0) {
+		sd_end_cmd();
+		printf(__ERROR("CMD25")" error\n");
+		return -EIO;
+	}
+	
+	sd_status.wcount = nbuf;
+	sdcard_write(b);
 
 	// see you in the interrupt handler	
 	return 0;
@@ -774,14 +797,22 @@ void sdcard_write_start(void)
 	release(&sdcard_lock.lk);
 
 	struct buf *b = container_of(dl, struct buf, list);
-	if (b->disk)
-		panic("sdcard_write_start: sd not busy with on-flight buf");
+	int nbuf = 1;
+
+	uint32 sec = b->sectorno;
+	for (dl = dl->next; dl != &sd_wqueue.head; dl = dl->next) {
+		struct buf *next = container_of(dl, struct buf, list);
+		if (next->sectorno == ++sec)	// consecutive sector
+			nbuf++;
+		else
+			break;
+	}
 	
 	b->disk = 1;
 	b->dirty = 0;
 	release(&sd_wqueue.lock);
 
-	if (sdcard_write(b) < 0) {
+	if (sdcard_multiple_write(b, nbuf) < 0) {
 		// unset status
 		acquire(&sd_wqueue.lock);
 		b->disk = 0;
@@ -867,21 +898,45 @@ void sdcard_intr(void)
 	bnext = (dl == &sd_wqueue.head) ? NULL :
 			container_of(dl, struct buf, list);
 	
-	// race read
-	if (sd_status.rpending || bnext == NULL) {
-		release(&sd_wqueue.lock);
-		sdcard_multiple_write_stop();
-	} else {
+	if (--sd_status.wcount > 0) {
+		if (bnext == NULL || bnext->sectorno != b->sectorno + 1) {
+			sdcard_multiple_write_stop();
+			panic("sdcard_intr: bad sd_status.wcount");
+		}
 		bnext->dirty = 0;
 		bnext->disk = 1;
 		release(&sd_wqueue.lock);
+		sdcard_write(bnext);
+		goto out;
+	}
+	else if (sd_status.rpending || bnext == NULL) {	// race read
+		release(&sd_wqueue.lock);
+		sdcard_multiple_write_stop();
+	}
+	else {
+		int nbuf = 1;
+		uint32 sec = bnext->sectorno;
 
-		if (bnext->sectorno == b->sectorno + 1) {
-			sdcard_multiple_write(bnext);
+		// preview the consecutive count
+		for (dl = dl->next; dl != &sd_wqueue.head; dl = dl->next) {
+			struct buf *next = container_of(dl, struct buf, list);
+			if (next->sectorno == ++sec)	// consecutive sector
+				nbuf++;
+			else
+				break;
+		}
+
+		bnext->dirty = 0;
+		bnext->disk = 1;
+		release(&sd_wqueue.lock);
+		// printf("nbuf = %d\n", nbuf);
+		if (nbuf <= 2 && bnext->sectorno == b->sectorno + 1) {
+			sd_status.wcount = nbuf;
+			sdcard_write(bnext);
 		} else {
 			sdcard_multiple_write_stop();
 
-			if (sdcard_write(bnext) < 0) {
+			if (sdcard_multiple_write(bnext, nbuf) < 0) {
 				// unset status
 				acquire(&sd_wqueue.lock);
 				bnext->dirty = 1;
@@ -905,4 +960,11 @@ stop_out:
 out:
 	if (!redo)
 		bput(b);
+}
+
+int sdcard_wqueue_empty(void)
+{
+	// race test
+	return sd_wqueue.head.next == &sd_wqueue.head && 
+			sd_wqueue.head.prev == &sd_wqueue.head;
 }
