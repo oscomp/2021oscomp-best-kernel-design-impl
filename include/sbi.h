@@ -105,11 +105,16 @@ static inline struct sbiret sbi_send_ipi(
 // xv6-k210 specific SBI interface 
 #define XV6_EID 	0x0a000210
 #define XV6_SET_EXT 		0x00
+#define XV6_IS_EXT			0x01
 #define XV6_CONSOLE_PUTS 	0x10
 #define XV6_GET_TIMER 		0x20
 
 static inline struct sbiret sbi_xv6_set_ext(void) {
 	return SBI_CALL_0(XV6_EID, XV6_SET_EXT);
+}
+
+static inline struct sbiret sbi_xv6_is_ext(void) {
+	return SBI_CALL_0(XV6_EID, XV6_IS_EXT);
 }
 
 static inline struct sbiret sbi_xv6_console_puts(char *str, int n) {
