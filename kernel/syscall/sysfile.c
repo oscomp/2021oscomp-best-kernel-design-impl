@@ -39,15 +39,14 @@ argfd(int n, int *pfd, struct file **pf)
 	int fd;
 	struct file *f;
 
-	if(argint(n, &fd) < 0)
-		return -1;
-	if(pfd)
+	argint(n, &fd);
+	if (pfd)
 		*pfd = fd;
-	if(fd < 0)
+	if (fd < 0)
 		return -1;
 	if ((f = fd2file(fd, 0)) == NULL)
 		return -1;
-	if(pf)
+	if (pf)
 		*pf = f;
 	return 0;
 }
@@ -108,8 +107,10 @@ sys_read(void)
 	int n;
 	uint64 p;
 
-	if(argfd(0, 0, &f) < 0 || argaddr(1, &p) < 0 || argint(2, &n) < 0)
-		return -1;
+	if (argfd(0, 0, &f) < 0)
+		return -EBADF;
+	argaddr(1, &p);
+	argint(2, &n);
 	return fileread(f, p, n);
 }
 
@@ -120,9 +121,10 @@ sys_write(void)
 	int n;
 	uint64 p;
 
-	if(argfd(0, 0, &f) < 0 || argaddr(1, &p) < 0 || argint(2, &n) < 0)
-		return -1;
-
+	if (argfd(0, 0, &f) < 0)
+		return -EBADF;
+	argaddr(1, &p);
+	argint(2, &n);
 	return filewrite(f, p, n);
 }
 
@@ -132,8 +134,8 @@ sys_close(void)
 	int fd;
 	struct file *f;
 
-	if(argfd(0, &fd, &f) < 0)
-		return -1;
+	if (argfd(0, &fd, &f) < 0)
+		return -EBADF;
 	f = fd2file(fd, 1);
 	fileclose(f);
 	return 0;
@@ -145,8 +147,9 @@ sys_fstat(void)
 	struct file *f;
 	uint64 st; // user pointer to struct stat
 
-	if(argfd(0, 0, &f) < 0 || argaddr(1, &st) < 0)
-		return -1;
+	if (argfd(0, 0, &f) < 0)
+		return -EBADF;
+	argaddr(1, &st);
 	return filestat(f, st);
 }
 
@@ -168,8 +171,11 @@ sys_fstatat(void)
 		dp = f->ip;
 	}
 
-	if (argstr(1, path, MAXPATH) < 0 || argaddr(2, &staddr) < 0 || argint(3, &flag) < 0)
+	if (argstr(1, path, MAXPATH) < 0)
 		return -ENAMETOOLONG;
+	argaddr(2, &staddr);
+	argint(3, &flag);
+
 	if ((ip = nameifrom(dp, path)) == NULL)
 		return -ENOENT;
 
@@ -200,8 +206,11 @@ sys_openat(void)
 	} else {
 		dp = f->ip;
 	}
-	if (argstr(1, path, MAXPATH) < 0 || argint(2, &omode) < 0 || argint(3, &fmode) < 0)
+	if (argstr(1, path, MAXPATH) < 0)
 		return -ENAMETOOLONG;
+	
+	argint(2, &omode);
+	argint(3, &fmode);
 
 	if(omode & O_CREATE){
 		ip = create(dp, path, (fmode & ~S_IFMT) | S_IFREG);
@@ -272,9 +281,10 @@ sys_mkdirat(void)
 	} else {
 		dp = f->ip;
 	}
-	if (argstr(1, path, MAXPATH) < 0 || argint(2, &mode) < 0) {
+	if (argstr(1, path, MAXPATH) < 0)
 		return -ENAMETOOLONG;
-	}
+	argint(2, &mode);
+
 	__debug_info("mkdirat", "create dir %s\n", path);
 	if ((ip = create(dp, path, (mode & ~S_IFMT) | S_IFDIR)) == NULL) {
 		__debug_warn("mkdirat", "create fail\n");
@@ -406,12 +416,12 @@ sys_unlinkat(void)
 	}
 	if (s >= path && *s == '.' && (s == path || *--s == '/')) {
 		__debug_warn("sys_unlinkat", "illegel path %s\n", path);
-		return -1;
+		return -EACCES;
 	}
 	
-	if((ip = nameifrom(dp, path)) == NULL){
+	if ((ip = nameifrom(dp, path)) == NULL) {
 		__debug_warn("sys_unlinkat", "can namei %s\n", path);
-		return -1;
+		return -ENOENT;
 	}
 	int isdir = S_ISDIR(ip->mode);
 	if (isdir && mode != AT_REMOVEDIR) {
@@ -426,7 +436,7 @@ sys_unlinkat(void)
 	if (isdir && isdirempty(ip) != 1) {
 		iunlockput(ip);
 		__debug_warn("sys_unlinkat", "dir isn't empty\n");
-		return -1;
+		return -ENOTEMPTY;
 	}
 	int ret = unlink(ip);
 	iunlockput(ip);

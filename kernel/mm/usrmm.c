@@ -219,31 +219,15 @@ int loadseg(pagetable_t pagetable, uint64 va, struct seg *s, struct inode *ip)
 		goto bad;
 	}
 
-	#ifdef QEMU
-	// // Temporarily solution for illegal float point instructions in busybox on QEMU
-	// if (strncmp(ip->entry->filename, "busybox", MAXNAME) == 0 &&
-	// 		va <= 0x10614 && 0x10614 < end)
-	// {
-	// 	__debug_warn("loadseg", "meet strange region\n");
-	// 	uint16 *ins = (uint16 *)((uint64)pa + 0x10614 % PGSIZE);
-	// 	*ins = 0xa035;
-	// 	ins = (uint16 *)((uint64)pa + 0x10678 % PGSIZE);
-	// 	*ins = 0xa035;
-	// } else if (strncmp(ip->entry->filename, "lua", MAXNAME) == 0 &&
-	// 		va <= 0x33176 && 0x33176 < end)
-	// {
-	// 	__debug_warn("loadseg", "meet strange region\n");
-	// 	uint16 *ins = (uint16 *)((uint64)pa + 0x33176 % PGSIZE);
-	// 	*ins = 0xa035;
-	// 	// ins = (uint16 *)((uint64)pa + 0x10678 % PGSIZE);
-	// 	// *ins = 0xa035;
-	// }
-
-	#endif
-
 	return 0;
 
 bad:
 	freepage(pa);
 	return -1;
+}
+
+// Test whether the given range is in any part of the current proc's v-space
+int rangeinseg(uint64 start, uint64 end)
+{
+	return partofseg(myproc()->segment, start, end) ? 1 : 0;
 }

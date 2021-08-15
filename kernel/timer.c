@@ -46,6 +46,13 @@ void timer_tick() {
 	if (cpuid() == 0) {
 		ticks++;
 		wakeup(&ticks);
+		
+		// static uint64 last = 0;
+		// uint64 now = readtime();
+		// if (now - last >= CLK_FREQ) {
+		// 	last = now;
+		// 	printf("%d s\n", now / CLK_FREQ);
+		// }
 	}
 	set_next_timeout();
 }

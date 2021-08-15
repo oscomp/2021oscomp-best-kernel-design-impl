@@ -792,6 +792,16 @@ copyout2(uint64 dstva, char *src, uint64 len)
 	return badaddr == 0 ? 0 : -1;
 }
 
+/**
+ * The copyout2() checks the user-vaddr legality every time,
+ * which is a waste of time. We only need to check one time,
+ * then do several times of the copying work.
+ */
+int copyout_nocheck(uint64 dstva, char *src, uint64 len)
+{
+	return safememmove((char *)dstva, src, len) == 0 ? 0 : -1;
+}
+
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
 // Return 0 on success, -1 on error.
@@ -829,6 +839,16 @@ copyin2(char *dst, uint64 srcva, uint64 len)
 	}
 	uint64 badaddr = safememmove(dst, (char *)srcva, len);
 	return badaddr == 0 ? 0 : -1;
+}
+
+/**
+ * The copyin2() checks the user-vaddr legality every time,
+ * which is a waste of time. We only need to check one time,
+ * then do several times of the copying work.
+ */
+int copyin_nocheck(char *dst, uint64 srcva, uint64 len)
+{
+	return safememmove(dst, (char *)srcva, len) == 0 ? 0 : -1;
 }
 
 // Copy a null-terminated string from user to kernel.
@@ -904,6 +924,22 @@ copyinstr2(char *dst, uint64 srcva, uint64 max)
 	} else {
 		return -1;
 	}
+}
+
+int either_copyout_nocheck(int user_dst, uint64 dst, void *src, uint64 len)
+{
+	if (user_dst)
+		return copyout_nocheck(dst, src, len);
+	memmove((char*)dst, src, len);
+	return 0;
+}
+
+int either_copyin_nocheck(void *dst, int user_src, uint64 src, uint64 len)
+{
+	if (user_src)
+		return copyin_nocheck(dst, src, len);
+	memmove(dst, (char*)src, len);
+	return 0;
 }
 
 void vmprint(pagetable_t pagetable)

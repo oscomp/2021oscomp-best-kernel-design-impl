@@ -113,18 +113,20 @@ int unlink(struct inode *ip)
 	for (sb = &rootfs; sb != NULL; sb = sb->next) {
 		if (sb->dev == ip) {
 			__debug_warn("unlink", "%s is busy\n", de->filename);
-			return -1;
+			return -EBUSY;
 		}
 	}
 
 	sb = ip->sb;
 	if (de == sb->root) {
 		__debug_warn("unlink", "try to unlink root\n");
-		return -1;
+		return -EACCES;
 	}
-	if (ip->op->unlink(ip) < 0) {
+
+	int ret = ip->op->unlink(ip);
+	if (ret < 0) {
 		__debug_warn("unlink", "fail\n");
-		return -1;
+		return ret;
 	}
 
 	acquire(&sb->cache_lock);
@@ -136,7 +138,7 @@ int unlink(struct inode *ip)
 	// }
 	release(&sb->cache_lock);
 
-	return 0;
+	return ret;
 }
 
 
@@ -529,6 +531,9 @@ int namepath(struct inode *ip, char *path, int max)
 // Is the directory dp empty except for "." and ".." ?
 int isdirempty(struct inode *dp)
 {
+	if (dp->entry->child)
+		return 0;
+
 	struct dirent dent;
 	int off = 0, ret;
 	while (1) {

@@ -624,3 +624,82 @@ void spi_send_data_no_cmd_dma(dmac_channel_number_t channel_num,
 	spi_handle->ssienr = 0x00;
 
 }
+
+/*
+#include "sched/proc.h"
+#include "mm/vm.h"
+
+int spi_receive_multiple_dma(dmac_channel_number_t dma_receive_channel_num,
+								spi_device_num_t spi_num, spi_chip_select_t chip_select,
+								uint8 *bufs[], uint32 lens[], uint32 nbuf)
+{
+	volatile spi_t *spi_handle = spi[spi_num];
+	dmac_lli_item_t dst_items[nbuf];
+	dmac_lli_item_t *dsts = (dmac_lli_item_t *) kwalkaddr(myproc()->pagetable, (uint64)dst_items);
+	uint64 src = (uint64)&spi_handle->dr[0];
+
+	uint32 total = 0;
+	for (int i = 0; i < nbuf; i++) {
+		dsts[i].sar = src;
+		dsts[i].dar = (uint64)bufs[i];
+		dsts[i].ch_block_ts = lens[i] / 4 - 1;	// byte to word
+		total += lens[i];
+	}
+
+	spi_set_tmod(spi_num, SPI_TMOD_RECV);
+	spi_handle->ctrlr1 = total / 4 - 1;
+	spi_handle->dmacr = 0x3;
+	spi_handle->ssienr = 0x01;
+
+	sysctl_dma_select((sysctl_dma_channel_t)dma_receive_channel_num, SYSCTL_DMA_SELECT_SSI0_RX_REQ + spi_num * 2);
+	
+	dmac_set_single_multiple(dma_receive_channel_num, 0, dsts, nbuf, (void *)src,
+							DMAC_ADDR_NOCHANGE, DMAC_ADDR_INCREMENT, DMAC_MSIZE_1, DMAC_TRANS_WIDTH_32);
+
+	if (spi_get_frame_format(spi_num) == SPI_FF_STANDARD)
+		spi[spi_num]->dr[0] = 0xffffffff;
+
+	spi_handle->ser = 1U << chip_select;
+
+	dmac_wait_done(dma_receive_channel_num);
+
+	spi_handle->ser = 0x00;
+	spi_handle->ssienr = 0x00;
+	return 0;
+}
+
+int spi_send_multiple_dma(dmac_channel_number_t dma_receive_channel_num,
+								spi_device_num_t spi_num, spi_chip_select_t chip_select,
+								uint8 *bufs[], uint32 lens[], uint32 nbuf)
+{
+	volatile spi_t *spi_handle = spi[spi_num];
+	dmac_lli_item_t src_items[nbuf];
+	dmac_lli_item_t *srcs = (dmac_lli_item_t *) kwalkaddr(myproc()->pagetable, (uint64)src_items);
+	uint64 dst = (uint64)&spi_handle->dr[0];
+
+	for (int i = 0; i < nbuf; i++) {
+		srcs[i].sar = (uint64)bufs[i];
+		srcs[i].dar = dst;
+		srcs[i].ch_block_ts = lens[i] / 4 - 1;
+	}
+
+	spi_set_tmod(spi_num, SPI_TMOD_TRANS);
+	spi_handle->dmacr = 0x2;
+	spi_handle->ssienr = 0x01;
+
+	sysctl_dma_select((sysctl_dma_channel_t)dma_receive_channel_num, SYSCTL_DMA_SELECT_SSI0_TX_REQ + spi_num * 2);
+	
+	dmac_set_single_multiple(dma_receive_channel_num, 1, srcs, nbuf, (void *)dst,
+							DMAC_ADDR_INCREMENT, DMAC_ADDR_NOCHANGE, DMAC_MSIZE_4, DMAC_TRANS_WIDTH_32);
+
+	spi_handle->ser = 1U << chip_select;
+
+	dmac_wait_done(dma_receive_channel_num);
+
+	while ((spi_handle->sr & 0x05) != 0x04)
+		;
+	spi_handle->ser = 0x00;
+	spi_handle->ssienr = 0x00;
+	return 0;
+}
+*/

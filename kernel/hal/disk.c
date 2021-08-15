@@ -70,3 +70,61 @@ void disk_intr(void)
 
 	__debug_info("disk_intr", "leave\n");
 }
+
+// int disk_read_multi_blk(struct buf *bufs[], int nbuf)
+// {
+// 	#ifdef QEMU
+// 	return virtio_disk_multi_rw(bufs, nbuf, 0);
+// 	#else
+// 	return sdcard_read_sectors(bufs, nbuf);
+// 	#endif
+// }
+
+// int disk_write_multi_blk(struct buf *bufs[], int nbuf)
+// {
+// 	#ifdef QEMU
+// 	return virtio_disk_multi_rw(bufs, nbuf, 1);
+// 	#else
+// 	return sdcard_write_sectors(bufs, nbuf);
+// 	#endif
+// }
+
+/*
+void disk_test(void)
+{
+	void *page = allocpage();
+	if (page == NULL)
+		return;
+
+	memset(page, 0, PGSIZE);
+	struct buf *bufs = page;
+	struct buf *pbufs[2];
+
+	bufs[0].sectorno = 10952;
+	bufs[1].sectorno = 10953;
+	// bufs[2].sectorno = 10866;
+
+	pbufs[0] = &bufs[0];
+	pbufs[1] = &bufs[1];
+	// pbufs[2] = &bufs[2];
+
+	disk_read_multi_blk(pbufs, 2);
+
+	printf(__INFO("sec 1")"\n%s\n", bufs[0].data);
+	printf(__INFO("sec 2")"\n%s\n", bufs[1].data);
+	// printf(__INFO("sec 3")"\n%s\n", bufs[2].data);
+
+	// for (int i = 0; i < 10; i++) {
+	// 	// printf("%d\t", bufs[1].data[i]);
+	// 	bufs[0].data[i] = '1';
+	// 	bufs[1].data[i] = '2';
+	// }
+
+	// printf("writing sec %d\n", bufs[0].sectorno);
+	// disk_write(&bufs[0], bufs[0].sectorno);
+	// printf("writing sec %d\n", bufs[1].sectorno);
+	// disk_write(&bufs[1], bufs[1].sectorno);
+
+	freepage(page);
+}
+*/

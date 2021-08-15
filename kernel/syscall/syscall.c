@@ -108,8 +108,7 @@ int
 argstr(int n, char *buf, int max)
 {
 	uint64 addr;
-	if(argaddr(n, &addr) < 0)
-		return -1;
+	argaddr(n, &addr);
 	int ret = fetchstr(addr, buf, max);
 	struct proc *p = myproc();
 	if (ret >= 0 && (p->tmask/* & (1 << (p->trapframe->a7 - 1))*/)) {
@@ -333,14 +332,14 @@ static char *sysnames[] = {
 void
 syscall(void)
 {
-	int num;
+	uint64 num;
 	struct proc *p = myproc();
 
 	__debug_info("syscall", "enter syscall\n");
 	__debug_assert("syscall", p != NULL, "p == NULL\n");
 	num = p->trapframe->a7;
 	__debug_info("syscall", "num = %d\n", num);
-	if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+	if (num < NELEM(syscalls) && syscalls[num]) {
 		// trace
 		int trace = p->tmask;// & (1 << (num - 1));
 		if (trace) {

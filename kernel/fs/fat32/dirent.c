@@ -228,7 +228,6 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 	struct fat32_entry *ep = i2fat(ip);
 	ep->attribute = S_ISDIR(mode) ? ATTR_DIRECTORY : 0;
 	ep->ent_cnt = (strlen(name) + CHAR_LONG_NAME - 1) / CHAR_LONG_NAME + 1;
-	ip->inum = ((uint64)reloc_clus(dir, off, 0) << 32) | (off % sb2fat(sb)->byts_per_clus);
 
 	if (S_ISDIR(mode)) {    // generate "." and ".." for ep
 		if ((ep->first_clus = alloc_clus(sb)) == 0 ||
@@ -247,6 +246,7 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 	if (fat_make_entry(dir, ep, name, off, 1) < 0)
 		goto fail;
 
+	ip->inum = ((uint64)reloc_clus(dir, off, 0) << 32) | (off % sb2fat(sb)->byts_per_clus);
 	return ip;
 
 fail:

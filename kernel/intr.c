@@ -14,10 +14,11 @@ push_off(void)
 	int old = intr_get();
 
 	intr_off();
+	struct cpu *c = mycpu();
 	//printf("\e[32mpush_off()\e[0m: cpuid(): %d\n", cpuid());
-	if(mycpu()->noff == 0)
-		mycpu()->intena = old;
-	mycpu()->noff += 1;
+	if (c->noff == 0)
+		c->intena = old;
+	c->noff += 1;
 }
 
 void

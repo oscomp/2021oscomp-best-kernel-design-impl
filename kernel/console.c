@@ -33,6 +33,7 @@
 #include "mm/vm.h"
 #include "utils/debug.h"
 #include "fs/buf.h"
+#include "errno.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
@@ -74,7 +75,7 @@ consolewrite(int user_src, uint64 src, int n)
 		if (m > INPUT_BUF) {
 			m = INPUT_BUF;
 		}
-		if(either_copyin(outbuf, user_src, src, m) == -1)
+		if (either_copyin_nocheck(outbuf, user_src, src, m) == -1)
 			break;
 		for (int i = 0; i < m; i++) {
 			sbi_console_putchar(outbuf[i]);
@@ -92,13 +93,17 @@ int consolewritev(struct inode *ip, struct iovec *iovecs, int count, uint off)
 
 	// acquire(&cons.lock);	// use inode's lock instead
 	for (int i = 0; i < count; i++) {
+		uint64 addr = (uint64)iovecs[i].iov_base;
 		uint64 n = iovecs[i].iov_len;
+		if (!rangeinseg(addr, addr + n))
+			return -EFAULT;
+
 		int m, j;
 		for (j = 0; j < n; j += m, tot += m) {
 			m = n - j;  // left count
 			if (m > INPUT_BUF)
 				m = INPUT_BUF;
-			if (copyin2(outbuf, (uint64)iovecs[i].iov_base + j, m) < 0)
+			if (copyin_nocheck(outbuf, addr + j, m) < 0)
 				break;
 			for (int c = 0; c < m; c++) {
 				sbi_console_putchar(outbuf[c]);
@@ -153,7 +158,7 @@ consoleread(int user_dst, uint64 dst, int n)
 		release(&cons.lock);
 		
 		// copy the input byte to the user-space buffer.
-		if (either_copyout(user_dst, dst, inbuf, j) < 0)
+		if (either_copyout_nocheck(user_dst, dst, inbuf, j) < 0)
 			break;
 		dst += j;
 		n -= j;
@@ -174,6 +179,9 @@ int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
 	for (int i = 0; i < count; i++) {
 		uint64 dst = (uint64)iovecs[i].iov_base;
 		uint64 n = iovecs[i].iov_len;
+		if (!rangeinseg(dst, dst + n))
+			return -EFAULT;
+
 		while (n > 0) {
 			// wait until interrupt handler has put some
 			// input into cons.buffer.
@@ -203,7 +211,7 @@ int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
 			release(&cons.lock);
 
 			// copy the input byte to the user-space buffer.
-			if (copyout2(dst, inbuf, j) < 0) {
+			if (copyout_nocheck(dst, inbuf, j) < 0) {
 				count = 0; // break the out-level loop
 				break;
 			}
