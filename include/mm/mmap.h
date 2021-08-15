@@ -22,6 +22,10 @@
 #define MAP_ANONYMOUS	0x20
 #define MAP_FAILED ((void *) -1)
 
+#define MS_ASYNC		1
+#define MS_INVALIDATE	2
+#define MS_SYNC			4
+
 // struct mapped {
 // 	uint32 offset;
 // 	uint16 len;
@@ -58,5 +62,6 @@ void mmapdel(struct seg *seg, int sync);
 void mmapdup(struct seg *seg);
 uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, struct file *f, int64 off);
 int do_munmap(uint64 start, uint64 len);
+int do_msync(uint64 addr, uint64 len, int flags);
 
 #endif

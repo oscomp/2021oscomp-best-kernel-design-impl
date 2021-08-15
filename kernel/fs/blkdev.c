@@ -118,38 +118,38 @@ int disk_write_block(struct superblock *sb, int usr, char *src, uint64 sectorno,
 
 int disk_read_block(struct superblock *sb, int usr, char *dst, uint64 sectorno, uint64 off, uint64 len)
 {
-	if (off + len > BSIZE)
-		panic("diskfs_read");
+	// if (off + len > BSIZE)
+	// 	panic("diskfs_read");
 	int ret;
-	// if (off + len <= BSIZE) {
+	if (off + len <= BSIZE) {
 		// __debug_info("diskfs_read", "sec:%d off:%d len:%d\n", sectorno, off, len);
 		struct buf *b = bread(sb->devnum, sectorno);
 		ret = either_copyout_nocheck(usr, (uint64)dst, b->data + off, len);
 		brelse(b);
-	// } else {	// over sectors
-	// 	int const cnt = (off + len + BSIZE - 1) / BSIZE;
-	// 	int i;
-	// 	uint32 m, tot = 0;
-	// 	struct buf *bufs[cnt];
-	// 	// gathering buffers
-	// 	for (i = 0; i < cnt; i++)
-	// 		bufs[i] = bget(sb->devnum, sectorno++);
+	} else {	// over sectors
+		int const cnt = (off + len + BSIZE - 1) / BSIZE;
+		int i;
+		uint32 m, tot = 0;
+		struct buf *bufs[cnt];
+		// gathering buffers
+		for (i = 0; i < cnt; i++)
+			bufs[i] = bget(sb->devnum, sectorno++);
 
-	// 	ret = breads(bufs, cnt);
-	// 	if (ret >= 0) {
-	// 		m = BSIZE - off;
-	// 		ret = either_copyout_nocheck(usr, (uint64)dst, bufs[0]->data + off, m);
-	// 		tot += m;
-	// 	}
-	// 	for (i = 1, m = BSIZE; ret >= 0 && i < cnt; i++) {
-	// 		if (len - tot < BSIZE)
-	// 			m = len - tot;
-	// 		ret = either_copyout_nocheck(usr, (uint64)dst + tot, bufs[i]->data, m);
-	// 		tot += m;
-	// 	}
-	// 	for (i = 0; i < cnt; i++)
-	// 		brelse(bufs[i]);
-	// }
+		ret = breads(bufs, cnt);
+		if (ret >= 0) {
+			m = BSIZE - off;
+			ret = either_copyout_nocheck(usr, (uint64)dst, bufs[0]->data + off, m);
+			tot += m;
+		}
+		for (i = 1, m = BSIZE; ret >= 0 && i < cnt; i++) {
+			if (len - tot < BSIZE)
+				m = len - tot;
+			ret = either_copyout_nocheck(usr, (uint64)dst + tot, bufs[i]->data, m);
+			tot += m;
+		}
+		for (i = 0; i < cnt; i++)
+			brelse(bufs[i]);
+	}
 	return ret < 0 ? ret : len;
 }
 

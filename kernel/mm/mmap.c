@@ -765,6 +765,56 @@ int do_munmap(uint64 start, uint64 len)
 }
 
 
+int do_msync(uint64 addr, uint64 len, int flags)
+{
+	struct proc *p = myproc();
+	struct seg *s = partofseg(p->segment, addr, addr + len);
+	if (s == NULL)
+		return -EFAULT;
+
+	// private mapping and anonymous mapping can not be synchronized
+	if (s->type != MMAP || MMAP_ANONY(s->mmap) || !MMAP_SHARE(s->mmap))
+		return 0;
+
+	// MS_INVALIDATE does nothing on our system
+	if (!(flags & (MS_ASYNC|MS_SYNC)))
+		goto out;
+
+	struct file *f = MMAP_FILE(s->mmap);
+	struct inode *ip = f->ip;
+	int ret = 0;
+
+	uint64 foff = s->f_off + (addr - s->addr);
+	uint64 sz = s->sz < len ? s->sz : len;
+	uint64 end = foff + sz;
+
+	acquire(&ip->ilock);
+	for (; foff < end; foff += PGSIZE) {
+		struct mmap_page *map = get_mmap_page(&ip->mapping, foff);
+		if (map == NULL)
+			panic("__file_mmapdel: no map node\n");
+		
+		if (map->pa && foff < ip->size) {
+			uint64 flen = (ip->size - foff < map->f_len) ?
+							ip->size - foff : map->f_len;
+			release(&ip->ilock);
+			ilock(ip);
+		
+			// This op may fail, but what can we do about it?
+			if (map->valid) {
+				ip->fop->write(ip, 0, (uint64)map->pa, foff, flen);
+			}
+			iunlock(ip);
+			acquire(&ip->ilock);
+		}
+	}
+	release(&ip->ilock);
+
+out:
+	return ret;
+}
+
+
 /**
  * Page fault handler, the real allocator.
  */

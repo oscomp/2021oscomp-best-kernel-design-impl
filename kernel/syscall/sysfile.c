@@ -670,7 +670,7 @@ sys_fcntl(void)
 		return minfd;
 	}
 
-	__debug_error("sys_fcntl", "unsupported cmd %d\n", cmd);
+	__debug_warn("sys_fcntl", "unsupported cmd %d\n", cmd);
 
 	return -1;
 }

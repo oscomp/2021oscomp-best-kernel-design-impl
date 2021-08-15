@@ -725,7 +725,7 @@ void scheduler(void) {
 			swtch(&c->context, &tmp->context);
 			// switch back to kernel pagetable 
 			w_satp(MAKE_SATP(kernel_pagetable));
-			sfence_vma();
+			// sfence_vma();
 			/*__debug_info("scheduler()", "swtch from %s\n", tmp->name);*/
 			found = 1;
 		}

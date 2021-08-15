@@ -34,6 +34,7 @@ struct buf {
 void			binit(void);
 struct buf*		bget(uint dev, uint sectorno);
 struct buf*		bread(uint dev, uint sectorno);
+int				breads(struct buf *bufs[], int nbuf);
 void			bwrite(struct buf *b);
 void			brelse(struct buf *b);
 void			bput(struct buf *b);

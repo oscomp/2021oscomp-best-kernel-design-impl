@@ -127,3 +127,24 @@ sys_munmap(void)
 
 	return do_munmap(start, len);
 }
+
+uint64
+sys_msync(void)
+{
+	uint64 addr;
+	uint64 len;
+	int flags;
+
+	argaddr(0, &addr);
+	argaddr(1, &len);
+	argint(2, &flags);
+
+	if (!(flags & (MS_ASYNC|MS_SYNC|MS_INVALIDATE)) ||
+		((flags & MS_ASYNC) && (flags & MS_SYNC)) ||
+		(addr % PGSIZE))
+	{
+		return -EINVAL;
+	}
+
+	return do_msync(addr, len, flags);
+}

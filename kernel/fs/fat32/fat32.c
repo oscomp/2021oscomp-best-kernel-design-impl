@@ -201,32 +201,32 @@ uint fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user, uin
 	uint sec = first_sec_of_clus(fat, cluster) + off / bps;
 
 	// __debug_info("fat_rw_clus", "clus:%d off:%d len:%d\n", cluster, off, n);
-	for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
-		m = bps - off % bps;
-		if (n - tot < m) {
-			m = n - tot;
-		}
-		// __debug_info("fat_rw_clus", "sec:%d m:%d\n", sec, m);
-		if (write) {
-			if (sb->op.write(sb, user, (char*)data, sec, off % bps, m) < 0) {
-				break;
-			}
-		} else if (sb->op.read(sb, user, (char*)data, sec, off % bps, m) < 0) {
-			break;
-		}
-	}
-	// if (write) {
-	// 	for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
-	// 		m = bps - off % bps;
-	// 		if (n - tot < m)
-	// 			m = n - tot;
-	// 		// __debug_info("fat_rw_clus", "sec:%d m:%d\n", sec, m);
-	// 		if (sb->op.write(sb, user, (char*)data, sec, off % bps, m) < 0)
-	// 			break;
+	// for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
+	// 	m = bps - off % bps;
+	// 	if (n - tot < m) {
+	// 		m = n - tot;
 	// 	}
-	// } else {
-	// 	tot = sb->op.read(sb, user, (char*)data, sec, off % bps, n);
+	// 	// __debug_info("fat_rw_clus", "sec:%d m:%d\n", sec, m);
+	// 	if (write) {
+	// 		if (sb->op.write(sb, user, (char*)data, sec, off % bps, m) < 0) {
+	// 			break;
+	// 		}
+	// 	} else if (sb->op.read(sb, user, (char*)data, sec, off % bps, m) < 0) {
+	// 		break;
+	// 	}
 	// }
+	if (write) {
+		for (tot = 0; tot < n; tot += m, off += m, data += m, sec++) {
+			m = bps - off % bps;
+			if (n - tot < m)
+				m = n - tot;
+			// __debug_info("fat_rw_clus", "sec:%d m:%d\n", sec, m);
+			if (sb->op.write(sb, user, (char*)data, sec, off % bps, m) < 0)
+				break;
+		}
+	} else {
+		tot = sb->op.read(sb, user, (char*)data, sec, off % bps, n);
+	}
 	// __debug_info("fat_rw_clus", "done: tot:%d\n", tot);
 	return tot;
 }

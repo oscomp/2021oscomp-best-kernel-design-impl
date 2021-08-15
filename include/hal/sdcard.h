@@ -15,5 +15,6 @@ int sdcard_read(struct buf *b);
 int sdcard_submit(struct buf *b);
 void sdcard_write_start(void);
 void sdcard_intr(void);
+int sdcard_read_sectors(struct buf * restrict bufs[], int nbuf);
 
 #endif 

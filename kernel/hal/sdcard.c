@@ -512,57 +512,6 @@ void test_sdcard(void) {
 	while (1) ;
 }
 
-/*
-static uint8 dummy_data_for_dma[16] = { 0xff };
-int sdcard_read_sectors(struct buf *bufs[], int nbuf)
-{
-	if (nbuf <= 0)
-		panic("sdcard_read_multiple: bad nbuf");
-
-	int ret = -EIO;
-	uint8 *addrs[nbuf * 2];
-	uint32 lens[nbuf * 2];
-	uint32 sector = bufs[0]->sectorno;
-	uint32 address = is_standard_sd ? sector << 9 : sector;
-
-	for (int i = 0; i < nbuf; i++) {
-		if (bufs[i]->sectorno != sector++)
-			panic("inconsecutive sector number");
-
-		addrs[i * 2] = bufs[i]->data;
-		lens[i * 2] = BSIZE;
-		addrs[i * 2 + 1] = dummy_data_for_dma;
-		lens[i * 2 + 1] = 4;
-	}
-
-	acquiresleep(&sdcard_lock);
-
-	sd_send_cmd(SD_CMD18, address, 0);
-	if (sd_get_response_R1() != 0)
-		goto end;
-
-
-	uint8 result = 0xff;
-	int timeout = 0xffff;
-	while (timeout-- > 0 && result != 0xfe)
-		sd_read_data(&result, 1);
-
-	if (result != 0xfe)
-		goto end;
-
-	ret = sd_read_multiple_data_dma(addrs, lens, nbuf * 2);
-	sd_end_cmd();
-
-	sd_send_cmd(SD_CMD12, 0, 0);
-	sd_get_response_R1();
-	sd_end_cmd();	// this is needed
-
-end:
-	sd_end_cmd();
-	releasesleep(&sdcard_lock);
-	return ret;
-}
-*/
 
 // for interrupt handler
 #define BUSY_READ	1
@@ -661,6 +610,54 @@ end:
 }
 
 
+int sdcard_read_sectors(struct buf * restrict bufs[], int nbuf)
+{
+	int ret = 0;
+	uint32 address = is_standard_sd ?
+						bufs[0]->sectorno << 9 :
+						bufs[0]->sectorno;
+
+	// wait our turn
+	sdcard_read_wait(bufs[0]);
+
+	sd_send_cmd(SD_CMD18, address, 0);
+	if (sd_get_response_R1() != 0) {
+		ret = -EIO;
+		printf(__WARN("sdread")" response! sec %d\n", bufs[0]->sectorno);
+		goto out;
+	}
+
+	for (int i = 0; i < nbuf; i++) {
+		uint8 result = 0xff;
+		int timeout = 0xffff;
+		while (timeout-- > 0 && result != 0xfe)
+			sd_read_data(&result, 1);
+
+		if (result != 0xfe) {
+			ret = -EIO;
+			printf(__WARN("sdread")" %d\n", bufs[i]->sectorno);
+			break;
+		}
+
+		sd_read_data_dma(bufs[i]->data, BSIZE);
+		
+		uint8 dummy_crc[2];
+		sd_read_data(dummy_crc, 2);
+	}
+	sd_end_cmd();
+
+	sd_send_cmd(SD_CMD12, 0, 0);
+	sd_get_response_R1();
+	sd_end_cmd();	// this is needed
+
+out:
+	sd_end_cmd();
+	if (sdcard_read_done(bufs[0]))
+		sdcard_write_start();
+	return ret;
+}
+
+
 static void sdcard_multiple_write(struct buf *b)
 {
 	// uint8 start_token = 0xfe;
@@ -725,6 +722,10 @@ static void sdcard_multiple_write_stop(void)
 	for (int timeout = 0xffff; timeout >= 0 && token != 0xff; timeout--)
 		sd_read_data(&token, 1);
 	
+	sd_end_cmd();
+
+	sd_send_cmd(SD_CMD12, 0, 0);
+	sd_get_response_R1();
 	sd_end_cmd();
 
 	// check writing result

@@ -207,6 +207,7 @@ free_chain(int i)
 	}
 }
 
+/*
 // allocate three descriptors (they need not be contiguous).
 // disk transfers always use three descriptors.
 static int
@@ -222,19 +223,37 @@ alloc3_desc(int * restrict idx)
 	}
 	return 0;
 }
+*/
 
-int
-virtio_disk_rw(struct buf *b, int write)
+static int alloc_descs(int * restrict idx, int n)
 {
+	for (int i = 0; i < n; i++) {
+		idx[i] = alloc_desc();
+		if (idx[i] < 0) {
+			for (int j = 0; j < i; j++)
+				free_desc(idx[j]);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static int
+virtio_disk_rw(struct buf * restrict bufs[], int nbuf, int write)
+{
+	int ndesc = nbuf + 2;
+	if (ndesc > NUM)
+		return -1;
+
 	acquire(&disk.vdisk_lock);
 	// the spec's Section 5.2 says that legacy block operations use
 	// three descriptors: one for type/reserved/sector, one for the
 	// data, one for a 1-byte status result.
 
 	// allocate the three descriptors.
-	int idx[3];
+	int idx[NUM];
 	while (1) {
-		if (alloc3_desc(idx) == 0)
+		if (alloc_descs(idx, ndesc) == 0)
 			break;
 		if (write) {	// write don't wait
 			release(&disk.vdisk_lock);
@@ -254,7 +273,7 @@ virtio_disk_rw(struct buf *b, int write)
 	buf0->type = write ? VIRTIO_BLK_T_OUT :	// write the disk
 						VIRTIO_BLK_T_IN;	// read the disk
 	buf0->reserved = 0;
-	buf0->sector = b->sectorno;
+	buf0->sector = bufs[0]->sectorno;
 
 	// first
 	desc = &disk.desc[idx[0]];
@@ -263,17 +282,18 @@ virtio_disk_rw(struct buf *b, int write)
 	desc->flags = VRING_DESC_F_NEXT;
 	desc->next = idx[1];
 
-	// second
-	desc = &disk.desc[idx[1]];
-	desc->addr = (uint64) b->data;
-	desc->len = BSIZE;
-	desc->flags = write ? 0 :				// device reads b->data
-						VRING_DESC_F_WRITE;	// device writes b->data
-	desc->flags |= VRING_DESC_F_NEXT;
-	desc->next = idx[2];
+	for (int i = 1; i <= nbuf; i++) {
+		desc = &disk.desc[idx[i]];
+		desc->addr = (uint64) bufs[i - 1]->data;
+		desc->len = BSIZE;
+		desc->flags = write ? 0 :				// device reads b->data
+							VRING_DESC_F_WRITE;	// device writes b->data
+		desc->flags |= VRING_DESC_F_NEXT;
+		desc->next = idx[i + 1];
+	}
 
 	// last
-	desc = &disk.desc[idx[2]];
+	desc = &disk.desc[idx[ndesc - 1]];
 	desc->addr = (uint64) &disk.info[idx[0]].status;
 	desc->len = 1;
 	desc->flags = VRING_DESC_F_WRITE;		// device writes the status
@@ -289,7 +309,7 @@ virtio_disk_rw(struct buf *b, int write)
 	 */
 	disk.info[idx[0]].idx1 = write ? idx[0] : -1;
 	disk.info[idx[0]].status = 0xff;		// device writes 0 on success
-	disk.info[idx[0]].b = b;
+	disk.info[idx[0]].b = bufs[0];
 
 	// tell the device the first index in our chain of descriptors.
 	disk.avail->ring[disk.avail->idx % NUM] = idx[0];
@@ -305,11 +325,11 @@ virtio_disk_rw(struct buf *b, int write)
 
 	int res = 0;
 	if (!write) {
-		b->disk = 1;
+		bufs[0]->disk = 1;
 		// Wait for virtio_disk_intr() to say request has finished.
-		while (b->disk == 1) {
+		while (bufs[0]->disk == 1) {
 			// printf(__INFO("virtio_disk_rw")" sleep on %d\n", b->sectorno);
-			sleep(b, &disk.vdisk_lock);
+			sleep(bufs[0], &disk.vdisk_lock);
 		}
 		res = -(disk.info[idx[0]].status != 0);
 		free_chain(idx[0]);
@@ -392,7 +412,8 @@ virtio_disk_intr()
 			b->dirty = 0;
 			disk.queue_running++;
 			release(&disk.queue.lock);
-			if (virtio_disk_rw(b, 1) < 0) {
+			bufs[0] = b;
+			if (virtio_disk_rw(bufs, 1, 1) < 0) {
 				acquire(&disk.queue.lock);
 				b->disk = 0;
 				b->dirty = 1;
@@ -420,17 +441,17 @@ void virtio_disk_write_start(void)
 		return;
 	}
 	
-	struct buf *b;
-	b = container_of(l, struct buf, list);
-	if (b->disk)
+	struct buf *b[1];
+	b[0] = container_of(l, struct buf, list);
+	if (b[0]->disk)
 		panic("virtio_disk_write_start: on-flight buf");
 
-	b->disk = 1;
-	b->dirty = 0;
+	b[0]->disk = 1;
+	b[0]->dirty = 0;
 	disk.queue_running = 1;
 	release(&disk.queue.lock);
 
-	if (virtio_disk_rw(b, 1) < 0) {
+	if (virtio_disk_rw(b, 1, 1) < 0) {
 		/**
 		 * This happens when lacking of descs,
 		 * but don't worry, since lacking of
@@ -439,8 +460,8 @@ void virtio_disk_write_start(void)
 		 * start us.
 		 */
 		acquire(&disk.queue.lock);
-		b->disk = 0;
-		b->dirty = 1;
+		b[0]->disk = 0;
+		b[0]->dirty = 1;
 		disk.queue_running--;
 		release(&disk.queue.lock);
 	}
@@ -470,93 +491,14 @@ int virtio_disk_submit(struct buf *b)
 	return res;
 }
 
-/*
-static int alloc_descs(int *idx, int n)
+int virtio_disk_read(struct buf *b)
 {
-	for (int i = 0; i < n; i++) {
-		idx[i] = alloc_desc();
-		if (idx[i] < 0) {
-			for (int j = 0; j < i; j++)
-				free_desc(idx[j]);
-			return -1;
-		}
-	}
-	return 0;
+	struct buf *bufs[1];
+	bufs[0] = b;
+	return virtio_disk_rw(bufs, 1, 0);
 }
 
-int virtio_disk_multi_rw(struct buf *bufs[], int nbuf, int write)
+int virtio_disk_multiple_read(struct buf *bufs[], int nbuf)
 {
-	int ndesc = nbuf + 2;
-	if (nbuf <= 0 || ndesc > NUM)
-		panic("virtio_disk_multi_rw: bad nbuf");
-
-	acquire(&disk.vdisk_lock);
-
-	int idx[NUM];
-	while (1) {
-		if (alloc_descs(idx, ndesc) == 0)
-			break;
-		sleep(&disk.free[0], &disk.vdisk_lock);
-	}
-	
-	struct virtio_blk_outhdr {
-		uint32 type;
-		uint32 reserved;
-		uint64 sector;
-	};
-	struct virtio_blk_outhdr buf0;
-	struct virtio_blk_outhdr *pbuf0;
-	uint64 sector = bufs[0]->sectorno;
-	
-	pbuf0 = (struct virtio_blk_outhdr*)kwalkaddr(myproc()->pagetable, (uint64)&buf0);
-
-
-	buf0.type = write ? VIRTIO_BLK_T_OUT : VIRTIO_BLK_T_IN;
-	buf0.reserved = 0;
-	buf0.sector = sector;
-
-	disk.desc[idx[0]].addr = (uint64)pbuf0;
-	disk.desc[idx[0]].len = sizeof(struct virtio_blk_outhdr);
-	disk.desc[idx[0]].flags = VRING_DESC_F_NEXT;
-	disk.desc[idx[0]].next = idx[1];
-
-	for (int i = 1; i <= nbuf; i++) {
-		if (sector++ != bufs[i - 1]->sectorno)
-			panic("inconsecutive sector number");
-
-		disk.desc[idx[i]].addr = (uint64)bufs[i - 1]->data;
-		disk.desc[idx[i]].len = BSIZE;
-		disk.desc[idx[i]].flags = write ? 0 : VRING_DESC_F_WRITE;
-		disk.desc[idx[i]].flags |= VRING_DESC_F_NEXT;
-		disk.desc[idx[i]].next = idx[i + 1];
-	}
-
-	disk.info[idx[0]].status = -1;
-	disk.desc[idx[ndesc - 1]].addr = (uint64)&disk.info[idx[0]].status;
-	disk.desc[idx[ndesc - 1]].len = 1;
-	disk.desc[idx[ndesc - 1]].flags = VRING_DESC_F_WRITE;
-	disk.desc[idx[ndesc - 1]].next = 0;
-
-	bufs[0]->disk = 1;
-	disk.info[idx[0]].b = bufs[0];
-
-	disk.avail[2 + (disk.avail[1] % NUM)] = idx[0];
-	__sync_synchronize();
-	disk.avail[1] = disk.avail[1] + 1;
-
-	*R(VIRTIO_MMIO_QUEUE_NOTIFY) = 0; // queue number
-
-	while (bufs[0]->disk == 1) {
-		sleep(bufs[0], &disk.vdisk_lock);
-	}
-
-	int ret = disk.info[idx[0]].status == 0 ? 0 : -1;
-
-	disk.info[idx[0]].b = 0;
-	free_chain(idx[0]);
-
-	release(&disk.vdisk_lock);
-
-	return ret;
+	return virtio_disk_rw(bufs, nbuf, 0);
 }
-*/

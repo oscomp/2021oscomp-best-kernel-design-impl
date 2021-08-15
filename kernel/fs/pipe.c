@@ -376,9 +376,10 @@ uint32 pipepoll(struct file *fp, struct poll_table *pt)
 	uint32 mask = 0;
 	struct pipe *pi = fp->pipe;
 
-	__debug_info("pipepoll", "r/w=%d/%d | ro/wo=%d/%d | rq/wq=%d/%d\n",
+	__debug_info("pipepoll", "r/w=%d/%d | ro/wo=%d/%d | rq/wq=%d/%d rn/wn=%d/%d\n",
 				fp->readable, fp->writable, pi->readopen, pi->writeopen,
-				!wait_queue_empty(&pi->rqueue), !wait_queue_empty(&pi->wqueue));
+				!wait_queue_empty(&pi->rqueue), !wait_queue_empty(&pi->wqueue),
+				pi->nread, pi->nwrite);
 
 	if (fp->readable)
 		poll_wait(fp, &pi->rqueue, pt);
@@ -388,8 +389,12 @@ uint32 pipepoll(struct file *fp, struct poll_table *pt)
 	if (fp->readable) {
 		if (pi->nwrite - pi->nread > 0)			// has something to read
 			mask |= POLLIN;
-		if (!pi->writeopen)
-			mask |= POLLHUP;
+		if (!pi->writeopen) {
+			// if (pi->nwrite - pi->nread == 0)
+			// 	mask |= POLLPRI;
+			// else
+				mask |= POLLHUP;
+		}
 	}
 
 	if (fp->writable) {

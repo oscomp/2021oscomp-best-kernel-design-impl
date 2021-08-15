@@ -37,7 +37,7 @@ int disk_read(struct buf *b)
 	__debug_info("disk_read", "enter\n");
 
 	#ifdef QEMU
-	return virtio_disk_rw(b, 0);
+	return virtio_disk_read(b);
 	#else 
 	return sdcard_read(b);
 	#endif
@@ -90,36 +90,26 @@ void disk_intr(void)
 	__debug_info("disk_intr", "leave\n");
 }
 
-// int disk_read_multi_blk(struct buf *bufs[], int nbuf)
-// {
-// 	#ifdef QEMU
-// 	return virtio_disk_multi_rw(bufs, nbuf, 0);
-// 	#else
-// 	return sdcard_read_sectors(bufs, nbuf);
-// 	#endif
-// }
+int disk_multiple_read(struct buf *bufs[], int nbuf)
+{
+	#ifdef QEMU
+	return virtio_disk_multiple_read(bufs, nbuf);
+	#else
+	return sdcard_read_sectors(bufs, nbuf);
+	#endif
+}
 
-// int disk_write_multi_blk(struct buf *bufs[], int nbuf)
-// {
-// 	#ifdef QEMU
-// 	return virtio_disk_multi_rw(bufs, nbuf, 1);
-// 	#else
-// 	return sdcard_write_sectors(bufs, nbuf);
-// 	#endif
-// }
 /*
 #include "time.h"
-#include "mm/pm.h"
 
 #define TEST_NBUF	500
 #define CONSECUTIVE	1
 
 void disk_test(void)
 {
-	// void *page = allocpage();
-	// struct buf **bufs = page;
+	struct buf *bufs[4];
 	struct buf *b;
-	int setcorno = 10000, i;
+	int setcorno = 11420, i;
 	
 	uint64 t1 = readtime();
 
@@ -139,38 +129,29 @@ void disk_test(void)
 		brelse(b);
 	}
 
-	// for (i = 0; i < TEST_NBUF; i++) {
-	// 	bufs[i] = bget(ROOTDEV, setcorno + i);
-	// 	bufs[i]->data[0] = i + random;
-	// 	bufs[i]->data[BSIZE - 1] = i + random;
-	// }
-	
-	// for (i = 0; i < TEST_NBUF; i++)
-	// 	bwrite(bufs[i]);
-	
-	// for (i = 0; i < TEST_NBUF; i++) {
-	// 	while (bufs[i]->dirty || bufs[i]->disk) {	// not done
-	// 		asm volatile("wfi");
-	// 	}
-	// 	bufs[i]->valid = 0;
-	// }
-
 	uint64 t2 = readtime();
 
 	struct timeval t;
 	convert_to_timeval(t2 - t1, &t);
 	printf("%d KB cost %d s %d us\n", BSIZE * BNUM / 1024, t.sec, t.usec);
 
-	for (i = 0; i < BNUM; i++) {
-		b = bread(ROOTDEV, setcorno + i * CONSECUTIVE);
-		uchar ans = i + t1;
-		if (b->data[0] != ans || b->data[BSIZE - 1] != ans)
-			printf(__WARN("read")" sec %d get wrong data\n", b->sectorno);
-		brelse(b);
+	for (i = 0; i < BNUM; i += 4) {
+		for (int j = 0; j < 4; j++) {
+			bufs[j] = bget(ROOTDEV, setcorno + (j + i) * CONSECUTIVE);
+			bufs[j]->data[0] = bufs[j]->data[BSIZE - 1] = 0;
+		}
+		int ret = breads(bufs, 4);
+		if (ret < 0)
+			printf(__WARN("breads")" fail! errno %d\n", ret);
+		for (int j = 0; j < 4; j++) {
+			uchar ans = i + j + t1;
+			b = bufs[j];
+			if (b->data[0] != ans || b->data[BSIZE - 1] != ans)
+				printf(__WARN("read")" sec %d get wrong data\n", b->sectorno);
+			brelse(b);
+		}
 	}
-	printf(__INFO("read")" write correct\n");
-
-	// freepage(page);
+	printf(__INFO("read")" read/write correct\n");
 
 	for(;;) {
 		asm volatile("wfi");

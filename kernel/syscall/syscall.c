@@ -184,6 +184,7 @@ extern uint64 sys_statfs(void);
 extern uint64 sys_getrusage(void);
 extern uint64 sys_setitimer(void);
 extern uint64 sys_sync(void);
+extern uint64 sys_msync(void);
 
 static uint64 (*syscalls[])(void) = {
 	[SYS_fork]			sys_fork,
@@ -255,6 +256,7 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_getrusage]		sys_getrusage,
 	[SYS_setitimer]		sys_setitimer,
 	[SYS_sync]			sys_sync,
+	[SYS_msync]			sys_msync,
 };
 
 static char *sysnames[] = {
@@ -327,6 +329,7 @@ static char *sysnames[] = {
 	[SYS_getrusage]		"getrusage",
 	[SYS_setitimer]		"setitimer",
 	[SYS_sync]			"sync",
+	[SYS_msync]			"msync",
 };
 
 void

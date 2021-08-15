@@ -232,25 +232,33 @@ void bsync(void)
 	disk_write_start();
 }
 
-/*
 int breads(struct buf *bufs[], int nbuf)
 {
-	int i, j;
-	for (i = 0; i < nbuf && bufs[i]->valid; i++);
-	for (j = nbuf - 1; j > i && bufs[j]->valid; j--);
+	int i = 0, j, ret = 0;
 
-	int ret = 0;
-	if (i <= j) {
-		// for (int k = i; k <= j; k++)
-		// 	printf("the %d buf: sec %d\n", k, bufs[k]->sectorno);
-		ret = disk_read_multi_blk(&bufs[i], j - i + 1);
-		if (ret >= 0)
-			for (; i <= j; i++)
-				bufs[i]->valid = 1;
+	// find consecutive sectors
+	while (i < nbuf) {
+		if (!bufs[i]->valid) {
+			for (j = i + 1;
+				j < nbuf && !bufs[j]->valid &&
+				bufs[j]->sectorno == bufs[j - 1]->sectorno + 1;
+				j++);
+			j--;
+			if (i == j)
+				ret = disk_read(bufs[i]);
+			else
+				ret = disk_multiple_read(&bufs[i], j - i + 1);
+			if (ret < 0)
+				break;
+			while (i <= j)
+				bufs[i++]->valid = 1;
+		} else {
+			i++;
+		}
 	}
+
 	return ret;
 }
-*/
 
 void bput(struct buf *b)
 {
