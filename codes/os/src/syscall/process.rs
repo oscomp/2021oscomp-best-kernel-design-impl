@@ -540,7 +540,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
         } else {
             drop(inner);
             drop(task);
-            print!("\n");
+            print!(" ");
             suspend_current_and_run_next();
             // continue;
         }
