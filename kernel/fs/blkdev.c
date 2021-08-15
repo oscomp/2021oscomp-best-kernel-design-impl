@@ -172,13 +172,8 @@ struct superblock *fs_install(struct inode *dev)
 
 	__debug_info("fs_install", "enter check\n");
 	if (dev->mode & S_IFBLK) {
-		struct inode *ip = namei("/dev/vda2");
-		if (ip != dev) {
-			if (ip != NULL)
-				iput(ip);
+		if (dev->sb != &devfs)
 			return NULL;
-		}
-		iput(ip);
 		isdev = 1;
 	} else if (dev->mode & S_IFREG)
 		isdev = 0;

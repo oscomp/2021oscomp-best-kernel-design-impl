@@ -138,6 +138,8 @@ struct dentry {
 
 
 extern struct superblock rootfs;
+extern struct superblock procfs;
+extern struct superblock devfs;
 
 void rootfs_init();
 void rootfs_print();
@@ -172,6 +174,7 @@ int isdirempty(struct inode *dp);
 int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, void *data);
 int do_umount(struct inode *mntpoint, int flag);
 int do_rename(struct inode *iold, struct inode *dstdir, char *newname);
+int mountsysfs(struct superblock *sb, struct inode *mntpoint, char *type);
 
 static inline void iunlockput(struct inode *ip)
 {

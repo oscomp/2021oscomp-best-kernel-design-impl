@@ -16,6 +16,8 @@
 
 
 struct superblock rootfs;
+struct superblock procfs;
+struct superblock devfs;
 
 
 /**
@@ -174,8 +176,9 @@ struct file_op null_op = {
 	.writev = dummy_file_rw_vec,
 };
 
-static struct dentry *de_root_generate(struct dentry *parent,
-			char *name, int inum, int mode, int devnum)
+static struct dentry *de_root_generate(struct superblock *sb,
+							struct dentry *parent, char *name,
+							int inum, int mode, int devnum)
 {
 	struct dentry *de;
 	struct inode *ip;
@@ -194,7 +197,7 @@ static struct dentry *de_root_generate(struct dentry *parent,
 	de->inode = ip;
 	de->op = &rootfs_dentry_op;
 	ip->entry = de;
-	ip->sb = &rootfs;
+	ip->sb = sb;
 	
 	if (parent) {
 		de->next = parent->child;
@@ -223,33 +226,32 @@ static struct dentry *de_root_generate(struct dentry *parent,
 void rootfs_init()
 {
 	__debug_info("rootfs_init", "enter\n");
+
+	int inum = 0;
+
+	// init rootfs
 	memset(&rootfs, 0, sizeof(struct superblock));
 	initsleeplock(&rootfs.sb_lock, "rootfs_sb");
 	initlock(&rootfs.cache_lock, "rootfs_dcache");
 
-	int inum = 0;
-	if ((rootfs.root = de_root_generate(NULL, "/", inum++, S_IFDIR, 0)) == NULL)
-		panic("rootfs_init 1");
+	if ((rootfs.root = de_root_generate(&rootfs, NULL, "/", inum++, S_IFDIR, 0)) == NULL)
+		panic("rootfs_init: /");
 
-	struct dentry *dev, *home, *con, *proc, *vda, *mount, *zero, *null;
-	if ((dev = de_root_generate(rootfs.root, "dev", inum++, S_IFDIR, 0)) == NULL)
-		panic("rootfs_init: /dev");
-	if ((home = de_root_generate(rootfs.root, "home", inum++, S_IFDIR, 0)) == NULL)
-		panic("rootfs_init: /home");
-	if ((con = de_root_generate(dev, "console", inum++, S_IFCHR, 2)) == NULL)
-		panic("rootfs_init: /dev/console");
-	if ((vda = de_root_generate(dev, "vda2", inum++, S_IFBLK, ROOTDEV)) == NULL)
-		panic("rootfs_init: /dev/vda2");
-	if ((zero = de_root_generate(dev, "zero", inum++, S_IFCHR, 3)) == NULL)
-		panic("rootfs_init: /dev/zero");
-	if ((null = de_root_generate(dev, "null", inum++, S_IFCHR, 4)) == NULL)
-		panic("rootfs_init: /dev/null");
-	if ((proc = de_root_generate(rootfs.root, "proc", inum++, S_IFDIR, 0)) == NULL)
-		panic("rootfs_init: /proc");
-	if ((mount = de_root_generate(proc, "mounts", inum++, S_IFREG, 0)) == NULL)
-		panic("rootfs_init: /proc/mounts");
-	if (de_root_generate(proc, "meminfo", inum++, S_IFREG, 0) == NULL)
-		panic("rootfs_init: /proc/meminfo");
+	// init devfs
+	struct dentry *con, *vda, *zero, *null;
+	memset(&devfs, 0, sizeof(struct superblock));
+	initsleeplock(&devfs.sb_lock, "devfs_sb");
+	initlock(&devfs.cache_lock, "devfs_dcache");
+	if ((devfs.root = de_root_generate(&devfs, NULL, "/", inum++, S_IFDIR, 0)) == NULL)
+		panic("rootfs_init: devfs /");
+	if ((con = de_root_generate(&devfs, devfs.root, "console", inum++, S_IFCHR, 2)) == NULL)
+		panic("rootfs_init: devfs console");
+	if ((vda = de_root_generate(&devfs, devfs.root, "vda2", inum++, S_IFBLK, ROOTDEV)) == NULL)
+		panic("rootfs_init: devfs vda2");
+	if ((zero = de_root_generate(&devfs, devfs.root, "zero", inum++, S_IFCHR, 3)) == NULL)
+		panic("rootfs_init: devfs zero");
+	if ((null = de_root_generate(&devfs, devfs.root, "null", inum++, S_IFCHR, 4)) == NULL)
+		panic("rootfs_init: devfs null");
 
 	extern struct file_op console_op;
 	con->inode->fop = &console_op;
@@ -257,11 +259,39 @@ void rootfs_init()
 	zero->inode->fop = &zero_op;
 	null->inode->fop = &null_op;
 
+	// init procfs
+	struct dentry *mount;
+	memset(&procfs, 0, sizeof(struct superblock));
+	initsleeplock(&procfs.sb_lock, "procfs_sb");
+	initlock(&procfs.cache_lock, "procfs_dcache");
+	if ((procfs.root = de_root_generate(&procfs, NULL, "/", inum++, S_IFDIR, 0)) == NULL)
+		panic("rootfs_init: procfs /");
+	if ((mount = de_root_generate(&procfs, procfs.root, "mounts", inum++, S_IFREG, 0)) == NULL)
+		panic("rootfs_init: procfs mounts");
+	if (de_root_generate(&procfs, procfs.root, "meminfo", inum++, S_IFREG, 0) == NULL)
+		panic("rootfs_init: procfs meminfo");
+
 	extern struct file_op mountinfo_fop;
 	mount->inode->fop = &mountinfo_fop;
 
-	if (do_mount(vda->inode, home->inode, "fat32", 0, 0) < 0)
-		panic("rootfs_init: mount sd");
+	// mount disk
+	if (do_mount(vda->inode, rootfs.root->inode, "fat32", 0, 0) < 0)
+		panic("rootfs_init: mount disk");
+
+	// make directories and mount
+	struct inode *dir;
+
+	if ((dir = create(NULL, "/dev", S_IFDIR)) == NULL)
+		panic("rootfs_init: on disk /dev");
+	if (mountsysfs(&devfs, dir, "devfs") < 0)
+		panic("rootfs_init: mount devfs");
+	iunlockput(dir);
+
+	if ((dir = create(NULL, "/proc", S_IFDIR)) == NULL)
+		panic("rootfs_init: on disk /proc");
+	if (mountsysfs(&procfs, dir, "procfs") < 0)
+		panic("rootfs_init: mount procfs");
+	iunlockput(dir);
 
 	__debug_info("rootfs_init", "done\n");
 }

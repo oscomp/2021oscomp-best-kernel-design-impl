@@ -816,7 +816,7 @@ void forkret(void) {
 		// extern void disk_test(void);
 		// disk_test();
 		rootfs_init();
-		myproc()->cwd = namei("/home");
+		myproc()->cwd = namei("/");
 	}
 
 	myproc()->ikstmp = readtime();

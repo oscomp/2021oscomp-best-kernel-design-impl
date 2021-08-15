@@ -34,7 +34,12 @@ struct inode *create(struct inode *dp, char *path, int mode)
 
 	if ((dp = nameiparentfrom(dp, path, name)) == NULL) {
 		__debug_warn("create", "%s doesn't exist\n", path);
-		return NULL;
+		// root doesn't have parent
+		if (strncmp(path, "/", MAXPATH) != 0 || !S_ISDIR(mode))
+			return NULL;
+		dp = namei("/");
+		ilock(dp);
+		return dp;
 	}
 
 	ilock(dp);
@@ -292,6 +297,8 @@ void rootfs_print()
 {
 	printf("\n"__INFO("file tree")":\n");
 	de_print(&rootfs, 0);
+	if (rootfs.root->mount)
+		de_print(rootfs.root->mount, 0);
 }
 
 
@@ -411,7 +418,8 @@ static struct inode *lookup_path(struct inode *ip, char *path, int parent, char 
 			if (p->elf) return idup(p->elf);
 			return NULL;
 		}
-		ip = idup(rootfs.root->inode);
+		ip = de_mnt_in(rootfs.root)->inode;
+		ip = idup(ip);
 	} else if (*path != '\0') {
 		if (ip != NULL)
 			ip = idup(ip);
@@ -481,17 +489,23 @@ int namepath(struct inode *ip, char *path, int max)
 	struct superblock *sb = ip->sb;
 	struct dentry *de = ip->entry;
 
-	if (de == rootfs.root) {
-		path[0] = '/';
-		path[1] = '\0';
-		return 2;
-	}
-
 	int len;
 	char *p = path + max - 1;
 	*p = '\0';
 
 	acquire(&sb->cache_lock);
+	
+	while (de == sb->root) {	// test mount
+		release(&sb->cache_lock);
+		if (sb == &rootfs) {	// Meet root of rootfs.
+			safestrcpy(path, rootfs.root->filename, max);	
+			return strlen(rootfs.root->filename) + 1;
+		}
+		de = de->parent;
+		sb = de->inode->sb;
+		acquire(&sb->cache_lock);
+	}
+	
 	for (;;) {
 		while (de == sb->root) { // It indicates that de is a root and may be a mount point.
 			if ((de = de->parent) == NULL) { // Meet root of rootfs.

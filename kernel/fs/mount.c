@@ -6,8 +6,9 @@
 
 #include "fs/fs.h"
 #include "errno.h"
-#include "mm/kmalloc.h"
+#include "mm/pm.h"
 #include "utils/string.h"
+#include "sprintf.h"
 #include "utils/debug.h"
 
 int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
@@ -15,39 +16,49 @@ int either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 static int mountinfo_read(struct inode *ip, int usr, uint64 dst, uint off, uint n)
 {
 	uint tot = 0;
-	int const bufsz = 512;
-	char *buf = kmalloc(bufsz);
+	char *buf = allocpage();
 	if (buf == NULL)
 		return -ENOMEM;
 
-	char *p = buf;
+	char *pdev = buf + PGSIZE - MAXPATH;
+	char *pmnt = pdev - MAXPATH;
 
 	struct superblock *sb = rootfs.next;
 	for (; sb; sb = sb->next) {
-		int len = namepath(sb->dev, p, bufsz - tot);
-		p[len - 1] = ' ';
-		p += len;
-		tot += len;
-		if (tot >= bufsz) {
-			tot = bufsz;
-			break;
+		if (sb->dev) {
+			namepath(sb->dev, pdev, MAXPATH);
+		} else {
+			safestrcpy(pdev, sb->type, sizeof(sb->type));
 		}
-		len = namepath(sb->root->inode, p, bufsz - tot);
-		p[len - 1] = ' ';
-		p += len;
-		tot += len;
-		if (tot >= bufsz) {
-			tot = bufsz;
+		namepath(sb->root->inode, pmnt, MAXPATH);
+		int len = sprintf(buf + tot, PGSIZE - 2 * MAXPATH - tot,
+						"%s %s %s\n", pdev, pmnt, sb->type); 
+		if (len < 0)
 			break;
-		}
-		len = strlen(sb->type);
-		if (tot + len + 1 >= bufsz) {
-			break;
-		}
-		safestrcpy(p, sb->type, sizeof(sb->type));
-		p[len++] = '\n';
-		p += len;
 		tot += len;
+		// p[len - 1] = ' ';
+		// p += len;
+		// tot += len;
+		// if (tot >= bufsz) {
+		// 	tot = bufsz;
+		// 	break;
+		// }
+		// len = namepath(sb->root->inode, p, bufsz - tot);
+		// p[len - 1] = ' ';
+		// p += len;
+		// tot += len;
+		// if (tot >= bufsz) {
+		// 	tot = bufsz;
+		// 	break;
+		// }
+		// len = strlen(sb->type);
+		// if (tot + len + 1 >= bufsz) {
+		// 	break;
+		// }
+		// safestrcpy(p, sb->type, sizeof(sb->type));
+		// p[len++] = '\n';
+		// p += len;
+		// tot += len;
 	}
 
 	uint ret = 0;
@@ -57,7 +68,7 @@ static int mountinfo_read(struct inode *ip, int usr, uint64 dst, uint off, uint 
 			ret = -EFAULT;
 	}
 
-	kfree(buf);
+	freepage(buf);
 	return ret;
 }
 
@@ -87,10 +98,10 @@ int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, vo
 		__debug_warn("do_mount", "Unsupported fs type: %s\n", type);
 		return -1;
 	}
-	if (mntpoint->entry == rootfs.root) {
-		__debug_warn("do_mount", "can not mount at \"/\"\n");
-		return -1;
-	}
+	// if (mntpoint->entry == rootfs.root) {
+	// 	__debug_warn("do_mount", "can not mount at \"/\"\n");
+	// 	return -1;
+	// }
 
 	__debug_info("do_mount", "dev:%s mntpnt:%s\n", dev->entry->filename, mntpoint->entry->filename);
 
@@ -142,7 +153,7 @@ int do_umount(struct inode *mntpoint, int flag)
 	}
 
 	struct superblock *sb = mntpoint->sb;
-	if (mntpoint->entry != sb->root || sb == &rootfs) {
+	if (mntpoint->entry != sb->root || sb == &rootfs || sb == &devfs || sb == &procfs) {
 		__debug_warn("do_umount", "%s is not a mount point\n", mntpoint->entry->filename);
 		return -1;
 	}
@@ -183,5 +194,29 @@ int do_umount(struct inode *mntpoint, int flag)
 
 	fs_uninstall(sb);
 
+	return 0;
+}
+
+int mountsysfs(struct superblock *sb, struct inode *mntpoint, char *type)
+{
+	if (!S_ISDIR(mntpoint->mode))
+		return -1;
+
+	acquire(&rootfs.cache_lock); // borrow this lock
+
+	struct superblock *psb = &rootfs;
+	while (psb->next != NULL)
+		psb = psb->next;
+	psb->next = sb;
+
+	struct dentry *dmnt = mntpoint->entry;
+	sb->root->parent = dmnt;
+	safestrcpy(sb->root->filename, dmnt->filename, sizeof(dmnt->filename));
+	safestrcpy(sb->type, type, sizeof(sb->type));
+	dmnt->mount = sb;
+
+	release(&rootfs.cache_lock);
+
+	idup(mntpoint);
 	return 0;
 }
