@@ -34,16 +34,10 @@ struct context {
 	uint64 s11;
 };
 
-#define RUNNABLE 		1
-#define RUNNING			2
-#define SLEEPING 		3
-#define ZOMBIE 			4
-
-#define __occupy(state) \
-	(((cpuid() + 1) << 8) | (state))
-#define __liberate(state) \
-	((state) & 0xff)
-
+enum procstate {
+	RUNNABLE, RUNNING, 
+	SLEEPING, ZOMBIE, 
+};
 
 struct tms {
 	uint64 utime;		// user time 
@@ -68,7 +62,7 @@ struct proc {
 	struct proc *sched_next;		// point to next proc 
 	struct proc **sched_pprev;
 	int timer;						// timer 
-	uint64 state;					// current state of proc 
+	enum procstate state;			// current state of proc 
 	void *chan;						// the reason this proc is sleeping for 
 	uint64 sleep_expire;			// wake up time for sleeping
 
@@ -133,8 +127,10 @@ void proc_tick(void);
 	Return -1 if this process has no children */
 int wait4(int pid, uint64 status, uint64 options);
 
-/* Give up CPU and enter scheduler */
-void yield(void);
+/* Give up CPU and enter scheduler 
+	return 0 if it's not actually hung up
+	return 1 if it is hung up */
+int yield(void);
 
 /* Atomically release lock and sleep on chan. 
 	Reacquires lock when awakened */
@@ -145,7 +141,7 @@ void sleep(void *chan, struct spinlock *lk);
 void wakeup(void *chan);
 
 /* Jump into User Mode from Kernel */
-void enter_user(uint64 old_kstack) __attribute__((noreturn));
+void scheduler(void) __attribute__((noreturn));
 
 
 /* Memory-Management Related */
@@ -160,7 +156,7 @@ int growproc(uint64 newbrk);
 /* Per-CPU state */
 struct cpu {
 	struct proc *proc;		// The process running on this cpu, or NULL 
-	// struct context context;	// swtch() here to enter scheduler() 
+	struct context context;	// swtch() here to enter scheduler() 
 	int noff;				// Depth of push_off() nesting 
 	int intena;				// Were interrupts enabled before push_off()?
 };

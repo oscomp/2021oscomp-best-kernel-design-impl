@@ -29,10 +29,9 @@
 #include "utils/debug.h"
 
 uint64 swtch(struct context *old, struct context *new);
-void load_context(struct context *ctx, uint64 kstack) __attribute__((noreturn));
+void sched(void);
 
 void forkret(uint64 kstack);
-void scheduler(void);
 
 int __pid;
 #define HASH_SIZE 	17
@@ -139,7 +138,7 @@ static void freeproc(struct proc *p) {
 	// free trapframe 
 	kfree(p->trapframe);
 
-	// kernel stack freed by other procs, not freed here
+	freepage(p->kstack);
 
 	// parenting is handled in exit() and wait4()
 
@@ -194,7 +193,6 @@ static struct proc *allocproc(void) {
 
 	// scheduling 
 	p->killed = 0;
-	p->state = 0;
 	p->chan = NULL;
 	p->sched_next = NULL;
 	p->sched_pprev = NULL;
@@ -231,6 +229,9 @@ struct proc *proc_runnable[PRIORITY_NUMBER];
 struct proc *proc_sleep;
 struct spinlock proc_lock;
 
+// NOTICE! To avoid any potential deadlock with proc_lock, 
+// proc_lock should be acquired last with any situation requiring 
+// multiple spinlocks. 
 #define __enter_proc_cs \
 	acquire(&proc_lock);
 #define __leave_proc_cs \
@@ -259,89 +260,22 @@ static void __proc_list_remove_no_lock(struct proc *p) {
 }
 
 #define __insert_runnable(priority, p) do {\
-	(p)->state = RUNNABLE | (p->state & 0xff00); \
+	(p)->state = RUNNABLE; \
 	__proc_list_insert_no_lock(&(proc_runnable[priority]), p); \
 } while (0)
 #define __insert_sleep(p) do {\
-	(p)->state = SLEEPING | (p->state & 0xff00); \
+	(p)->state = SLEEPING; \
 	__proc_list_insert_no_lock(&proc_sleep, p); \
 } while (0)
 #define __remove(p) \
 	__proc_list_remove_no_lock(p) 
 
 
-// int fork_cow(void) {
-// 	struct proc *p = myproc();
-// 	struct proc *np;
-
-// 	// allocate new proc 
-// 	__debug_info("fork_cow", "bp1\n");
-// 	np = allocproc();
-// 	if (NULL == np) {
-// 		__debug_warn("fork", "fail to allocate\n");
-// 		return -1;
-// 	}
-
-// 	__debug_info("fork", "%d fork %d\n", p->pid, np->pid);
-
-// 	// copy parent's memory layout 
-// 	np->segment = copysegs(p->pagetable, p->segment, np->pagetable);
-// 	if (NULL == np->segment) {
-// 		__debug_warn("fork", "fail to copy segments\n");
-// 		freepage(np->kstack);
-// 		freeproc(np);
-// 		return -1;
-// 	}
-// 	np->pbrk = p->pbrk;
-
-// 	__debug_info("fork_cow", "bp2\n");
-// 	// filesystem 
-// 	if (copyfdtable(&p->fds, &np->fds) < 0) {
-// 		freepage(np->kstack);
-// 		freeproc(np);
-// 		return -1;
-// 	}
-// 	np->cwd = idup(p->cwd);
-// 	np->elf = idup(p->elf);
-
-// 	// copy parent's trapframe 
-// 	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
-// 		floatstore(p->trapframe);
-// 		w_sstatus_fs(SSTATUS_FS_CLEAN);
-// 	}
-// 	*(np->trapframe) = *(p->trapframe);
-// 	np->trapframe->a0 = 0;
-
-// 	// parenting 
-// 	acquire(&p->lk);
-// 	np->parent = p;
-// 	np->sibling_pprev = &(p->child);
-// 	np->sibling_next = p->child;
-// 	if (NULL != p->child) {
-// 		p->child->sibling_pprev = &(np->sibling_next);
-// 	}
-// 	p->child = np;
-// 	release(&p->lk);
-
-// 	// copy debug info 
-// 	safestrcpy(np->name, p->name, sizeof(p->name));
-// 	np->tmask = p->tmask;
-
-// 	int pid = np->pid;
-
-// 	__debug_info("fork_cow", "bp3\n");
-// 	// insert new proc into runnable list 
-// 	__enter_proc_cs 
-// 	np->timer = TIMER_NORMAL;
-// 	__insert_runnable(PRIORITY_NORMAL, np);
-// 	__leave_proc_cs 
-
-// 	return pid;
-// }
-
 int clone(uint64 flag, uint64 stack) {
 	struct proc *p = myproc();
 	struct proc *np;
+
+	__debug_info("clone", "%d enter\n", p->pid);
 
 	np = allocproc();
 	if (NULL == np) {
@@ -353,7 +287,6 @@ int clone(uint64 flag, uint64 stack) {
 	np->segment = copysegs(p->pagetable, p->segment, np->pagetable);
 	if (NULL == np->segment) {
 		__debug_warn("clone", "fail to copy segments\n");
-		freepage(np->kstack);
 		freeproc(np);
 		return -1;
 	}
@@ -363,7 +296,6 @@ int clone(uint64 flag, uint64 stack) {
 	// filesystem 
 	if (copyfdtable(&p->fds, &np->fds) < 0) {
 		__debug_warn("clone", "fail to copy fdt\n");
-		freepage(np->kstack);
 		freeproc(np);
 		return -1;
 	}
@@ -399,6 +331,9 @@ int clone(uint64 flag, uint64 stack) {
 
 	int pid = np->pid;
 
+	__debug_info("clone", "hart %d: %d -> %d\n", cpuid(), p->pid, np->pid);
+	__debug_info("clone", "hart %d new proc name %s\n", cpuid(), np->name);
+
 	__enter_proc_cs 
 	np->timer = TIMER_NORMAL;
 	__insert_runnable(PRIORITY_NORMAL, np);
@@ -418,11 +353,6 @@ static void __wakeup_no_lock(void *chan) {
 			p->timer = TIMER_IRQ;
 			p->chan = NULL;
 			__insert_runnable(PRIORITY_IRQ, p);
-
-			int hartid = (p->state >> 8) & 0xff;
-			if (hartid > 0 && hartid != cpuid() + 1) {
-				sbi_send_ipi(1 << (hartid - 1), 0);
-			}
 		}
 		p = next;
 	}
@@ -439,6 +369,8 @@ void exit(int xstate) {
 
 	extern struct proc *__initproc;
 	__debug_assert("exit", __initproc != p, "init exiting\n");
+
+	__debug_info("exit", "hart %d pid %d\n", cpuid(), p->pid);
 
 	// close all open files 
 	dropfdtable(&p->fds);
@@ -471,22 +403,18 @@ void exit(int xstate) {
 	release(&p->lk);
 
 	__debug_info("exit", "%d exit %d\n", p->pid, xstate);
-	__enter_proc_cs
-	__remove(p); 
-	__leave_proc_cs 
-
-	// switch to kernel_pagetable 
-	w_satp(MAKE_SATP(kernel_pagetable));
-	sfence_vma();
 
 	// by holding parent's lock, parent cannot re-parent child
-	uint64 old_kstack;
 	acquire(&p->parent->lk);
+
+	// acquire proc_lock after parent's lock, to avoid deadlock 
+	// with parent calling sleep(p, &p->lk) in wait4(). 
+	__enter_proc_cs
+
 	p->state = ZOMBIE;
+	__remove(p); 
 	__wakeup_no_lock(__initproc);
 	__wakeup_no_lock(p->parent);
-	old_kstack = p->kstack;
-	release(&p->parent->lk);
 
 	// As we don't release p->parent->lk, p->parent is not able 
 	// to start searching for zombie child. 
@@ -494,7 +422,7 @@ void exit(int xstate) {
 	// parent can free child's proc block only after child has switched out 
 	// so release parent's lock in scheduler. 
 
-	enter_user(old_kstack);
+	sched();
 
 	panic("panic! living dead!\n");
 }
@@ -505,6 +433,8 @@ void exit(int xstate) {
 int wait4(int pid, uint64 status, uint64 options) {
 	struct proc *np;
 	struct proc *p = myproc();
+
+	__debug_info("wait4", "hart %d pid %d\n", cpuid(), p->pid);
 
 	acquire(&p->lk);	// lock must be held to avoid missing wakeup from child's exit()
 	while (1) {
@@ -587,22 +517,6 @@ int kill(int pid) {
 	return 0;
 }
 
-// hang up current proc 
-void yield(void) {
-	struct proc *p = myproc();
-
-	__debug_assert("yield", p != NULL, "p == NULL\n");
-
-	__enter_proc_cs 
-	__remove(p);
-	p->timer = TIMER_NORMAL;
-	__insert_runnable(PRIORITY_NORMAL, p);
-
-	// run into scheduler to choose next proc for running 
-	scheduler();
-	__leave_proc_cs 
-}
-
 void sleep(void *chan, struct spinlock *lk) {
 	struct proc *p = myproc();
 
@@ -621,7 +535,7 @@ void sleep(void *chan, struct spinlock *lk) {
 	__remove(p);		// remove p from runnable 
 	__insert_sleep(p);
 
-	scheduler();
+	sched();
 	p->chan = NULL;
 
 	// release proc_lock first to avoid deadlock
@@ -630,18 +544,16 @@ void sleep(void *chan, struct spinlock *lk) {
 	acquire(lk);
 }
 
-struct proc *__get_runnable_no_lock(void) {
+static struct proc *__get_runnable_no_lock(void) {
 	struct proc const *tmp;
 
 	for (int i = 0; i < PRIORITY_NUMBER; i ++) {
 		tmp = proc_runnable[i];
 		while (NULL != tmp) {
-			if (__occupy(RUNNABLE) == tmp->state 
-					|| RUNNABLE == tmp->state) 
-			{
+			if (RUNNABLE == tmp->state) {
 				__debug_info("__get_runnable_no_lock", 
-						"hart %d get runnable %d state %x\n", cpuid(), 
-						tmp->pid, tmp->state);
+						"hart %d get runnable %d\n", 
+						cpuid(), tmp->pid);
 				return (struct proc*)tmp;
 			}
 			tmp = tmp->sched_next;
@@ -651,17 +563,36 @@ struct proc *__get_runnable_no_lock(void) {
 	return NULL;
 }
 
+// hang up current proc 
+int yield(void) {
+	struct proc *p = myproc();
+
+	__debug_assert("yield", p != NULL, "p == NULL\n");
+
+	__enter_proc_cs 
+	if (NULL == __get_runnable_no_lock()) {
+		// if there's no proc to run, yielding may not a good idea 
+		__leave_proc_cs 
+		return 0;
+	}
+
+	__remove(p);
+	p->timer = TIMER_NORMAL;
+	__insert_runnable(PRIORITY_NORMAL, p);
+
+	// run into scheduler to choose next proc for running 
+	sched();
+	__leave_proc_cs 
+
+	return 1;
+}
+
 
 // a fork child's very first sheduling by scheduler() will swtch to forkret 
 void forkret(uint64 kstack) {
 	extern int fs_first;
 
 	__leave_proc_cs 
-
-	// free old zombie proc 
-	if (NULL != kstack) {
-		freepage((void*)kstack);
-	}
 
 	w_sstatus_fs(SSTATUS_FS_CLEAN);
 
@@ -675,81 +606,85 @@ void forkret(uint64 kstack) {
 	usertrapret();
 }
 
-// When run into scheduler(), at least proc_lock should be held
 void scheduler(void) {
-	struct proc *tmp;				// the proc to swtch in 
-	struct proc *p = myproc();
-	int intena;
-
-	__debug_assert("scheduler", NULL != p, "p == NULL\n");
-
-	// occupy current proc to avoid taken by other harts
-	p->state = __occupy(p->state);
-	while (1) {
-		tmp = __get_runnable_no_lock();
-		if (NULL != tmp) {
-			break;
-		}
-
-		__leave_proc_cs 
-		intr_on();
-		__asm__ volatile("wfi");
-		__enter_proc_cs 
-	}
-
-	// all right, we find a proc to run
-
-	// liberate previous proc 
-	p->state = __liberate(p->state);
-
-	if (tmp != p) {
-		tmp->state = RUNNING;
-		mycpu()->proc = tmp;
-
-		w_satp(MAKE_SATP(tmp->pagetable));
-		sfence_vma();
-
-		intena = mycpu()->intena;
-		uint64 kstack = swtch(&p->context, &tmp->context);
-		if (NULL != kstack) {
-			freepage(kstack);
-		}
-		mycpu()->intena = intena;
-
-		w_satp(MAKE_SATP(p->pagetable));
-		sfence_vma();
-	}
-
-	p->state = RUNNING;
-	mycpu()->proc = p;
-}
-
-// kernel calls this function to load into a new proc, with no 
-// previous context. 
-void enter_user(uint64 old_kstack) {
-	// let's pick up a runnable proc!
-	struct cpu *c = mycpu();
 	struct proc *tmp;
+	struct cpu *c = mycpu();
 
+	// it should never returns!
 	while (1) {
+		int found = 0;
+		intr_on();		// make sure interrupts are available 
 		__enter_proc_cs 
 		tmp = __get_runnable_no_lock();
-		if (NULL == tmp) {
-			__leave_proc_cs 
-			intr_on();
-			__asm__ volatile("wfi");
-		}
-		else {
+		if (NULL != tmp) {	// if found one 
 			tmp->state = RUNNING;
 			c->proc = tmp;
 
+			// switch to user kernel pagetable 
+			// will switch to user's pagetable at usertrapret 
 			w_satp(MAKE_SATP(tmp->pagetable));
 			sfence_vma();
-			load_context(&tmp->context, old_kstack);
+			// swtch context 
+			swtch(&c->context, &tmp->context);
+			// switch back to kernel pagetable 
+			w_satp(MAKE_SATP(kernel_pagetable));
+			sfence_vma();
 
-			panic("user returns!\n");
+			// if tmp is zombie, we need to release the lock of it's parent 
+			if (ZOMBIE == tmp->state) {
+				release(&(tmp->parent->lk));
+			}
+			found = 1;
 		}
+		c->proc = NULL;
+		__leave_proc_cs
+		if (!found) {
+			intr_on();
+			asm volatile("wfi");
+		}
+	} 
+
+	__debug_error("scheduler", "scheduler returns!\n");
+	panic("panic!\n");
+}
+
+// sched() is the only way back to scheduler() 
+void sched(void) {
+	int intena;
+	struct proc *p = myproc();
+
+	__debug_assert("sched", NULL != p, "NULL == p\n");
+	// __debug_info("sched", "p %s\n", p->name);
+	if (!holding(&proc_lock)) 
+		panic("sched proc_lock\n");
+	if (1 != mycpu()->noff && !(ZOMBIE == p->state && 2 == mycpu()->noff)) 
+		panic("sched locks\n");
+	if (RUNNING == p->state) 
+		panic("sched running\n");
+	if (intr_get()) 
+		panic("sched interruptible\n");
+
+	// save floating-point registers
+	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
+		// printf(__INFO("sched")"floatstore, pid=%d, name=%s\n", p->pid, p->name);
+		floatstore(p->trapframe);
+		w_sstatus_fs(SSTATUS_FS_CLEAN);
 	}
+	
+	p->proc_tms.stime += readtime() - p->proc_tms.ikstmp;
+
+	intena = mycpu()->intena;
+	swtch(&p->context, &mycpu()->context);
+	mycpu()->intena = intena;
+
+	p->proc_tms.ikstmp = readtime();
+
+	// On k210, sstatus.fs seems to be hardwired to dirty(11b).
+	// if (r_sstatus_fs() == SSTATUS_FS_DIRTY)
+	// 	panic("sched out with dirty floating-point registers");
+
+	floatload(p->trapframe);
+	w_sstatus_fs(SSTATUS_FS_CLEAN);
 }
 
 
@@ -862,8 +797,8 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 
 
 /* Functions for Debug */
-static inline char const *__state_to_str(uint64 state) {
-	switch (__liberate(state)) {
+static inline char const *__state_to_str(enum procstate state) {
+	switch (state) {
 	case RUNNABLE: 		return "runnable";
 	case RUNNING: 		return "running";
 	case SLEEPING: 		return "sleeping";
@@ -890,7 +825,7 @@ static void __print_proc_no_lock(struct proc *list) {
 		printf("%d\t%d\t0x%x\t%d\t%s\t%d\t%d\t%p\n", 
 			list->pid, 
 			__initproc == list ? 0 : list->parent->pid, 
-			list->state,
+			__state_to_str(list->state),
 			list->killed, 
 			list->name, 
 			load, heap, 

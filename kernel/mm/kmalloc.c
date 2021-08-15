@@ -86,7 +86,7 @@ void kmallocinit(void) {
 	initlock(&kmem_table_lock, "kmem_table");
 
 	__debug_info("kmallocinit", "KMEM_NODE_FIX: %d\n", KMEM_NODE_FIX);
-	__debug_info("kmalloc", "init\n");
+	__debug_info("kmallocinit", "init\n");
 }
 
 // the question comes that whether we should free an allocator? 

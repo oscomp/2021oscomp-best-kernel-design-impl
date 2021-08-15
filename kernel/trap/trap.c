@@ -108,8 +108,9 @@ usertrap(void)
 	} 
 	else if (0 == handle_intr(cause)) {
 		// handle interrupt 
-		p->ivswtch += 1;
-		yield();			// scheduler() will determine whether proc hangs 
+		if (yield()) {
+			p->ivswtch += 1;
+		}
 	}
 	else if (0 == handle_excp(cause)) {
 		// handle exception 

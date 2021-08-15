@@ -21,6 +21,7 @@
 #include "utils/debug.h"
 
 extern char kernel_end[];	// first address after kernel 
+extern char boot_stack_top[];	// first address after kernel bootstack 
 
 struct run {
 	struct run *next;
@@ -49,7 +50,7 @@ void kpminit(void) {
 	initlock(&kmem.lock, "kmem");
 	kmem.freelist = NULL;
 	kmem.npage = 0;
-	freerange((uint64)kernel_end + 4 * 2 * PGSIZE, (uint64)PHYSTOP);
+	freerange((uint64)boot_stack_top, (uint64)PHYSTOP);
 	__debug_info("kpminit", "kernel_end: %p, phystop: %p, npage %d\n", 
 			kernel_end, (void*)PHYSTOP, kmem.npage);
 }
