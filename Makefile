@@ -27,11 +27,6 @@ CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -Iinclude/
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
-ifeq ($(mode), debug) 
-CFLAGS += -DDEBUG 
-CFLAGS += $(addprefix "-D__DEBUG_",$(module))
-endif 
-
 ifeq ($(platform), qemu)
 CFLAGS += -D QEMU
 endif
@@ -132,6 +127,15 @@ SRC += \
 else 
 SRC += \
 	$K/hal/virtio_disk.c
+endif 
+
+ifeq ($(mode), debug) 
+CFLAGS += -DDEBUG 
+	ifeq ($(module), all)
+	CFLAGS += $(addprefix "-D__DEBUG_", $(basename $(notdir $(SRC))))
+	else 
+	CFLAGS += $(addprefix "-D__DEBUG_",$(module))
+	endif 
 endif 
 
 # object files 

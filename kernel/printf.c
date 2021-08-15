@@ -120,7 +120,7 @@ printf(char *fmt, ...)
 }
 
 void
-panic(char *s)
+__panic(char *s)
 {
 	printf(__ERROR("panic")": ");
 	printf(s);

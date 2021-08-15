@@ -42,7 +42,6 @@ SECTIONS
     . = ALIGN(4K);
     bss_start = .;
     .bss : {
-	    *(.bss.stack)
         sbss_clear = .;
         *(.sbss .bss .bss.*)
         ebss_clear = .;
@@ -50,4 +49,7 @@ SECTIONS
 
     . = ALIGN(4K);
     PROVIDE(kernel_end = .);
+    .stack : {
+        *(.stack)
+    }
 }

@@ -108,11 +108,8 @@ usertrap(void)
 	} 
 	else if (0 == handle_intr(cause)) {
 		// handle interrupt 
-		if (NULL != get_runnable())	{
+		if (yield()) {
 			p->ivswtch += 1;
-			__debug_info("usertrap", "yield()\n");
-			// if a new proc is woke up by intr, run it first 
-			yield();
 		}
 	}
 	else if (0 == handle_excp(cause)) {
@@ -154,8 +151,7 @@ usertrapret(void) {
 	// set up trapframe values that uservec will need when
 	// the process next re-enters the kernel.
 	p->trapframe->kernel_satp = r_satp();         // kernel page table
-	//p->trapframe->kernel_sp = p->kstack + PGSIZE; // process's kernel stack
-	p->trapframe->kernel_sp = VKSTACK + PGSIZE;
+	p->trapframe->kernel_sp = p->kstack + PGSIZE;	// process's kernel stack 
 	p->trapframe->kernel_trap = (uint64)usertrap;
 	p->trapframe->kernel_hartid = r_tp();         // hartid for cpuid()
 
@@ -181,7 +177,8 @@ usertrapret(void) {
 	// switches to the user page table, restores user registers,
 	// and switches to user mode with sret.
 	uint64 fn = TRAMPOLINE + (userret - trampoline);
-	((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+	// ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+	((void (*)(uint64, uint64))fn)((uint64)(p->trapframe), satp);
 }
 
 // interrupts and exceptions from kernel code go here via kernelvec,
@@ -205,10 +202,7 @@ kerneltrap() {
 
 	//__debug_info("kerneltrap", "enter %d\n", scause);
 	if (0 == handle_intr(scause)) {
-		/*if (NULL != p && NULL != get_runnable()) {*/
-			/*__debug_info("kerneltrap", "yield()\n");*/
-			/*yield();*/
-		/*}*/
+		// handle interrupt
 	}
 	else if (0 == handle_excp(scause)) {
 		// handle exception 
@@ -293,6 +287,18 @@ int handle_intr(uint64 scause) {
 		}
 		#endif 
 
+		// send software interrupts to other harts to inform them 
+		// for (int i = 0; i < NCPU; i ++) {
+		// 	if (cpuid() != i) {
+		// 		sbi_send_ipi(1 << i, 0);
+		// 	}
+		// }
+
+		return 0;
+	}
+	else if (INTR_SOFTWARE == scause) {		// the real software interrupt
+		sbi_clear_ipi();
+
 		return 0;
 	}
 	else {
@@ -325,21 +331,6 @@ int handle_excp(uint64 scause) {
 	default: return -1;
 	}
 }
-
-/*static inline int is_page_fault(uint64 scause)*/
-/*{*/
-  /*switch (scause) {*/
-	/*#ifndef QEMU*/
-	  /*case EXCP_LOAD_ACCESS:*/
-	  /*case EXCP_STORE_ACCESS:*/
-	/*#else*/
-	  /*case EXCP_LOAD_PAGE:*/
-	  /*case EXCP_STORE_PAGE:*/
-	/*#endif*/
-		/*return 1;*/
-  /*}*/
-  /*return 0;*/
-/*}*/
 
 void trapframedump(struct trapframe *tf)
 {
