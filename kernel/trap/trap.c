@@ -267,7 +267,7 @@ int handle_intr(uint64 scause) {
 	other way, when an S-exception is happening, an M-intr
 	setting the stval might cover the real original stval. */
 	// else if (INTR_SOFTWARE == scause && 9 == r_stval()) 
-	else if (INTR_SOFTWARE == scause)
+	else if (INTR_SOFTWARE == scause && sbi_xv6_is_ext().value) 
 	#endif 
 	{
 		int irq = plic_claim();
@@ -294,8 +294,7 @@ int handle_intr(uint64 scause) {
 		#ifndef QEMU 
 		w_sip(r_sip() & ~2);	// clear pending bit 
 		{
-			struct sbiret res = sbi_xv6_set_ext();
-			if (SBI_SUCCESS != res.error) {
+			if (SBI_SUCCESS != sbi_xv6_set_ext().error) {
 				panic("sbi_xv6_set_ext() failed\n");
 			}
 		}
