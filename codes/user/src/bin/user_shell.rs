@@ -430,7 +430,7 @@ impl ArgMachine{
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
 
-        testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
+        //testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
 //
         testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
         testsuits.push("lmbench_all\0lat_pipe\0-P\01");                                  // 需要SIGKILL
