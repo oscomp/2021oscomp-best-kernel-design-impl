@@ -12,6 +12,7 @@
 #include "hal/riscv.h"
 #include "sync/spinlock.h"
 #include "intr.h"
+#include "sbi.h"
 #include "mm/pm.h"
 #include "printf.h"
 #include "utils/string.h"
@@ -417,6 +418,11 @@ static void __wakeup_no_lock(void *chan) {
 			p->timer = TIMER_IRQ;
 			p->chan = NULL;
 			__insert_runnable(PRIORITY_IRQ, p);
+
+			int hartid = (p->state >> 8) & 0xff;
+			if (hartid > 0 && hartid != cpuid() + 1) {
+				sbi_send_ipi(1 << (hartid - 1), 0);
+			}
 		}
 		p = next;
 	}
