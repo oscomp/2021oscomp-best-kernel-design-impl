@@ -46,4 +46,13 @@
 		do {} while(0)
 #endif 
 
+// asserts that we want to keep when it's no debugging 
+#define __assert(func, cond, ...) do {\
+	if (!(cond)) {\
+		__debug_error(func, "at %s: %d\n", __FILE__, __LINE__);\
+		__debug_error(func, __VA_ARGS__);\
+		panic("panic!\n");\
+	}\
+} while (0)
+
 #endif 

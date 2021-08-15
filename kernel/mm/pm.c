@@ -20,7 +20,7 @@
 #include "printf.h"
 #include "utils/debug.h"
 
-extern char kernel_end[];	// first address after kernel 
+extern char kernel_end[];		// first address after kernel 
 extern char boot_stack_top[];	// first address after kernel bootstack 
 
 struct run {
@@ -28,49 +28,42 @@ struct run {
 	uint64 npage;
 };
 
-static struct {
+struct pm_allocator {
 	struct spinlock lock;
 	struct run *freelist;
 	uint64 npage;
-} kmem;
+};
 
-#define __enter_kmem_cs \
-	acquire(&kmem.lock);
-#define __leave_kmem_cs \
-	release(&kmem.lock);
+struct pm_allocator multiple;
+struct pm_allocator single;
 
-static void freerange(uint64 pa_start, uint64 pa_end) {
-	uint64 start = PGROUNDUP(pa_start);
-	uint64 npage = (pa_end - start) / PGSIZE;
+#define SINGLE_PAGE_NUM 		400
+uint64 START_SINGLE = PHYSTOP - SINGLE_PAGE_NUM * PGSIZE;
 
-	freepage_n(start, npage);
-}
+#define __enter_mul_cs \
+	acquire(&multiple.lock);
+#define __leave_mul_cs \
+	release(&multiple.lock);
+#define __enter_sin_cs \
+	acquire(&single.lock);
+#define __leave_sin_cs \
+	release(&single.lock);
 
-void kpminit(void) {
-	initlock(&kmem.lock, "kmem");
-	kmem.freelist = NULL;
-	kmem.npage = 0;
-	freerange((uint64)boot_stack_top, (uint64)PHYSTOP);
-	__debug_info("kpminit", "kernel_end: %p, phystop: %p, npage %d\n", 
-			kernel_end, (void*)PHYSTOP, kmem.npage);
-}
 
-void *allocpage_n(uint64 n) {
+// Allocate n pages 
+static void *__mul_alloc_no_lock(uint64 n) {
 	struct run *pa;
 	struct run **pprev;
 
-	__debug_assert("allocpage_n", n > 0, "n <= 0\n");
-
-	__enter_kmem_cs 
-	pa = kmem.freelist;
-	pprev = &(kmem.freelist);
+	pa = multiple.freelist;
+	pprev = &(multiple.freelist);
 
 	while (NULL != pa) {
 		if (pa->npage >= n) {
 			struct run *ret = (struct run*)(
 				(uint64)pa + PGSIZE * (pa->npage - n)
 			);
-			if (pa == ret) {
+			if (pa == ret) {	// this block is used up, remove it
 				*pprev = pa->next;
 			}
 			else {
@@ -78,53 +71,30 @@ void *allocpage_n(uint64 n) {
 				pa = ret;
 			}
 
-			kmem.npage -= n;
-
+			multiple.npage -= n;
 			break;
 		}
 
 		pprev = &(pa->next);
 		pa = pa->next;
 	}
-	__leave_kmem_cs 
 
-	#ifdef DEBUG
-	// fill the memory with junk, so bugs may lead to a faster panic. 
-	if (NULL != pa) {
-		memset(pa, 5, n * PGSIZE);
-	}
-	#endif 
-
-	__debug_info("allocpage_n", "%p, %d\n", pa, n);
 	return (void*)pa;
 }
 
-void freepage_n(uint64 start, uint64 n) {
-	__debug_info("freepage_n", "start = %p, n = %d\n", start, n);
-
-	if (((uint64)start % PGSIZE) != 0 || n <= 0 || 
-		(	// memory range that could be freed 
-			!(start >= (uint64)kernel_end && (start + n * PGSIZE) <= PHYSTOP) 
-		)
-	) {
-		panic("freepage");
-	}
-
-	__enter_kmem_cs 
-	if (NULL == kmem.freelist) {		// if the allocator is empty
-		kmem.freelist = (struct run*)start;
-		kmem.freelist->npage = n;
-		kmem.freelist->next = NULL;
-		kmem.npage = n;
-
-		__leave_kmem_cs 
+// free n pages
+static void __mul_free_no_lock(uint64 start, uint64 n) {
+	if (NULL == multiple.freelist) {
+		multiple.freelist = (struct run*)start;
+		multiple.freelist->npage = n;
+		multiple.freelist->next = NULL;
+		multiple.npage = n;
 
 		return ;
 	}
 
-	// find the first block of memory after the memory to free 
 	struct run *prev = NULL;
-	struct run *next = kmem.freelist;
+	struct run *next = multiple.freelist;
 	while (NULL != next) {
 		if ((uint64)next > start) {
 			break;
@@ -150,7 +120,7 @@ void freepage_n(uint64 start, uint64 n) {
 		}
 	}
 	else {
-		kmem.freelist = pa;
+		multiple.freelist = pa;
 		pa->npage = n;
 	}
 
@@ -163,26 +133,164 @@ void freepage_n(uint64 start, uint64 n) {
 		}
 	}
 
-	kmem.npage += n;
+	multiple.npage += n;
+}
 
-	__debug_info("freepage_n", "avail_addr: %p, avail: %d\n", kmem.freelist, kmem.npage);
+static void __mul_freerange(uint64 pa_start, uint64 pa_end) {
+	uint64 start = PGROUNDUP(pa_start);
+	uint64 npage = (pa_end - start) / PGSIZE;
 
-	__leave_kmem_cs 
+	__enter_mul_cs 
+	__mul_free_no_lock(pa_start, npage);
+	__leave_mul_cs 
+}
+
+
+static void *__sin_alloc_no_lock(void) {
+	struct run *ret = single.freelist;
+
+	if (NULL != ret) {
+		single.freelist = ret->next;
+		single.npage -= 1;
+	}
+
+	return ret;
+}
+
+static void __sin_free_no_lock(uint64 pa) {
+	struct run *page = (struct run*)pa;
+
+	page->next = single.freelist;
+	single.freelist = page;
+	single.npage += 1;
+}
+
+static void __sin_freerange(uint64 pa_start, uint64 pa_end) {
+	uint64 start = PGROUNDUP(pa_start);
+
+	__enter_sin_cs 
+	while (start < pa_end) {
+		__sin_free_no_lock(start);
+		start += PGSIZE;
+	}
+	__leave_sin_cs 
+}
+
+void kpminit(void) {
+	// init multiple 
+	multiple.freelist = NULL;
+	multiple.npage = 0;
+	initlock(&multiple.lock, "multi-lock");
+
+	// init single 
+	single.freelist = NULL;
+	single.npage = 0;
+	initlock(&single.lock, "single-lock");
+
+	__assert("kpminit", START_SINGLE - (uint64)boot_stack_top >= PGSIZE, 
+			"START_SINGLE = %p, boot_stack_top = %p\n", 
+			START_SINGLE, boot_stack_top);
+	__mul_freerange((uint64)boot_stack_top, START_SINGLE);
+	__sin_freerange(START_SINGLE, PHYSTOP);
+
+	__debug_info("kpminit", "kernel_end: %p, start_single: %p, phystop: %p, npage %d\n", 
+			kernel_end, (void*)START_SINGLE, (void*)PHYSTOP, multiple.npage + single.npage);
+}
+
+void *allocpage_n(uint64 n) {
+	__debug_assert("allocpage_n", n > 1, "n = %d\n", n);
+
+	void *ret;
+	__enter_mul_cs 
+	ret = __mul_alloc_no_lock(n);
+	__leave_mul_cs 
+
+	#ifdef DEBUG
+	if (NULL != ret) {
+		memset(ret, 0x5, n * PGSIZE);
+	}
+	#endif 
+	__debug_info("allocpage_n", "%p %d page(s)\n", ret, n);
+
+	return ret;
+}
+
+void freepage_n(uint64 start, uint64 n) {
+	__debug_assert("freepage_n", 
+		(start >= (uint64)kernel_end && start < START_SINGLE) && 
+		(0 == start % PGSIZE) && n > 1, 
+		"start = %p, n = %d\n", start, n
+	);
+
+	__enter_mul_cs 
+	__mul_free_no_lock(start, n);
+	__leave_mul_cs 
+
+	__debug_info("freepage_n", "%p %d page(s)\n", start, n);
+}
+
+uint64 _allocpage(void) {
+	struct run *ret;
+
+	__enter_sin_cs 
+	ret = __sin_alloc_no_lock();
+	__leave_sin_cs 
+
+	if (NULL == ret) {
+		// we can't allocate one from single, let's borrow one from multiple
+		__enter_mul_cs 
+		ret = __mul_alloc_no_lock(1);
+		__leave_mul_cs 
+	}
+
+	#ifdef DEBUG
+	if (NULL != ret) {
+		memset(ret, 5, PGSIZE);
+	}
+	#endif 
+	__debug_info("allocpage", "%p\n", ret);
+
+	return (uint64)ret;
+}
+
+void _freepage(uint64 pa) {
+	uint64 start = (uint64)pa;
+
+	__debug_assert("freepage", 
+		(start >= (uint64)kernel_end && start < PHYSTOP) && 
+		0 == start % PGSIZE, 
+		"start = %p\n", start
+	);
+
+	if (start < START_SINGLE) {
+		__enter_mul_cs 
+		__mul_free_no_lock(start, 1);
+		__leave_mul_cs 
+	}
+	else {
+		__enter_sin_cs 
+		__sin_free_no_lock(start);
+		__leave_sin_cs 
+	}
+
+	__debug_info("freepage", "%p\n", start);
 }
 
 uint64 idlepages(void) {
-	return kmem.npage;
+	return multiple.npage + single.npage;
 }
 
 void pm_dump(void) {
-	__enter_kmem_cs 
-
-	struct run *pa = kmem.freelist;
-	printf("kmem avail: %d\n", kmem.npage);
+	__enter_mul_cs 
+	struct run *pa = multiple.freelist;
+	printf("multiple avail: %d\n", multiple.npage);
 	while (NULL != pa) {
 		printf("\t%p %d\n", pa, pa->npage);
 		pa = pa->next;
 	}
+	__leave_mul_cs 
 
-	__leave_kmem_cs 
+	__enter_sin_cs 
+	printf("single avail: %d\n", single.npage);
+	__leave_sin_cs 
 }

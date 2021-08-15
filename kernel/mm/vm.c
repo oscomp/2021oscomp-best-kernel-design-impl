@@ -42,8 +42,10 @@ kvminit()
 {
 	save_point = 0;
 
-	if (idlepages() > MAX_PAGES_NUM)
+	if (idlepages() > MAX_PAGES_NUM) {
+		pm_dump();
 		panic("kvminit: page_ref_table[] not enough");
+	}
 
 	initlock(&page_ref_lock, "page_ref_lock");
 	memset(page_ref_table, 0, sizeof(page_ref_table));
