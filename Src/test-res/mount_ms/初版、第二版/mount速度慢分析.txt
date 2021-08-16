@@ -1,0 +1,115 @@
+====== TEST 98 ======
+================ Goodbye GC ================
+[__hoit_read_flash: 1.756000ms]
+[while loop: 0.728000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: -8.909000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 0.000000ms]
+[while loop: 10.380000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.804000ms]
+[while loop: 0.459000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.773000ms]
+[while loop: 0.443000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: -8.418000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 0.000000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 11.519000ms]
+[while loop: 0.458000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.930000ms]
+[while loop: 0.474000ms]
+[add to sector: 0.016000ms]
+
+[__hoit_read_flash: 1.757000ms]
+[while loop: 0.475000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 0.000000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 11.124000ms]
+[while loop: 0.490000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.899000ms]
+[while loop: 0.601000ms]
+[add to sector: 0.016000ms]
+
+[__hoit_read_flash: 1.852000ms]
+[while loop: 0.601000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 0.000000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 10.206000ms]
+[while loop: 0.633000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.756000ms]
+[while loop: 0.648000ms]
+[add to sector: 0.015000ms]
+
+[__hoit_read_flash: 1.819000ms]
+[while loop: 0.648000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: -9.668000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 10.412000ms]
+[while loop: 0.633000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.962000ms]
+[while loop: 0.617000ms]
+[add to sector: 0.016000ms]
+
+[__hoit_read_flash: 1.741000ms]
+[while loop: 0.681000ms]
+[add to sector: 0.016000ms]
+
+[__hoit_read_flash: 0.000000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 10.807000ms]
+[while loop: 0.665000ms]
+[add to sector: 0.016000ms]
+
+[__hoit_read_flash: 1.883000ms]
+[while loop: 0.633000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 1.820000ms]
+[while loop: 0.538000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 0.000000ms]
+[while loop: 0.000000ms]
+[add to sector: 0.000000ms]
+
+[__hoit_read_flash: 11.108000ms]
+[while loop: 0.522000ms]
+[add to sector: 0.000000ms]
+
+[scan sector: 67.832000ms]

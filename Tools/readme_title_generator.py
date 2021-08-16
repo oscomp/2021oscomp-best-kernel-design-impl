@@ -1,7 +1,7 @@
 import os
 import sys
 backup_path = "./README_BAKUP.md"
-readme_path = "./README_HOITFS.md"
+readme_path = "./README.md"
 readme_generate_path = "./README_GEN.md" 
 docs_dir = "./Records/Docs/"
 ccb_dir = "./Records/CCB/"

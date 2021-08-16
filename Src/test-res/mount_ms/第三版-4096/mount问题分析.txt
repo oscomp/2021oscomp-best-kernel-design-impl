@@ -1,0 +1,334 @@
+下述操作：
+1. mount；
+2. 打开文件；
+3. 写入963379字节；
+4. 关闭文件；
+5. 打开文件；
+6. 读出963379字节，正常，说明内存结构正确，writeCacheBack表现正确， 
+    因为cache大小只有458752，肯定会触发writeBack；
+7. unmount，查看sector布局；
+8. 再次mount，发现CRC校验错误，输出错误信息（下面乱码部分）；
+9. 再次打开文件；
+10. 读出963379字节，异常；
+11. umount，查看sector布局，发现与7已经不一致；
+
+[root@sylixos:/root]# fstester -t hoitfs -args 963379
+Test With Options Below:
+        filesystem_type=hoitfs
+        test_count=10
+        test_file_factor=0.500000
+        test_type=random-read-test
+Press Any Key to Continue
+
+963379
+[scan sector: 40.664000ms]
+now sector offs: 0
+
+cycle 1: pass
+=================SECTOR 27=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 26=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 25=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 24=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 23=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 22=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 21=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 20=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 19=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 18=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 17=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 16=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 15=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 14=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 13=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 12=================
+UsedSize: 56392
+FreeSize: 896
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 11 [*CUR] =================
+UsedSize: 42392
+FreeSize: 14896
+ObseletEntity:   40
+AvailableEntity: 0
+=================SECTOR 10=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  9=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  8=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  7=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  6=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  5=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  4=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  3=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  2=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  1=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  0=================
+UsedSize: 56560
+FreeSize: 728
+ObseletEntity:   56
+AvailableEntity: 0
+=================MORE INFO=================
+Foreground GC Times: 0
+Background GC Times: 0
+================ Goodbye GC ================
+
+
+▒0{C▒▒Xxg18▒f1
+▒0{C▒▒8▒h1▒g1
+▒0{C▒▒▒▒i1▒▒h1
+
+
+
+▒0{C▒▒bc1▒b1
+▒!C▒▒▒fd1h▒c1
+
+
+
+
+C1▒
+
+cycle 2: error
+=================SECTOR 27=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR 26=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR 25=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR 24=================
+UsedSize: 29568
+FreeSize: 27720
+ObseletEntity:   28
+AvailableEntity: 0
+=================SECTOR 23=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 22=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 21=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 20=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 19=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 18=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 17=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 16=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 15=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 14=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 13=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 12=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 11=================
+UsedSize: 55968
+FreeSize: 1320
+ObseletEntity:   53
+AvailableEntity: 0
+=================SECTOR 10=================
+UsedSize: 42035
+FreeSize: 15253
+ObseletEntity:   40
+AvailableEntity: 0
+=================SECTOR  9=================
+UsedSize: 16896
+FreeSize: 40392
+ObseletEntity:   16
+AvailableEntity: 0
+=================SECTOR  8=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  7=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  6=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  5=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  4=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  3=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  2=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  1=================
+UsedSize: 0
+FreeSize: 57288
+ObseletEntity:   0
+AvailableEntity: 0
+=================SECTOR  0 [*CUR] =================
+UsedSize: 56078
+FreeSize: 1210
+ObseletEntity:   55
+AvailableEntity: 0
+=================MORE INFO=================
+Foreground GC Times: 0
+Background GC Times: 0
+================ Goodbye GC ================
+
+ 

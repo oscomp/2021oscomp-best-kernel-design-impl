@@ -3,14 +3,14 @@
         {
             "name": "Win32",
             "includePath": [
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixBSP\\SylixOS",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixBSP\\SylixOS\\bsp",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\SylixOS-IDE\\RealEvo\\compiler\\arm-sylixos-toolchain\\arm-sylixos-eabi\\include",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\SylixOS-IDE\\RealEvo\\compiler\\arm-sylixos-toolchain\\lib\\gcc\\arm-sylixos-eabi\\4.9.3\\include",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libcextern\\libcextern\\include",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libsylixos\\SylixOS",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libsylixos\\SylixOS\\include",
-                "G:\\MyProject\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libsylixos\\SylixOS\\include\\network"
+                "D:\\MyProject-Temp\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixBSP\\SylixOS",
+                "D:\\MyProject-Temp\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixBSP\\SylixOS\\bsp",
+                "D:\\RealEvo\\compiler\\arm-sylixos-toolchain\\arm-sylixos-eabi\\include",
+                "D:\\RealEvo\\compiler\\arm-sylixos-toolchain\\lib\\gcc\\arm-sylixos-eabi\\4.9.3\\include",
+                "D:\\MyProject-Temp\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libcextern\\libcextern\\include",
+                "D:\\MyProject-Temp\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libsylixos\\SylixOS",
+                "D:\\MyProject-Temp\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libsylixos\\SylixOS\\include",
+                "D:\\MyProject-Temp\\Project.HoitOS\\HoitOS\\SylixOS\\Workspace\\SylixOS\\libsylixos\\SylixOS\\include\\network"
             ],
             "defines": [
                 "_DEBUG",

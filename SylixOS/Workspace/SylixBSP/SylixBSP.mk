@@ -66,10 +66,23 @@ SylixOS/extfs/hoitFs/hoitFsFDLib.c \
 SylixOS/extfs/hoitFs/hoitFsGC.c \
 SylixOS/extfs/hoitFs/hoitFsLib.c \
 SylixOS/extfs/hoitFs/hoitFsLog.c \
-SylixOS/extfs/hoitFs/hoitFsMid.c \
 SylixOS/extfs/hoitFs/hoitFsTest.c \
 SylixOS/extfs/hoitFs/hoitFsTree.c \
 SylixOS/extfs/hoitFs/hoitFsTreeUtil.c \
+SylixOS/extfs/hoitFs/hoitMergeBuffer.c \
+SylixOS/extfs/spifFs/spifFs.c \
+SylixOS/extfs/spifFs/spifFsCache.c \
+SylixOS/extfs/spifFs/spifFsCmd.c \
+SylixOS/extfs/spifFs/spifFsFDLib.c \
+SylixOS/extfs/spifFs/spifFsGC.c \
+SylixOS/extfs/spifFs/spifFsGlue.c \
+SylixOS/extfs/spifFs/spifFsLib.c \
+SylixOS/extfs/spifFs/spifFsVerify.c \
+SylixOS/extfs/tools/fstester/fstester.c \
+SylixOS/extfs/tools/fstester/functionality.c \
+SylixOS/extfs/tools/list/iter.c \
+SylixOS/extfs/tools/list/list.c \
+SylixOS/extfs/tools/list/list_test.c \
 SylixOS/user/main.c
 
 

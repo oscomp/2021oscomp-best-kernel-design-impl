@@ -110,6 +110,7 @@ FUNC_LABEL(fiqEntry)
 
 FUNC_DEF(reset)
     LDR     R0 , =WTCON                                                ;/*  watch dog disable            */
+
     LDR     R1 , =0x0                                                  ;/*  复位时，看门狗是打开的       */
     STR     R1 , [R0]
 

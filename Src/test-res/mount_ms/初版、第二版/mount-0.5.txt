@@ -1,0 +1,6 @@
+[HOITFS-NO-OPT fstester -t hoitfs -l 100 -mnt -s 0.5] ( ms )
+
+[HOITFS fstester -t hoitfs -l 100 -mnt -s 0.5]
+
+
+[SPIFFS fstester -t spiffs -l 100 -mnt -s 0.5]

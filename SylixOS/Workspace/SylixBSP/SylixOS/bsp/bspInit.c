@@ -52,6 +52,9 @@
 #include "extfs/hoitFs/hoitFsTreeUtil.h"                                /*  红黑树测试 - PYQ             */
 #include "extfs/hoitFs/hoitFsTree.h"                                    /*  Frag树测试 - PYQ             */
 #include "extfs/hoitFs/hoitFsCache.h"                                   /*  Cache测试  - ZN              */
+#include "extfs/spifFs/spifFs.h"                                        /*  Spiffs文件驱动接口 - PYQ */
+#include "extfs/tools/list/common.h"                                    /*  链表模板测试 - PYQ */
+#include "extfs/tools/fstester/fstester.h"                              /*  fstester - PYQ */
 /*********************************************************************************************************
   操作系统符号表
 *********************************************************************************************************/
@@ -231,6 +234,7 @@ static VOID  halDrvInit (VOID)
     canDrv();                                                           /*  CAN    device driver        */
     
     API_HoitFsDrvInstall();                                             /*  挂载HoitFS文件系统 */
+    API_SpifFsDrvInstall();                                             /*  挂载SpifFS文件系统 */
     s3c2440GpioDrv();
 
 #ifdef MINI2440_PACKET
@@ -580,13 +584,12 @@ static PVOID  halBootThread (PVOID  pvBootArg)
 
     nor_init(INIT_FAKE_NOR);
     scan_nor();
-
 #ifdef NOR_TEST
     test_nor();
 #endif // NOR_TEST
 
 #ifdef HOIT_CACHE_TEST
-test_hoit_cache();
+    test_hoit_cache();
 #endif
 
 #ifdef RB_TEST
@@ -598,7 +601,9 @@ test_hoit_cache();
     pretty_print("[Frag Tree Test]", "", DO_CENTRAL);
     hoitFTTreeTest();
 #endif // FT_TEST
-
+    listTest();
+    //! Add By PYQ 2021-07-27
+    register_fstester_cmd();
 #else
     nandDevCreateEx("/n");                                              /*  mount nandflash disk(yaffs) */
 #endif

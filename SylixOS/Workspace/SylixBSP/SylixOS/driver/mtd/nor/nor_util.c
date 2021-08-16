@@ -237,6 +237,8 @@ VOID nor_write_buffer(UINT32 base, UINT offset, PCHAR content, UINT size_bytes){
 	}
 	if(IS_FAKE_MODE()){
 		PCHAR p = content;
+		INT	  i, size_words;
+		volatile INT fake;
 		if(get_sector_is_bad(sector_no)){                                                          /* 随机修改 */
 #ifdef NOR_DEBUG
 			printf("| -> [sector #%d is bad, there may be some error(s), remember to check]\n", sector_no);
@@ -251,9 +253,22 @@ VOID nor_write_buffer(UINT32 base, UINT offset, PCHAR content, UINT size_bytes){
 				}
 			} 
 		}
+		size_words = size_bytes / 2;
+		for (i = 0; i < size_words; i++)
+		{
+			/* 模拟nor_cmd_unlock， 2个访存周期 */
+			fake = 1;		/* Cycle 1 */
+			fake = 2;		/* Cycle 2 */
+			/* 模拟写入，2个访存周期 */
+			fake = 3;		/* Cycle 3 */
+			fake = 4;		/* Cycle 4 */
+			/* 模拟wait_ready， 至少2个访存周期 */
+			fake = 5;		/* Cycle 5 */
+			fake = 6;		/* Cycle 6 */
+		}
 		lib_memcpy((PVOID)(base + offset), content, size_bytes);
 	}
-	else{
+	else {
 		UINT size_words = size_bytes / 2;
 		INT remain_byte = size_bytes - size_words * 2 ;
 		INT i;
