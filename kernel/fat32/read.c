@@ -26,6 +26,11 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
         log(0, "ret is %d %c", ret, buf[0]);
         return ret;
     }
+    else if (current_running->fd[fd_index].dev == DEV_ZERO){
+        log(0, "it's ZERO");
+        memset(buf, 0, count);
+        return count;
+    }
     // 如果是管道，就读取管道输出
     if (current_running->fd[fd_index].piped == FD_PIPED){
         log(0, "it's a pipe fd");
@@ -114,25 +119,26 @@ int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt)
 {
     debug();
     log(0, "fd:%d, iovcnt:%d", fd, iovcnt);
-    int32_t fd_index = get_fd_index(fd, current_running);
+    // int32_t fd_index = get_fd_index(fd, current_running);
 
-    if (fd_index < 0)
-        return SYSCALL_FAILED;
-    if (current_running->fd[fd_index].dev == STDOUT || current_running->fd[fd_index].dev == STDERR)
-        return SYSCALL_FAILED;
+    // if (fd_index < 0)
+    //     return SYSCALL_FAILED;
+    // if (current_running->fd[fd_index].dev == STDOUT || current_running->fd[fd_index].dev == STDERR)
+    //     return SYSCALL_FAILED;
     
-    size_t count = 0, this_count;
+    size_t count = 0;
+    ssize_t this_count;
 
-    if (current_running->fd[fd_index].dev == STDIN){
-        for (uint32_t i = 0; i < iovcnt; i++){
-            if ((this_count = read_ring_buffer(&stdin_buf, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
-                return SYSCALL_FAILED;
-            count += this_count;
-            log(0, "count is %d", count);
-            iov++;
-        }
-    }
-    else{
+    // if (current_running->fd[fd_index].dev == STDIN){
+    //     for (uint32_t i = 0; i < iovcnt; i++){
+    //         if ((this_count = read_ring_buffer(&stdin_buf, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
+    //             return SYSCALL_FAILED;
+    //         count += this_count;
+    //         log(0, "count is %d", count);
+    //         iov++;
+    //     }
+    // }
+    // else{
         for (uint32_t i = 0; i < iovcnt; i++){
             if ((this_count = fat32_read(fd, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
                 return SYSCALL_FAILED;
@@ -140,6 +146,6 @@ int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt)
             log(0, "count is %d", count);
             iov++;
         }
-    }
+    // }
     return count;
 }

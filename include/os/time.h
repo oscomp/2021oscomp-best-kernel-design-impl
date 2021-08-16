@@ -4,6 +4,7 @@
 
 #include <type.h>
 #include <os/list.h>
+#include <time/itimer.h>
 
 #define NUM_TIMER 16
 
@@ -12,16 +13,15 @@
 #define TIMEBASE 403000000
 #define TICKCOUNT 62
 
-typedef void (*TimerCallback)(void *parameter);
-typedef uint64_t time_t;
-typedef uint64_t clock_t;
+typedef void (*TimerCallback)(void *);
 
 typedef struct timer
 {
+    timer_id_t timer_id;
     list_node_t list;
     uint64_t timeout_tick;
     TimerCallback callback_func;
-    void *parameter;
+    uint64_t parameter;
 } timer_t;
 
 /* for gettimes */
@@ -105,7 +105,7 @@ void kernel_time_count();
 void user_time_count();
 uint64_t timespec_to_tick(struct timespec *ts);
 uint64_t timeval_to_tick(struct timeval *ts);
-void set_timeval_from_ticks(time_t time, struct timeval *tv);
+void tick_to_timeval(time_t time, struct timeval *tv);
 
 uint64_t do_times(struct tms *tms);
 int8_t do_gettimeofday(struct timespec *ts);
@@ -116,11 +116,28 @@ int32_t do_getrusage(int32_t who, struct rusage *usage);
 extern uint64_t get_time_base();
 
 extern list_head timers;
+extern list_head available_timers;
 void timer_create(TimerCallback func, void* parameter, uint64_t tick);
-
+void do_set_test_timer();
 // this should be called by handle_int
 void timer_check(void);
-
+timer_t *alloc_timer();
 void latency(uint64_t time);
+
+/* add this timer to timers */
+static inline void enable_timer(timer_t *timer)
+{
+    list_add_tail(&timer->list, &timers);
+}
+/* delete this timer from timer list */
+static inline void disable_timer(timer_t *timer)
+{
+    list_del(&timer->list);
+}
+/* put this timer to available list */
+static inline void free_timer(timer_t *timer)
+{
+    list_add_tail(&timer->list, &available_timers);
+}
 
 #endif

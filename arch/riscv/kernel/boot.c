@@ -73,6 +73,7 @@ void setup_vm()
     clear_pgdir(PGDIR_PA);
     for (uint64_t i = START_ENTRYPOINT; i < KERNEL_END; i += LARGE_PAGE_SIZE)
     {
+
         map_page(i,(i&0xffffffff),PGDIR_PA);
     }
     for (uint64_t i = BOOT_KERNEL; i < BOOT_KERNEL_END; i += LARGE_PAGE_SIZE)
@@ -81,6 +82,7 @@ void setup_vm()
     }
     // enable virtual memory
     enable_vm();
+    sbi_console_putchar('6');
 }
 
 uintptr_t directmap(uintptr_t kva, uintptr_t pgdir)
@@ -235,7 +237,7 @@ int boot_kernel(unsigned long mhartid, uintptr_t riscv_dtb)
     // for (int i = 0; i < 20; ++i)
     //  {
     //     sbi_console_putchar('0'+(*c) % 10);
-    //  }     
+    //  }  
     start_kernel(mhartid, riscv_dtb);
     return 0;
 }

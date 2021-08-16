@@ -147,30 +147,75 @@ void do_yield()
     do_scheduler();
 }
 
+/* free resources, but it still cannot be reused until detached from its parent */
+static void freeproc(pcb_t *pcb)
+{
+    log2(0, "tid %d is freed by %d", pcb->tid, current_running->tid);
+    pcb->status = TASK_EXITED;
+    free_all_pages(pcb->pgdir, PAGE_ALIGN(pcb->kernel_sp));
+    free_all_fds(pcb);
+    handle_memory_leak(pcb);
+    list_add_tail(&pcb->list,&available_queue);
+}
+
+/* pid == -1: wait for any one of children */
+/* pid > 0: wait for the child whose tid == pid */
 int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
     debug();
     uint64_t status_ker_va = NULL;
     if (status) status_ker_va = get_kva_of(status,current_running->pgdir);
-    log(0, "kva is %lx", status_ker_va);
+    log(0, "pid is %d, kva is %lx", pid, status_ker_va);
     int64_t ret;
+
+    uint8_t child_still_running = 0;
     for (uint i = 0; i < NUM_MAX_TASK; ++i)
     {
-        if (pcb[i].parent.parent == current_running && (pid == -1 || pid == pcb[i].tid)){
+        if (pcb[i].parent.parent == current_running){
             // confirm pid
-            if (pcb[i].status != TASK_EXITED && pcb[i].status != TASK_ZOMBIE){
-                do_block(&current_running->list, &pcb[i].wait_list);
+            if (pid == pcb[i].tid){
                 ret = pcb[i].tid;
-                do_scheduler();
-                log(0, "exit status %d", pcb[i].exit_status);
-                if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
-                log(0, "ret is %ld", ret);
+                /* if not exited, need to wait */
+                /* if already exited, need to detach it, avoiding repeating wait */
+                if (!is_exited(&pcb[i]) && !is_zombie(&pcb[i])){
+                    do_block(&current_running->list, &pcb[i].wait_list);
+                    do_scheduler();
+                    log(0, "exit status %d", pcb[i].exit_status);
+                    if (status_ker_va) WEXITSTATUS(status_ker_va,pcb[i].exit_status);
+                    log(0, "ret is %ld", ret);
+                }
+                detach_from_parent(&pcb[i]);
                 return ret;
+            }
+            else if (pid == -1){
+                if (!is_exited(&pcb[i]) && !is_zombie(&pcb[i])){
+                    child_still_running = 1;
+                    continue;
+                }
+                else{
+                    ret = pcb[i].tid;
+                    detach_from_parent(&pcb[i]);
+                    return ret;
+                }
             }
         }
     }
-    log(0, "ret is %ld", ret);
-    return -1;
+    if (pid > 0){
+        log(0, "no child tid %d found", pid);
+        return -1;
+    }
+    else if (pid == -1){
+        if (child_still_running){
+            current_running->is_waiting_all_children = 1;
+            do_block(&current_running->list, &general_block_queue);
+            do_scheduler();
+            return current_running->unblock_child_pid;
+        }
+        else
+            return -1;
+    }
+    else
+        assert(0);
 }
 
 void do_block(list_node_t *list, list_head *queue)
@@ -193,17 +238,6 @@ void do_unblock(void *pcb_node)
     list_add_tail(pcb_node,&ready_queue);
 }
 
-static void freeproc(pcb_t *pcb)
-{
-    pcb->status = TASK_EXITED;
-    // pcb->parent.parent = NULL;
-    free_all_pages(pcb->pgdir, PAGE_ALIGN(pcb->kernel_sp));
-    for (uint8_t i = 0; i < NUM_FD; i++)
-        fat32_close(pcb->fd[i].fd_num);
-    handle_memory_leak(pcb);
-    list_add_tail(&pcb->list,&available_queue);
-}
-
 /* clone a child thread for current thread */
 /* FOR NOW, use tls as entry point */
 /* stack : ADDR OF CHILD STACK POINT */
@@ -214,8 +248,9 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
     // log(0, "flag: %d, stack: %lx, ptid: %lx", flag, stack, ptid);
     // log(0, "tls: %lx, ctid: %lx, nouse: %lx", tls, ctid, nouse);
     for (uint i = 1; i < NUM_MAX_TASK; ++i)
-        if (pcb[i].status == TASK_EXITED)
+        if (is_free_pcb(&pcb[i]))
         {
+
             pcb_t *pcb_underinit = &pcb[i];
             init_pcb_default(pcb_underinit, USER_THREAD);
             // log(0, "new tid is %d, pid_on_exec %d", pcb_underinit->tid, pcb_underinit->pid_on_exec);
@@ -244,12 +279,15 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
 
             /* user low space */
             for (uint64_t i = current_running->elf.text_begin; i < current_running->edata; i += NORMAL_PAGE_SIZE){
+                // log2(0, "111");
                 if (probe_kva_of(i, current_running->pgdir)){
                     /* copy it */
                     uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_ALL_MOD);
+                    // log2(0, "clone_page_kva is %lx", clone_page_kva);
                     memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
                 }
             }
+
             /* user high space (including stack) */
             for (uint64_t i = get_user_addr_top(current_running); i < USER_STACK_ADDR; i += NORMAL_PAGE_SIZE){
                 if (probe_kva_of(i, current_running->pgdir)){
@@ -266,7 +304,6 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
             list_add_tail(&pcb_underinit->list,&ready_queue);
             // log(0, "child process usp is %lx", pcb_underinit->user_sp);
             // log(0, "child process usp base is %lx", pcb_underinit->user_stack_base);
-            // log(0, "ret is %d", pcb_underinit->tid);
             return pcb_underinit->tid;
         }
     return -1;
@@ -293,7 +330,13 @@ void do_exit(int32_t exit_status)
         temp = tempnext;
     }
 
+    if (current_running->parent.parent && current_running->parent.parent->is_waiting_all_children){
+        do_unblock(&(current_running->parent.parent->list));
+        current_running->parent.parent->is_waiting_all_children = 0;
+        current_running->parent.parent->unblock_child_pid = current_running->tid;
+    }
     current_running->exit_status = exit_status;
+    freeproc(current_running);
     // decide terminal state by mode
     if (current_running->type == USER_THREAD || current_running->mode == ENTER_ZOMBIE_ON_EXIT){
         log(0, "tid %d is entering ZOMBIE\n", current_running->tid);
@@ -303,11 +346,11 @@ void do_exit(int32_t exit_status)
     {
         /* check if there are child process who is terminated and its source is waiting to be free */
         for (int i = 0; i < NUM_MAX_TASK; ++i)
-            if (pcb[i].status == TASK_ZOMBIE && pcb[i].parent.parent == current_running){
+            if (is_my_child(&pcb[i])){
                 log(0, "tid %d is ZOMBIE freed\n", pcb[i].tid);
-                freeproc(&pcb[i]);
+                /* pcb[i].parent is of no use, should be freed */
+                detach_from_parent(&pcb[i]);
             }
-        freeproc(current_running);
     }
     do_scheduler();
 }
@@ -322,13 +365,67 @@ void do_exit(int32_t exit_status)
 int32_t do_kill(pid_t pid, int32_t sig)
 {
     debug();
-    if (pid > 0 || pid < -1)
+    assert(sig == SIGKILL);
+    if (pid > 0 || pid < -1){
+        if (pid < 0)
+            pid = -pid;
         for (int i = 0; i < NUM_MAX_TASK; ++i)
         {
-            if (pcb[i].status != TASK_EXITED && pcb[i].pid == pid)
+            if (pcb[i].tid == pid){
+                if (!is_exited(&pcb[i]) && !is_zombie(&pcb[i])){
+                    list_node_t *temp = pcb[i].wait_list.next;
+
+                    while (temp != &pcb[i].wait_list)
+                    {
+                        list_node_t *tempnext = temp->next;
+                        list_del(temp);
+
+                        pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
+                        if (pt_pcb->status != TASK_EXITED){
+                            do_unblock(temp);
+                        }
+                        
+                        temp = tempnext;
+                    }
+
+                    if (pcb[i].parent.parent && pcb[i].parent.parent->is_waiting_all_children){
+                        do_unblock(&(pcb[i].parent.parent->list));
+                        pcb[i].parent.parent->is_waiting_all_children = 0;
+                        pcb[i].parent.parent->unblock_child_pid = pcb[i].tid;
+                    }
+                    pcb[i].exit_status = 1;
+                    freeproc(&pcb[i]);
+                    // decide terminal state by mode
+                    if (pcb[i].type == USER_THREAD || pcb[i].mode == ENTER_ZOMBIE_ON_EXIT){
+                        log(0, "tid %d is entering ZOMBIE\n", current_running->tid);
+                        pcb[i].status = TASK_ZOMBIE;
+                    }
+                    else if (pcb[i].mode == AUTO_CLEANUP_ON_EXIT)
+                    {
+                        /* check if there are child process who is terminated and its source is waiting to be free */
+                        for (int j = 0; j < NUM_MAX_TASK; ++j)
+                            if (pcb[j].status == TASK_ZOMBIE && pcb[j].parent.parent == &pcb[i]){
+                                log(0, "tid %d is ZOMBIE freed\n", pcb[j].tid);
+                                detach_from_parent(&pcb[j]);
+                            }
+                    }
+                }
+                else{
+                    log(0, "tid %d has already died", pcb[i].tid);
+                }
                 return 0;
+            }
         }
+    }
     return -1;
+}
+
+/* kill a thread in thread group */
+int do_tgkill(int tgid, int tid, int sig)
+{
+    debug();
+    log(0, "tgid is %d, tid is %d, sig is %d", tgid, tid, sig);
+    do_kill(tid, sig);
 }
 
 /* exit all threads */

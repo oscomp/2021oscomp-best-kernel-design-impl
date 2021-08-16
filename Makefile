@@ -15,7 +15,7 @@ BOOTLOADER_ENTRYPOINT = 0x80000000
 START_ENTRYPOINT = 0x80020000
 
 TARGET = K210
-KERNEL_ENTRYPOINT = 0xffffffff80300000
+KERNEL_ENTRYPOINT = 0xffffffff80200000
 ifeq ($(TARGET), qemu)
 	KERNEL_ENTRYPOINT = 0xffffffff80600000
 	CFLAGS += -Iqemu
@@ -52,8 +52,9 @@ SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mount.c ./kernel/fat32/read.c 
 				./kernel/fat32/utils.c ./kernel/fat32/file.c ./kernel/fat32/pipe.c ./kernel/fat32/poll.c \
 				./kernel/fat32/safe.c ./kernel/fat32/link.c ./kernel/fat32/stat.c ./kernel/fat32/directory.c
 SRC_IO		= ./kernel/io/io.c ./kernel/io/select.c ./kernel/io/ring_buffer.c
-SRC_SYSTEM	= ./kernel/system/system.c ./kernel/system/uname.c ./kernel/system/resource.c
-SRC_TIME	= ./kernel/time/timer.c ./kernel/time/utils.c ./kernel/time/system_time.c
+SRC_SYSTEM	= ./kernel/system/system.c ./kernel/system/uname.c ./kernel/system/resource.c ./kernel/system/vm86.c
+SRC_TIME	= ./kernel/time/timer.c ./kernel/time/utils.c ./kernel/time/system_time.c ./kernel/time/sleep.c \
+				./kernel/time/itimer.c
 SRC_LIBS	= ./libs/string.c ./libs/printk.c
 
 SRC_LIBC	= ./tiny_libc/printf.c ./tiny_libc/string.c ./tiny_libc/mthread.c ./tiny_libc/syscall.c ./tiny_libc/invoke_syscall.S
@@ -64,6 +65,7 @@ SRC_USER	= ./test/shell.c
 
 TEST_ELF	= shell.elf
 ifeq ($(TARGET), qemu)
+# 	TEST_ELF	+= busybox.elf
 	TEST_ELF	+= lmbench_all.elf
 endif
 

@@ -27,16 +27,16 @@
 #define START_ENTRYPOINT 0xffffffff80000000lu
 
 #ifdef K210
-    #define KERNEL_ENTRYPOINT 0xffffffff80300000lu
+    #define KERNEL_ENTRYPOINT 0xffffffff80200000lu
     #define KERNEL_END 0xffffffff80600000lu
 #else
     #define KERNEL_ENTRYPOINT 0xffffffff80600000lu
-    #define KERNEL_END 0xffffffff90200000lu
+    #define KERNEL_END 0xffffffff80d00000lu
 #endif
 
 #ifdef K210
-    #define BOOT_KERNEL 0x80020000lu
-    #define BOOT_KERNEL_END 0x80300000lu
+    #define BOOT_KERNEL 0x80000000lu
+    #define BOOT_KERNEL_END 0x80600000lu
 #else
     #define BOOT_KERNEL 0x80200000lu
     #define BOOT_KERNEL_END 0x80600000lu
@@ -108,9 +108,9 @@ static inline void set_satp(
 // }
 
 #ifdef K210
-    #define PGDIR_PA 0x802fd000lu  // LEVEL 1 PGDIR
+    #define PGDIR_PA 0x801fd000  // LEVEL 1 PGDIR
 #else
-    #define PGDIR_PA 0x805f0000lu
+    #define PGDIR_PA 0x805f0000
 #endif
 
 /*

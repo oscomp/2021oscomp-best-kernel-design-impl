@@ -13,7 +13,7 @@
 #define BLOCKS_PER_PAGE (PAGE_SIZE/BLOCK_SIZE)
 
 #ifdef K210
-    #define INIT_KERNEL_STACK 0xffffffff80400000lu
+    #define INIT_KERNEL_STACK 0xffffffff804a0000lu
 #else
     #define INIT_KERNEL_STACK 0xffffffff80b00000lu
 #endif
@@ -22,7 +22,7 @@
 #define USER_STACK_ADDR 0x3ffff2a000lu
 #define USER_PILE_ADDR 0x20000000lu
 #define FREEMEM_TOP KERNEL_END
-#define MEM_FOR_PROC 0xffffffff80150000lu
+#define MEM_FOR_PROC 0xffffffff80020000lu
 
 #define KERNEL_STACK_SIZE NORMAL_PAGE_SIZE
 #define PAGES_PER_USER_STACK 10

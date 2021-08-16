@@ -83,8 +83,22 @@ uint64_t timeval_to_tick(struct timeval *tv)
     return uticks + tv->tv_sec * time_base;
 }
 
-void set_timeval_from_ticks(time_t time, struct timeval *tv)
+void tick_to_timespec(time_t time, struct timespec *ts)
 {
+    time /= 100;
+    ts->tv_sec = time / time_base;
+    uint64_t left = time % time_base;
+    ts->tv_nsec = 0;
+    for (uint i = 0; i < NANO; ++i)
+    {
+        ts->tv_nsec = 10*ts->tv_nsec + left * 10 / time_base;
+        left = (left * 10) % time_base;
+    }
+}
+
+void tick_to_timeval(time_t time, struct timeval *tv)
+{
+    time /= 100;
     tv->tv_sec = time / time_base; /* compute second */
 
     uint64_t left = time % time_base; /* compute micro seconds */

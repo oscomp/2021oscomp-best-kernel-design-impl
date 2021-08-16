@@ -42,3 +42,8 @@ pid_t sys_wait4(pid_t pid, uint16_t *status, int32_t options)
 {
     return invoke_syscall(SYS_wait4, pid, status, options, IGNORE, IGNORE);
 }
+
+void sys_set_test_timer()
+{
+    invoke_syscall(SYS_set_test_timer, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
+}

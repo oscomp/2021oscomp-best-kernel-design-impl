@@ -204,6 +204,8 @@ enum{
 #define STDOUT 1
 #define STDERR 2
 #define DEFAULT_DEV 3
+#define DEV_ZERO 4
+#define DEV_NULL 5
 
 /* file map */
 #define MAP_FILE 0
@@ -247,6 +249,7 @@ int8 fat32_read_test(const char *filename);
 
 int fat32_openat(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
 int64 fat32_close(fd_num_t fd);
+void free_all_fds(pcb_t *pcb);
 
 int64 fat32_read(fd_num_t fd, uchar *buf, size_t count);
 int64 fat32_readv(fd_num_t fd, struct iovec *iov, int iovcnt);

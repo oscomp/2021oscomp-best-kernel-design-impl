@@ -2,9 +2,9 @@
 #include <os/mm.h>
 #include <pgtable.h>
 #include <type.h>
+#include <os/stdio.h>
 
 // maybe you can map it to IO_ADDR_START ?
-static uintptr_t io_base = IO_ADDR_START;
 static uintptr_t pgtable_base = IO_PAGE_START;
 
 uintptr_t alloc_page()
@@ -21,6 +21,7 @@ void map_page(uint64_t va, uint64_t pa, PTE *pgdir)
     PTE *ptr = pgdir + vpn2;
     if (!get_attribute(*ptr,_PAGE_PRESENT)){
         uintptr_t pagebase = alloc_page();
+        // printk_port("pagebase is %lx\n", pagebase);
         clear_pgdir(pagebase);
         uint64_t pfn0 = kva2pa(pagebase) >> NORMAL_PAGE_SHIFT;        
         set_pfn(ptr,pfn0);

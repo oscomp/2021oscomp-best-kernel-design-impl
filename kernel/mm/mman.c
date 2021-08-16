@@ -90,7 +90,7 @@ int64_t do_brk(uintptr_t ptr)
     else{
         for (uintptr_t i = edata; i < ptr; i += NORMAL_PAGE_SIZE)
             alloc_page_helper(i, current_running->pgdir, _PAGE_READ|_PAGE_WRITE);
-        log2(0, "brk size is %lx", ptr - edata);
+        log(0, "brk size is %lx", ptr - edata);
         set_edata(current_running, ptr);
         return ptr;
     }

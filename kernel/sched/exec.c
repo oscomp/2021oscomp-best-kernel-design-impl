@@ -84,6 +84,8 @@ static int is_sh(char *file_name)
         return 0;
 }
 
+/* a whole new pcb */
+/* parent.parent remains unchanged */
 int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 {
     debug();

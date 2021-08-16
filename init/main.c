@@ -61,6 +61,7 @@ static void init_pcb()
         pcb[i].list.ptr = &pcb[i];
         pcb[i].pid = 0;
         pcb[i].wait_list.next = &pcb[i].wait_list;pcb[i].wait_list.prev = &pcb[i].wait_list;
+        pcb[i].parent.parent = NULL;
         pcb[i].status = TASK_EXITED;
         list_add_tail(&pcb[i].list,&available_queue);
     }
@@ -153,6 +154,9 @@ static void init_syscall(void)
     syscall[SYS_msync] = &do_msync;
     syscall[SYS_fsync] = &fat32_fsync;
     syscall[SYS_prlimit64] = &do_prlimit;
+    syscall[SYS_tgkill] = &do_tgkill;
+    syscall[SYS_vm86] = &do_vm86;
+    syscall[SYS_set_test_timer] = &do_set_test_timer;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~
@@ -174,7 +178,6 @@ int main()
     printk_port("> [INIT] System call initialized successfully.\n\r");
     init_timers();
     printk_port("> [INIT] Timers initialization succeeded.\n\r");
-
 #ifdef K210
     // init sdcard (@—.—@)
     fpioa_pin_init();
@@ -197,12 +200,10 @@ int main()
     ioremap(GPIOHS, 0x1000);
     ioremap(GPIO, 0x1000);
     ioremap(SPI_SLAVE, 0x1000);
-    // ioremap(GPIOHS, 0x1000);
     ioremap(SPI0, 0x1000);
     ioremap(SPI1, 0x1000);
     ioremap(SPI2, 0x1000);
 #endif
-
     printk("> [INIT] IOREMAP initialized successfully.\n\r");
 
     share_pgtable(shell_pgdir,pa2kva(PGDIR_PA));

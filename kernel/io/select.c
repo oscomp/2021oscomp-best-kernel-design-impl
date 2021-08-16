@@ -64,7 +64,8 @@ int do_pselect6(int nfds, fd_set *readfds, fd_set *writefds,
         return SYSCALL_FAILED;
     else if (nfds == 0)
         return 0;
-    assert(nfds <= 8);
+    // assert(nfds <= 32);
+    log(0, "nfds is %d", nfds);
     log(0, "size of fd_set is %d", sizeof(fd_set));
 
     uint64_t timeout_ticks = timespec_to_tick(timeout);

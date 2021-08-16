@@ -30,6 +30,11 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
     {
         return write_ring_buffer(&stderr_buf, buff, count);
     }
+    else if (current_running->fd[fd_index].dev == DEV_NULL){
+        log(0, "it's NULL");
+        memset(buff, 0, count);
+        return count;
+    } 
     else{
         // 如果是管道，就调用pipe_write
         if (current_running->fd[fd_index].piped == FD_PIPED){
@@ -94,29 +99,29 @@ int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
 {
     debug();
     log(0, "fd:%d, iovcnt:%d", fd, iovcnt);
-    int32_t fd_index = get_fd_index(fd, current_running);
-    if (fd_index < 0) return -1;
+    // int32_t fd_index = get_fd_index(fd, current_running);
+    // if (fd_index < 0) return -1;
 
     size_t count = 0;
 
-    if (current_running->fd[fd_index].dev == STDOUT){  
-        for (uint32_t i = 0; i < iovcnt; i++){
-            log(0, "iov_base:%lx, iov_len: %d", iov->iov_base, iov->iov_len);      
-            count += write_ring_buffer(&stdout_buf, iov->iov_base, iov->iov_len); /* FOR NOW */
-            iov++;
-        }
-        return count;
-    }
-    else if (current_running->fd[fd_index].dev == STDERR){
-        for (uint32_t i = 0; i < iovcnt; i++){  
-            log(0, "iov_base:%lx, iov_len: %d", iov->iov_base, iov->iov_len);     
-            count += write_ring_buffer(&stderr_buf, iov->iov_base, iov->iov_len);
-            iov++;
-        }
-        return count;
-    }
-    else{
-        size_t this_count;
+    // if (current_running->fd[fd_index].dev == STDOUT){  
+    //     for (uint32_t i = 0; i < iovcnt; i++){
+    //         log(0, "iov_base:%lx, iov_len: %d", iov->iov_base, iov->iov_len);      
+    //         count += write_ring_buffer(&stdout_buf, iov->iov_base, iov->iov_len); /* FOR NOW */
+    //         iov++;
+    //     }
+    //     return count;
+    // }
+    // else if (current_running->fd[fd_index].dev == STDERR){
+    //     for (uint32_t i = 0; i < iovcnt; i++){  
+    //         log(0, "iov_base:%lx, iov_len: %d", iov->iov_base, iov->iov_len);     
+    //         count += write_ring_buffer(&stderr_buf, iov->iov_base, iov->iov_len);
+    //         iov++;
+    //     }
+    //     return count;
+    // }
+    // else{
+        ssize_t this_count;
         for (uint32_t i = 0; i < iovcnt; i++){
             if ((this_count = fat32_write(fd, iov->iov_base, iov->iov_len)) == SYSCALL_FAILED)
                 return SYSCALL_FAILED;
@@ -125,5 +130,5 @@ int64 fat32_writev(fd_num_t fd, struct iovec *iov, int iovcnt)
             iov++;
         }
         return count; 
-    }
+    // }
 }

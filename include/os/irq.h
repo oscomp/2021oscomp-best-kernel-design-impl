@@ -35,7 +35,7 @@ enum ExcCode
 };
 
 #define TIMER_INTERVAL 150000
-#define PREEMPT_FREQUENCY 200
+#define PREEMPT_FREQUENCY 100
 
 typedef void (*handler_t)(regs_context_t*, uint64_t, uint64_t);
 

@@ -42,9 +42,15 @@ static void fat32_set_elf()
 int64 fat32_readmy(uchar *buf, size_t count)
 {
     #ifndef K210
+    static int cnt = 0;
     uchar *elf_binary = NULL;
     int32_t length = -1;
-    get_elf_file("lmbenchall", &elf_binary, &length);
+    // if (cnt == 0){
+    //     get_elf_file("busybox", &elf_binary, &length);
+    //     cnt++;
+    // }
+    // else
+        get_elf_file("lmbenchall", &elf_binary, &length);
     memcpy(buf, elf_binary + current_running->myelf_fd.pos, count);
     current_running->myelf_fd.length = length;
     return count;

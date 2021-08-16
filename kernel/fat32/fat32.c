@@ -8,9 +8,9 @@
 #include <user_programs.h>
 #include <os/sched.h>
 
-fat_t fat = {0};
-uchar root_buf[NORMAL_PAGE_SIZE] = {0};
-uchar filebuf[NORMAL_PAGE_SIZE] = {0};
+fat_t fat;
+uchar root_buf[NORMAL_PAGE_SIZE];
+uchar filebuf[NORMAL_PAGE_SIZE];
 ientry_t cwd_first_clus = 0;
 ientry_t cwd_clus = 0, root_clus = 0, root_first_clus = 0;
 isec_t cwd_sec = 0, root_sec = 0;
@@ -210,6 +210,37 @@ int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 
     if ((flags & (O_CREAT | O_DIRECTORY)) == (O_CREAT | O_DIRECTORY))
         return SYSCALL_FAILED;
 
+    /* for const */
+    uint32 path_len = strlen(path_const);
+    uchar path[path_len+1];
+    strcpy(path, path_const);
+    /* handle \r */
+    handle_windows_switch_line(path);
+
+    /* handle /dev/zero */
+    if (!strcmp(path_const, "/dev/zero")){
+        log(0, "is /dev/zero");
+        for (int i = 0; i < NUM_FD; ++i){
+            if (!current_running->fd[i].used){
+                current_running->fd[i].used = FD_USED;
+                current_running->fd[i].dev = DEV_ZERO;
+                return current_running->fd[i].fd_num;
+            }
+        }
+        return -1;
+    }
+    else if (!strcmp(path_const, "/dev/null")){
+        log(0, "is /dev/null");
+        for (int i = 0; i < NUM_FD; ++i){
+            if (!current_running->fd[i].used){
+                current_running->fd[i].used = FD_USED;
+                current_running->fd[i].dev = DEV_NULL;
+                return current_running->fd[i].fd_num;
+            }
+        }
+        return -1;
+    }
+
     #ifndef K210
     for (int i = 0; i < NUM_FD; ++i)
         if (!current_running->fd[i].used){
@@ -218,13 +249,6 @@ int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 
         }
         return -1;
     #endif
-
-    /* for const */
-    uint32 path_len = strlen(path_const);
-    uchar path[path_len+1];
-    strcpy(path, path_const);
-    /* handle \r */
-    handle_windows_switch_line(path);
 
     uchar *temp1, *temp2; // for path parse
     uint32_t now_clus; // now cluster num
@@ -619,9 +643,9 @@ int16 fat32_mkdirat(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
 
         if (isend){
             // already exists
-            if (search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL)){
+            if (search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL) || ignore){
                 kfree(tempbuf);
-                return SYSCALL_FAILED;
+                return (-EEXIST);
             }
             _create_new_file(temp1, now_clus, tempbuf, NULL, FILE_DIR);
 
@@ -630,14 +654,14 @@ int16 fat32_mkdirat(fd_num_t dirfd, const uchar *path_const, uint32_t mode)
         }
         else{
             // search dir until fail or goto search file
-            if ((p = search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore == 1){
+            if ((p = search(temp1, now_clus, tempbuf, SEARCH_DIR, &ignore, NULL)) != NULL || ignore){
                 now_clus = (ignore) ? now_clus : get_cluster_from_dentry(p);
                 ++temp2;
                 temp1 = temp2;
                 continue ;
             }
             kfree(tempbuf);
-            return SYSCALL_FAILED;
+            return (-ENOENT);
         }
     }
 
@@ -813,6 +837,23 @@ int64 fat32_close(fd_num_t fd)
         clear_all_valid(fdp);
         return SYSCALL_SUCCESSED;
     }
+}
+
+void free_all_fds(pcb_t *pcb)
+{
+    for (uint8_t i = 0; i < NUM_FD; i++){
+        if (pcb->fd[i].used == FD_UNUSED)
+            continue;
+        fd_t *fdp = &pcb->fd[i];
+
+        if (fdp->redirected == FD_UNREDIRECTED && fdp->piped == FD_PIPED){
+            /* if nobody redirect to it ,close pipe */
+            if (fdp->is_pipe_read && close_pipe_read(fdp->pip_num) == SYSCALL_FAILED)
+                assert(0);
+            if (fdp->is_pipe_write && close_pipe_write(fdp->pip_num) == SYSCALL_FAILED)
+                assert(0);
+        }
+    }   
 }
 
 /* read as many sectors as we can */

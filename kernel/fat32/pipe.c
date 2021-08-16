@@ -18,8 +18,7 @@ int16 close_pipe_read(pipe_num_t pip_num)
 {
     if (pipes[pip_num].r_valid == PIPE_INVALID)
         return SYSCALL_FAILED;
-    log(0, "is pipe close, thread %d is closing", current_running->tid);
-    log(0, "pipe %d r_valid-- and is %d", pip_num, pipes[pip_num].r_valid - 1);
+    log(0, "pipe %d r_valid-- by %d and is %d", pip_num, current_running->tid, pipes[pip_num].r_valid - 1);
     pipes[pip_num].r_valid--;
     return SYSCALL_SUCCESSED;
 }
@@ -30,8 +29,7 @@ int16 close_pipe_read(pipe_num_t pip_num)
 int16 close_pipe_write(pipe_num_t pip_num){
     if (pipes[pip_num].w_valid == PIPE_INVALID)
         return SYSCALL_FAILED;
-    log(0, "is pipe close, thread %d is closing", current_running->tid);
-    log(0, "pipe %d w_valid-- and is %d", pip_num, pipes[pip_num].w_valid - 1);
+    log(0, "pipe %d w_valid-- by %d and is %d", pip_num, current_running->tid, pipes[pip_num].w_valid - 1);
     pipes[pip_num].w_valid--;
     return SYSCALL_SUCCESSED;
 }
@@ -120,8 +118,9 @@ ssize_t pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
         log(0, "dangerous pipe write, more than 1 inlet");
     int64_t writesize = write_ring_buffer(&pipes[pip_num].rbuf, buf, count);
     /* someone maybe waiting for read pipe */
-    if (writesize > 0 && !list_empty(&pipes[pip_num].wait_list))
+    if (writesize > 0 && !list_empty(&pipes[pip_num].wait_list)){
         do_unblock(pipes[pip_num].wait_list.next);
+    }
     /* someone maybe polling */
     log(0, "pipe[%d] write %d", pip_num, writesize);
     return writesize; // write count

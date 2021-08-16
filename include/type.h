@@ -45,6 +45,8 @@ typedef uint64_t uintptr_t;
 typedef int64_t intptr_t;
 typedef uint64_t size_t;
 typedef int64_t ssize_t;
+typedef uint64_t time_t;
+typedef uint64_t clock_t;
 
 typedef uint32_t fd_num_t;
 typedef uint16_t unicode_t;
@@ -64,6 +66,7 @@ typedef uint64_t blkcnt_t;
 typedef uint64_t sigval_t;
 
 typedef uint64_t rlim_t;
+typedef uint32_t timer_id_t;
 
 /* Minimum of signed integral types.  */
 # define INT8_MIN               (-128)

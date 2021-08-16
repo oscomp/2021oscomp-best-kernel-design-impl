@@ -13,62 +13,40 @@ int main()
     char str4[20];
     char str5[20];
     char str6[20];
+    char str7[20];
+    char str8[20];
+    char str9[20];
+    char str10[20];
+    char str11[20];
+    char str12[20];
+    char str_echo[60];
     uint64_t tid;
 
-    char str_echo[60];
-    strcpy(str_echo, "latency measurements\n");
-    sys_write(1, str_echo, 21);
+    // strcpy(str_echo, "latency measurements\n");
+    // sys_write(1, str_echo, 21);
 
-    // argc = 3;
+    // argc = 4;
     // strcpy(str1, "./busybox");
-    // strcpy(str2, "sh");
-    // strcpy(str3, "busybox_testcode.sh");
-    // argv[0] = str1; 
-    // if (argc > 1)
-    //     argv[1] = str2;
-    // if (argc > 2)
-    //     argv[2] = str3;
-    // if (argc > 3)
-    //     argv[3] = str4;
-    // if (argc > 4)
-    //     argv[4] = str5;
-    // if (argc > 5)
-    //     argv[5] = str6;
-    // argv[argc] = NULL;
-    // envp[0] = NULL;
+    // strcpy(str2, "mkdir");
+    // strcpy(str3, "-p");
+    // strcpy(str4, "/var/tmp");
 
-    // if ((tid = sys_clone(0,0,0,0,0)) != 0){
-    //     sys_wait4(-1,0,0);
-    //     // sys_exit(0);
-    // }
-    // else{
-    //     sys_exec(argv[0], argv, envp);
-    // }
+    argc = 3;
+    strcpy(str1, "./busybox");
+    strcpy(str2, "sh");
+    strcpy(str3, "lmbench_testcode.sh");
 
-    // argc = 3;
-    // strcpy(str1, "./busybox");
-    // strcpy(str2, "sh");
-    // strcpy(str3, "lmbench_testcode.sh");
-    // argv[0] = str1; 
-    // if (argc > 1)
-    //     argv[1] = str2;
-    // if (argc > 2)
-    //     argv[2] = str3;
-    // if (argc > 3)
-    //     argv[3] = str4;
-    // if (argc > 4)
-    //     argv[4] = str5;
-    // if (argc > 5)
-    //     argv[5] = str6;
-    // argv[argc] = NULL;
-    // envp[0] = NULL;
+    // lat_sig -P 1 install
+    // argc = 5;
+    // strcpy(str1, "./lmbench_all");
+    // strcpy(str2, "lat_sig");
+    // strcpy(str3, "-P");
+    // strcpy(str4, "1");
+    // strcpy(str5, "install");
+    // strcpy(str6, "32");
+    // strcpy(str7, "2");
 
-    argc = 5;
-    strcpy(str1, "./lmbench_all");
-    strcpy(str2, "lat_syscall");
-    strcpy(str3, "-P");
-    strcpy(str4, "1");
-    strcpy(str5, "null");
+    // lmbench_all lat_ctx -P 1 -s 32 2
     argv[0] = str1; 
     if (argc > 1)
         argv[1] = str2;
@@ -80,10 +58,15 @@ int main()
         argv[4] = str5;
     if (argc > 5)
         argv[5] = str6;
+    if (argc > 6)
+        argv[6] = str7;
+    if (argc > 7)
+        argv[7] = str8;
     argv[argc] = NULL;
     envp[0] = NULL;
 
     if ((tid = sys_clone(0,0,0,0,0)) != 0){
+        sys_set_test_timer();
         sys_wait4(-1,0,0);
         // sys_exit(0);
     }

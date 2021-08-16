@@ -77,11 +77,11 @@
 #define CSR_MHARTID 0xf14
 
 #ifdef K210
-    #define PHY_STACK1 0x802c0000
-    #define PHY_STACK2 0x802c8000
+    #define PHY_STACK1 0x804b2000
+    #define PHY_STACK2 0x804b4000
 #else
-    #define PHY_STACK1 0x805c0000
-    #define PHY_STACK2 0x805c8000
+    #define PHY_STACK1 0x805e0000
+    #define PHY_STACK2 0x805e8000
 #endif
 
 #endif /* CSR_H */

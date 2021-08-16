@@ -25,6 +25,7 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     pcb_underinit->tid = process_id++;
     pcb_underinit->type = type; 
     init_list_head(&pcb_underinit->wait_list);
+    pcb_underinit->is_waiting_all_children = 0;
     pcb_underinit->status = TASK_READY; 
     pcb_underinit->priority = DEFAULT_PRIORITY; 
     pcb_underinit->temp_priority = pcb_underinit->priority; 
@@ -39,16 +40,12 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     for (int i = 0; i < NUM_FD; ++i){
         memset(&pcb_underinit->fd[i], 0, sizeof(fd_t));
         pcb_underinit->fd[i].fd_num = i;
-        // pcb_underinit->fd[i].redirected = FD_UNREDIRECTED;
-        // pcb_underinit->fd[i].piped = FD_UNPIPED;
-        // pcb_underinit->fd[i].poll_status = 0;
     }
     // open stdin , stdout and stderr
     pcb_underinit->fd[0].dev = STDIN; pcb_underinit->fd[0].used = FD_USED; pcb_underinit->fd[0].flags = O_RDONLY; 
     pcb_underinit->fd[1].dev = STDOUT; pcb_underinit->fd[1].used = FD_USED; pcb_underinit->fd[1].flags = O_WRONLY;
     pcb_underinit->fd[2].dev = STDERR; pcb_underinit->fd[2].used = FD_USED; pcb_underinit->fd[2].flags = O_WRONLY;
     for (int i = 3; i < NUM_FD; ++i){
-        pcb_underinit->fd[i].used = FD_UNUSED; // remember to set up other props when use it
         pcb_underinit->fd[i].dev = DEFAULT_DEV;
     }
     /* systime */
@@ -59,6 +56,10 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     /* context switch time */
     pcb_underinit->scheduler_switch_time = 0;
     pcb_underinit->yield_switch_time = 0;
+    /* itimer */
+    pcb->itimer.list.ptr = pcb;
+    pcb->itimer.callback_func = NULL;
+    pcb->itimer.parameter = NULL;
 }
 
 void init_pcb_exec(pcb_t *pcb_underinit)
@@ -67,6 +68,12 @@ void init_pcb_exec(pcb_t *pcb_underinit)
     pcb_underinit->pid = pcb_underinit->pid_on_exec;
     pcb_underinit->type = USER_PROCESS;
     pcb_underinit->mode = AUTO_CLEANUP_ON_EXIT;
+    /* handle signal function should be reset */
+    for (uint32_t i = 0; i < NUM_SIG; i++){
+        pcb_underinit->siginfo[i].sigaction.sa_handler = SIG_DFL;
+        memset(&(pcb_underinit->siginfo[i].sigaction.sa_mask), 0, sizeof(sigset_t));
+        pcb_underinit->siginfo[i].sigaction.sa_flags = 0;
+    }
 }
 // static void copyout(uintptr_t pgdir, unsigned char *dst, unsigned char *src, size_t size)
 // {
@@ -384,6 +391,8 @@ static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_sta
     memcpy(&pcb_underinit->myelf_fd, &current_running->myelf_fd, sizeof(fd_t));
     for (int i = 0; i < NUM_PHDR_IN_PCB; i++)
         memcpy(&pcb_underinit->phdr[i], &current_running->phdr[i], sizeof(Elf64_Phdr));
+    for (int i = 0; i < NUM_SIG; i++)
+        memcpy(&pcb_underinit->siginfo[i], &current_running->siginfo[i], sizeof(struct pcb_siginfo));
 }
 
 static void init_clone_pcb_prop(pcb_t *pcb_underinit, uint32_t flag)

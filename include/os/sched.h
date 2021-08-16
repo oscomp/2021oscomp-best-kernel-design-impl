@@ -9,8 +9,9 @@
 #include <os/smp.h>
 #include <os/time.h>
 #include <os/elf.h>
+#include <sched/signal.h>
 
-#define NUM_MAX_TASK 16
+#define NUM_MAX_TASK 72
 
 /* used to save register infomation */
 typedef struct regs_context
@@ -64,8 +65,9 @@ typedef struct dir_pos{
     isec_t sec;
 }dir_pos_t;
 
-#define NUM_FD 16
+#define NUM_FD 128
 #define NUM_PHDR_IN_PCB 2
+#define NUM_SIG 24
 
 typedef uint64_t poll_status_t;
 
@@ -135,6 +137,14 @@ typedef struct fd{
 #pragma pack()
 
 #pragma pack(8)
+struct pcb_siginfo{
+    sigaction_t sigaction;
+    reg_t sepc;
+    reg_t user_sp;
+};
+#pragma pack()
+
+#pragma pack(8)
 /* Process Control Block */
 struct pcb
 {
@@ -157,6 +167,8 @@ struct pcb
     /* previous, next pointer */
     list_node_t list;
     list_head wait_list;
+    uint8_t is_waiting_all_children;
+    pid_t unblock_child_pid;
 
     /* process id */
     pid_t pid;
@@ -222,6 +234,15 @@ struct pcb
     /* context switch time */
     uint64_t scheduler_switch_time;
     uint64_t yield_switch_time;
+
+    /* itimer */
+    timer_t itimer;
+
+    /* signal handler */
+    struct pcb_siginfo siginfo[NUM_SIG];
+    uint8_t sig_recv[NUM_SIG];
+    uint8_t sig_pend[NUM_SIG];
+    uint8_t sig_mask[NUM_SIG];
 };
 #pragma pack()
 typedef struct pcb pcb_t;
@@ -262,18 +283,6 @@ typedef struct aux_elem
     uint64_t val;
 }aux_elem_t;
 
-/* signal */
-#define SIGHUP 1
-#define SIGINT 2
-#define SIGQUIT 3
-#define SIGTERM 15
-#define SIGCHLD 17
-#define SIGKILL 9
-#define SIGSTOP 19      
-#define SIGTSTP 20
-#define SIGCONT 18
-#define SIGUSR1 10
-#define SIGUSR2 12
 
 /* sa_flags */
 #define SA_NOCLDSTOP 0x1
@@ -284,63 +293,6 @@ typedef struct aux_elem
 #define SA_ONSTACK 0x8000000
 #define SA_RESETHAND 0x80000000
 #define SA_RESTART 0x10000000
-
-/* for sigprocmask */
-#define SIG_BLCOK 0x0
-#define SIG_UNBLOCK 0x1
-#define SIG_SETMASK 0x2
-
-/* size of sigset_t */
-#define _NSIG_WORDS 16
-
-typedef struct{
-    unsigned long sig[_NSIG_WORDS];
-}sigset_t;
-
-typedef struct siginfo{
-    int      si_signo;     /* Signal number */
-    int      si_errno;     /* An errno value */
-    int      si_code;      /* Signal code */
-    int      si_trapno;    /* Trap number that caused
-                             hardware-generated signal
-                             (unused on most architectures) */
-    pid_t    si_pid;       /* Sending process ID */
-    uid_t    si_uid;       /* Real user ID of sending process */
-    int      si_status;    /* Exit value or signal */
-    clock_t  si_utime;     /* User time consumed */
-    clock_t  si_stime;     /* System time consumed */
-    sigval_t si_value;     /* Signal value */
-    int      si_int;       /* POSIX.1b signal */
-    void    *si_ptr;       /* POSIX.1b signal */
-    int      si_overrun;   /* Timer overrun count;
-                             POSIX.1b timers */
-    int      si_timerid;   /* Timer ID; POSIX.1b timers */
-    void    *si_addr;      /* Memory location which caused fault */
-    long     si_band;      /* Band event (was int in glibc 2.3.2 and earlier) */
-    int      si_fd;        /* File descriptor */
-    short    si_addr_lsb;  /* Least significant bit of address
-                             (since Linux 2.6.32) */
-    void    *si_lower;     /* Lower bound when address violation
-                             occurred (since Linux 3.19) */
-    void    *si_upper;     /* Upper bound when address violation */
-    int      si_pkey;      /* Protection key on PTE that caused
-                             fault (since Linux 4.6) */
-    void    *si_call_addr; /* Address of system call instruction
-                             (since Linux 3.5) */
-    int      si_syscall;   /* Number of attempted system call
-                             (since Linux 3.5) */
-    unsigned int si_arch;  /* Architecture of attempted system call
-                             (since Linux 3.5) */
-}siginfo_t;
-
-
-typedef struct sigaction{
-    void     (*sa_handler)(int);
-    // void     (*sa_sigaction)(int, siginfo_t *, void *);
-    sigset_t   sa_mask;
-    int        sa_flags;
-    void     (*sa_restorer)(void);
-}sigaction_t;
 
 /* ready queue to run */
 extern list_head ready_queue;
@@ -379,6 +331,7 @@ void do_block(list_node_t *, list_head *queue);
 void do_unblock(void *);
 
 int32_t do_kill(pid_t pid, int32_t sig);
+int do_tgkill(int tgid, int tid, int sig);
 int do_waitpid(pid_t pid);
 void do_process_show();
 pid_t do_getpid();
@@ -465,4 +418,31 @@ static inline uint8_t count_spawn_num(pid_t pid)
     return ret;
 }
 
+/* if pcb itself has exited, return true */
+static inline uint8_t is_exited(pcb_t *pcb)
+{
+    return (pcb->status == TASK_EXITED);
+}
+
+/* if pcb itself is zombie, return true */
+static inline uint8_t is_zombie(pcb_t *pcb)
+{
+    return (pcb->status == TASK_ZOMBIE);
+}
+
+/* if pcb can be used again, return true */
+static inline uint8_t is_free_pcb(pcb_t *pcb)
+{
+    return (pcb->status == TASK_EXITED && pcb->parent.parent == NULL);
+}
+
+static inline uint8_t is_my_child(pcb_t *pcb)
+{
+    return pcb->parent.parent == current_running;
+}
+
+static inline void detach_from_parent(pcb_t *pcb)
+{
+    pcb->parent.parent = NULL;
+}
 #endif

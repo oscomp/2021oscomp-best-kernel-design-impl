@@ -230,16 +230,6 @@ void freePage(ptr_t baseAddr)
     }
     if (clear){
         int cnt = 0;
-        for (list_node_t *test = freePageList.next; test != &freePageList; test = test->next)
-            if (test->ptr == baseAddr){
-                printk_port("now tid %d is releasing, but %lx has been released by %d\n",   
-                    current_running->tid, baseAddr, test->tid);
-                cnt++;
-            }
-        if (cnt){
-            printk_port("cnt is %d\n", cnt);
-            assert(0);
-        }
         list_node_t *temp = NULL;
         for (temp = freePagebackupList.next; temp != &freePagebackupList; temp = temp->next)
             if (temp->ptr == baseAddr){

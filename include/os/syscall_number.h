@@ -66,6 +66,8 @@
 #define SYS_sched_yield 124
 #define SYS_kill 129
 
+#define SYS_tgkill 131
+
 #define SYS_rt_sigaction 134
 #define SYS_rt_sigprocmask 135
 
@@ -75,6 +77,7 @@
 
 #define SYS_uname 160
 #define SYS_getrusage 165
+#define SYS_vm86 166
 
 #define SYS_gettimeofday 169
 
@@ -104,6 +107,7 @@
 
 #define SYS_renameat2 276
 
+#define SYS_set_test_timer 499
 #define SYSCALL_TESTDISK 500
 #define SYSCALL_TEST 501
 
