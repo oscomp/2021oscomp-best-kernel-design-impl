@@ -52,8 +52,6 @@ struct tms {
 // Process Control Block 
 struct proc {
 	// basic information 
-	// these fields MUST be protected by lk 
-	int killed;				// if non-zero, have been killed
 	int xstate;				// Exit status to be returned to parent's wait()
 	int pid;				// Process ID 
 	struct proc *hash_next;		// next proc on hash list 
@@ -99,6 +97,7 @@ struct proc {
 	__sigset_t sig_set;
 	__sigset_t sig_pending;
 	struct sig_frame *sig_frame;
+	int killed;						// store current signum 
 
 	// debug 
 	char name[16];	// process name 

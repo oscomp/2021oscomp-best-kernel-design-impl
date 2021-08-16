@@ -178,7 +178,7 @@ static int pipewritable(struct pipe *pi)
 	 */
 	acquire(&pi->lock);
 	while ((m = pi->nwrite - pi->nread) == PIPESIZE) {		// pipe is full
-		if (pi->readopen == 0 || pr->killed) {
+		if (pi->readopen == 0 || pr->killed == SIGTERM) {
 			m = -1;
 			break;
 		}
@@ -200,7 +200,7 @@ static int pipereadable(struct pipe *pi)
 
 	acquire(&pi->lock);
 	while ((m = pi->nwrite - pi->nread) == 0 && pi->writeopen) {	// pipe is empty
-		if (pr->killed) {
+		if (pr->killed == SIGTERM) {
 			m = -1;
 			break;
 		}

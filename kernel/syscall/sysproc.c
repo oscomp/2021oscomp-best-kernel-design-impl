@@ -168,7 +168,7 @@ sys_sleep(void)
 	acquire(&p->lk);
 	ticks0 = ticks;
 	while(ticks - ticks0 < n){
-		if(p->killed){
+		if(SIGTERM == p->killed){
 			ret = -1;
 			break;
 		}
@@ -205,7 +205,7 @@ uint64 sys_nanosleep(void) {
 	acquire(&p->lk);
 	uint64 tick0 = ticks;
 	while (ticks - tick0 < n) {
-		if (p->killed) {
+		if (SIGTERM == p->killed) {
 			return -1;
 		}
 		sleep(&ticks, &p->lk);

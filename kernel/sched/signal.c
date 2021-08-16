@@ -103,6 +103,9 @@ int sigprocmask(
 		}
 	}
 
+	// SIGTERM cannot be masked 
+	p->sig_set.__val[0] &= 1ul << SIGTERM;
+
 	return 0;
 }
 
@@ -157,32 +160,47 @@ extern char sig_trampoline[];
 extern char sig_handler[];
 extern char default_sigaction[];
 
-void sigdetect(void) {
+void sighandle(void) {
 	struct proc *p = myproc();
-	struct sig_frame *frame;
 
 	__debug_assert("sigdetect", NULL != p, "p == NULL\n");
 
+	__debug_info("sighandle", "killed = %d\n", p->killed);
 	int signum = 0;
-	for (int i = 0; i < SIGSET_LEN; i ++) {
-		int const len = sizeof(unsigned long) * 8;
-		int bit = 0;
-		for (; bit < len; bit ++) {
-			if (p->sig_pending.__val[i] & (1ul << bit)) {
-				signum += bit;
-				p->sig_pending.__val[i] &= ~(1ul << bit);
-				goto find;
+	if (p->killed) {
+		signum = p->killed;
+
+		const int len = sizeof(unsigned long) * 8;
+		int i = (unsigned long)(p->killed) / len;
+		int bit = (unsigned long)(p->killed) % len;
+		p->sig_pending.__val[i] &= ~(1ul << bit++);
+		p->killed = 0;
+
+		for (; i < SIGSET_LEN; i ++) {
+			while (bit < len) {
+				if (p->sig_pending.__val[i] & (1ul << bit)) {
+					p->killed = i * len + bit;
+					goto start_handle;
+				}
+				bit ++;
 			}
 		}
-		signum += len;
-	}
-	return ;	// no signal to handle
 
-find: 
+		__debug_info("sighandler", "pid %d update pending_num %d -> %d\n", 
+				p->pid, signum, p->killed);
+	}
+	else {
+		// no signal to handle
+		return ;
+	}
+
+	struct sig_frame *frame;
+	struct trapframe *tf;
+start_handle: 
 	frame = kmalloc(sizeof(struct sig_frame));
 	__assert("sigdetect", NULL != frame, "alloc frame failed\n");
 
-	struct trapframe *tf = kmalloc(sizeof(struct trapframe));
+	tf = kmalloc(sizeof(struct trapframe));
 	__assert("sigdetect", NULL != tf, "alloc tf failed\n");
 
 	// search for signal handler 

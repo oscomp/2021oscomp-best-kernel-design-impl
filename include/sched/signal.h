@@ -79,9 +79,7 @@ void sigaction_free(ksigaction_t *head);
 
 int sigaction_copy(ksigaction_t **pdst, ksigaction_t const *src);
 
-// Detect if there's a signal that we can handle, if is, 
-// store the old trapframe and pending to sig_frame list. 
-void sigdetect(void);
+void sighandle(void);
 
 // Return from a signal handling, restore previous trapframe and pending 
 // from sig_frame list. 

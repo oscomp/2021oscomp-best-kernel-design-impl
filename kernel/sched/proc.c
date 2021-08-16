@@ -204,7 +204,6 @@ static struct proc *allocproc(void) {
 	}
 
 	// scheduling 
-	p->killed = 0;
 	p->chan = NULL;
 	p->sched_next = NULL;
 	p->sched_pprev = NULL;
@@ -217,6 +216,7 @@ static struct proc *allocproc(void) {
 	for (int i = 0; i < SIGSET_LEN; i ++) {
 		p->sig_pending.__val[i] = 0;
 	}
+	p->killed = 0;
 
 	// file system 
 	memset(&p->fds, 0, sizeof(p->fds));
@@ -534,16 +534,19 @@ int kill(int pid, int sig) {
 	// we must hold hash_lock here, in case tmp is freed by its parent
 	// I mean calling freeproc 
 
-	printf("pid %d receive signal %d\n", pid, sig);
+	__debug_info("kill", "%d send sig %d to %d\n", myproc()->pid, sig, pid);
 
 	int const len = sizeof(unsigned long) * 8;
 	int bit = sig % len;
 	int i = sig / len;
-	tmp->sig_pending.__val[i] |= 1ul << bit;
 
-	if (SIGTERM == sig) {
-		tmp->killed = 1;
+	__assert("kill", i < SIGSET_LEN, "signal too large %d\n", sig);
+	tmp->sig_pending.__val[i] |= 1ul << bit;
+	if (0 == tmp->killed || sig < tmp->killed) {
+		tmp->killed = sig;
 	}
+
+	printf("pid %d pending_num = %d\n", pid, tmp->killed);
 
 	__enter_proc_cs 
 	if (SLEEPING == tmp->state) {

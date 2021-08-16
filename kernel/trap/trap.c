@@ -94,10 +94,13 @@ usertrap(void)
 
 	uint64 cause = r_scause();
 	__debug_info("usertrap", "cause %d\n", cause);
+	__debug_info("usertrap", "epc = %p\n", r_sepc());
+	__debug_info("usertrap", "p->killed = %d\n", p->killed);
 	if (cause == EXCP_ENV_CALL) {
 		// system call
-		if(p->killed)
+		if(SIGTERM == p->killed) {
 			exit(-1);
+		}
 		// sepc points to the ecall instruction,
 		// but we want to return to the next instruction.
 		p->trapframe->epc += 4;
@@ -119,12 +122,13 @@ usertrap(void)
 		printf("\nusertrap(): unexpected scause %p pid=%d %s\n", cause, p->pid, p->name);
 		printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
 		trapframedump(p->trapframe);
-		p->killed = 1;
+		p->killed = SIGTERM;
 	}
    
-	if(p->killed)
-		exit(-1);
-	sigdetect();		// search for signal
+	if (p->killed) {
+		__debug_info("usertrap", "enter handler\n");
+		sighandle();
+	}
 
 	__debug_info("usertrap", "%d: enter usertrapret\n", cause);
 	usertrapret();
