@@ -444,6 +444,7 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     // print_free_pages();
     unsafe {
         llvm_asm!("sfence.vma" :::: "volatile");
+        llvm_asm!("fence.i" :::: "volatile");
     }
     gdb_println!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
