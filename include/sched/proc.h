@@ -13,6 +13,7 @@
 #include "mesg/signal.h"
 #include "sync/spinlock.h"
 #include "time.h"
+#include "sched/singal.h"
 
 // Saved registers for kernel context switches.
 struct context {
@@ -97,6 +98,7 @@ struct proc {
 	ksigaction_t *sig_act;
 	__sigset_t sig_set;
 	__sigset_t sig_pending;
+	struct sig_frame *sig_frame;
 
 	// debug 
 	char name[16];	// process name 

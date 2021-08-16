@@ -2,7 +2,7 @@
 #define __SIGNAL_H
 
 #include "types.h"
-#include "utils/list.h"
+#include "trap.h"
 
 #define SIGRTMIN 	34
 #define SIGRTMAX	64
@@ -10,6 +10,12 @@
 // Some other signals 
 #define SIGTERM 	15
 #define SIGKILL		9
+#define SIGABRT		6
+#define SIGHUP		1
+#define SIGINT		2
+#define SIGQUIT		3
+#define SIGILL		4
+#define SIGTRAP		5
 
 // Signal Flags
 #define SA_NOCLDSTOP	0x00000001
@@ -42,18 +48,12 @@ struct sigaction {
 	// void (*sa_restorer)(void);	// this field is not used on risc-v
 };
 
-typedef struct {
-	list_node_t __list;
-	struct sigaction act;
+typedef struct __ksigaction_t {
+	struct __ksigaction_t *next;
+	struct __ksigaction_t **pprev;
+	struct sigaction sigact;
 	int signum;
 } ksigaction_t;
-
-union sigval {
-	int sival_int;
-	void *sival_ptr;
-};
-
-void do_notify_resume(void);
 
 int set_sigaction(
 	int signum, 
@@ -67,9 +67,23 @@ int sigprocmask(
 	__sigset_t *oldset
 );
 
-int sigqueue(int pid, int sig, union sigval const value);
+void sigqueue(int pid, int signum);
 
-void sigact_copy(ksigaction_t **pdst, ksigaction_t *src);
-void sigact_free(ksigaction_t *head);
+struct sig_frame {
+	__sigset_t mask;
+	struct trapframe *tf;
+	struct sig_frame *next;
+};
+
+// Free the list of sig_frame. 
+void sigframefree(struct sig_frame *head);
+
+// Detect if there's a signal that we can handle, if is, 
+// store the old trapframe and pending to sig_frame list. 
+void sigdetect(void);
+
+// Return from a signal handling, restore previous trapframe and pending 
+// from sig_frame list. 
+void sigreturn(void);
 
 #endif 
