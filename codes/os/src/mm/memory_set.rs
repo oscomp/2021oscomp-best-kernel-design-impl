@@ -578,7 +578,7 @@ impl MemorySet {
         }
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        // println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
+        //println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
         self.remap_cow(vpn, ppn, former_ppn);
         // println!{"finishing remap!"}
         for area in self.areas.iter_mut() {

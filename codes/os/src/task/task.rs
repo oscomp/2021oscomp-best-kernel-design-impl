@@ -643,8 +643,10 @@ impl TaskControlBlock {
             let pte = self.acquire_inner_lock().enquire_vpn(vpn);
             // if the virtPage is a CoW
             if pte.is_some() && pte.unwrap().is_cow() {
+                
                 let former_ppn = pte.unwrap().ppn();
                 self.acquire_inner_lock().cow_alloc(vpn, former_ppn);
+                
                 0
             } else {
                 -1

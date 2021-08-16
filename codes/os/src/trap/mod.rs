@@ -168,6 +168,7 @@ pub fn trap_handler() -> ! {
                 // page fault exit code
                 let current_task = current_task().unwrap();
                 if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGSEGV){
+                    current_task.acquire_inner_lock().memory_set.print_pagetable();
                     println!(
                         "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, core dumped.",
                         scause.cause(),
@@ -177,6 +178,10 @@ pub fn trap_handler() -> ! {
                     drop(current_task);
                     exit_current_and_run_next(-2);
                 }
+            }
+            unsafe {
+                llvm_asm!("sfence.vma" :::: "volatile");
+                llvm_asm!("fence.i" :::: "volatile");
             }
             // println!{"Trap solved..."}
         }
@@ -257,7 +262,7 @@ pub fn trap_return() -> ! {
     //    }
     //};
     unsafe {
-        llvm_asm!("fence.i" :::: "volatile");
+        //llvm_asm!("fence.i" :::: "volatile");
         // WARNING: here, we make a2 = __signal_trampoline, because otherwise the "__signal_trampoline" func will be optimized to DEATH
         llvm_asm!("jr $0" :: "r"(restore_va), "{a0}"(trap_cx_ptr), "{a1}"(user_satp), "{a2}"(__signal_trampoline as usize) :: "volatile");
     }
