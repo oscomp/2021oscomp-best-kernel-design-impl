@@ -10,10 +10,10 @@
 #include "fs/file.h"
 #include "fs/fs.h"
 #include "hal/riscv.h"
-#include "mesg/signal.h"
+#include "sched/signal.h"
 #include "sync/spinlock.h"
 #include "time.h"
-#include "sched/singal.h"
+#include "sched/signal.h"
 
 // Saved registers for kernel context switches.
 struct context {
@@ -116,7 +116,7 @@ void exit(int xstatus);
 /* Kill the process with the given pid. 
 	The victim won't exit until it tries to return 
 	to user space (see usertrap() in trap.c) */
-int kill(int pid);
+int kill(int pid, int sig);
 
 
 /* Scheduling */

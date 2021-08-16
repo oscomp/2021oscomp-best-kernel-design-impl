@@ -22,8 +22,9 @@
 #include "mm/vm.h"
 #include "mm/kmalloc.h"
 #include "mm/usrmm.h"
-#include "mesg/signal.h"
+#include "sched/signal.h"
 #include "errno.h"
+#include "sched/signal.h"
 #include "sched/proc.h"
 
 #include "utils/debug.h"
@@ -38,6 +39,11 @@ int __pid;
 #define __hash(pid) 	((pid) % HASH_SIZE)
 struct proc *pid_hash[HASH_SIZE];
 struct spinlock hash_lock;
+
+#define __enter_hash_cs \
+	acquire(&hash_lock);
+#define __leave_hash_cs \
+	release(&hash_lock);
 
 // Always insert new proc to the front of hash list 
 // so procs on list is in descending order. 
@@ -142,10 +148,16 @@ static void freeproc(struct proc *p) {
 
 	// parenting is handled in exit() and wait4()
 
+	// free signal 
+	sigaction_free(p->sig_act);
+
+	// free the list of sig_frame 
+	sigframefree(p->sig_frame);
+
 	// remove this proc from pid_hash
-	acquire(&hash_lock);
+	__enter_hash_cs
 	hash_remove_no_lock(p);
-	release(&hash_lock);
+	__leave_hash_cs
 
 	kfree(p);
 }
@@ -201,6 +213,10 @@ static struct proc *allocproc(void) {
 
 	// signal 
 	p->sig_act = NULL;
+	p->sig_frame = NULL;
+	for (int i = 0; i < SIGSET_LEN; i ++) {
+		p->sig_pending.__val[i] = 0;
+	}
 
 	// file system 
 	memset(&p->fds, 0, sizeof(p->fds));
@@ -209,10 +225,10 @@ static struct proc *allocproc(void) {
 	// debug information left for initialization 
 
 	// pid management 
-	acquire(&hash_lock);
+	__enter_hash_cs
 	p->pid = __pid ++;
 	hash_insert_no_lock(p);
-	release(&hash_lock);
+	__leave_hash_cs
 
 	return p;
 }
@@ -291,6 +307,16 @@ int clone(uint64 flag, uint64 stack) {
 		return -1;
 	}
 	np->pbrk = p->pbrk;
+
+	// copy parent's signal fields 
+	if (0 != sigaction_copy(&np->sig_act, p->sig_act)) {
+		__debug_warn("clone", "fail to copy sigaction\n");
+		freeproc(np);
+		return -1;
+	}
+	for (int i = 0; i < SIGSET_LEN; i ++) {
+		np->sig_set.__val[i] = p->sig_set.__val[i];
+	}
 
 	// these parts may be improved later 
 	// filesystem 
@@ -490,20 +516,35 @@ int wait4(int pid, uint64 status, uint64 options) {
 	}
 }
 
-int kill(int pid) {
+
+// Well, isn'kill a function for signal? We can't place 
+// it in sched/signal.c because we need to search for the target 
+// proc with pid, that requires hash_lock. 
+int kill(int pid, int sig) {
 	struct proc *tmp;
 
-	acquire(&hash_lock);
+	__enter_hash_cs 
 	// search for the wanted proc 
 	tmp = hash_search_no_lock(pid);
-
 	if (NULL == tmp) {	// if not found 
-		release(&hash_lock);
+		__leave_hash_cs 
 		return -ESRCH;
 	}
 
 	// we must hold hash_lock here, in case tmp is freed by its parent
-	tmp->killed = 1;	// find it 
+	// I mean calling freeproc 
+
+	printf("pid %d receive signal %d\n", pid, sig);
+
+	int const len = sizeof(unsigned long) * 8;
+	int bit = sig % len;
+	int i = sig / len;
+	tmp->sig_pending.__val[i] |= 1ul << bit;
+
+	if (SIGTERM == sig) {
+		tmp->killed = 1;
+	}
+
 	__enter_proc_cs 
 	if (SLEEPING == tmp->state) {
 		__remove(tmp);
@@ -512,8 +553,8 @@ int kill(int pid) {
 		__insert_runnable(PRIORITY_IRQ, tmp);
 	}
 	__leave_proc_cs 
-	release(&hash_lock);
 
+	__leave_hash_cs 
 	return 0;
 }
 
@@ -822,7 +863,7 @@ static void __print_proc_no_lock(struct proc *list) {
 			}
 		}
 
-		printf("%d\t%d\t0x%x\t%d\t%s\t%d\t%d\t%p\n", 
+		printf("%d\t%d\t%s\t%d\t%s\t%d\t%d\t%p\n", 
 			list->pid, 
 			__initproc == list ? 0 : list->parent->pid, 
 			__state_to_str(list->state),
@@ -839,14 +880,14 @@ static void __print_proc_no_lock(struct proc *list) {
 void procdump(void) {
 	printf("\nepc = %p\n", r_sepc());
 
-	acquire(&hash_lock);
+	__enter_hash_cs
 	printf("next pid = %d\n", __pid);
 	printf("\nPID\tPPID\tSTATE\tKILLED\tNAME\tMEM_LOAD\tMEM_HEAP\n");
 	for (int i = 0; i < HASH_SIZE; i ++) {
 		__print_proc_no_lock(pid_hash[i]);
 	}
 
-	release(&hash_lock);
+	__leave_hash_cs
 }
 
 // return total number of proc 
@@ -854,7 +895,7 @@ int procnum(void) {
 	int num = 0;
 	struct proc const *tmp;
 
-	acquire(&hash_lock);
+	__enter_hash_cs
 	for (int i = 0; i < HASH_SIZE; i ++) {
 		tmp = pid_hash[i];
 		while (NULL != tmp) {
@@ -862,7 +903,7 @@ int procnum(void) {
 			tmp = tmp->hash_next;
 		}
 	}
-	release(&hash_lock);
+	__leave_hash_cs
 
 	return num;
 }
@@ -911,6 +952,10 @@ void userinit(void) {
 
 	p->tmask = 0;
 	p->elf = NULL;
+
+	for (int i = 0; i < SIGSET_LEN; i ++) {
+		p->sig_set.__val[i] = ~0;
+	}
 
 	__enter_proc_cs 
 	__insert_runnable(PRIORITY_NORMAL, p);

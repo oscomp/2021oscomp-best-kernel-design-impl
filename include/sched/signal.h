@@ -30,12 +30,11 @@
 #define SIG_UNBLOCK 	1
 #define SIG_SETMASK		2
 
-#define SIG_LENGTH 		16
-
 typedef void (*__sighandler_t)(int);
 
+#define SIGSET_LEN 		16
 typedef struct {
-	unsigned long __val[16];
+	unsigned long __val[SIGSET_LEN];
 } __sigset_t;
 
 struct sigaction {
@@ -50,7 +49,6 @@ struct sigaction {
 
 typedef struct __ksigaction_t {
 	struct __ksigaction_t *next;
-	struct __ksigaction_t **pprev;
 	struct sigaction sigact;
 	int signum;
 } ksigaction_t;
@@ -67,8 +65,6 @@ int sigprocmask(
 	__sigset_t *oldset
 );
 
-void sigqueue(int pid, int signum);
-
 struct sig_frame {
 	__sigset_t mask;
 	struct trapframe *tf;
@@ -77,6 +73,11 @@ struct sig_frame {
 
 // Free the list of sig_frame. 
 void sigframefree(struct sig_frame *head);
+
+// Free the list of sig_action. 
+void sigaction_free(ksigaction_t *head);
+
+int sigaction_copy(ksigaction_t **pdst, ksigaction_t const *src);
 
 // Detect if there's a signal that we can handle, if is, 
 // store the old trapframe and pending to sig_frame list. 

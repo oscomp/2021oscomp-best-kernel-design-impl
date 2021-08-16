@@ -135,7 +135,12 @@ kvminithart()
 
 static int __hash_page_idx(uint64 pa)
 {
-	if (pa % PGSIZE || pa < PGROUNDUP((uint64)kernel_end) || pa >= PHYSTOP) {
+	extern char sig_trampoline[];
+
+	if (pa % PGSIZE || !(
+		(pa >= PGROUNDUP((uint64)kernel_end) && pa < PHYSTOP) || 
+		((uint64)sig_trampoline == pa)
+	)) {
 		__debug_error("__hash_page_idx", "%p not in [%p, %p]\n",
 					pa, PGROUNDUP((uint64)kernel_end), PHYSTOP);
 		panic("__hash_page");
@@ -384,6 +389,7 @@ void
 uvminit(pagetable_t pagetable, uchar *src, uint sz)
 {
 	char *mem;
+	extern char sig_trampoline[];
 
 	if(sz >= PGSIZE)
 		panic("inituvm: more than a page");
@@ -391,6 +397,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 	memset(mem, 0, PGSIZE);
 	pagereg((uint64)mem, 0);	// mappages will increase it
 	mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_X|PTE_U);
+	mappages(pagetable, SIG_TRAMPOLINE, PGSIZE, (uint64)sig_trampoline, PTE_R | PTE_X | PTE_U);
 	memmove(mem, src, sz);
 }
 

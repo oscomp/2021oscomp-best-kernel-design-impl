@@ -215,16 +215,6 @@ uint64 sys_nanosleep(void) {
 	return 0;
 }
 
-uint64
-sys_kill(void)
-{
-	int pid;
-
-	if(argint(0, &pid) < 0)
-		return -1;
-	return kill(pid);
-}
-
 // return how many clock tick interrupts have occurred
 // since start.
 uint64

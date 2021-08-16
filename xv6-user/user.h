@@ -2,6 +2,7 @@
 #include "fs/stat.h"
 #include "fs/fcntl.h"
 #include "sysinfo.h"
+#include "sched/signal.h"
 
 // struct stat;
 struct rtcdate;
@@ -33,7 +34,7 @@ static inline int pipe(int *fdarr) {
 int write(int fd, const void *buf, int len);
 int read(int fd, void *buf, int len);
 int close(int fd);
-int kill(int pid);
+int kill(int pid, int sig);
 // int exec(char*, char**);
 int execve(char *name, char *argv[], char *envp[]);
 static inline int exec(char *name, char *argv[]) {
@@ -85,6 +86,9 @@ int uname(void *buf);
 void *mmap(void *start, int len, int prot, int flags, int fd, int off);
 int munmap(void *start, int len);
 void sync(void);
+
+void rt_sigaction(int signum, struct sigaction const *act, struct sigaction *oldact);
+void rt_sigprocmask(int how, __sigset_t *set, __sigset_t *oldset);
 
 // ulib.c
 int stat(const char*, struct kstat*);

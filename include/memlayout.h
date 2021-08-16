@@ -105,6 +105,9 @@
 // in both user and kernel space.
 #define TRAMPOLINE              (MAXVA - PGSIZE)
 
+// map SIG_TRAMPOLINE right a page below TRAMPOLINE 
+#define SIG_TRAMPOLINE 			(TRAMPOLINE - PGSIZE)
+
 #define VUMMAP                  0x70000000
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.

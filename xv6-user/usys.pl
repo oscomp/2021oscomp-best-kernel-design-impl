@@ -49,3 +49,5 @@ entry("uname");
 entry("mmap");
 entry("munmap");
 entry("sync");
+entry("rt_sigaction");
+entry("rt_sigprocmask");

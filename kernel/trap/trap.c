@@ -124,6 +124,7 @@ usertrap(void)
    
 	if(p->killed)
 		exit(-1);
+	sigdetect();		// search for signal
 
 	__debug_info("usertrap", "%d: enter usertrapret\n", cause);
 	usertrapret();
@@ -172,7 +173,7 @@ usertrapret(void) {
 	uint64 satp = MAKE_SATP(p->pagetable);
 	 
 	permit_usr_mem(); // it's odd that without this the hart will stuck in u-mode on k210
-	 
+
 	// jump to trampoline.S at the top of memory, which 
 	// switches to the user page table, restores user registers,
 	// and switches to user mode with sret.
