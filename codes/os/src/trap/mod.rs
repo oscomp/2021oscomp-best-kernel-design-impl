@@ -220,6 +220,8 @@ pub fn trap_return() -> ! {
     // println!("after perform_signal_handler");
     set_user_trap_entry();
 
+    // current_task().unwrap().acquire_inner_lock().memory_set.print_pagetable();
+
     // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
     //println!("{:X}", TRAP_CONTEXT);

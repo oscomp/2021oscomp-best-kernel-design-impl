@@ -16,6 +16,7 @@ pub const TIMER_ENABLE:usize       = MEMORY_GDB_START + 4;
 pub const FORK_ENABLE:usize       = MEMORY_GDB_START + 5;
 pub const MAP_ENABLE:usize        = MEMORY_GDB_START + 6;
 pub const SIGNAL_ENABLE:usize        = MEMORY_GDB_START + 7;
+pub const BLANK_ENABLE:usize        = MEMORY_GDB_START + 8;
 
 
 // always open channel

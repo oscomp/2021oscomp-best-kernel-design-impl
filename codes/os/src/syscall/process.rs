@@ -398,6 +398,10 @@ pub fn sys_brk(brk_addr: usize) -> isize{
         let grow_size: isize = (brk_addr - former_addr) as isize;
         addr_new = current_task().unwrap().grow_proc(grow_size);
     }
+    
+    unsafe {
+        llvm_asm!("sfence.vma" :::: "volatile");
+    }
     gdb_println!(SYSCALL_ENABLE,"sys_brk(0x{:X}) = 0x{:X}", brk_addr, addr_new);
     addr_new as isize
 }
@@ -438,6 +442,9 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     // add new task to scheduler
     add_task(new_task);
     // print_free_pages();
+    unsafe {
+        llvm_asm!("sfence.vma" :::: "volatile");
+    }
     gdb_println!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
@@ -540,7 +547,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
         } else {
             drop(inner);
             drop(task);
-            print!(" ");
+            gdb_print!(BLANK_ENABLE," ");
             suspend_current_and_run_next();
             // continue;
         }

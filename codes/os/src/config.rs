@@ -33,9 +33,10 @@ pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 64;
 // pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 4;
 pub const KERNEL_STACK_SIZE: usize = PAGE_SIZE * 2;
 pub const KERNEL_HEAP_SIZE: usize = PAGE_SIZE * 0x100;
+pub const MEMORY_START: usize = 0x80200000;
 pub const MEMORY_END: usize = 0x80800000;
 
-pub const KMMAP_BASE: usize = 0x50000000;
+pub const KMMAP_BASE: usize = 0x90000000;
 pub const MMAP_BASE: usize = 0x60000000;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const SIGNAL_TRAMPOLINE: usize = 0x80000000 - PAGE_SIZE;

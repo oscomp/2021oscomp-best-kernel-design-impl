@@ -407,7 +407,7 @@ impl ArgMachine{
         println!("latency measurements");
         let mut testsuits :Vec<&str>= Vec::new();
         //testsuits.push("busybox\0ls"); 
-        //testsuits.push("syscalltest");
+        // testsuits.push("usertests");
         testsuits.push("lmbench_all\0lat_syscall\0-P\01\0null");
         testsuits.push("lmbench_all\0lat_syscall\0-P\01\0read");
         testsuits.push("lmbench_all\0lat_syscall\0-P\01\0write");

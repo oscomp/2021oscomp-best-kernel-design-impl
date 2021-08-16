@@ -81,8 +81,8 @@ impl Processor {
                 // True: switch
                 // False: return to current task, don't switch
                 if let Some(task) = fetch_task() {
-
                     let mut task_inner = task.acquire_inner_lock();
+                    task_inner.memory_set.activate();// change satp
                     let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
                     task_inner.task_status = TaskStatus::Running;
                     drop(task_inner);
@@ -93,16 +93,15 @@ impl Processor {
                     // let ru_stime = get_kernel_runtime_usec();
                     // update_kernel_clock();
                     // current_task_inner.rusage.add_stime(ru_stime);
+
                     // Change status to Ready
                     current_task_inner.task_status = TaskStatus::Ready;
                     // if current_task.pid.0 >1 {
                     //     current_task_inner.memory_set.print_pagetable();
                     // }
                     drop(current_task_inner);
-                    //println!("drop lock1");
-                    
-                    // push back to ready queue.
                     add_task(current_task);
+                    // drop(current_task);
                     ////////// current task  /////////
                     unsafe {
                         __switch(
@@ -120,6 +119,7 @@ impl Processor {
                     drop(current_task_inner);
                     //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
+                    // drop(current_task);
 
                     unsafe {
                         __switch(
@@ -144,8 +144,9 @@ impl Processor {
                     //     task_inner.memory_set.print_pagetable();
 
                     // }
-                    drop(task_inner);
+                    task_inner.memory_set.activate();// change satp
                     // release
+                    drop(task_inner);
                     self.inner.borrow_mut().current = Some(task);
                     unsafe {
                         __switch(

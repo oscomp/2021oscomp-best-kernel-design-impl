@@ -6,7 +6,9 @@ use super::{
     VirtAddr,
     PhysAddr,
     StepByOne,
+    kernel_token,
 };
+use crate::config::*;
 use crate::task::{current_user_token, current_task};
 use alloc::vec::Vec;
 use alloc::vec;
@@ -143,6 +145,25 @@ impl PageTable {
         }
         result
     }
+
+    // level = {1,2,3}
+    pub fn find_pte_level(&self, vpn:VirtPageNum, level:usize) -> Option<&PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&PageTableEntry> = None;
+        for i in 0..(level) {
+            let pte = &ppn.get_pte_array()[idxs[i]];
+            if !pte.is_valid() {
+                return None;
+            }
+            if i == (level -1) {
+                result = Some(pte);
+                break;
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
     
     // only X+W+R can be set
     // return -1 if find no such pte
@@ -167,6 +188,8 @@ impl PageTable {
         }
         0
     }
+
+
 
     pub fn print_pagetable(&mut self){
         let idxs = [0 as usize;3];
@@ -240,6 +263,44 @@ impl PageTable {
     pub fn set_flags(&mut self, vpn: VirtPageNum, flags: PTEFlags) {
         self.find_pte_create(vpn).unwrap().set_flags(flags);
     }
+
+    // WARNING: This is a very naive version, which may cause severe errors when "config.rs" is changed
+    pub fn map_kernel_shared(&mut self){
+        let token = kernel_token();
+        let kernel_pagetable = PageTable::from_token(token);
+        // insert shared pte of from kernel
+        let kernel_vpn:VirtPageNum = (MEMORY_START / PAGE_SIZE).into();
+        let pte_kernel = kernel_pagetable.find_pte_level(kernel_vpn, 1);
+        let idxs = kernel_vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let pte = &mut ppn.get_pte_array()[idxs[0]];
+        *pte = *pte_kernel.unwrap();
+        // insert top va(kernel stack + trampoline)
+        let kernel_vpn:VirtPageNum = (TRAMPOLINE / PAGE_SIZE).into();
+        let pte_kernel = kernel_pagetable.find_pte_level(kernel_vpn, 1);
+        let idxs = kernel_vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let pte = &mut ppn.get_pte_array()[idxs[0]];
+        *pte = *pte_kernel.unwrap();
+        // insert MMIO (assert that each MMIO length is one PAGE)
+        for pair in MMIO {
+            let kernel_vpn:VirtPageNum = (pair.0 / PAGE_SIZE).into();
+            let idxs = kernel_vpn.indexes();
+            let mut ppn = self.root_ppn;
+            for i in 0..3 {
+                let pte = &mut ppn.get_pte_array()[idxs[i]];
+                if !pte.is_valid() {
+                    let pte_kernel = kernel_pagetable.find_pte_level(kernel_vpn, i+1);
+                    *pte = *pte_kernel.unwrap();
+                    break;
+                }
+                ppn = pte.ppn();
+            }
+        }
+        
+        
+    }
+
     pub fn token(&self) -> usize {
         8usize << 60 | self.root_ppn.0
     }

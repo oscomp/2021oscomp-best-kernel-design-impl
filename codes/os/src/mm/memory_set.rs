@@ -199,6 +199,10 @@ impl MemorySet {
         );
     }
 
+    fn map_kernel_shared(&mut self){
+        self.page_table.map_kernel_shared();
+    }
+
     /// Without kernel stacks.
     pub fn new_kernel() -> Self {
         let mut memory_set = Self::new_bare();
@@ -261,7 +265,7 @@ impl MemorySet {
         let mut auxv:Vec<AuxHeader> = Vec::new();
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        // memory_set.map_trampoline();
         memory_set.map_signal_trampoline();
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
@@ -412,6 +416,7 @@ impl MemorySet {
             MapPermission::R | MapPermission::W | MapPermission::U,
         ), None);
         
+        memory_set.map_kernel_shared();
 
         (memory_set, user_stack_top, user_heap_bottom, elf.header.pt2.entry_point() as usize, auxv)
     }
@@ -419,7 +424,7 @@ impl MemorySet {
     pub fn from_existed_user(user_space: &MemorySet) -> MemorySet {
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        // memory_set.map_trampoline();
         memory_set.map_signal_trampoline();
         // copy data sections/trap_context/user_stack
         for area in user_space.areas.iter() {
@@ -460,6 +465,7 @@ impl MemorySet {
             }
             memory_set.mmap_chunks.push(new_mmap_area);
         }
+        memory_set.map_kernel_shared();
         memory_set
     }
 
@@ -470,7 +476,7 @@ impl MemorySet {
         // Including:   Trampoline
         //              Trap_Context
         //              User_Stack
-        memory_set.map_trampoline();
+        // memory_set.map_trampoline();
         memory_set.map_signal_trampoline();
         for area in user_space.areas.iter() {
             let head_vpn = area.vpn_range.get_start();
@@ -554,6 +560,7 @@ impl MemorySet {
             memory_set.mmap_chunks.push(new_mmap_area);
         }
         // println!{"returning..."};
+        memory_set.map_kernel_shared();
         memory_set
     }
 
