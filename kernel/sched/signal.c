@@ -49,6 +49,7 @@ int set_sigaction(
 	struct proc *p = myproc();
 
 	ksigaction_t *tmp = __search_sig(p, signum);
+	// printf("pid %d search %d find %p\n", p->pid, signum, tmp);
 
 	if (NULL != oldact && NULL != tmp) {
 		oldact->__sigaction_handler = tmp->sigact.__sigaction_handler;
@@ -72,7 +73,16 @@ int set_sigaction(
 		for (int i = 0; i < len; i ++) {
 			tmp->sigact.sa_mask.__val[i] = act->sa_mask.__val[i];
 		}
+		tmp->signum = signum;
 	}
+
+	// tmp = p->sig_act;
+	// printf("pid = %d\n", p->pid);
+	// while (NULL != tmp) {
+	// 	printf("signum = %d, handler = %p\n", tmp->signum, tmp->sigact.__sigaction_handler.sa_handler);
+	// 	tmp = tmp->next;
+	// }
+	// printf("++++++++++++++++++++++\n");
 
 	return 0;
 }

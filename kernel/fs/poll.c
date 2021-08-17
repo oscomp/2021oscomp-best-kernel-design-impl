@@ -230,6 +230,10 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 		// at this point, maybe we are already waken up by some
 		if (poll_sched_timeout(&wait, expire))
 			immediate = 1;
+		if (myproc()->killed) {
+			immediate = 1;
+			wait.error = -EINTR;
+		}
 	}
 
 	poll_end(&wait);
