@@ -53,10 +53,10 @@ int set_sigaction(
 
 	if (NULL != oldact && NULL != tmp) {
 		oldact->__sigaction_handler = tmp->sigact.__sigaction_handler;
-		oldact->sa_flags = tmp->sigact.sa_flags;
-		for (int i = 0; i < len; i ++) {
-			oldact->sa_mask.__val[i] = tmp->sigact.sa_mask.__val[i];
-		}
+		// oldact->sa_flags = tmp->sigact.sa_flags;
+		// for (int i = 0; i < len; i ++) {
+		// 	oldact->sa_mask.__val[i] = tmp->sigact.sa_mask.__val[i];
+		// }
 	}
 
 	if (NULL != act) {
@@ -68,11 +68,11 @@ int set_sigaction(
 			tmp = new;
 		}
 
-		tmp->sigact.sa_flags = act->sa_flags;
+		// tmp->sigact.sa_flags = act->sa_flags;
 		tmp->sigact.__sigaction_handler = act->__sigaction_handler;
-		for (int i = 0; i < len; i ++) {
-			tmp->sigact.sa_mask.__val[i] = act->sa_mask.__val[i];
-		}
+		// for (int i = 0; i < len; i ++) {
+		// 	tmp->sigact.sa_mask.__val[i] = act->sa_mask.__val[i];
+		// }
 		tmp->signum = signum;
 	}
 
