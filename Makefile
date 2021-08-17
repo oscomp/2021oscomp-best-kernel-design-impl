@@ -21,7 +21,7 @@ QEMU	:= qemu-system-riscv64
 
 # flags
 # CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -g
-CFLAGS = -Wall -O -fno-omit-frame-pointer -ggdb -g
+CFLAGS = -Wall -O -fno-omit-frame-pointer -ggdb -g -march=rv64gc
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
