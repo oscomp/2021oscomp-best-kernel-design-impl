@@ -50,9 +50,9 @@ uint64 sys_rt_sigaction(void) {
 
 	if (uptr_act) {
 		if (
-			copyin2((char*)&(act.__sigaction_handler), uptr_act, sizeof(__sighandler_t)) < 0 || 
-			copyin2((char*)&(act.sa_mask), uptr_act + sizeof(__sighandler_t), size) < 0 || 
-			copyin2((char*)&(act.sa_flags), uptr_act + sizeof(__sighandler_t) + size, sizeof(int)) < 0
+			copyin2((char*)&(act.__sigaction_handler), uptr_act, sizeof(__sighandler_t)) < 0 
+			// copyin2((char*)&(act.sa_mask), uptr_act + sizeof(__sighandler_t), size) < 0 || 
+			// copyin2((char*)&(act.sa_flags), uptr_act + sizeof(__sighandler_t) + size, sizeof(int)) < 0
 		) {
 			return -EFAULT;
 		}
@@ -73,9 +73,9 @@ uint64 sys_rt_sigaction(void) {
 	// }
 	if (uptr_oldact) {
 		if (
-			copyout2(uptr_oldact, (char*)&(act.__sigaction_handler), sizeof(__sighandler_t)) < 0 || 
-			copyout2(uptr_oldact + sizeof(__sighandler_t), (char*)&(act.sa_mask), size) < 0 || 
-			copyout2(uptr_oldact + sizeof(__sighandler_t) + size, (char*)&(act.sa_flags), sizeof(int)) < 0
+			copyout2(uptr_oldact, (char*)&(act.__sigaction_handler), sizeof(__sighandler_t)) < 0 
+			// copyout2(uptr_oldact + sizeof(__sighandler_t), (char*)&(act.sa_mask), size) < 0 || 
+			// copyout2(uptr_oldact + sizeof(__sighandler_t) + size, (char*)&(act.sa_flags), sizeof(int)) < 0
 		) {
 			return -EFAULT;
 		}

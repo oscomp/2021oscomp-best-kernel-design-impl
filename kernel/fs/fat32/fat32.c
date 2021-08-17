@@ -336,7 +336,7 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 {
 	struct fat32_entry *entry = i2fat(ip);
 
-	if (/*off > entry->file_size || */off + n < off || (uint64)off + n > 0x100000
+	if (/*off > entry->file_size || */off + n < off || (uint64)off + n > 0x80000
 		|| (entry->attribute & ATTR_READ_ONLY)) {
 		return -1;
 	}
