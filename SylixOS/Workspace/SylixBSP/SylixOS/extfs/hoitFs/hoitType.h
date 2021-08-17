@@ -59,7 +59,7 @@
 /*********************************************************************************************************
   HoitFs 特性宏控
 *********************************************************************************************************/
-#define  MULTI_THREAD_ENABLE      /* 启用多线程 */
+// #define  MULTI_THREAD_ENABLE      /* 启用多线程 */
 #define  EBS_ENABLE               /* 启用EBS */
 #define  WRITE_BUFFER_ENABLE      /* 启用WriteBuffer */
 // #define  BACKGOURND_GC_ENABLE     /* 启用后台GC */
