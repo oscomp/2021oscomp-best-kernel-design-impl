@@ -84,9 +84,7 @@ sys_getppid(void) {
 uint64
 sys_fork(void)
 {
-	extern int fork_cow();
-	return fork_cow();
-	// return fork();
+	return clone(0, NULL);
 }
 
 uint64 
@@ -176,8 +174,8 @@ sys_sleep(void)
 		p->sleep_expire = expire;
 		do {
 			sleep(&p->sleep_expire, &p->lk);
-			if (p->killed) {
-				ret = -1;
+			if (SIGTERM == p->killed) {
+				ret = -EINTR;
 				break;
 			}
 		} while (p->sleep_expire != 0);
@@ -217,8 +215,8 @@ uint64 sys_nanosleep(void) {
 		p->sleep_expire = expire;
 		do {
 			sleep(&p->sleep_expire, &p->lk);
-			if (p->killed) {	// or signal pending with -EINTR
-				ret = -1;
+			if (SIGTERM == p->killed) {	// or signal pending with -EINTR
+				ret = -EINTR;
 				break;
 			}
 		} while (p->sleep_expire != 0);
@@ -238,16 +236,6 @@ uint64 sys_nanosleep(void) {
 	}
 
 	return ret;
-}
-
-uint64
-sys_kill(void)
-{
-	int pid;
-
-	if(argint(0, &pid) < 0)
-		return -1;
-	return kill(pid);
 }
 
 // return how many clock tick interrupts have occurred

@@ -42,8 +42,10 @@ kvminit()
 {
 	save_point = 0;
 
-	if (idlepages() > MAX_PAGES_NUM)
+	if (idlepages() > MAX_PAGES_NUM) {
+		pm_dump();
 		panic("kvminit: page_ref_table[] not enough");
+	}
 
 	initlock(&page_ref_lock, "page_ref_lock");
 	memset(page_ref_table, 0, sizeof(page_ref_table));
@@ -133,7 +135,12 @@ kvminithart()
 
 static int __hash_page_idx(uint64 pa)
 {
-	if (pa % PGSIZE || pa < PGROUNDUP((uint64)kernel_end) || pa >= PHYSTOP) {
+	extern char sig_trampoline[];
+
+	if (pa % PGSIZE || !(
+		(pa >= PGROUNDUP((uint64)kernel_end) && pa < PHYSTOP) || 
+		((uint64)sig_trampoline == pa)
+	)) {
 		__debug_error("__hash_page_idx", "%p not in [%p, %p]\n",
 					pa, PGROUNDUP((uint64)kernel_end), PHYSTOP);
 		panic("__hash_page");
@@ -382,6 +389,7 @@ void
 uvminit(pagetable_t pagetable, uchar *src, uint sz)
 {
 	char *mem;
+	extern char sig_trampoline[];
 
 	if(sz >= PGSIZE)
 		panic("inituvm: more than a page");
@@ -389,6 +397,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 	memset(mem, 0, PGSIZE);
 	pagereg((uint64)mem, 0);	// mappages will increase it
 	mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_X|PTE_U);
+	mappages(pagetable, SIG_TRAMPOLINE, PGSIZE, (uint64)sig_trampoline, PTE_R | PTE_X | PTE_U);
 	memmove(mem, src, sz);
 }
 
@@ -656,44 +665,25 @@ uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
 }
 
 /**
- * Initialize a kernel pagetable for each process with a kernel stack
+ * Initialize a kernel pagetable for each process, which is a copy of kernel_pagetable
  */
 pagetable_t
 kvmcreate()
 {
 	pagetable_t pagetable;
-	char *pstack;
-	if ((pagetable = allocpage()) == NULL || (pstack = allocpage()) == NULL) {
-		if (pagetable)
-			freepage(pagetable);
+	if (NULL == (pagetable = allocpage())) {
 		return NULL;
 	}
 
 	memmove(pagetable, kernel_pagetable, PGSIZE);
-	if (mappages(pagetable, VKSTACK, PGSIZE, (uint64)pstack, PTE_R | PTE_W) != 0) {
-		pte_t pte = pagetable[PX(2, VKSTACK)];
-		if (pte & PTE_V) {
-			freewalk((pagetable_t) PTE2PA(pte));
-		}
-		freepage(pstack);
-		freepage(pagetable);
-		return NULL;
-	}
+
 	return pagetable;
 }
 
 // Should be called after uvmfree if the pagetable contains user space!
-// And after trapframe unmapped, otherwise freewalk will panic.
 void
 kvmfree(pagetable_t pagetable, int stack_free)
 {
-	if (stack_free) {
-		unmappages(pagetable, VKSTACK, 1, VM_FREE);
-		pte_t pte = pagetable[PX(2, VKSTACK)];
-		if (pte & PTE_V) {
-			freewalk((pagetable_t) PTE2PA(pte));
-		}
-	}
 	freepage(pagetable);
 }
 
@@ -719,14 +709,14 @@ kvmfree(pagetable_t pagetable, int stack_free)
 // a page fault failed to handle, kerneltrap() called for help
 uint64 kern_pgfault_escape(uint64 badaddr)
 {
-	myproc()->kstack = badaddr; // this field is useless, borrow it, set unsafe for tht current hart
+	myproc()->badaddr = badaddr; // this field is useless, borrow it, set unsafe for tht current hart
 	return save_point;
 }
 
 static uint64 safememmove(char *dst, char *src, uint64 len)
 {
 	struct proc * volatile p = myproc();
-	uint64 volatile old = p->kstack;			// p->kstack might store the stval later
+	uint64 volatile old = p->badaddr;			// p->badaddr might store the stval later
 
 	// kerneltrap() in trap.c can look up for this safe escape.
 	uint64 safe_pc;
@@ -738,7 +728,7 @@ static uint64 safememmove(char *dst, char *src, uint64 len)
 
 	// __sync_synchronize();
 
-	uint64 badaddr = p->kstack;
+	uint64 badaddr = p->badaddr;
 	if (badaddr == old) {
 		permit_usr_mem();
 		while (len--) {         // There is no overlap between user and kernel space
@@ -746,7 +736,7 @@ static uint64 safememmove(char *dst, char *src, uint64 len)
 		}
 		badaddr = 0;
 	} else {
-		p->kstack = old;
+		p->badaddr = old;
 	}
 	protect_usr_mem();
 	

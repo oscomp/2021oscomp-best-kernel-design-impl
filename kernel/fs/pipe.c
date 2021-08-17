@@ -25,13 +25,13 @@
  * transplant va to pa. (In fact, it's still va, but it's
  * equal to pa since we use direct-mapping.
  */
-static inline struct wait_node *waitinit(struct wait_node *onstacknode)
-{
-	struct wait_node *pwait;
-	pwait = (struct wait_node *)kwalkaddr(myproc()->pagetable, (uint64)onstacknode);
-	pwait->chan = pwait;
-	return pwait;
-}
+// static inline struct wait_node *waitinit(struct wait_node *onstacknode)
+// {
+// 	struct wait_node *pwait;
+// 	pwait = (struct wait_node *)kwalkaddr(myproc()->pagetable, (uint64)onstacknode);
+// 	pwait->chan = pwait;
+// 	return pwait;
+// }
 
 static uint32 pipepoll(struct file *, struct poll_table *);
 
@@ -215,10 +215,11 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 {
 	int i, m;
 	char *const pipebound = pi->data + PIPESIZE;
-	struct wait_node wait, *pwait;
+	struct wait_node wait;
 
-	pwait = waitinit(&wait);
-	pipelock(pi, pwait, PIPE_WRITER);		// block other writers
+	// pwait = waitinit(&wait);
+	wait.chan = &wait;
+	pipelock(pi, &wait, PIPE_WRITER);		// block other writers
 	for (i = 0; i < n;) {
 		if ((m = pipewritable(pi)) < 0) {
 			i = -EPIPE;
@@ -244,7 +245,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 	pipewakeup(pi, PIPE_READER);
 	release(&pi->lock);
 out:
-	pipeunlock(pi, pwait, PIPE_WRITER);
+	pipeunlock(pi, &wait, PIPE_WRITER);
 	// __debug_info("pipewrite", "written %d/%d\n", i, n);
 	return i;
 }
@@ -254,10 +255,11 @@ piperead(struct pipe *pi, uint64 addr, int n)
 {
 	int i = -1, m;
 	char *const pipebound = pi->data + PIPESIZE;
-	struct wait_node wait, *pwait;
+	struct wait_node wait;
 
-	pwait = waitinit(&wait);
-	pipelock(pi, pwait, PIPE_READER);	// block other readers
+	// pwait = waitinit(&wait);
+	wait.chan = &wait;
+	pipelock(pi, &wait, PIPE_READER);	// block other readers
 
 	if ((m = pipereadable(pi)) < 0) {
 		goto out;
@@ -277,7 +279,7 @@ piperead(struct pipe *pi, uint64 addr, int n)
 	pipewakeup(pi, PIPE_WRITER);
 	release(&pi->lock);
 out:
-	pipeunlock(pi, pwait, PIPE_READER);
+	pipeunlock(pi, &wait, PIPE_READER);
 	// __debug_info("piperead", "read %d\n", i);
 	return i;
 }
@@ -286,10 +288,11 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 {
 	int ret = 0;
 	char *const pipebound = pi->data + PIPESIZE;
-	struct wait_node wait, *pwait;
+	struct wait_node wait;
 
-	pwait = waitinit(&wait);
-	pipelock(pi, pwait, PIPE_WRITER);	// block other writers
+	// pwait = waitinit(&wait);
+	wait.chan = &wait;
+	pipelock(pi, &wait, PIPE_WRITER);	// block other writers
 
 	for (int i = 0; i < count; i++) {
 		uint64 addr = (uint64)ioarr[i].iov_base;
@@ -323,7 +326,7 @@ out1:
 	pipewakeup(pi, PIPE_READER);
 	release(&pi->lock);
 out2:
-	pipeunlock(pi, pwait, PIPE_WRITER);
+	pipeunlock(pi, &wait, PIPE_WRITER);
 	return ret;
 }
 
@@ -331,10 +334,11 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 {
 	int ndata, ret = 0;
 	char *const pipebound = pi->data + PIPESIZE;
-	struct wait_node wait, *pwait;
+	struct wait_node wait;
 
-	pwait = waitinit(&wait);
-	pipelock(pi, pwait, PIPE_READER);	// block other readers
+	// pwait = waitinit(&wait);
+	wait.chan = &wait;
+	pipelock(pi, &wait, PIPE_READER);	// block other readers
 
 	if ((ndata = pipereadable(pi)) < 0) {
 		ret = -EPIPE;
@@ -365,7 +369,7 @@ out1:
 	pipewakeup(pi, PIPE_WRITER);
 	release(&pi->lock);
 out2:
-	pipeunlock(pi, pwait, PIPE_READER);
+	pipeunlock(pi, &wait, PIPE_READER);
 	return ret;
 }
 

@@ -27,14 +27,11 @@ CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -Iinclude/
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
-ifeq ($(mode), debug) 
-CFLAGS += -DDEBUG 
-CFLAGS += $(addprefix "-D__DEBUG_",$(module))
-endif 
-
 ifeq ($(platform), qemu)
 CFLAGS += -D QEMU
 endif
+
+ASFLAGS = -Iinclude/
 
 LDFLAGS = -z max-page-size=4096
 
@@ -93,7 +90,6 @@ SRC	+= \
 	$K/fs/pipe.c \
 	$K/fs/poll.c \
 	$K/fs/rootfs.c \
-	$K/mesg/signal.c \
 	$K/mm/kmalloc.c \
 	$K/mm/mmap.c \
 	$K/mm/pm.c \
@@ -101,6 +97,7 @@ SRC	+= \
 	$K/mm/vm.c \
 	$K/sched/proc.c \
 	$K/sched/swtch.S \
+	$K/sched/signal.c \
 	$K/sync/sleeplock.c \
 	$K/sync/spinlock.c \
 	$K/syscall/syscall.c \
@@ -113,6 +110,7 @@ SRC	+= \
 	$K/trap/fcntxt.S \
 	$K/trap/kernelvec.S \
 	$K/trap/trampoline.S \
+	$K/trap/sig_trampoline.S \
 	$K/trap/trap.c \
 	$K/utils/list.c \
 	$K/utils/rbtree.c \
@@ -132,6 +130,15 @@ SRC += \
 else 
 SRC += \
 	$K/hal/virtio_disk.c
+endif 
+
+ifeq ($(mode), debug) 
+CFLAGS += -DDEBUG 
+	ifeq ($(module), all)
+	CFLAGS += $(addprefix "-D__DEBUG_", $(basename $(notdir $(SRC))))
+	else 
+	CFLAGS += $(addprefix "-D__DEBUG_",$(module))
+	endif 
 endif 
 
 # object files 
@@ -248,7 +255,8 @@ UPROGS=\
 	$U/_umount\
 	$U/_dup3\
 	$U/_mmaptests\
-	$U/_sync
+	$U/_sync\
+	$U/_signal_test
 
 user: $(UPROGS)
 

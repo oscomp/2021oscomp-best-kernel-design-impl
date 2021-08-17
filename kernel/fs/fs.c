@@ -423,8 +423,9 @@ static struct inode *lookup_path(struct inode *ip, char *path, int parent, char 
 	} else if (*path != '\0') {
 		if (ip != NULL)
 			ip = idup(ip);
-		else
+		else {
 			ip = idup(myproc()->cwd);
+		}
 	} else {
 		__debug_warn("lookup_path", "path invalid\n");
 		return NULL;

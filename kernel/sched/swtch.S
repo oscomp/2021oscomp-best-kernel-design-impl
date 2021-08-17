@@ -5,7 +5,8 @@
 # Save current registers in old. Load from new.	
 
 
-.globl swtch
+	# void switch(struct context *old, struct context *new);
+	.globl swtch
 swtch:
 	sd ra, 0(a0)
 	sd sp, 8(a0)
@@ -38,5 +39,3 @@ swtch:
 	ld s11, 104(a1)
 	
 	ret
-
-	

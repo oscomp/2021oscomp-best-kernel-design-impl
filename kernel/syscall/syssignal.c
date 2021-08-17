@@ -5,7 +5,7 @@
 #define __module_name__ 		"syssignal"
 
 #include "types.h"
-#include "mesg/signal.h"
+#include "sched/signal.h"
 #include "syscall.h"
 #include "printf.h"
 #include "param.h"
@@ -87,8 +87,12 @@ uint64 sys_rt_sigprocmask(void) {
 	return 0;
 }
 
-uint64 sys_rt_sigreturn(void) {
-	__debug_info("signal handler returns!\n");
-	panic("can't work yet!");
-	return 0;
+uint64 sys_kill(void) {
+	int pid, sig;
+
+	// if(argint(0, &pid) < 0)
+	// 	return -1;
+	argint(0, &pid);
+	argint(1, &sig);
+	return kill(pid, sig);
 }

@@ -134,7 +134,7 @@ consoleread(int user_dst, uint64 dst, int n)
 		// input into cons.buffer.
 		acquire(&cons.lock);
 		while (cons.r == cons.w) {
-			if (myproc()->killed) {
+			if (myproc()->killed == SIGTERM) {
 				release(&cons.lock);
 				return -1;
 			}
@@ -187,7 +187,7 @@ int consolereadv(struct inode *ip, struct iovec *iovecs, int count, uint off)
 			// input into cons.buffer.
 			acquire(&cons.lock);
 			while (cons.r == cons.w) {
-				if (myproc()->killed) {
+				if (myproc()->killed == SIGTERM) {
 					release(&cons.lock);
 					return -1;
 				}

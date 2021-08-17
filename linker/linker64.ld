@@ -20,6 +20,10 @@ SECTIONS
         *(trampsec)
         . = ALIGN(0x1000);
         ASSERT(. - _trampoline == 0x1000, "error: trampoline larger than one page");
+        _sig_trampoline = .;
+        *(sigtrampsec)
+        . = ALIGN(0x1000);
+        ASSERT(. - _sig_trampoline == 0x1000, "error: sig_trampoline larger than one page");
         PROVIDE(etext = .);
     }
 
@@ -42,7 +46,6 @@ SECTIONS
     . = ALIGN(4K);
     bss_start = .;
     .bss : {
-	    *(.bss.stack)
         sbss_clear = .;
         *(.sbss .bss .bss.*)
         ebss_clear = .;
@@ -50,4 +53,7 @@ SECTIONS
 
     . = ALIGN(4K);
     PROVIDE(kernel_end = .);
+    .stack : {
+        *(.stack)
+    }
 }

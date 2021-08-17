@@ -167,7 +167,6 @@ extern uint64 sys_readlinkat(void);
 extern uint64 sys_mprotect(void);
 extern uint64 sys_rt_sigaction(void);
 extern uint64 sys_rt_sigprocmask(void);
-extern uint64 sys_rt_sigreturn(void);
 extern uint64 sys_fstatat(void);
 extern uint64 sys_fcntl(void);
 extern uint64 sys_pselect(void);
@@ -226,7 +225,6 @@ static uint64 (*syscalls[])(void) = {
 	[SYS_sched_yield]	sys_sched_yield,
 	[SYS_rt_sigaction]	sys_rt_sigaction, 
 	[SYS_rt_sigprocmask] sys_rt_sigprocmask, 
-	[SYS_rt_sigreturn]	sys_rt_sigreturn, 
 	[SYS_gettimeofday]	sys_gettimeofday,
 	[SYS_nanosleep]		sys_nanosleep,
 	[SYS_mmap]			sys_mmap,
@@ -299,7 +297,6 @@ static char *sysnames[] = {
 	[SYS_sched_yield]	"sched_yield",
 	[SYS_rt_sigaction]	"rt_sigaction", 
 	[SYS_rt_sigprocmask] 	"rt_sigprocmask", 
-	[SYS_rt_sigreturn]	"rt_sigreturn", 
 	[SYS_gettimeofday]	"gettimeofday",
 	[SYS_nanosleep]		"nanosleep",
 	[SYS_mmap]			"mmap",
@@ -342,7 +339,14 @@ syscall(void)
 	__debug_assert("syscall", p != NULL, "p == NULL\n");
 	num = p->trapframe->a7;
 	__debug_info("syscall", "num = %d\n", num);
-	if (num < NELEM(syscalls) && syscalls[num]) {
+	if (SYS_rt_sigreturn == num) {
+		extern void sigreturn(void);
+
+		// SYS_rt_sigreturn is very different, as it needs to restore previous 
+		// trapframe, we shouldn't save any value to trapframe
+		sigreturn();
+	}
+	else if (num < NELEM(syscalls) && syscalls[num]) {
 		// trace
 		int trace = p->tmask;// & (1 << (num - 1));
 		if (trace) {

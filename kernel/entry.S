@@ -12,7 +12,7 @@ _entry:
 loop: 
 	j loop 
 
-	.section .bss.stack 
+	.section .stack 
 	.align 12
 	.globl boot_stack 
 boot_stack: 

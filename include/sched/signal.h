@@ -2,7 +2,7 @@
 #define __SIGNAL_H
 
 #include "types.h"
-#include "utils/list.h"
+#include "trap.h"
 
 #define SIGRTMIN 	34
 #define SIGRTMAX	64
@@ -10,6 +10,12 @@
 // Some other signals 
 #define SIGTERM 	15
 #define SIGKILL		9
+#define SIGABRT		6
+#define SIGHUP		1
+#define SIGINT		2
+#define SIGQUIT		3
+#define SIGILL		4
+#define SIGTRAP		5
 
 // Signal Flags
 #define SA_NOCLDSTOP	0x00000001
@@ -24,12 +30,11 @@
 #define SIG_UNBLOCK 	1
 #define SIG_SETMASK		2
 
-#define SIG_LENGTH 		16
-
 typedef void (*__sighandler_t)(int);
 
+#define SIGSET_LEN 		16
 typedef struct {
-	unsigned long __val[16];
+	unsigned long __val[SIGSET_LEN];
 } __sigset_t;
 
 struct sigaction {
@@ -42,18 +47,11 @@ struct sigaction {
 	// void (*sa_restorer)(void);	// this field is not used on risc-v
 };
 
-typedef struct {
-	list_node_t __list;
-	struct sigaction act;
+typedef struct __ksigaction_t {
+	struct __ksigaction_t *next;
+	struct sigaction sigact;
 	int signum;
 } ksigaction_t;
-
-union sigval {
-	int sival_int;
-	void *sival_ptr;
-};
-
-void do_notify_resume(void);
 
 int set_sigaction(
 	int signum, 
@@ -67,9 +65,24 @@ int sigprocmask(
 	__sigset_t *oldset
 );
 
-int sigqueue(int pid, int sig, union sigval const value);
+struct sig_frame {
+	__sigset_t mask;
+	struct trapframe *tf;
+	struct sig_frame *next;
+};
 
-void sigact_copy(ksigaction_t **pdst, ksigaction_t *src);
-void sigact_free(ksigaction_t *head);
+// Free the list of sig_frame. 
+void sigframefree(struct sig_frame *head);
+
+// Free the list of sig_action. 
+void sigaction_free(ksigaction_t *head);
+
+int sigaction_copy(ksigaction_t **pdst, ksigaction_t const *src);
+
+void sighandle(void);
+
+// Return from a signal handling, restore previous trapframe and pending 
+// from sig_frame list. 
+void sigreturn(void);
 
 #endif 

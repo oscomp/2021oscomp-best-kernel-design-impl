@@ -4,7 +4,7 @@
 #include "types.h"
 #include "time.h"
 #include "sync/spinlock.h"
-#include "mesg/signal.h"
+#include "sched/signal.h"
 #include "fs/file.h"
 #include "utils/dlist.h"
 #include "sync/waitqueue.h"

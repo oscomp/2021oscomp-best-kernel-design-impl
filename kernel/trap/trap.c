@@ -66,7 +66,7 @@ trapinithart(void)
 
 	__debug_info("trapinithart", "init\n");
 }
-
+#include "mm/pm.h"
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -94,10 +94,13 @@ usertrap(void)
 
 	uint64 cause = r_scause();
 	__debug_info("usertrap", "cause %d\n", cause);
+	__debug_info("usertrap", "epc = %p\n", r_sepc());
+	__debug_info("usertrap", "p->killed = %d\n", p->killed);
 	if (cause == EXCP_ENV_CALL) {
 		// system call
-		if(p->killed)
+		if(SIGTERM == p->killed) {
 			exit(-1);
+		}
 		// sepc points to the ecall instruction,
 		// but we want to return to the next instruction.
 		p->trapframe->epc += 4;
@@ -108,11 +111,8 @@ usertrap(void)
 	} 
 	else if (0 == handle_intr(cause)) {
 		// handle interrupt 
-		if (NULL != get_runnable())	{
+		if (yield()) {
 			p->ivswtch += 1;
-			__debug_info("usertrap", "yield()\n");
-			// if a new proc is woke up by intr, run it first 
-			yield();
 		}
 	}
 	else if (0 == handle_excp(cause)) {
@@ -122,11 +122,16 @@ usertrap(void)
 		printf("\nusertrap(): unexpected scause %p pid=%d %s\n", cause, p->pid, p->name);
 		printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
 		trapframedump(p->trapframe);
-		p->killed = 1;
+		printf("idlepages %d\n", idlepages());
+		p->killed = SIGTERM;
 	}
    
-	if(p->killed)
-		exit(-1);
+	if (p->killed) {
+		if (SIGTERM == p->killed)
+			exit(-1);
+		__debug_info("usertrap", "enter handler\n");
+		sighandle();
+	}
 
 	__debug_info("usertrap", "%d: enter usertrapret\n", cause);
 	usertrapret();
@@ -154,8 +159,7 @@ usertrapret(void) {
 	// set up trapframe values that uservec will need when
 	// the process next re-enters the kernel.
 	p->trapframe->kernel_satp = r_satp();         // kernel page table
-	//p->trapframe->kernel_sp = p->kstack + PGSIZE; // process's kernel stack
-	p->trapframe->kernel_sp = VKSTACK + PGSIZE;
+	p->trapframe->kernel_sp = p->kstack + PGSIZE;	// process's kernel stack 
 	p->trapframe->kernel_trap = (uint64)usertrap;
 	p->trapframe->kernel_hartid = r_tp();         // hartid for cpuid()
 
@@ -176,12 +180,13 @@ usertrapret(void) {
 	uint64 satp = MAKE_SATP(p->pagetable);
 	 
 	permit_usr_mem(); // it's odd that without this the hart will stuck in u-mode on k210
-	 
+
 	// jump to trampoline.S at the top of memory, which 
 	// switches to the user page table, restores user registers,
 	// and switches to user mode with sret.
 	uint64 fn = TRAMPOLINE + (userret - trampoline);
-	((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+	// ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
+	((void (*)(uint64, uint64))fn)((uint64)(p->trapframe), satp);
 }
 
 // interrupts and exceptions from kernel code go here via kernelvec,
@@ -205,10 +210,7 @@ kerneltrap() {
 
 	//__debug_info("kerneltrap", "enter %d\n", scause);
 	if (0 == handle_intr(scause)) {
-		/*if (NULL != p && NULL != get_runnable()) {*/
-			/*__debug_info("kerneltrap", "yield()\n");*/
-			/*yield();*/
-		/*}*/
+		// handle interrupt
 	}
 	else if (0 == handle_excp(scause)) {
 		// handle exception 
@@ -300,6 +302,18 @@ int handle_intr(uint64 scause) {
 		}
 		#endif 
 
+		// send software interrupts to other harts to inform them 
+		// for (int i = 0; i < NCPU; i ++) {
+		// 	if (cpuid() != i) {
+		// 		sbi_send_ipi(1 << i, 0);
+		// 	}
+		// }
+
+		return 0;
+	}
+	else if (INTR_SOFTWARE == scause) {		// the real software interrupt
+		sbi_clear_ipi();
+
 		return 0;
 	}
 	else {
@@ -332,21 +346,6 @@ int handle_excp(uint64 scause) {
 	default: return -1;
 	}
 }
-
-/*static inline int is_page_fault(uint64 scause)*/
-/*{*/
-  /*switch (scause) {*/
-	/*#ifndef QEMU*/
-	  /*case EXCP_LOAD_ACCESS:*/
-	  /*case EXCP_STORE_ACCESS:*/
-	/*#else*/
-	  /*case EXCP_LOAD_PAGE:*/
-	  /*case EXCP_STORE_PAGE:*/
-	/*#endif*/
-		/*return 1;*/
-  /*}*/
-  /*return 0;*/
-/*}*/
 
 void trapframedump(struct trapframe *tf)
 {

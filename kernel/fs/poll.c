@@ -130,7 +130,7 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 	struct fdset rfds, wfds, exfds;
 	uint64 expire;
 	struct poll_wait_queue wait;
-	struct poll_wait_queue *pwait;
+	// struct poll_wait_queue *pwait;
 	int immediate = 0;
 	
 	
@@ -149,10 +149,11 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 	fdset_work_init(&rfds, &wfds, &exfds, readfds, writefds, exceptfds);
 
 	// Since the node is on stack, if we want other process to get us, we should use pa.
-	pwait = (struct poll_wait_queue *)kwalkaddr(myproc()->pagetable, (uint64)&wait);
-	poll_init(pwait);
+	// pwait = (struct poll_wait_queue *)kwalkaddr(myproc()->pagetable, (uint64)&wait);
+	// pwait = &wait;
+	poll_init(&wait);
 	if (immediate)
-		pwait->pt.func = NULL;		// we won't be inserted into any queue in later poll()s
+		wait.pt.func = NULL;		// we won't be inserted into any queue in later poll()s
 
 	int ret = 0;
 	for (;;)
@@ -185,29 +186,29 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 				
 				__debug_info("pselect", "fd=%d\n", i);
 				
-				pwait->pt.key = POLLEX_SET;
+				wait.pt.key = POLLEX_SET;
 				if (r & bit)
-					pwait->pt.key |= POLLIN_SET;
+					wait.pt.key |= POLLIN_SET;
 				if (w & bit)
-					pwait->pt.key |= POLLOUT_SET;
+					wait.pt.key |= POLLOUT_SET;
 
-				uint32 mask = file_poll(fp, &pwait->pt);
+				uint32 mask = file_poll(fp, &wait.pt);
 				__debug_info("pselect", "mask=%d\n", mask);
 
 				if ((mask & POLLIN_SET) && (r & bit)) {
 					rres |= bit;
 					ret++;
-					pwait->pt.func = NULL;
+					wait.pt.func = NULL;
 				}
 				if ((mask & POLLOUT_SET) && (w & bit)) {
 					wres |= bit;
 					ret++;
-					pwait->pt.func = NULL;
+					wait.pt.func = NULL;
 				}
 				if ((mask & POLLEX_SET) && (ex & bit)) {
 					exres |= bit;
 					ret++;
-					pwait->pt.func = NULL;
+					wait.pt.func = NULL;
 				}
 			}
 			if (readfds)
@@ -217,21 +218,21 @@ int pselect(int nfds, struct fdset *readfds, struct fdset *writefds, struct fdse
 			if (exceptfds)
 				exceptfds->fd_bits[idx] = exres;
 		}
-		pwait->pt.func = NULL;		// only need to be called once for each file
+		wait.pt.func = NULL;		// only need to be called once for each file
 
 		if (ret > 0 || immediate)	// got results or don't sleep-wait
 			break;
-		if (pwait->error) {
-			ret = pwait->error;
+		if (wait.error) {
+			ret = wait.error;
 			break;
 		}
 
 		// at this point, maybe we are already waken up by some
-		if (poll_sched_timeout(pwait, expire))
+		if (poll_sched_timeout(&wait, expire))
 			immediate = 1;
 	}
 
-	poll_end(pwait);
+	poll_end(&wait);
 
 	__debug_info("pselect", "return %d\n", ret);
 	return ret;
