@@ -724,8 +724,8 @@ static void sdcard_multiple_write_wait(void)
 
 	// waiting sdcard programming, dma can't do this
 	uint8 result = 0xff;
-	int timeout;
-	for (timeout = 0xfffff; timeout >= 0 && (result & 0x1f) != 0x5; timeout--)
+	int64 timeout;
+	for (timeout = 0xffffff; timeout >= 0 && (result & 0x1f) != 0x5; timeout--)
 		sd_read_data(&result, 1);
 	if (timeout < 0)
 		panic("sdcard_intr: response 1");	// really don't know what to do
