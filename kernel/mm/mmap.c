@@ -854,6 +854,7 @@ static int handle_anonymous_shared(uint64 badaddr, struct seg *s)
 	return 0;
 }
 
+/*
 static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 {
 	struct proc *p = myproc();
@@ -924,6 +925,7 @@ static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 	printf(" \b");
 	return page;
 }
+*/
 
 static int __page_file_read(struct inode *ip, uint64 off, uint64 page)
 {
@@ -972,18 +974,18 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 			pa = allocpage();
 			if (pa == NULL) {
 				release(&ip->ilock);
-				pa = __page_file_swap(ip, off, badaddr);
-				if (pa == NULL)
-					return -ENOMEM;
+				// pa = __page_file_swap(ip, off, badaddr);
+				// if (pa == NULL)
+				return -ENOMEM;
 
-				acquire(&ip->ilock);
-				if (map->pa == NULL) {
-					pagereg((uint64)pa, 1);
-					map->pa = pa;
-				} else {
-					freepage(pa);
-					pa = map->pa;
-				}
+				// acquire(&ip->ilock);
+				// if (map->pa == NULL) {
+				// 	pagereg((uint64)pa, 1);
+				// 	map->pa = pa;
+				// } else {
+				// 	freepage(pa);
+				// 	pa = map->pa;
+				// }
 			} else {
 				pagereg((uint64)pa, 1);		// keep refs on shared mappings
 				map->pa = pa;
