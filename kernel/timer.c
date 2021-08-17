@@ -38,23 +38,23 @@ set_next_timeout() {
 	// sbi_set_timer(r_time() + INTERVAL);
 	// struct sbiret result = sbi_xv6_get_timer();
 	// __debug_assert("set_next_timeout", SBI_SUCCESS == result.error, "SBI call failed");
-	struct sbiret result;
-	result.value = readtime();	// don't need to trap for time
-	result = sbi_set_timer(result.value + INTERVAL);
-	__debug_assert("set_next_timeout", SBI_SUCCESS == result.error, "SBI call failed");
+	uint64 now = readtime();
+	if (cpuid() == 0) {
+		// ticks++;
+		// wakeup(&ticks);
+		
+		static uint64 last = 0;
+		if (now - last >= CLK_FREQ * 5) {
+			last = now;
+			printf("%d s\n", now / CLK_FREQ / 5);
+		}
+	}
+	// struct sbiret result;
+	// result.value = readtime();	// don't need to trap for time
+	sbi_set_timer(now + INTERVAL);
+	// __debug_assert("set_next_timeout", SBI_SUCCESS == result.error, "SBI call failed");
 }
 
 void timer_tick() {
-	if (cpuid() == 0) {
-		ticks++;
-		// wakeup(&ticks);
-		
-		// static uint64 last = 0;
-		// uint64 now = readtime();
-		// if (now - last >= CLK_FREQ) {
-		// 	last = now;
-		// 	printf("%d s\n", now / CLK_FREQ);
-		// }
-	}
 	set_next_timeout();
 }
