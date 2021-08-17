@@ -280,8 +280,6 @@ impl MemorySet {
         let mut max_end_vpn = VirtPageNum(0);
         let mut head_va = 0; // top va of ELF which points to ELF header
         // push ELF related auxv
-        // let ph_head_addr = (elf.find_section_by_name(".text").unwrap().address() as usize )- (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
-        // let ph_head_addr = (elf.header.pt2.entry_point() as usize) - (elf.header.pt2.ph_entry_size() as usize) * (elf.header.pt2.ph_count() as usize);
         auxv.push(AuxHeader{aux_type: AT_PHENT, value: elf.header.pt2.ph_entry_size() as usize});// ELF64 header 64bytes
         auxv.push(AuxHeader{aux_type: AT_PHNUM, value: ph_count as usize});
         auxv.push(AuxHeader{aux_type: AT_PAGESZ, value: PAGE_SIZE as usize});
@@ -297,8 +295,6 @@ impl MemorySet {
         auxv.push(AuxHeader{aux_type: AT_CLKTCK, value: 100 as usize});
         auxv.push(AuxHeader{aux_type: AT_SECURE, value: 0 as usize});
         auxv.push(AuxHeader{aux_type: AT_NOTELF, value: 0x112d as usize});
-        // auxv.push(AuxHeader{aux_type: AT_SYSINFO, value: 0x1 as usize});
-        // auxv.push(AuxHeader{aux_type: AT_SYSINFO_EHDR, value: 0x3 as usize});
 
         // denotes if .comment should be mapped
         let mut comment_flag = true;
@@ -349,26 +345,6 @@ impl MemorySet {
         let ph_head_addr = head_va + elf.header.pt2.ph_offset() as usize;
         auxv.push(AuxHeader{aux_type: AT_PHDR, value: ph_head_addr as usize});
 
-
-        // if comment_flag {
-        //     println!("map .comment");
-        //     let start_va: VirtAddr = (0).into();
-        //     let end_va: VirtAddr = (PAGE_SIZE).into();
-        //     let mut map_perm = MapPermission::U;            
-        //     map_perm |= MapPermission::R; 
-
-        //     let map_area = MapArea::new(
-        //         start_va,
-        //         end_va,
-        //         MapType::Framed,
-        //         map_perm,
-        //     );
-            
-        //     memory_set.push( 
-        //         map_area,
-        //         Some(&elf.input[comment_sec.offset() as usize..(comment_sec.offset() + comment_sec.size().min(PAGE_SIZE as u64)) as usize])
-        //     );        
-        // }
 
         //map user heap
         let max_end_va: VirtAddr = max_end_vpn.into();
@@ -439,8 +415,6 @@ impl MemorySet {
         }
         for vpn in user_space.chunks.vpn_table.iter() {
             let vpn_copy: VirtPageNum = vpn.0.into();
-            // memory_set.chunks.vpn_table.push(vpn_copy);
-            // memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
             memory_set.push_chunk(vpn_copy);
             let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
             let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
@@ -485,7 +459,6 @@ impl MemorySet {
                 //skipping the part using CoW
                 continue;
             }
-            // println!{"mapping area with head {:?}", head_vpn}
             let new_area = MapArea::from_another(area);
             memory_set.push(new_area, None);
             for vpn in area.vpn_range {
@@ -495,7 +468,6 @@ impl MemorySet {
                 dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
             }
         }
-        // println!{"CoW starting..."};
         //This part is for copy on write
         let mut parent_areas = &user_space.areas;
         let page_table = &mut user_space.page_table;
@@ -509,11 +481,9 @@ impl MemorySet {
             let mut new_area = MapArea::from_another(area);
             // map the former physical address
             for vpn in area.vpn_range {
-                // println!{"mapping {:?}", vpn};
                 //change the map permission of both pagetable
                 // get the former flags and ppn
                 let pte = page_table.translate(vpn).unwrap();
-                // println!{"The content of PTE: {}", pte.bits};
                 let pte_flags = pte.flags() & !PTEFlags::W;
                 let src_ppn = pte.ppn();
                 frame_add_ref(src_ppn);
@@ -522,17 +492,13 @@ impl MemorySet {
                 page_table.set_cow(vpn);
                 // map the cow page table to src_ppn
                 memory_set.page_table.map(vpn, src_ppn, pte_flags);
-                // println!{"mapping {:?} --- {:?}", vpn, src_ppn};
                 memory_set.set_cow(vpn);
-                // new_area.data_frames.insert(vpn, FrameTracker::new(src_ppn));
                 new_area.insert_tracker(vpn, src_ppn);
             }
             memory_set.push_mapped(new_area);
         }
         for vpn in user_space.chunks.vpn_table.iter() {
             let vpn_copy: VirtPageNum = vpn.0.into();
-            // memory_set.chunks.vpn_table.push(vpn_copy);
-            // memory_set.chunks.map_one(&mut memory_set.page_table, vpn_copy);
             memory_set.push_chunk(vpn_copy);
             let src_ppn = user_space.translate(vpn_copy).unwrap().ppn();
             let dst_ppn = memory_set.translate(vpn_copy).unwrap().ppn();
@@ -559,7 +525,6 @@ impl MemorySet {
             }
             memory_set.mmap_chunks.push(new_mmap_area);
         }
-        // println!{"returning..."};
         memory_set.map_kernel_shared();
         memory_set
     }
@@ -568,7 +533,6 @@ impl MemorySet {
     pub fn cow_alloc(&mut self, vpn: VirtPageNum, former_ppn: PhysPageNum) -> usize {
         if enquire_refcount(former_ppn) == 1 {
             self.page_table.reset_cow(vpn);
-            // println!{"The content of PTE: {}", pte.bits};
             // change the flags of the src_pte
             self.page_table.set_flags(
                 vpn, 
@@ -578,28 +542,20 @@ impl MemorySet {
         }
         let frame = frame_alloc().unwrap();
         let ppn = frame.ppn;
-        //println!("cow_alloc  {:X}, {:X}, {:X}", vpn.0, ppn.0, former_ppn.0);
         self.remap_cow(vpn, ppn, former_ppn);
-        // println!{"finishing remap!"}
         for area in self.areas.iter_mut() {
             let head_vpn = area.vpn_range.get_start();
             let tail_vpn = area.vpn_range.get_end();
             if vpn <= tail_vpn && vpn >= head_vpn {
-                // println!{"find the MapArea to insert FrameTracker"}
                 area.data_frames.insert(vpn, frame);
-                // println!{"finished insert frame!"}
                 break;
             }
         }
-        // println!{"finishing cow_alloc!"}
         0
     }
 
     pub fn lazy_alloc_heap (&mut self, vpn: VirtPageNum) -> usize {
-        // println!{"performing lazy alloc on {:?}", vpn}
         self.push_chunk(vpn);
-        // self.chunks.vpn_table.push(vpn);
-        // self.chunks.map_one(&mut self.page_table, vpn);
         0
     }
 
@@ -609,10 +565,8 @@ impl MemorySet {
     }
 
     pub fn lazy_mmap (&mut self, stval: VirtAddr) -> isize {
-        //println!{"performing lazy mmap on {:?}", stval}
         for mmap_chunk in self.mmap_chunks.iter() {
             if stval >= mmap_chunk.mmap_start && stval < mmap_chunk.mmap_end {
-                // println!{"The map_perm of mmap_trunk is 0x{:X}", mmap_chunk.map_perm.bits};
                 if (mmap_chunk.map_perm & MapPermission::W).bits == 0 {
                     return -1;
                 }
@@ -642,7 +596,6 @@ impl MemorySet {
     }
     
     pub fn recycle_data_pages(&mut self) {
-        //*self = Self::new_bare();
         self.areas.clear();
     }
 
@@ -723,7 +676,6 @@ impl ChunkArea {
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
         // [WARNING]:因为没有map，所以不能使用
-        //gdb_println!(MAP_ENABLE,"[map_one]: pte_flags:{:?} vpn:0x{:X}",pte_flags,vpn.0);
         page_table.map(vpn, ppn, pte_flags);
     }
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {

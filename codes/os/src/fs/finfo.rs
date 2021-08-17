@@ -447,27 +447,6 @@ impl FdSet {
         }
         fd_v
     }
-
-    /* 
-    pub fn as_bytes(&self) -> &[u8] {
-        let size = core::mem::size_of::<Self>();
-        unsafe {
-            core::slice::from_raw_parts(
-                self as *const _ as usize as *const u8,
-                size,
-            )
-        }
-    }
-    
-    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        let size = core::mem::size_of::<Self>();
-        unsafe {
-            core::slice::from_raw_parts_mut(
-                self as *mut _ as usize as *mut u8,
-                size,
-            )
-        }
-    }  */
 }
 
 use crate::lang_items::Bytes;

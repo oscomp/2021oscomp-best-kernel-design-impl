@@ -185,7 +185,6 @@ impl OSInode {
         let inner = self.inner.lock();
         let vfile = inner.inode.clone();
         let (size, atime, mtime, ctime, ino) = vfile.stat();
-        //println!("info = {:?}", (size, atime, mtime, ctime));
         let st_mod:u32 = {
             if vfile.is_dir() {
                 //println!("is dir");
@@ -210,10 +209,8 @@ impl OSInode {
         let inner = self.inner.lock();
         let vfile = inner.inode.clone();
         let (size, atime, mtime, ctime, ino) = vfile.stat();
-        //println!("info = {:?}", (size, atime, mtime, ctime));
         let st_mod:u32 = {
             if vfile.is_dir() {
-                //println!("is dir");
                 finfo::S_IFDIR | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
             } else {
                 finfo::S_IFREG | finfo::S_IRWXU | finfo::S_IRWXG | finfo::S_IRWXO
@@ -353,25 +350,12 @@ lazy_static! {
 
 pub fn init_rootfs(){
     println!("[fs] build rootfs ... start");
-    //let dir_etc = open("/","etc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    //println!("[fs] build rootfs: creating /etc");
-    //let file = open("/","dev", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    //println!("[fs] build rootfs: creating /dev");
-    //let file = open("/","root", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    //println!("[fs] build rootfs: creating userdir");
-    //let file_pswd = open("/etc","passwd", OpenFlags::CREATE, DiskInodeType::File).unwrap();
-    
     println!("[fs] build rootfs: creating /proc");
     let file = open("/","proc", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     println!("[fs] build rootfs: init /proc");
-    //let file = open("/proc","0", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
-    //let file = open("/proc","1", OpenFlags::CREATE, DiskInodeType::Directory).unwrap();
     let file = open("/proc","mounts", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let meminfo = open("/proc","meminfo", OpenFlags::CREATE, DiskInodeType::File).unwrap();
     let file = open("/","ls", OpenFlags::CREATE, DiskInodeType::File).unwrap();
-    //let mut meminfo_data = String::new();
-    //meminfo_data.push_str("MemTotal:    8192 kB\n");
-    //meminfo.write_all(&Vec::from(meminfo_data.as_str()));
     println!("[fs] build rootfs ... finish");
 }
 
@@ -389,8 +373,6 @@ pub fn list_apps() {
 // TODO: 对所有的Inode加锁！
 // 在这一层实现互斥访问
 pub fn list_files(work_path: &str, path: &str){
-    //let curr_inode = EasyFileSystem::get_inode(&ROOT_INODE.get_fs(), inode_id);
-    //println!("enter list files");
     let work_inode = {
         if work_path == "/" || (path.len()>0 && path.chars().nth(0).unwrap() == '/') {
             //println!("curr is root");
@@ -400,9 +382,7 @@ pub fn list_files(work_path: &str, path: &str){
             ROOT_INODE.find_vfile_bypath( wpath ).unwrap()
         }
     };
-    //println!("path  = {}, len = {}", path, path.len());
     let mut pathv:Vec<&str> = path.split('/').collect();
-    //println!("pathv.len = {}", path.len());
     let cur_inode = work_inode.find_vfile_bypath(pathv).unwrap();
 
     let mut file_vec = cur_inode.ls_lite().unwrap();
@@ -416,7 +396,6 @@ pub fn list_files(work_path: &str, path: &str){
         }
         
     }
-    // println!("");
 }
 
 bitflags! {
@@ -446,13 +425,6 @@ impl OpenFlags {
     }
 }
 
-//pub fn find_par_inode_id(path: &str) -> u32{
-//    let mut pathv:Vec<&str> = path.split('/').collect();
-//    pathv.pop();
-//    let inode = ROOT_INODE.find_vfile_bypath(pathv).unwrap();
-//    //println!("find par ok");
-//    inode.get_id()
-//}
 
 pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType) -> Option<Arc<OSInode>> {
     // DEBUG: 相对路径
@@ -472,20 +444,11 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
     if flags.contains(OpenFlags::CREATE) {
         if let Some(inode) = cur_inode.find_vfile_bypath(pathv.clone()) {
             // clear size
-            //println!("clear size");
             inode.remove();
-            //Some(Arc::new(OSInode::new(
-            //    readable,
-            //    writable,
-            //    inode,
-            //)))
         } 
         {
             // create file
-            //println!("start create");
             let name = pathv.pop().unwrap();
-            //println!("name = {}", name);
-            // print!("\n");
             if let Some(temp_inode) = cur_inode.find_vfile_bypath(pathv.clone()){
                 let attribute = {
                     match type_ {
@@ -493,11 +456,8 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                         DiskInodeType::File=>{ ATTRIBUTE_ARCHIVE }
                     }
                 };
-                // print!("\n");
                 temp_inode.create( name, attribute)
                 .map(|inode| {
-                    // print!("\n");
-                    //println!("end create");
                     Arc::new(OSInode::new(
                         readable,
                         writable,
@@ -505,12 +465,10 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
                     ))
                 })
             }else{
-                // println!("cannot find pah");
                 None
             }
         }
     } else {
-        //println!("pathv = {:?}", pathv);
         cur_inode.find_vfile_bypath(pathv)
             .map(|inode| {
                 if flags.contains(OpenFlags::TRUNC) {
@@ -529,7 +487,6 @@ pub fn open(work_path: &str, path: &str, flags: OpenFlags, type_: DiskInodeType)
 pub fn ch_dir(work_path: &str, path: &str) -> isize{
     // 切换工作路径
     // 切换成功，返回inode_id，否则返回-1
-    //println!("enter cd");
     let cur_inode = {
         if work_path == "/" || ( path.len() > 0 && path.chars().nth(0).unwrap() == '/' ) {
             ROOT_INODE.clone()
@@ -540,7 +497,6 @@ pub fn ch_dir(work_path: &str, path: &str) -> isize{
         }
     };
     let pathv:Vec<&str> = path.split('/').collect();
-    //println!("in cd, pathv = {:?}", pathv);
     if let Some(tar_dir) = cur_inode.find_vfile_bypath(pathv){
         // ! 当inode_id > 2^16 时，有溢出的可能（目前不会发生。。
         0

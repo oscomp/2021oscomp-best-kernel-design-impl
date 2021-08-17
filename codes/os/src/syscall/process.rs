@@ -26,19 +26,8 @@ use core::slice;
 
 
 pub fn sys_exit(exit_code: i32) -> ! {
-    // let current_task = current_task().unwrap();
-    // gdb_println!(SYSCALL_ENABLE, "sys_exit(exit_code: {}) (pid {})", exit_code, current_task.pid.0);
-    // if current_task.is_signal_execute() || !current_task.check_signal_handler(Signals::SIGTERM){
-    //     drop(current_task);
-        exit_current_and_run_next(exit_code);
-        panic!("Unreachable in sys_exit!");
-    // }
-    // // mark not processing signal handler
-    // let mut inner = current_task.acquire_inner_lock();
-    // // restore trap_cx
-    // let trap_cx = inner.get_trap_cx();
-    // *trap_cx = inner.trapcx_backup.clone();
-    // return trap_cx.x[10] as isize; //return a0: not modify any of trap_cx
+    exit_current_and_run_next(exit_code);
+    panic!("Unreachable in sys_exit!");
 }
 
 pub fn sys_yield() -> isize {
@@ -89,7 +78,6 @@ pub fn sys_getrusage(who: isize, usage: *mut u8) -> isize {
     let rusage = &task.acquire_inner_lock().rusage;
     userbuf.write(rusage.as_bytes());
     gdb_println!(SYSCALL_ENABLE, "sys_getrusage(who: {}, usage: {:?}) = {}", who, rusage, 0);
-    // crate::sbi::shutdown();
     0
 }
 
@@ -119,13 +107,11 @@ pub fn sys_sleep(time_req: *mut u64, time_remain: *mut u64) -> isize{
     let token = current_user_token();
     let sec = *translated_ref(token, time_req) as usize;
     let usec = *translated_ref(token, unsafe{time_req.add(1)}) as usize;
-    // println!("sys_sleep: sec:{} usec:{}", sec, usec);
     let (end_sec,end_usec) = sum_time(sec, usec, get_time_s(), get_time_us());
     loop{
         let cur_sec = get_time_s();
         let cur_usec = get_time_us();
         if compare_time(end_sec, end_usec, cur_sec, cur_usec) {
-            //print!("\n");
             suspend_current_and_run_next();
         }
         else{
@@ -273,7 +259,6 @@ pub fn sys_sigaction(signum: isize, act :*mut usize, oldact: *mut usize) -> isiz
     if !(handler == SIG_DFL || handler == SIG_IGN ){
         task_inner.siginfo.signal_handler.insert(signum, sigaction_new);
     }
-    // gdb_println!(SYSCALL_ENABLE, "sys_sigaction(handler: 0x{:X}, mask: 0x{:X}, flags: 0x{:X}) = {}", handler, mask, flags, 0);
     if oldact as usize != 0{
         gdb_println!(SYSCALL_ENABLE, "sys_sigaction(signum: {:?}, act: {:?}, oldact: {:?}) = {}", signum, sigaction_new_copy, sigaction_old, 0);
     }
@@ -335,7 +320,6 @@ pub fn sys_kill(pid: isize, signal: isize) -> isize {
 
 pub fn sys_set_tid_address(tidptr: usize) -> isize {
     current_task().unwrap().acquire_inner_lock().address.clear_child_tid = tidptr;
-    // print!("sys_set_tid_address: return {}", sys_gettid());
     sys_gettid()
 }
 
@@ -346,19 +330,10 @@ pub fn sys_getpid() -> isize {
 
 // For user, pid is tgid in kernel
 pub fn sys_getppid() -> isize {
-    // let mut search_task_pid: usize = current_task().unwrap().pid.0;
-    
     let mut search_task: Arc<TaskControlBlock> = current_task().unwrap();
     search_task = search_task.get_parent().unwrap();
     gdb_println!(SYSCALL_ENABLE,"sys_getppid() = {}",search_task.tgid);
     search_task.tgid as isize
-
-    // while search_task_pid != 0 {
-    //     search_task = search_task.get_parent().unwrap();
-    //     search_task_pid = search_task.pid.0;
-    // }
-    
-    // getppid(child_pid, &search_task) as isize
 }
 
 pub fn sys_getuid() -> isize {
@@ -384,7 +359,6 @@ pub fn sys_gettid() -> isize {
 
 pub fn sys_sbrk(grow_size: isize, is_shrink: usize) -> isize {
     let current_va = current_task().unwrap().grow_proc(grow_size) as isize;
-    // gdb_println!(SYSCALL_ENABLE,"(sys_sbrk ret 0x{:X})",current_va);
     current_va
 }
 
@@ -407,8 +381,6 @@ pub fn sys_brk(brk_addr: usize) -> isize{
 //    int *ptid, int *ctid,
 //    unsigned long newtls);
 pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls: usize) -> isize {
-    // print_free_pages();
-    //print!("\n");
     let current_task = current_task().unwrap();
     let new_task = current_task.fork(false);
     let tid = new_task.getpid();
@@ -438,11 +410,6 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     trap_cx.x[10] = 0;
     // add new task to scheduler
     add_task(new_task);
-    // print_free_pages();
-    //unsafe {
-    //    llvm_asm!("sfence.vma" :::: "volatile");
-    //    llvm_asm!("fence.i" :::: "volatile");
-    //}
     gdb_println!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
@@ -450,11 +417,8 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     //println!("[sys_exec]");
     let token = current_user_token();
-    // println!{"----------pin1"}
     let path = translated_str(token, path);
-    // println!{"----------pin2"}
     let mut args_vec: Vec<String> = Vec::new();
-    // println!{"----------pin3"}
     loop {
         let arg_str_ptr = *translated_ref(token, args);
         if arg_str_ptr == 0 {
@@ -479,23 +443,17 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
             )
         );
         drop(inner);
-        // print!("[exec 0]");
         let elf_buf = task.kmmap(0, len, 0, 0, fd as isize, 0);
-        // print!("[exec 1]");
         let argc = args_vec.len();
         unsafe{
-            // print!("[exec 2]");
             let elf_ref = slice::from_raw_parts(elf_buf as *const u8, len);
             task.exec(elf_ref, args_vec);
             let inner = task.acquire_inner_lock();
         }
-        // print!("[exec 3]");
-        // print_free_pages();
         task.kmunmap(elf_buf, len);
         // drop fd
         let mut inner = task.acquire_inner_lock();
         inner.fd_table[fd].take();
-        //println!("[sys_exec] finish");
         
         gdb_println!(SYSCALL_ENABLE, "sys_exec(path: {}, args: {:?}) = {}", path, args_vec_copy, argc);
         0 
@@ -547,7 +505,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
             drop(inner);
             drop(task);
             gdb_print!(BLANK_ENABLE," ");
-            print!(" ");
+            // print!(" ");
             suspend_current_and_run_next();
             // continue;
         }
@@ -601,10 +559,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
     let mut adjust_len = len;
     if adjust_len == 0{
         adjust_len = PAGE_SIZE;
-        //println!("[sys_mmap]:adjust_len = {}",adjust_len);
     }
-    
-    //println!("[{}][insert_mmap_area]: start 0x{:X} len 0x{:X}", task.pid.0, start, len);
     let result_addr = task.mmap(start, adjust_len, prot, flags, fd, off);
     gdb_println!(SYSCALL_ENABLE,"sys_mmap(0x{:X},{},{},0x{:X},{},{}) = 0x{:X}",start, len, prot, flags, fd, off, result_addr);
     return result_addr as isize;
@@ -614,7 +569,6 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize, flags: usize, fd: isize, 
 pub fn sys_munmap(start: usize, len: usize) -> isize {
     let task = current_task().unwrap();
     let ret = task.munmap(start, len);
-    //println!("after munmap, heap size = {}", HEAP_ALLOCATOR.lock(  );
     ret
 }
 

@@ -215,52 +215,24 @@ pub fn trap_handler() -> ! {
 
 #[no_mangle]
 pub fn trap_return() -> ! {
-   
-
     // update RUsage of process
     // update_user_clock();
     // let ru_stime = get_kernel_runtime_usec();
     // current_task().unwrap().acquire_inner_lock().rusage.add_stime(ru_stime);
     perform_signal_handler();
-    // println!("after perform_signal_handler");
     set_user_trap_entry();
-
-    // current_task().unwrap().acquire_inner_lock().memory_set.print_pagetable();
-
-    // println!("core:{} trap return ",get_core_id());
     let trap_cx_ptr = TRAP_CONTEXT;
-    //println!("{:X}", TRAP_CONTEXT);
     let user_satp = current_user_token();
-    //println!("[trap_return] satp = {:X}", user_satp);
-    // println!("satp = {:X}", current_user_token());
-    //let task = current_task().unwrap();
-    //let inner = task.acquire_inner_lock();
-    //inner.print_cx();
-    //drop(inner);
-    //drop(task);
-    //println!{"{:?}", current_task().unwrap().acquire_inner_lock().get_trap_cx()};
     let trap_cx = current_task().unwrap().acquire_inner_lock().get_trap_cx();
     if trap_cx.get_sp() == 0{
         println!("[trap_ret] sp = 0");
     }
-    //println!("[trap_ret] sepc = {:X}", trap_cx.sepc);
-
     extern "C" {
         fn __alltraps();
         fn __restore();
         fn __signal_trampoline();
     }
-    // println!("__signal_trampoline is at 0x{:X}", __signal_trampoline as usize);
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
-    // println!{"restore_va: {}", restore_va}
-    //let sched:usize = {
-    //    if user_satp != G_SATP.lock().get() {
-    //        //println!("{:X}  {:X}", user_satp, G_SATP.lock().get());
-    //        1
-    //    } else {
-    //        0
-    //    }
-    //};
     unsafe {
         //llvm_asm!("fence.i" :::: "volatile");
         // WARNING: here, we make a2 = __signal_trampoline, because otherwise the "__signal_trampoline" func will be optimized to DEATH

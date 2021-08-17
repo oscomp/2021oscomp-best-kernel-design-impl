@@ -90,48 +90,41 @@ lazy_static! {
 
 #[no_mangle]
 pub fn rust_main() -> ! {
-    //let mut sp:usize;
-    //let mut tp:usize;
-    //unsafe {
-    //    llvm_asm!("mv $0, sp" : "=r"(sp));
-    //    llvm_asm!("mv $0, tp" : "=r"(tp));
-    //}
-    //println!("sp:{:x}",sp);
-    //println!("tp:{:x}",tp);
-    //println!("enter kernel");
-        // println!("[core 2] Hello, world!");
     let core = id();
-    // println!("get id = {}", core);
+    // println!("core {} is running",core);
     if core != 0 {
-        //println!("other core: {}", core);
         loop{}
-        //mm::init_othercore();
-        //trap::init();
-        //trap::enable_timer_interrupt();
-        //timer::set_next_trigger();
-        //task::run_tasks();
-        //panic!("Unreachable in rust_main!");
+        /// WARNING: Multicore mode only supports customized RustSBI platform, especially not including OpenSBI
+        /// We use OpenSBI in qemu and customized RustSBI in k210, if you want to try Multicore mode, you have to
+        /// try to switch to RustSBI in qemu and try to wakeup, which needs some effort and you can refer to docs.
+        // while !CORE2_FLAG.lock().is_in(){}
+        mm::init_othercore();
+        println!("other core start");
+        trap::init();
+        trap::enable_timer_interrupt();
+        timer::set_next_trigger();
+        println!("other core start run tasks");
+        task::run_tasks();
+        panic!("Unreachable in rust_main!");
     }
-    //println!("clear bss");
     clear_bss();
-    //println!("init mm");
     mm::init();
-    //println!("init mm ... ok");
     mm::remap_test();
-    //fs::stdio::init();
+    println!("UltraOS: memory initialized");
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    
+    println!("UltraOS: interrupt initialized");
     fs::init_rootfs();
-    //fs::list_apps();
-    //println!("init fs");
-    //prints!("init fs");
+    println!("UltraOS: fs initialized");
     task::add_initproc();
+    println!("UltraOS: task initialized");
+    println!("UltraOS: wake other cores");
     let mask:usize = 1 << 1;
     sbi_send_ipi(&mask as *const usize as usize);
     // CORE2_FLAG.lock().set_in();
-    test();
+    // test();
+    println!("UltraOS: run tasks");
     task::run_tasks();
     panic!("Unreachable in rust_main!");
 }

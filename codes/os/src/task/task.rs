@@ -616,15 +616,11 @@ impl TaskControlBlock {
     }
     
     pub fn check_lazy(&self, va: VirtAddr, is_load: bool) -> isize {
-        // println!{"into check lazy..."}
-        // println!{"The checking addr is {:?}", va};
         let vpn: VirtPageNum = va.floor();
         let heap_base = self.acquire_inner_lock().heap_start;
         let heap_pt = self.acquire_inner_lock().heap_pt;
         let stack_top = self.acquire_inner_lock().base_size;
         let stack_bottom = stack_top - USER_STACK_SIZE;
-        // println!{"The base of the user stack: {:X} ~ {:X}", stack_bottom, stack_top};
-        // println!{"============================{:?}", vpn}
         let mmap_start = self.acquire_inner_lock().mmap_area.mmap_start;
         let mmap_end = self.acquire_inner_lock().mmap_area.mmap_top;
 
@@ -684,30 +680,18 @@ impl TaskControlBlock {
         
         if start != 0 { // "Start" va Already mapped
             while startvpn < (start+len)/PAGE_SIZE {
-                // println!("[mmap]:map_flags 0x{:X}",map_flags);
-                // inner.memory_set.print_pagetable();
                 if inner.memory_set.set_pte_flags(startvpn.into(), map_flags as usize) == -1{
                     panic!("mmap: start_va not mmaped");
                 }
-                // inner.memory_set.print_pagetable();
                 startvpn +=1;
             }
             return start;
         }
         else{ // "Start" va not mapped
-            //println!("[insert_mmap_area]: va_top 0x{:X} end_va 0x{:X}", va_top.0, end_va.0);
-            // println!("[insert_mmap_area]: flags 0x{:X}",flags);
-            // println!("[insert_mmap_area]: map_flags 0x{:X}",map_flags);
-            // println!("[insert_mmap_area]: map_flags {:?}",MapPermission::from_bits(map_flags).unwrap());
-            // inner.memory_set.print_pagetable();
-            // println!{"pin1"}
             inner.memory_set.insert_kernel_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
             //inner.memory_set.insert_mmap_area(va_top, end_va, MapPermission::from_bits(map_flags).unwrap());
-            // inner.memory_set.print_pagetable();
-            // println!{"pin2"}
             inner.mmap_area.push_kernel(va_top.0, len, prot, flags, fd, off, fd_table, token);
             //inner.mmap_area.push(va_top.0, len, prot, flags, fd, off, fd_table, token);
-            // println!{"pin3"}
             va_top.0
         }
     }
@@ -729,17 +713,7 @@ impl TaskControlBlock {
         let token = ks_lock.token();
         let va_top = kma_lock.get_mmap_top();
         let end_va = VirtAddr::from(va_top.0 + len);
-        // println!("vatop = 0x{:X}, end_va = 0x{:X}", va_top.0, end_va.0);
         ks_lock.insert_kernel_mmap_area(va_top, end_va,  MapPermission::W | MapPermission::R );
-        // let page_table = PageTable::from_token(KERNEL_TOKEN.token());
-        // println!("pte = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().bits);
-        //println!("ppn = 0x{:X}", page_table.translate(VirtAddr::from(MMAP_BASE).floor()).unwrap().ppn().0);
-        //point();
-        //ks_lock.activate();
-        //unsafe{
-        //    *(MMAP_BASE as *mut usize) = 5;
-        //}
-    
         kma_lock.push_kernel(va_top.into(), len, prot, flags, fd, off, fd_table, token)
     }
 

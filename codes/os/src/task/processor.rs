@@ -17,7 +17,7 @@ pub fn get_core_id() -> usize{
     unsafe {
         llvm_asm!("mv $0, tp" : "=r"(tp));
     }
-    //tp
+    // tp
     0
 }
 
@@ -72,8 +72,7 @@ impl Processor {
         loop{
             // True: Not first time to fetch a task 
             if let Some(current_task) = take_current_task(){
-                //println!("try lock");
-                gdb_print!(PROCESSOR_ENABLE,"[run:pid{}]",current_task.pid.0);
+                gdb_print!(PROCESSOR_ENABLE,"[hart {} run:pid{}]", get_core_id(), current_task.pid.0);
                 let mut current_task_inner = current_task.acquire_inner_lock();
                 //println!("get lock");
                 let task_cx_ptr2 = current_task_inner.get_task_cx_ptr2();
@@ -96,12 +95,8 @@ impl Processor {
 
                     // Change status to Ready
                     current_task_inner.task_status = TaskStatus::Ready;
-                    // if current_task.pid.0 >1 {
-                    //     current_task_inner.memory_set.print_pagetable();
-                    // }
                     drop(current_task_inner);
                     add_task(current_task);
-                    // drop(current_task);
                     ////////// current task  /////////
                     unsafe {
                         __switch(
@@ -111,16 +106,8 @@ impl Processor {
                     }
                 }
                 else{
-                    //print!("[no ready process]");
-                    // if current_task.pid.0 >1 {
-                    //     current_task_inner.memory_set.print_pagetable();
-
-                    // }
                     drop(current_task_inner);
-                    //println!("drop lock2");
                     self.inner.borrow_mut().current = Some(current_task);
-                    // drop(current_task);
-
                     unsafe {
                         __switch(
                             idle_task_cx_ptr2,
@@ -135,15 +122,9 @@ impl Processor {
                 if let Some(task) = fetch_task() {
                     // acquire
                     let idle_task_cx_ptr2 = self.get_idle_task_cx_ptr2();
-                    // println!("*1");
                     let mut task_inner = task.acquire_inner_lock();
-                    // println!("*2");
                     let next_task_cx_ptr2 = task_inner.get_task_cx_ptr2();
                     task_inner.task_status = TaskStatus::Running;
-                    // if task.pid.0 >1 {
-                    //     task_inner.memory_set.print_pagetable();
-
-                    // }
                     task_inner.memory_set.activate();// change satp
                     // release
                     drop(task_inner);
@@ -228,11 +209,7 @@ pub fn get_kernel_runtime_usec() -> usize{
 
 pub fn schedule(switched_task_cx_ptr2: *const usize) {
     let core_id: usize = get_core_id();
-    //println!("core {} still alive", core_id);    
     let idle_task_cx_ptr2 = PROCESSOR_LIST[core_id].get_idle_task_cx_ptr2();
-    // if PROCESSOR_LIST[core_id].current().unwrap().pid.0 > 1{
-    //     PROCESSOR_LIST[core_id].current().unwrap().acquire_inner_lock().memory_set.print_pagetable();
-    // }
     unsafe {
         __switch(
             switched_task_cx_ptr2,
