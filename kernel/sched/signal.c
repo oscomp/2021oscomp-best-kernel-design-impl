@@ -196,7 +196,17 @@ void sighandle(void) {
 
 	struct sig_frame *frame;
 	struct trapframe *tf;
+	ksigaction_t *sigact;
+	
 start_handle: 
+	sigact = __search_sig(p, signum);
+
+	if (SIGCHLD == signum) {
+		if (NULL == sigact || NULL == sigact->sigact.__sigaction_handler.sa_handler)
+			return;
+		// printf("handler %p\n", sigact->sigact.__sigaction_handler.sa_handler);
+	}
+
 	frame = kmalloc(sizeof(struct sig_frame));
 	__assert("sigdetect", NULL != frame, "alloc frame failed\n");
 
@@ -204,7 +214,6 @@ start_handle:
 	__assert("sigdetect", NULL != tf, "alloc tf failed\n");
 
 	// search for signal handler 
-	ksigaction_t *sigact = __search_sig(p, signum);
 
 	// copy mask 
 	for (int i = 0; i < SIGSET_LEN; i ++) {
@@ -222,7 +231,7 @@ start_handle:
 	tf->epc = (uint64)(SIG_TRAMPOLINE + ((uint64)sig_handler - (uint64)sig_trampoline));
 	tf->sp = p->trapframe->sp;
 	tf->a0 = signum;
-	if (NULL != sigact) {
+	if (NULL != sigact && sigact->sigact.__sigaction_handler.sa_handler) {
 		tf->a1 = (uint64)(sigact->sigact.__sigaction_handler.sa_handler);
 	}
 	else {

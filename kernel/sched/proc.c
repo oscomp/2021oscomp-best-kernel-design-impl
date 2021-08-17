@@ -432,7 +432,10 @@ void exit(int xstate) {
 	release(&p->lk);
 
 	__debug_info("exit", "%d exit %d\n", p->pid, xstate);
-
+	p->parent->sig_pending.__val[0] |= 1ul << SIGCHLD;
+	if (0 == p->parent->killed || SIGCHLD < p->parent->killed) {
+		p->parent->killed = SIGCHLD;
+	}
 	// by holding parent's lock, parent cannot re-parent child
 	acquire(&p->parent->lk);
 

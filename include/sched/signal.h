@@ -16,6 +16,7 @@
 #define SIGQUIT		3
 #define SIGILL		4
 #define SIGTRAP		5
+#define SIGCHLD		17
 
 // Signal Flags
 #define SA_NOCLDSTOP	0x00000001
