@@ -150,10 +150,10 @@ OBJ := $(addsuffix .o, $(OBJ))
 # Generate binary file to burn onto k210
 all: $T/kernel $(SBI) 
 ifeq ($(platform), k210) 
-	# @$(OBJCOPY) $T/kernel --strip-all -O binary $T/kernel.bin
-	# @$(OBJCOPY) $(SBI) --strip-all -O binary $T/k210.bin
-	# @dd if=$T/kernel.bin of=$T/k210.bin bs=128k seek=1
-	# cp $T/k210.bin ./k210.bin
+	@$(OBJCOPY) $T/kernel --strip-all -O binary $T/kernel.bin
+	@$(OBJCOPY) $(SBI) --strip-all -O binary $T/k210.bin
+	@dd if=$T/kernel.bin of=$T/k210.bin bs=128k seek=1
+	cp $T/k210.bin ./k210.bin
 	@sudo chmod 777 $(k210-serialport)
 	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t ./k210.bin
 endif 
