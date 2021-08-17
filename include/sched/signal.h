@@ -57,13 +57,15 @@ typedef struct __ksigaction_t {
 int set_sigaction(
 	int signum, 
 	struct sigaction const *act, 
-	struct sigaction *oldact
+	struct sigaction *oldact, 
+	int len
 );
 
 int sigprocmask(
 	int how, 
 	__sigset_t *set, 
-	__sigset_t *oldset
+	__sigset_t *oldset, 
+	int len
 );
 
 struct sig_frame {

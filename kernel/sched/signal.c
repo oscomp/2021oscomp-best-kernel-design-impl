@@ -43,14 +43,19 @@ static ksigaction_t *__search_sig(struct proc *p, int signum) {
 int set_sigaction(
 	int signum, 
 	struct sigaction const *act, 
-	struct sigaction *oldact
+	struct sigaction *oldact, 
+	int len
 ) {
 	struct proc *p = myproc();
 
 	ksigaction_t *tmp = __search_sig(p, signum);
 
 	if (NULL != oldact && NULL != tmp) {
-		*oldact = tmp->sigact;
+		oldact->__sigaction_handler = tmp->sigact.__sigaction_handler;
+		oldact->sa_flags = tmp->sigact.sa_flags;
+		for (int i = 0; i < len; i ++) {
+			oldact->sa_mask.__val[i] = tmp->sigact.sa_mask.__val[i];
+		}
 	}
 
 	if (NULL != act) {
@@ -58,16 +63,14 @@ int set_sigaction(
 			// insert a new action into the proc 
 			ksigaction_t *new = kmalloc(sizeof(ksigaction_t));
 			__debug_assert("set_sigaction", NULL != new, "alloc error\n");
-
-			new->sigact = *act;
-			new->signum = signum;
-
 			__insert_sig(p, new);
-
-
+			tmp = new;
 		}
-		else {
-			tmp->sigact = *act;
+
+		tmp->sigact.sa_flags = act->sa_flags;
+		tmp->sigact.__sigaction_handler = act->__sigaction_handler;
+		for (int i = 0; i < len; i ++) {
+			tmp->sigact.sa_mask.__val[i] = act->sa_mask.__val[i];
 		}
 	}
 
@@ -77,13 +80,14 @@ int set_sigaction(
 int sigprocmask(
 	int how, 
 	__sigset_t *set, 
-	__sigset_t *oldset
+	__sigset_t *oldset, 
+	int len
 ) {
 	struct proc *p = myproc();
 
 	__debug_assert("sigprocmask", NULL != p, "p == NULL\n");
 
-	for (int i = 0; i < SIGSET_LEN; i ++) {
+	for (int i = 0; i < len; i ++) {
 		if (NULL != oldset) {
 			oldset->__val[i] = p->sig_set.__val[i];
 		}
@@ -197,14 +201,17 @@ void sighandle(void) {
 	struct sig_frame *frame;
 	struct trapframe *tf;
 	ksigaction_t *sigact;
-	
 start_handle: 
+	// search for signal handler 
 	sigact = __search_sig(p, signum);
 
-	if (SIGCHLD == signum) {
-		if (NULL == sigact || NULL == sigact->sigact.__sigaction_handler.sa_handler)
+	// fast skip 
+	// if (NULL == sigact && SIGCHLD == signum) {
+	// 	return ;
+	// }
+	if (SIGCHLD == signum && 
+		(NULL == sigact || NULL == sigact->sigact.__sigaction_handler.sa_handler)) {
 			return;
-		// printf("handler %p\n", sigact->sigact.__sigaction_handler.sa_handler);
 	}
 
 	frame = kmalloc(sizeof(struct sig_frame));
@@ -212,8 +219,6 @@ start_handle:
 
 	tf = kmalloc(sizeof(struct trapframe));
 	__assert("sigdetect", NULL != tf, "alloc tf failed\n");
-
-	// search for signal handler 
 
 	// copy mask 
 	for (int i = 0; i < SIGSET_LEN; i ++) {

@@ -87,7 +87,7 @@ void *mmap(void *start, int len, int prot, int flags, int fd, int off);
 int munmap(void *start, int len);
 void sync(void);
 
-void rt_sigaction(int signum, struct sigaction const *act, struct sigaction *oldact);
+void rt_sigaction(int signum, struct sigaction const *act, struct sigaction *oldact, int len);
 void rt_sigprocmask(int how, __sigset_t *set, __sigset_t *oldset);
 
 // ulib.c

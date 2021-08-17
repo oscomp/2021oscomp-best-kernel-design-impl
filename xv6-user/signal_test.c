@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 			sigact.sa_mask.__val[i] = 0;
 		}
 
-	rt_sigaction(sig, &sigact, NULL);
+	rt_sigaction(sig, &sigact, NULL, 8);
 
 	int pid = fork();
 	if (0 == pid) {
