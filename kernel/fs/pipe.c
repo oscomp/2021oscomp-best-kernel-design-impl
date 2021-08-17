@@ -14,6 +14,7 @@
 #include "fs/pipe.h"
 #include "mm/kmalloc.h"
 #include "mm/vm.h"
+#include "mm/pm.h"
 #include "utils/debug.h"
 #include "errno.h"
 #include "fs/poll.h"
@@ -43,7 +44,8 @@ pipealloc(struct file **pf0, struct file **pf1)
 
 	if ((f0 = filealloc()) == NULL ||
 		(f1 = filealloc()) == NULL ||
-		(pi = kmalloc(sizeof(struct pipe))) == NULL)
+		//  (pi = kmalloc(sizeof(struct pipe))) == NULL)
+		(pi = allocpage()) == NULL)
 	{
 		goto bad;
 	}
@@ -75,7 +77,10 @@ pipealloc(struct file **pf0, struct file **pf1)
 
  bad:
 	if (pi)
-		kfree(pi);
+		// kfree(pi);
+	{
+		freepage(pi);
+	}
 	if (f0)
 		fileclose(f0);
 	if (f1)
@@ -149,7 +154,8 @@ pipeclose(struct pipe *pi, int writable)
 	}
 	if (pi->readopen == 0 && pi->writeopen == 0) {
 		release(&pi->lock);
-		kfree(pi);
+		// kfree(pi);
+		freepage(pi);
 	} else
 		release(&pi->lock);
 }

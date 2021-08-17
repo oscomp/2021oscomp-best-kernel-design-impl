@@ -33,7 +33,8 @@
 
 typedef void (*__sighandler_t)(int);
 
-#define SIGSET_LEN 		16
+// #define SIGSET_LEN 		16
+#define SIGSET_LEN 		1
 typedef struct {
 	unsigned long __val[SIGSET_LEN];
 } __sigset_t;

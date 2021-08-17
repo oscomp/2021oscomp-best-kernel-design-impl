@@ -801,8 +801,10 @@ void sdcard_write_start(void)
 	struct buf *b = container_of(dl, struct buf, list);
 	int nbuf = 1;
 
+	#define __NBUF_WRITE	32
+
 	uint32 sec = b->sectorno;
-	for (dl = dl->next; dl != &sd_wqueue.head && nbuf < 8; dl = dl->next) {
+	for (dl = dl->next; dl != &sd_wqueue.head && nbuf < __NBUF_WRITE; dl = dl->next) {
 		struct buf *next = container_of(dl, struct buf, list);
 		if (next->sectorno == ++sec)	// consecutive sector
 			nbuf++;
@@ -920,7 +922,7 @@ void sdcard_intr(void)
 		uint32 sec = bnext->sectorno;
 
 		// preview the consecutive count
-		for (dl = dl->next; dl != &sd_wqueue.head && nbuf < 8; dl = dl->next) {
+		for (dl = dl->next; dl != &sd_wqueue.head && nbuf < __NBUF_WRITE; dl = dl->next) {
 			struct buf *next = container_of(dl, struct buf, list);
 			if (next->sectorno == ++sec)	// consecutive sector
 				nbuf++;
