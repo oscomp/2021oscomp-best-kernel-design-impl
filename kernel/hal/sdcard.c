@@ -681,22 +681,22 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 						b->sectorno << 9 :
 						b->sectorno;
 
-	int ret;
-	sd_send_cmd(SD_CMD55, 0, 0);
-	ret = sd_get_response_R1();
-	sd_end_cmd();
-	if (ret != 0) {
-		printf(__ERROR("CMD55")" error\n");
-		return -EIO;
-	}
+	// int ret;
+	// sd_send_cmd(SD_CMD55, 0, 0);
+	// ret = sd_get_response_R1();
+	// sd_end_cmd();
+	// if (ret != 0) {
+	// 	printf(__ERROR("CMD55")" error\n");
+	// 	return -EIO;
+	// }
 
-	sd_send_cmd(SD_ACMD23, nbuf, 0);
-	ret = sd_get_response_R1();
-	sd_end_cmd();
-	if (ret != 0) {
-		printf(__ERROR("ACMD23")" error\n");
-		return -EIO;
-	}
+	// sd_send_cmd(SD_ACMD23, nbuf, 0);
+	// ret = sd_get_response_R1();
+	// sd_end_cmd();
+	// if (ret != 0) {
+	// 	printf(__ERROR("ACMD23")" error\n");
+	// 	return -EIO;
+	// }
 
 	sd_send_cmd(SD_CMD25, address, 0);
 	if (sd_get_response_R1() != 0) {
@@ -718,6 +718,8 @@ static void sdcard_multiple_write_wait(void)
 {
 	dmac_ch_clear_intr(DMAC_CHANNEL0, 0);
 	spi_send_data_dma_clean_up(SPI_DEVICE_0);
+
+	intr_on();
 
 	uint8 dummy_crc[2] = {0xff, 0xff};
 	sd_write_data(dummy_crc, 2);

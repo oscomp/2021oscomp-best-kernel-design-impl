@@ -780,8 +780,10 @@ int do_msync(uint64 addr, uint64 len, int flags)
 		return 0;
 
 	// MS_INVALIDATE does nothing on our system
-	if (!(flags & (MS_ASYNC|MS_SYNC)))
-		goto out;
+	if (!(flags & (MS_ASYNC|MS_SYNC))) {
+		// goto out;
+		return -1;
+	}
 
 	struct file *f = MMAP_FILE(s->mmap);
 	struct inode *ip = f->ip;
