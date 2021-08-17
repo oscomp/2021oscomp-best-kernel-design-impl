@@ -153,6 +153,8 @@ ifeq ($(platform), k210)
 	@$(OBJCOPY) $(SBI) --strip-all -O binary $T/k210.bin
 	@dd if=$T/kernel.bin of=$T/k210.bin bs=128k seek=1
 	cp $T/k210.bin ./k210.bin
+	@sudo chmod 777 $(k210-serialport)
+	@python3 ./tools/kflash.py -p $(k210-serialport) -b 1500000 -t ./k210.bin
 endif 
 
 # Compile Kernel

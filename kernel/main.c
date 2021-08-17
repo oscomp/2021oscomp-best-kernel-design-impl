@@ -65,7 +65,8 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		// we need IPI to wake up other hart(s)
 		for (int i = 1; i < NCPU; i ++) {
 			unsigned long mask = 1 << i;
-			struct sbiret res = sbi_send_ipi(mask, 0);
+			// struct sbiret res = sbi_send_ipi(mask, 0);
+			sbi_send_ipi(mask, 0);
 			__debug_assert("main", SBI_SUCCESS == res.error, "sbi_send_ipi failed");
 		}
 		__sync_synchronize();

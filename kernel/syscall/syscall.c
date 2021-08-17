@@ -358,7 +358,7 @@ syscall(void)
 		}
 		
 	} else {
-		printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
+		// printf(__ERROR("pid %d %s: unknown syscall %d")"\n", p->pid, p->name, num);
 		p->trapframe->a0 = -1;
 	}
 }

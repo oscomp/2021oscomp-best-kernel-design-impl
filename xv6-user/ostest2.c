@@ -14,6 +14,11 @@ char *argv[] = {
 	0
 };
 
+char *envp[] = {
+	"PATH=/",
+	0
+};
+
 int main(void) {
 	open("/dev/console", O_RDWR);
 	dup(0);
@@ -21,7 +26,7 @@ int main(void) {
 
 	int pid = fork();
 	if (0 == pid) {
-		exec("busybox", argv);
+		execve("busybox", argv, envp);
 	}
 	else {
 		while (1) {
