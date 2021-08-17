@@ -28,6 +28,7 @@
 #endif 
 
 // set the interval as 50ms 
-#define INTERVAL 		(CLK_FREQ / 20)
+// #define INTERVAL 		(CLK_FREQ / 20)
+#define INTERVAL			CLK_FREQ
 
 #endif

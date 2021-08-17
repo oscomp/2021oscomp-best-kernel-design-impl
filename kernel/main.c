@@ -89,7 +89,10 @@ main(unsigned long hartid, unsigned long dtb_pa)
 	// shrink the boot stack
 	extern char boot_stack[];
 	uint64 kstack = (uint64)boot_stack + hartid * 4 * PGSIZE;
-	freepage_n(kstack, 3);
+	// freepage_n(kstack, 3);
+	for (int i = 0; i < 3; i ++) {
+		freepage(kstack + PGSIZE * i);
+	}
 
 	scheduler();
 }
