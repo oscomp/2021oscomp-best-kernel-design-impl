@@ -13,8 +13,8 @@ TOOLPREFIX 	:= riscv64-unknown-elf-
 # TOOLPREFIX	:= riscv64-linux-gnu-
 CC 		:= $(TOOLPREFIX)gcc
 AS		:= $(TOOLPREFIX)gas
-# LD		:= $(TOOLPREFIX)ld
-LD 		:= $(TOOLPREFIX)gcc
+LD		:= $(TOOLPREFIX)ld
+# LD 		:= $(TOOLPREFIX)gcc
 OBJCOPY	:= $(TOOLPREFIX)objcopy
 OBJDUMP	:= $(TOOLPREFIX)objdump
 
@@ -22,7 +22,7 @@ QEMU	:= qemu-system-riscv64
 
 # flags
 # CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -g
-CFLAGS = -Wall -O -fno-omit-frame-pointer -ggdb -g -mabi=lp64d -march=rv64imafdc
+CFLAGS = -Wall -O -fno-omit-frame-pointer -ggdb -g -march=rv64imafdc
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
@@ -109,7 +109,6 @@ SRC	+= \
 	$K/syscall/syssignal.c \
 	$K/syscall/systime.c \
 	$K/syscall/sysuname.c \
-	$K/trap/fcntxt.S \
 	$K/trap/kernelvec.S \
 	$K/trap/trampoline.S \
 	$K/trap/sig_trampoline.S \
@@ -119,6 +118,7 @@ SRC	+= \
 	$K/utils/string.c \
 	$K/hal/plic.c \
 	$K/hal/disk.c
+# $K/trap/fcntxt.S 
 
 ifeq ($(platform), k210) 
 SRC += \

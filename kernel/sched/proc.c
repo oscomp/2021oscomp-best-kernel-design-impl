@@ -330,7 +330,7 @@ int clone(uint64 flag, uint64 stack) {
 
 	// copy parent's trapframe 
 	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
-		floatstore(p->trapframe);
+		((floattrap)floatstore)(p->trapframe);
 		w_sstatus_fs(SSTATUS_FS_CLEAN);
 	}
 	*(np->trapframe) = *(p->trapframe);
@@ -717,7 +717,7 @@ void sched(void) {
 	// save floating-point registers
 	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {
 		// printf(__INFO("sched")"floatstore, pid=%d, name=%s\n", p->pid, p->name);
-		floatstore(p->trapframe);
+		((floattrap)floatstore)(p->trapframe);
 		w_sstatus_fs(SSTATUS_FS_CLEAN);
 	}
 	
@@ -733,7 +733,7 @@ void sched(void) {
 	// if (r_sstatus_fs() == SSTATUS_FS_DIRTY)
 	// 	panic("sched out with dirty floating-point registers");
 
-	floatload(p->trapframe);
+	((floattrap)floatload)(p->trapframe);
 	w_sstatus_fs(SSTATUS_FS_CLEAN);
 }
 

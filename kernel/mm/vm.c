@@ -31,9 +31,10 @@ static uint8 page_ref_table[MAX_PAGES_NUM];  // user pages ref, for COW fork mec
 // back to this point when fail to handle a page fault
 static uint64 save_point = 0;
 
-extern char etext[];  // kernel.ld sets this to end of kernel code.
+// extern char etext[];  // kernel.ld sets this to end of kernel code.
 extern char trampoline[]; // trampoline.S
 extern char kernel_end[]; // first address after kernel.
+extern char extratext[];
 /*
  * create a direct-map page table for the kernel.
  */
@@ -102,9 +103,9 @@ kvminit()
 	// map rustsbi
 	// kvmmap(RUSTSBI_BASE, RUSTSBI_BASE, KERNBASE - RUSTSBI_BASE, PTE_R | PTE_X);
 	// map kernel text executable and read-only.
-	kvmmap(KERNBASE, KERNBASE, (uint64)etext - KERNBASE, PTE_R | PTE_X);
+	kvmmap(KERNBASE, KERNBASE, (uint64)extratext - KERNBASE, PTE_R | PTE_X);
 	// map kernel data and the physical RAM we'll make use of.
-	kvmmap((uint64)etext, (uint64)etext, PHYSTOP - (uint64)etext, PTE_R | PTE_W);
+	kvmmap((uint64)extratext, (uint64)extratext, PHYSTOP - (uint64)extratext, PTE_R | PTE_W);
 	// map the trampoline for trap entry/exit to
 	// the highest virtual address in the kernel.
 	kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);

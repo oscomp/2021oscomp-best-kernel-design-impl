@@ -31,6 +31,11 @@ SECTIONS
     rodata_start = .;
     .rodata : {
         srodata = .;
+         *(.rodata.floatload)
+        . = ALIGN(4);
+        *(.rodata.floatstore)
+        . = ALIGN(4K);
+        extratext = .;
         *(.rodata .rodata.*)
         erodata = .;
     }

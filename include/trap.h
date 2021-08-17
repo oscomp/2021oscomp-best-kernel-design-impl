@@ -93,7 +93,11 @@ struct trapframe {
 void            trapinithart(void);
 void            usertrapret(void);
 void            trapframedump(struct trapframe *tf);
-void			floatstore(struct trapframe *tf);
-void			floatload(struct trapframe *tf);
+
+// void			floatstore(struct trapframe *tf);
+// void			floatload(struct trapframe *tf);
+typedef void (*floattrap)(struct trapframe*);
+extern uchar const floatstore[];
+extern uchar const floatload[];
 
 #endif
