@@ -553,8 +553,8 @@ static int mmap_file(struct seg *s, uint64 len, int flags, struct file *f, int64
 
 	uint64 n;
 	struct mmap_page *map;
-	struct rb_node *parent;
-	struct rb_node **plink;
+	struct rb_node *parent = NULL;
+	struct rb_node **plink = NULL;
 
 	acquire(&ip->ilock);
 	for (n = 0; n < len; n += PGSIZE) {
@@ -610,8 +610,8 @@ static int mmap_anonymous(struct seg *s, int flags)
 
 	uint64 off;
 	struct mmap_page *map;
-	struct rb_node *parent;
-	struct rb_node **plink;
+	struct rb_node *parent = NULL;
+	struct rb_node **plink = NULL;
 
 	/**
 	 * Build a mmap pages tree at the beginning, the tree nodes
