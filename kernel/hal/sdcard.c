@@ -698,6 +698,8 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 	// 	return -EIO;
 	// }
 
+	printf("nbuf = %d, sectorno = %d\n", nbuf, b->sectorno);
+
 	sd_send_cmd(SD_CMD25, address, 0);
 	if (sd_get_response_R1() != 0) {
 		sd_end_cmd();
