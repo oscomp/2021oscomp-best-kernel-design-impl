@@ -125,14 +125,14 @@ static struct mmap_page *get_mmap_with_parent(struct rb_root *root,
 	return NULL;
 }
 
-static struct mmap_page *next_mmap_page(struct mmap_page *map)
+static struct mmap_page *get_adjacent_page(struct mmap_page *map, int prev)
 {
-	struct rb_node *next;
-	next = rb_next(&map->rb);
-	if (!next)
+	struct rb_node *node;
+	node = prev ? rb_prev(&map->rb) : rb_next(&map->rb);
+	if (!node)
 		return NULL;
 
-	return rb_entry(next, struct mmap_page, rb);
+	return rb_entry(node, struct mmap_page, rb);
 }
 
 /**
@@ -182,7 +182,7 @@ static void __file_mmapdel(struct seg *seg, int sync)
 		
 		__debug_info("__file_mmapdel", "v=%d, off=%p, len=%d\n",
 					map->valid, off, map->f_len);
-		if (sync && map->pa && off < ip->size) {
+		if (sync && (seg->flag & PTE_W) && map->pa && off < ip->size) {
 			uint64 len = (ip->size - off < map->f_len) ?
 							ip->size - off : map->f_len;
 			release(&ip->ilock);
@@ -232,7 +232,7 @@ static void __anon_mmapdup(struct seg *seg)
 		if (map == NULL || map->f_off != off)
 			panic("__anon_mmapdup: no map node\n");
 		map->ref++;
-		map = next_mmap_page(map);
+		map = get_adjacent_page(map, 0);
 	}
 	release(&fp->lock);
 
@@ -256,7 +256,7 @@ static void __file_mmapdup(struct seg *seg)
 			panic("__file_mmapdup: no map node\n");
 		
 		map->ref++;
-		map = next_mmap_page(map);
+		map = get_adjacent_page(map, 0);
 	}
 	release(&ip->ilock);
 
@@ -851,6 +851,74 @@ static int handle_anonymous_shared(uint64 badaddr, struct seg *s)
 	return 0;
 }
 
+static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
+{
+	struct proc *p = myproc();
+	struct seg *s = locateseg(p->segment, badaddr);
+	uint64 start = s->f_off;	// start offset
+	uint64 end = start + s->sz;	// end offset
+	void *page = NULL;
+
+	if (s->sz == PGSIZE)		// can't spare any page
+		return NULL;
+
+	acquire(&ip->ilock);
+
+	uint64 off = (foff == start) ? end - PGSIZE : foff - PGSIZE;
+	struct mmap_page *map = get_mmap_page(&ip->mapping, off);
+	int miss = 0, free = 0;
+
+	while (off != foff)
+	{
+		if (map->ref == 1 && map->pa) {	// only us
+			void *victim = map->pa;
+			map->pa = NULL;
+			release(&ip->ilock);
+
+			ilock(ip);
+			if ((s->flag & PTE_W) && map->valid && off < ip->size) {
+				uint64 len = (ip->size - off < map->f_len) ?
+								ip->size - off : map->f_len;
+				ip->fop->write(ip, 0, (uint64)victim, off, len);
+			}
+			map->valid = 0;
+			iunlock(ip);
+
+			unmappages(p->pagetable, s->addr + (off - s->f_off), 1, VM_USER|VM_FREE);
+			
+			if (pageput((uint64)victim) != 0)
+				panic("__page_file_swap: bad page ref");
+			if (!page)
+				page = victim;
+			else
+				freepage(victim);
+
+			free++;
+			miss = 0;
+
+			acquire(&ip->ilock);
+		} else {
+			miss++;
+			if (free >= 10 && miss >= 5) {		// enough
+				printf(__INFO("mmap file swap")" evict enough %d\n", free);
+				break;
+			}
+		}
+		if (off == start) {
+			off = end - PGSIZE;
+			map = get_mmap_page(&ip->mapping, off);
+		} else {
+			off -= PGSIZE;
+			map = get_adjacent_page(map, 1);
+		}
+		// if (!map || map->f_off != off)
+		// 	panic("__page_file_swap: bad map node");
+	}
+	release(&ip->ilock);
+
+	return page;
+}
+
 static int __page_file_read(struct inode *ip, uint64 off, uint64 page)
 {
 	if (off >= ip->size) {	// offset out of file size
@@ -895,14 +963,28 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 		 * So we use a 'valid' field and the sleeplock to sync this.
 		 */
 		if (map->pa == NULL) {
-			map->pa = allocpage();
-			if (map->pa == NULL) {
+			pa = allocpage();
+			if (pa == NULL) {
 				release(&ip->ilock);
-				return -ENOMEM;
+				pa = __page_file_swap(ip, off, badaddr);
+				if (pa == NULL)
+					return -ENOMEM;
+
+				acquire(&ip->ilock);
+				if (map->pa == NULL) {
+					pagereg((uint64)pa, 1);
+					map->pa = pa;
+				} else {
+					freepage(pa);
+					pa = map->pa;
+				}
+			} else {
+				pagereg((uint64)pa, 1);		// keep refs on shared mappings
+				map->pa = pa;
 			}
-			pagereg((uint64)map->pa, 1);	// keep refs on shared mappings
+		} else {
+			pa = map->pa;
 		}
-		pa = map->pa;
 		release(&ip->ilock);
 		
 		/**

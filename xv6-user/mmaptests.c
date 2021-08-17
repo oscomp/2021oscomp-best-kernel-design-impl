@@ -427,6 +427,73 @@ void ruinheap(char *testname)
     exit(0);
 }
 
+void mmaploop(char *testname)
+{
+    int fd = open("mmap_junk", O_CREATE|O_TRUNC|O_RDWR);
+    if (fd < 0) {
+        fprintf(2, "%s: open fail!\n", testname);
+        exit(1);
+    }
+
+    char *addr = mmap(NULL, 0x1000, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+    if ((int64)addr < 0) {
+        fprintf(2, "%s: mmap buf fail with %d!\n", testname, (int64)addr);
+        exit(1);
+    }
+    for (int i = 0; i < 128; i++) {
+        if (write(fd, addr, 0x1000) != 0x1000) {
+            fprintf(2, "%s: write fail!\n", testname);
+            exit(1);
+        }
+    }
+    munmap(addr, 0x1000);
+
+    for (int i = 0; i < 8; i++) {
+        addr = mmap(NULL, 128 * 0x1000, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+        for (int j = 0; j < 128 * 0x1000; j += 0x1000)
+            *(addr + j) = '0';
+        munmap(addr, 128 * 0x1000);
+    }
+    close(fd);
+    unlink("mmap_junk");
+    exit(0);
+}
+
+void mmapswap(char *testname)
+{
+    int fd = open("mmap_swap", O_CREATE|O_TRUNC|O_RDWR);
+    if (fd < 0) {
+        fprintf(2, "%s: open fail!\n", testname);
+        exit(1);
+    }
+
+    uint64 const filesz = 8 * 1024 * 1024;    // 8M
+    char *addr = mmap(NULL, 0x1000, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+    if ((int64)addr < 0) {
+        fprintf(2, "%s: mmap buf fail with %d!\n", testname, (int64)addr);
+        exit(1);
+    }
+    for (int i = 0; i < filesz / 0x1000; i++) {
+        if (write(fd, addr, 0x1000) != 0x1000) {
+            fprintf(2, "%s: write fail!\n", testname);
+            exit(1);
+        }
+    }
+    munmap(addr, 0x1000);
+
+    addr = mmap(NULL, filesz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    for (uint64 j = 0; j < filesz; j += 0x1000)
+        *(uint64 *)(addr + j) = j;
+    for (uint64 j = 0; j < filesz; j += 0x2000)
+        if (*(uint64 *)(addr + j) != j) {
+            fprintf(2, "%s: wrong data at offset %p\n", testname, j);
+            exit(1);
+        }
+    munmap(addr, filesz);
+    close(fd);
+    unlink("mmap_swap");
+    exit(0);
+}
 
 int run(void f(char *), char *s) {
     int pid;
@@ -468,6 +535,8 @@ int main(int argc, char *argv[]){
         { anonsharedrw, "anonsharedrw" },
         { shareprivate, "shareprivate" },
         { ruinheap, "ruinheap" },
+        { mmaploop, "mmaploop" },
+        { mmapswap, "mmapswap" },
         { 0, 0 },
     };
 
