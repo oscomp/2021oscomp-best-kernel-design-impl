@@ -47,8 +47,8 @@ struct file*
 filedup(struct file *f)
 {
 	acquire(&f->lock);
-	if(f->ref < 1)
-		panic("filedup");
+	// if(f->ref < 1)
+	// 	panic("filedup");
 	f->ref++;
 	release(&f->lock);
 	return f;
@@ -61,8 +61,8 @@ fileclose(struct file *f)
 	// struct file ff;
 
 	acquire(&f->lock);
-	if(f->ref < 1)
-		panic("fileclose");
+	// if(f->ref < 1)
+	// 	panic("fileclose");
 	if(--f->ref > 0){
 		release(&f->lock);
 		return;
@@ -360,8 +360,8 @@ void dropfdtable(struct fdtable *fdt)
 
 struct file *fd2file(int fd, int free)
 {
-	if (fd < 0)
-		panic("fd2file");
+	// if (fd < 0)
+	// 	panic("fd2file");
 
 	struct proc *p = myproc();
 	struct fdtable *head = &p->fds, *prev = NULL;
@@ -447,8 +447,8 @@ int fdalloc(struct file *f, int flag)
 
 int fdalloc3(struct file *f, int fd, int flag)
 {
-	if (fd < 0)
-		panic("fdalloc3");
+	// if (fd < 0)
+	// 	panic("fdalloc3");
 
 	__debug_info("fdalloc3", "in fd=%d flag=%d\n", fd, flag);
 	struct proc *p = myproc();
@@ -530,8 +530,8 @@ void fdcloexec(struct fdtable *fdt)
 // allocate one greater or equal to fd
 int fcntldup(struct file *f, int fd, int cloexec)
 {
-	if (fd < 0)
-		panic("fcntldup");
+	// if (fd < 0)
+	// 	panic("fcntldup");
 
 	struct proc *p = myproc();
 	struct fdtable *fdt = &p->fds, *prev = NULL;

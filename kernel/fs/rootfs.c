@@ -283,15 +283,27 @@ void rootfs_init()
 
 	if ((dir = create(NULL, "/dev", S_IFDIR)) == NULL)
 		panic("rootfs_init: on disk /dev");
+	iunlockput(dir);
+	dir = namei("/dev");
+	ilock(dir);
 	if (mountsysfs(&devfs, dir, "devfs") < 0)
 		panic("rootfs_init: mount devfs");
 	iunlockput(dir);
 
 	if ((dir = create(NULL, "/proc", S_IFDIR)) == NULL)
 		panic("rootfs_init: on disk /proc");
+	iunlockput(dir);
+	dir = namei("/proc");
+	ilock(dir);
 	if (mountsysfs(&procfs, dir, "procfs") < 0)
 		panic("rootfs_init: mount procfs");
 	iunlockput(dir);
+
+	if ((dir = create(NULL, "/bin", S_IFDIR)) == NULL)
+		panic("rootfs_init: on disk /bin");
+	iunlockput(dir);
+
+	syncfs();
 
 	__debug_info("rootfs_init", "done\n");
 }

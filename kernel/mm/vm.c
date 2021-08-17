@@ -43,10 +43,10 @@ kvminit()
 {
 	save_point = 0;
 
-	if (idlepages() > MAX_PAGES_NUM) {
-		pm_dump();
-		panic("kvminit: page_ref_table[] not enough");
-	}
+	// if (idlepages() > MAX_PAGES_NUM) {
+	// 	pm_dump();
+	// 	panic("kvminit: page_ref_table[] not enough");
+	// }
 
 	initlock(&page_ref_lock, "page_ref_lock");
 	memset(page_ref_table, 0, sizeof(page_ref_table));
@@ -138,14 +138,14 @@ static int __hash_page_idx(uint64 pa)
 {
 	extern char sig_trampoline[];
 
-	if (pa % PGSIZE || !(
-		(pa >= PGROUNDUP((uint64)kernel_end) && pa < PHYSTOP) || 
-		((uint64)sig_trampoline == pa)
-	)) {
-		__debug_error("__hash_page_idx", "%p not in [%p, %p]\n",
-					pa, PGROUNDUP((uint64)kernel_end), PHYSTOP);
-		panic("__hash_page");
-	}
+	// if (pa % PGSIZE || !(
+	// 	(pa >= PGROUNDUP((uint64)kernel_end) && pa < PHYSTOP) || 
+	// 	((uint64)sig_trampoline == pa)
+	// )) {
+	// 	__debug_error("__hash_page_idx", "%p not in [%p, %p]\n",
+	// 				pa, PGROUNDUP((uint64)kernel_end), PHYSTOP);
+	// 	panic("__hash_page");
+	// }
 	return (pa - PGROUNDUP((uint64)kernel_end)) >> PGSHIFT;
 }
 
@@ -212,8 +212,8 @@ pte_t *
 walk(pagetable_t pagetable, uint64 va, int alloc)
 {
 	
-	if(va >= MAXVA)
-		panic("walk");
+	// if(va >= MAXVA)
+	// 	panic("walk");
 
 	for(int level = 2; level > 0; level--) {
 		pte_t *pte = &pagetable[PX(level, va)];
@@ -258,8 +258,9 @@ walkaddr(pagetable_t pagetable, uint64 va)
 void
 kvmmap(uint64 va, uint64 pa, uint64 sz, int perm)
 {
-	if(mappages(kernel_pagetable, va, sz, pa, perm) != 0)
-		panic("kvmmap");
+	// if(mappages(kernel_pagetable, va, sz, pa, perm) != 0)
+	// 	panic("kvmmap");
+	mappages(kernel_pagetable, va, sz, pa, perm);
 }
 
 // translate a kernel virtual address to
@@ -280,12 +281,12 @@ kwalkaddr(pagetable_t kpt, uint64 va)
 	uint64 pa;
 	
 	pte = walk(kpt, va, 0);
-	if(pte == 0)
-		panic("kwalkaddr1");
-	if((*pte & PTE_V) == 0)
-		panic("kwalkaddr2");
-	if((*pte & PTE_U))
-		panic("kwalkaddr3");
+	// if(pte == 0)
+	// 	panic("kwalkaddr1");
+	// if((*pte & PTE_V) == 0)
+	// 	panic("kwalkaddr2");
+	// if((*pte & PTE_U))
+	// 	panic("kwalkaddr3");
 	pa = PTE2PA(*pte);
 	return pa+off;
 }
@@ -307,8 +308,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 	for(;;){
 		if((pte = walk(pagetable, a, 1)) == NULL)
 			return -1;
-		if(*pte & PTE_V)
-			panic("remap");
+		// if(*pte & PTE_V)
+		// 	panic("remap");
 		if (*pte & PTE_U) { // mprotect might take care of perm ahead
 			__debug_assert("mappages", PTE2PA(*pte) == NULL, "invalid page with ppn\n");
 			*pte |= PA2PTE(pa) | PTE_V;
@@ -337,8 +338,8 @@ unmappages(pagetable_t pagetable, uint64 va, uint64 npages, int flag)
 	uint64 a;
 	pte_t *pte;
 
-	if((va % PGSIZE) != 0)
-		panic("unmappages: not aligned");
+	// if((va % PGSIZE) != 0)
+	// 	panic("unmappages: not aligned");
 
 	int do_free = flag & VM_FREE;
 	int usr = flag & VM_USER;
@@ -356,8 +357,8 @@ unmappages(pagetable_t pagetable, uint64 va, uint64 npages, int flag)
 			 */
 			continue;
 		}
-		if(PTE_FLAGS(*pte) == PTE_V)
-			panic("unmappages: not a leaf");
+		// if(PTE_FLAGS(*pte) == PTE_V)
+		// 	panic("unmappages: not a leaf");
 		uint64 pa = PTE2PA(*pte);
 		if (do_free && (!usr || pageput(pa) == 0)) {
 			freepage((void*)pa);
@@ -392,8 +393,8 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 	char *mem;
 	extern char sig_trampoline[];
 
-	if(sz >= PGSIZE)
-		panic("inituvm: more than a page");
+	// if(sz >= PGSIZE)
+	// 	panic("inituvm: more than a page");
 	mem = allocpage();
 	memset(mem, 0, PGSIZE);
 	pagereg((uint64)mem, 0);	// mappages will increase it
@@ -477,9 +478,10 @@ freewalk(pagetable_t pagetable)
 			uint64 child = PTE2PA(pte);
 			freewalk((pagetable_t)child);
 			pagetable[i] = 0;
-		} else if(pte & PTE_V){
-			panic("freewalk: leaf");
-		}
+		} 
+		// else if(pte & PTE_V){
+		// 	panic("freewalk: leaf");
+		// }
 	}
 	freepage((void*)pagetable);
 }
@@ -615,10 +617,10 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 start, uint64 end, int cow)
 int
 uvmprotect(pagetable_t pagetable, uint64 va, uint64 len, int prot)
 {
-	if (va % PGSIZE || prot & ~(PTE_X|PTE_W|PTE_R)) {
-		__debug_error("uvmprotect", "va=%p, prot=0x%0x\n", va, prot);
-		panic("uvmprotect");
-	}
+	// if (va % PGSIZE || prot & ~(PTE_X|PTE_W|PTE_R)) {
+	// 	__debug_error("uvmprotect", "va=%p, prot=0x%0x\n", va, prot);
+	// 	panic("uvmprotect");
+	// }
 	
 	int protw = prot & PTE_W;
 	int fence = 0;

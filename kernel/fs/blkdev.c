@@ -89,8 +89,8 @@ static int img_clear_block(struct superblock *sb, uint64 sectorno, uint64 sector
 
 int disk_write_block(struct superblock *sb, int usr, char *src, uint64 sectorno, uint64 off, uint64 len)
 {
-	if (off + len > BSIZE)
-		panic("diskfs_write");
+	// if (off + len > BSIZE)
+	// 	panic("diskfs_write");
 
 	// __debug_info("diskfs_write", "sec:%d off:%d len:%d\n", sectorno, off, len);
 	struct buf *b;

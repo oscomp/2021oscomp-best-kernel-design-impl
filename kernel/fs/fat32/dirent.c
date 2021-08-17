@@ -106,10 +106,10 @@ static uint8 cal_checksum(uchar* shortname)
 int fat_make_entry(struct inode *dir, struct fat32_entry *ep, char *filename, uint off, int islong)
 {
 	struct fat32_entry *dp = i2fat(dir);
-	if (!(dp->attribute & ATTR_DIRECTORY))
-		panic("fat_make_entry: not dir");
-	if (off % sizeof(union fat_disk_entry))
-		panic("fat_make_entry: not aligned");
+	// if (!(dp->attribute & ATTR_DIRECTORY))
+	// 	panic("fat_make_entry: not dir");
+	// if (off % sizeof(union fat_disk_entry))
+	// 	panic("fat_make_entry: not aligned");
 
 	uint32 const bpc = sb2fat(dir->sb)->byts_per_clus;
 	uint32 clus;
@@ -207,8 +207,8 @@ struct inode *fat_alloc_entry(struct inode *dir, char *name, int mode)
 		return NULL;
 	}
 	struct fat32_entry *dp = i2fat(dir);
-	if (!(dp->attribute & ATTR_DIRECTORY))
-		panic("ealloc not dir");
+	// if (!(dp->attribute & ATTR_DIRECTORY))
+	// 	panic("ealloc not dir");
 
 	struct superblock *sb = dir->sb;
 	struct inode *ip;
@@ -409,10 +409,10 @@ int fat_read_entry(struct inode *dir, struct fat32_entry *ep, char *namebuf, uin
 		return -1;
 
 	struct fat32_entry *dp = i2fat(dir);
-	if (!(dp->attribute & ATTR_DIRECTORY))
-		panic("enext not dir");
-	if (off % 32)
-		panic("enext not align");
+	// if (!(dp->attribute & ATTR_DIRECTORY))
+	// 	panic("enext not dir");
+	// if (off % 32)
+	// 	panic("enext not align");
 
 	union fat_disk_entry de;
 	uint32 const bpc = sb2fat(dir->sb)->byts_per_clus;

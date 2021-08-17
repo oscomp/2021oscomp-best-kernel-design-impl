@@ -59,8 +59,8 @@ static void close_anonfile(struct anonfile *fp)
 	acquire(&fp->lock);
 	fp->ref--;
 	if (fp->ref == 0) {
-		if (fp->mapping.rb_node != NULL)
-			panic("close_anonfile: rbtree not empty");
+		// if (fp->mapping.rb_node != NULL)
+		// 	panic("close_anonfile: rbtree not empty");
 		release(&fp->lock);
 		__debug_info("close_anonfile", "free one: %p\n", fp);
 		kfree(fp);
@@ -151,8 +151,8 @@ static void __anon_mmapdel(struct seg *seg)
 	acquire(&fp->lock);
 	for (; off < end; off += PGSIZE) {
 		struct mmap_page *map = get_mmap_page(&fp->mapping, off);
-		if (map == NULL)
-			panic("__anon_mmapdel: no map node\n");
+		// if (map == NULL)
+		// 	panic("__anon_mmapdel: no map node\n");
 		
 		put_mmap_page(map, &fp->mapping);
 	}
@@ -177,8 +177,8 @@ static void __file_mmapdel(struct seg *seg, int sync)
 	acquire(&ip->ilock);
 	for (; off < end; off += PGSIZE) {
 		struct mmap_page *map = get_mmap_page(&ip->mapping, off);
-		if (map == NULL)
-			panic("__file_mmapdel: no map node\n");
+		// if (map == NULL)
+		// 	panic("__file_mmapdel: no map node\n");
 		
 		__debug_info("__file_mmapdel", "v=%d, off=%p, len=%d\n",
 					map->valid, off, map->f_len);
@@ -229,8 +229,8 @@ static void __anon_mmapdup(struct seg *seg)
 	acquire(&fp->lock);
 	struct mmap_page *map = get_mmap_page(&fp->mapping, off);
 	for (; off < end; off += PGSIZE) {
-		if (map == NULL || map->f_off != off)
-			panic("__anon_mmapdup: no map node\n");
+		// if (map == NULL || map->f_off != off)
+		// 	panic("__anon_mmapdup: no map node\n");
 		map->ref++;
 		map = get_adjacent_page(map, 0);
 	}
@@ -252,8 +252,8 @@ static void __file_mmapdup(struct seg *seg)
 	acquire(&ip->ilock);
 	struct mmap_page *map = get_mmap_page(&ip->mapping, off);
 	for (; off < end; off += PGSIZE) {
-		if (map == NULL || map->f_off != off)
-			panic("__file_mmapdup: no map node\n");
+		// if (map == NULL || map->f_off != off)
+		// 	panic("__file_mmapdup: no map node\n");
 		
 		map->ref++;
 		map = get_adjacent_page(map, 0);
@@ -332,8 +332,9 @@ static struct seg *split_segment(struct seg *s, uint64 start, uint64 end)
 		} else if (end >= s->addr + s->sz) {
 			spliter = start;
 			s2 = s1;
-		} else
-			panic("split_segment: funny case");
+		} 
+		// else
+		// 	panic("split_segment: funny case");
 
 		s1->addr = spliter;
 		s1->sz = segend - spliter;
@@ -633,8 +634,9 @@ static int mmap_anonymous(struct seg *s, int flags)
 		map->valid = 0;
 
 		// shouldn't get result since we haven't put "off" into it
-		if (get_mmap_with_parent(&fp->mapping, off, &parent, &plink))
-			panic("mmap_anonymous: rbtree");
+		// if (get_mmap_with_parent(&fp->mapping, off, &parent, &plink))
+		// 	panic("mmap_anonymous: rbtree");
+		get_mmap_with_parent(&fp->mapping, off, &parent, &plink);
 		rb_link_node(&map->rb, parent, plink);
 		rb_insert_color(&map->rb, &fp->mapping);
 	}
@@ -673,8 +675,9 @@ uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, struct file *f, in
 						!!(prot & PROT_EXEC), !!(prot & PROT_WRITE), !!(prot & PROT_READ));
 			return -EPERM;
 		}
-	} else if (!(flags & MAP_ANONYMOUS))
-		panic("do_mmap: bad file");	// sys_mmap should check this
+	} 
+	// else if (!(flags & MAP_ANONYMOUS))
+	// 	panic("do_mmap: bad file");	// sys_mmap should check this
 
 	uint64 sz = PGROUNDUP(len);
 	struct seg *prev, *new;
@@ -791,8 +794,8 @@ int do_msync(uint64 addr, uint64 len, int flags)
 	acquire(&ip->ilock);
 	for (; foff < end; foff += PGSIZE) {
 		struct mmap_page *map = get_mmap_page(&ip->mapping, foff);
-		if (map == NULL)
-			panic("__file_mmapdel: no map node\n");
+		// if (map == NULL)
+		// 	panic("__file_mmapdel: no map node\n");
 		
 		if (map->pa && foff < ip->size) {
 			uint64 flen = (ip->size - foff < map->f_len) ?
@@ -828,8 +831,8 @@ static int handle_anonymous_shared(uint64 badaddr, struct seg *s)
 	
 	acquire(&fp->lock);
 	map = get_mmap_page(&fp->mapping, off);
-	if (map == NULL)
-		panic("handle_anonymous_shared: no map node");
+	// if (map == NULL)
+	// 	panic("handle_anonymous_shared: no map node");
 
 	if (map->pa == NULL) {
 		map->pa = allocpage();
@@ -886,8 +889,9 @@ static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 
 			unmappages(p->pagetable, s->addr + (off - s->f_off), 1, VM_USER|VM_FREE);
 			
-			if (pageput((uint64)victim) != 0)
-				panic("__page_file_swap: bad page ref");
+			// if (pageput((uint64)victim) != 0)
+			// 	panic("__page_file_swap: bad page ref");
+			pageput((uint64)victim);
 			if (!page)
 				page = victim;
 			else
@@ -900,7 +904,6 @@ static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 		} else {
 			miss++;
 			if (free >= 10 && miss >= 5) {		// enough
-				printf(__INFO("mmap file swap")" evict enough %d\n", free);
 				break;
 			}
 		}
@@ -916,6 +919,9 @@ static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 	}
 	release(&ip->ilock);
 
+
+	// printf(__INFO("mmap file swap")" evict enough %d\n", free);
+	printf(" \b");
 	return page;
 }
 
@@ -951,8 +957,8 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 	map = get_mmap_page(&ip->mapping, off);
 
 	if (share) {
-		if (map == NULL)
-			panic("handle_file_mmap: no map node");
+		// if (map == NULL)
+		// 	panic("handle_file_mmap: no map node");
 		
 		/**
 		 * Here is another problem. The first fault allocates a page here,

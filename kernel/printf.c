@@ -77,8 +77,8 @@ printf(char *fmt, ...)
 	if(locking)
 		acquire(&pr.lock);
 	
-	if (fmt == 0)
-		panic("null fmt");
+	// if (fmt == 0)
+	// 	panic("null fmt");
 
 	va_start(ap, fmt);
 	for(i = 0; (c = fmt[i] & 0xff) != 0; i++){

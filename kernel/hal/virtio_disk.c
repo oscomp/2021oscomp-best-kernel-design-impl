@@ -101,13 +101,13 @@ virtio_disk_init(void)
 	disk.queue_running = 0;
 	disk.nwait = 0;
 
-	if (*R(VIRTIO_MMIO_MAGIC_VALUE) != 0x74726976 ||
-		*R(VIRTIO_MMIO_VERSION) != 1 ||
-		*R(VIRTIO_MMIO_DEVICE_ID) != 2 ||
-		*R(VIRTIO_MMIO_VENDOR_ID) != 0x554d4551)
-	{
-		panic("could not find virtio disk");
-	}
+	// if (*R(VIRTIO_MMIO_MAGIC_VALUE) != 0x74726976 ||
+	// 	*R(VIRTIO_MMIO_VERSION) != 1 ||
+	// 	*R(VIRTIO_MMIO_DEVICE_ID) != 2 ||
+	// 	*R(VIRTIO_MMIO_VENDOR_ID) != 0x554d4551)
+	// {
+	// 	panic("could not find virtio disk");
+	// }
 	
 	status |= VIRTIO_CONFIG_S_ACKNOWLEDGE;
 	*R(VIRTIO_MMIO_STATUS) = status;
@@ -139,10 +139,10 @@ virtio_disk_init(void)
 	// initialize queue 0.
 	*R(VIRTIO_MMIO_QUEUE_SEL) = 0;
 	uint32 max = *R(VIRTIO_MMIO_QUEUE_NUM_MAX);
-	if (max == 0)
-		panic("virtio disk has no queue 0");
-	if (max < NUM)
-		panic("virtio disk max queue too short");
+	// if (max == 0)
+	// 	panic("virtio disk has no queue 0");
+	// if (max < NUM)
+	// 	panic("virtio disk max queue too short");
 	*R(VIRTIO_MMIO_QUEUE_NUM) = NUM;
 	memset(disk.pages, 0, sizeof(disk.pages));
 	*R(VIRTIO_MMIO_QUEUE_PFN) = ((uint64)disk.pages) >> PGSHIFT;
@@ -179,10 +179,10 @@ alloc_desc()
 static void
 free_desc(int i)
 {
-	if (i >= NUM)
-		panic("free_desc 1");
-	if (disk.free[i])
-		panic("free_desc 2");
+	// if (i >= NUM)
+	// 	panic("free_desc 1");
+	// if (disk.free[i])
+	// 	panic("free_desc 2");
 	disk.desc[i].addr = 0;
 	disk.desc[i].len = 0;
 	disk.desc[i].flags = 0;
@@ -365,8 +365,8 @@ virtio_disk_intr()
 		int id = disk.used->ring[disk.used_idx % NUM].id;
 		disk.used_idx += 1;
 
-		if (disk.info[id].status != 0)
-			panic("virtio_disk_intr status");
+		// if (disk.info[id].status != 0)
+		// 	panic("virtio_disk_intr status");
 
 		b = disk.info[id].b;
 		// disk.info[id].b = 0;
@@ -432,8 +432,9 @@ void virtio_disk_write_start(void)
 	if (disk.queue_running > 0) {
 		release(&disk.queue.lock);
 		return;
-	} else if (disk.queue_running < 0)
-		panic("virtio_disk_write_start: bad counter");
+	} 
+	// else if (disk.queue_running < 0)
+	// 	panic("virtio_disk_write_start: bad counter");
 
 	struct d_list *l = disk.queue.head.next;
 	if (l == &disk.queue.head) {
@@ -443,8 +444,8 @@ void virtio_disk_write_start(void)
 	
 	struct buf *b[1];
 	b[0] = container_of(l, struct buf, list);
-	if (b[0]->disk)
-		panic("virtio_disk_write_start: on-flight buf");
+	// if (b[0]->disk)
+	// 	panic("virtio_disk_write_start: on-flight buf");
 
 	b[0]->disk = 1;
 	b[0]->dirty = 0;

@@ -705,14 +705,14 @@ void sched(void) {
 
 	__debug_assert("sched", NULL != p, "NULL == p\n");
 	// __debug_info("sched", "p %s\n", p->name);
-	if (!holding(&proc_lock)) 
-		panic("sched proc_lock\n");
-	if (1 != mycpu()->noff && !(ZOMBIE == p->state && 2 == mycpu()->noff)) 
-		panic("sched locks\n");
-	if (RUNNING == p->state) 
-		panic("sched running\n");
-	if (intr_get()) 
-		panic("sched interruptible\n");
+	// if (!holding(&proc_lock)) 
+	// 	panic("sched proc_lock\n");
+	// if (1 != mycpu()->noff && !(ZOMBIE == p->state && 2 == mycpu()->noff)) 
+	// 	panic("sched locks\n");
+	// if (RUNNING == p->state) 
+	// 	panic("sched running\n");
+	// if (intr_get()) 
+	// 	panic("sched interruptible\n");
 
 	// save floating-point registers
 	if (r_sstatus_fs() == SSTATUS_FS_DIRTY) {

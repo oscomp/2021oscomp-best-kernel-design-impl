@@ -115,10 +115,10 @@ int do_mount(struct inode *dev, struct inode *mntpoint, char *type, int flag, vo
 	// We planed only to support one mount at a time.
 	// But in fact, if mntpoint is mounted, namei will get its mounting dev,
 	// so this could be a root of a fs, at which can be mounted.
-	if (dmnt->mount != NULL) {
-		__debug_error("do_mount", "%s is already be mounted\n", dmnt->filename);
-		panic("do_mount");
-	}
+	// if (dmnt->mount != NULL) {
+	// 	__debug_error("do_mount", "%s is already be mounted\n", dmnt->filename);
+	// 	panic("do_mount");
+	// }
 
 	struct superblock *sb;
 	sb = fs_install(dev);

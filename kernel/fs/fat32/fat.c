@@ -36,8 +36,8 @@ static inline uint32 fat_offset_of_clus(struct fat32_sb *fat, uint32 cluster)
 int fat_cache_init(struct superblock *sb)
 {
 	struct fat32_sb *fat = sb2fat(sb); 
-	if (fat->fatcache.page)
-		panic("fat_cache_init: superblock is not clean");
+	// if (fat->fatcache.page)
+	// 	panic("fat_cache_init: superblock is not clean");
 
 	if ((fat->fatcache.page = allocpage()) == NULL)
 		return -ENOMEM;
@@ -65,9 +65,9 @@ int fat_cache_init(struct superblock *sb)
 	}
 
 	// Check whether the 'next free' field lie to us.
-	if (*(uint32 *)(afsec + fat_offset_of_clus(fat, fat->next_free)) != 0
-		&& fat_update_next_free(sb) == 0)
-		panic("fat_cache_init: no next free");
+	// if (*(uint32 *)(afsec + fat_offset_of_clus(fat, fat->next_free)) != 0
+	// 	&& fat_update_next_free(sb) == 0)
+	// 	panic("fat_cache_init: no next free");
 
 	releasesleep(&sb->sb_lock);
 	return 0;

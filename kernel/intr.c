@@ -27,12 +27,12 @@ pop_off(void)
 	struct cpu *c = mycpu();
 
 	//printf("\e[31mpop_off()\e[0m: cpuid(): %d\n", cpuid());
-	if(intr_get())
-		panic("pop_off - interruptible");
-	if(c->noff < 1) {
-		//printf("c->noff = %d\n", c->noff);
-		panic("pop_off");
-	}
+	// if(intr_get())
+	// 	panic("pop_off - interruptible");
+	// if(c->noff < 1) {
+	// 	//printf("c->noff = %d\n", c->noff);
+	// 	panic("pop_off");
+	// }
 	//printf("c->noff: %d\n", c->noff);
 	//printf("c: %x\n", c);
 	c->noff -= 1;

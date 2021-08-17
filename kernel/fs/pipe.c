@@ -108,11 +108,12 @@ static void pipeunlock(struct pipe *pi, struct wait_node *wait, int who)
 	q = (who == PIPE_READER) ? &pi->rqueue : &pi->wqueue;
 
 	acquire(&q->lock);
-	if (wait_queue_empty(q))
-		panic("pipeunlock: empty queue");
+	// if (wait_queue_empty(q))
+	// 	panic("pipeunlock: empty queue");
+	// wait_queue_empty(q);
 
-	if (wait != wait_queue_next(q))
-		panic("pipeunlock: not next");
+	// if (wait != wait_queue_next(q))
+	// 	panic("pipeunlock: not next");
 	
 	wait_queue_del(wait);			// walk out the queue
 	if (!wait_queue_empty(q)) {		// wake up the next one

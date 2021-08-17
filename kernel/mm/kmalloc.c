@@ -259,10 +259,10 @@ void kfree(void *addr) {
 			pprev = &(tmp->next);
 			tmp = tmp->next;
 		}
-		if (NULL == tmp) {
-			__debug_error("free", "NULL == tmp\n");
-			panic("kfree(): linked list broken!\n");
-		}
+		// if (NULL == tmp) {
+		// 	__debug_error("free", "NULL == tmp\n");
+		// 	panic("kfree(): linked list broken!\n");
+		// }
 
 		#ifdef DEBUG 
 		// display linked list of kmem_allocator 

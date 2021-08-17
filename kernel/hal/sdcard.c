@@ -124,7 +124,7 @@ static void sd_end_cmd(void) {
  */
 static uint8 sd_get_response_R1(void) {
 	uint8 result = 0xff;
-	uint16 timeout = 0xff;
+	uint32 timeout = 0xff;
 
 	while (timeout--) {
 		sd_read_data(&result, 1);
@@ -153,7 +153,7 @@ static void sd_get_response_R7_rest(uint8 *frame) {
 }
 
 static int switch_to_SPI_mode(void) {
-	int timeout = 0xff;
+	int timeout = 0xffffff;
 
 	while (--timeout) {
 		sd_send_cmd(SD_CMD0, 0, 0x95);
@@ -282,7 +282,7 @@ static int check_block_size(void) {
 				printf("SDSC detected, setting block size\n");
 
 				// setting SD card block size to BSIZE 
-				int timeout = 0xff;
+				int timeout = 0xffffff;
 				int result = 0xff;
 				while (--timeout) {
 					sd_send_cmd(SD_CMD16, BSIZE, 0);
@@ -366,9 +366,9 @@ void sdcard_init(void) {
 	sd_status.wpending = 0;
 	sd_status.wcount = 0;
 
-	if (0 != result) {
-		panic("sdcard_init failed");
-	}
+	// if (0 != result) {
+	// 	panic("sdcard_init failed");
+	// }
 	#ifdef DEBUG
 	printf("sdcard_init\n");
 	#endif
@@ -539,8 +539,8 @@ static void sdcard_read_wait(struct buf *b)
 
 	// Check sdcard working status.
 	while (sd_status.busy) {
-		if (sd_status.busy != BUSY_WRITE)
-			panic("sdcard_read_wait: status");
+		// if (sd_status.busy != BUSY_WRITE)
+		// 	panic("sdcard_read_wait: status");
 		// let writers see us
 		sd_status.rpending = 1;
 		sleep(&sd_status.rpending, &sdcard_lock.lk);
@@ -554,8 +554,8 @@ static void sdcard_read_wait(struct buf *b)
 static int sdcard_read_done(struct buf *b)
 {
 	acquire(&sd_rqueue.lock);
-	if (&b->list != sd_rqueue.head.next)
-		panic("sdcard_read_done: wrong order");
+	// if (&b->list != sd_rqueue.head.next)
+	// 	panic("sdcard_read_done: wrong order");
 	
 	dlist_del(&b->list);
 
@@ -595,7 +595,7 @@ int sdcard_read(struct buf *b)
 		goto end;
 	}
 
-	for (int timeout = 0xffff; timeout > 0 && result != 0xfe; timeout--)
+	for (int timeout = 0xffffff; timeout > 0 && result != 0xfe; timeout--)
 		sd_read_data(&result, 1);
 		
 	if (result != 0xfe) {
@@ -634,7 +634,7 @@ int sdcard_read_sectors(struct buf * restrict bufs[], int nbuf)
 
 	for (int i = 0; i < nbuf; i++) {
 		uint8 result = 0xff;
-		int timeout = 0xffff;
+		int timeout = 0xffffff;
 		while (timeout-- > 0 && result != 0xfe)
 			sd_read_data(&result, 1);
 
@@ -681,22 +681,22 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 						b->sectorno << 9 :
 						b->sectorno;
 
-	int ret;
-	sd_send_cmd(SD_CMD55, 0, 0);
-	ret = sd_get_response_R1();
-	sd_end_cmd();
-	if (ret != 0) {
-		printf(__ERROR("CMD55")" error\n");
-		return -EIO;
-	}
+	// int ret;
+	// sd_send_cmd(SD_CMD55, 0, 0);
+	// ret = sd_get_response_R1();
+	// sd_end_cmd();
+	// if (ret != 0) {
+	// 	printf(__ERROR("CMD55")" error\n");
+	// 	return -EIO;
+	// }
 
-	sd_send_cmd(SD_ACMD23, nbuf, 0);
-	ret = sd_get_response_R1();
-	sd_end_cmd();
-	if (ret != 0) {
-		printf(__ERROR("ACMD23")" error\n");
-		return -EIO;
-	}
+	// sd_send_cmd(SD_ACMD23, nbuf, 0);
+	// ret = sd_get_response_R1();
+	// sd_end_cmd();
+	// if (ret != 0) {
+	// 	printf(__ERROR("ACMD23")" error\n");
+	// 	return -EIO;
+	// }
 
 	sd_send_cmd(SD_CMD25, address, 0);
 	if (sd_get_response_R1() != 0) {
@@ -725,15 +725,15 @@ static void sdcard_multiple_write_wait(void)
 	// waiting sdcard programming, dma can't do this
 	uint8 result = 0xff;
 	int timeout;
-	for (timeout = 0xfffff; timeout >= 0 && (result & 0x1f) != 0x5; timeout--)
+	for (timeout = 0xffffff; timeout >= 0 && (result & 0x1f) != 0x5; timeout--)
 		sd_read_data(&result, 1);
-	if (timeout < 0)
-		panic("sdcard_intr: response 1");	// really don't know what to do
+	// if (timeout < 0)
+	// 	panic("sdcard_intr: response 1");	// really don't know what to do
 	
 	for (timeout = 0xfffff, result = 0; timeout >= 0 && result == 0; timeout--)
 		sd_read_data(&result, 1);
-	if (timeout < 0)
-		panic("sdcard_intr: response 2");	// really don't know what to do
+	// if (timeout < 0)
+	// 	panic("sdcard_intr: response 2");	// really don't know what to do
 }
 
 
@@ -742,7 +742,7 @@ static void sdcard_multiple_write_stop(void)
 	uint8 token = 0xfd;		// stop token
 	sd_write_data(&token, 1);
 
-	for (int timeout = 0xffff; timeout >= 0 && token != 0xff; timeout--)
+	for (int timeout = 0xffffff; timeout >= 0 && token != 0xff; timeout--)
 		sd_read_data(&token, 1);
 	
 	sd_end_cmd();
@@ -753,16 +753,16 @@ static void sdcard_multiple_write_stop(void)
 
 	// check writing result
 	sd_send_cmd(SD_CMD13, 0, 0);
-	if (sd_get_response_R1() != 0)
-		panic("sdcard_intr: CMD13 bad response");
+	// if (sd_get_response_R1() != 0)
+	// 	panic("sdcard_intr: CMD13 bad response");
 
 	uint8 error = 0xff;
 	sd_read_data(&error, 1);
 	sd_end_cmd();
-	if (error) {
-		printf(__ERROR("sdcard_intr")" write error %x\n", error);
-		panic("sdcard_intr");
-	}
+	// if (error) {
+	// 	printf(__ERROR("sdcard_intr")" write error %x\n", error);
+	// 	panic("sdcard_intr");
+	// }
 }
 
 
@@ -871,8 +871,9 @@ void sdcard_intr(void)
 		// reader is waiting out there
 		// him will do the clean work himself
 		return;
-	} else if (sd_status.busy != BUSY_WRITE)
-		panic("sdcard_intr: unknown busy");
+	} 
+	// else if (sd_status.busy != BUSY_WRITE)
+	// 	panic("sdcard_intr: unknown busy");
 	
 	// but writer doesn't wait, so we need to clean up for him
 	// release(&sdcard_lock.lk);

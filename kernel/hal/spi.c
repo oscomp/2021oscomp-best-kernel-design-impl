@@ -204,8 +204,8 @@ void spi_send_data_standard(spi_device_num_t spi_num, spi_chip_select_t chip_sel
 {
 	// configASSERT(spi_num < SPI_DEVICE_MAX && spi_num != 2);
 	// uint8 *v_buf = malloc(cmd_len + tx_len);
-	if (SPI_BUF_SIZE < cmd_len + tx_len)
-		panic("spi: spi_buf too small");
+	// if (SPI_BUF_SIZE < cmd_len + tx_len)
+	// 	panic("spi: spi_buf too small");
 	uint8 *v_buf = spi_buf;
 	uint64 i;
 	for(i = 0; i < cmd_len; i++)

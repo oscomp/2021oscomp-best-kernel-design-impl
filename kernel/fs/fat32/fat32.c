@@ -193,8 +193,8 @@ void __alert_fs_err(const char *func)
 uint fat_rw_clus(struct superblock *sb, uint32 cluster, int write, int user, uint64 data, uint off, uint n)
 {
 	struct fat32_sb *fat = sb2fat(sb);
-	if (off + n > fat->byts_per_clus)
-		panic("fat_rw_clus: offset out of range");
+	// if (off + n > fat->byts_per_clus)
+	// 	panic("fat_rw_clus: offset out of range");
 
 	uint tot, m;
 	uint16 const bps = fat->bpb.byts_per_sec;
@@ -251,8 +251,8 @@ struct inode *fat_alloc_inode(struct superblock *sb)
 
 void fat_destroy_inode(struct inode *ip)
 {
-	if (ip == NULL)
-		panic("fat_destroy_inode");
+	// if (ip == NULL)
+	// 	panic("fat_destroy_inode");
 
 	struct fat32_entry *ep = i2fat(ip);
 	free_clus_cache(ep);
@@ -498,8 +498,8 @@ int fat_read_dir(struct inode *ip, struct dirent *dent, uint off)
  */
 struct fat32_entry *fat_lookup_dir_ent(struct inode *dir, char *filename, uint *poff)
 {
-	if (!(i2fat(dir)->attribute & ATTR_DIRECTORY))
-		panic("dirlookup not DIR");
+	// if (!(i2fat(dir)->attribute & ATTR_DIRECTORY))
+	// 	panic("dirlookup not DIR");
 	if (dir->state & I_STATE_FREE)
 		return NULL;
 
