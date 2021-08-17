@@ -28,7 +28,7 @@ void SD_CS_LOW(void) {
 
 void SD_HIGH_SPEED_ENABLE(void) {
     // spi_set_clk_rate(SPI_DEVICE_0, 10000000);
-	spi_set_baudr(SPI_DEVICE_0, 38);
+	spi_set_baudr(SPI_DEVICE_0, 16);
 }
 
 static void sd_lowlevel_init(uint8 spi_index) {
