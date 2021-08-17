@@ -2,6 +2,10 @@
 
 拥有友好代码和详细文档的Rust编写的基于RISC-V64的多核操作系统UltraOS，支持qemu和k210平台运行。
 
+UltraOS: A developer friendly project that has detailed documents of **RISC-V multicore operating system** that is written by Rust language in qemu and k210 platform.
+
+The documents have no English version and the developers have no plan to do so. But we have English comments in codes which might help, or you can use translation tools to get more detail about this project.
+
 #### 运行
 根目录下Makefile提供了两个命令。
 
@@ -17,7 +21,13 @@
 
 该命令将生成内核文件，并且直接在k210上运行UltraOS。但是，为了能够运行更多的程序，请在k210上插入sd卡，并在里面放置预备文件和程序，UltraOS会将其作为文件系统控制的外存进行使用。同时，需要注意的是，为了支持比赛的进行，我们的UltraOS会自行运行
 
-#### 联系我们
+> make gdb
+
+> make monitor
+
+这一组命令分别在两个窗口运行，即可启动gdb调试。
+
+#### 联系我们 Contact Us
 
 [loancold@qq.com](mailto:loancold@qq.com)
 
@@ -39,7 +49,7 @@
 - 高性能优化：内存弱一致性优化、lazy与CoW、文件系统双文件块缓存等优化等机制
 - 信号机制：进程支持进程信号软中断。
 - 支持C语言程序和Rust语言用户程序编写和运行（提供回归测试基础）
-- FAT32与EXT2-like虚拟文件系统
+- FAT32虚拟文件系统
 - 混合调试工具：Monitor（结合静态宏打印以及动态gdb特性）
 - 详细项目文档、开发过程支持以及理解友好型代码构造和注释
 
@@ -54,5 +64,12 @@
   - os：kernel代码
   - riscv-syscalls-testing：官方评测程序
   - simple_fat32：fat32文件系统，隶属于kernel
-  - user：Rust用户程序代码
+  - user：用户程序相关
 
+#### 感谢与声明
+
+本项目使用了洛佳等开发者的[RustSBI](https://github.com/rustsbi/rustsbi) 2021.03.26版本，以及吴一凡等开发者的[rCoreTutorial-v3](https://github.com/rcore-os/rCore-Tutorial-v3) 2021.03.26版本。
+
+同时感谢哈尔滨工业大学（深圳）的黎庚祉同学给予的帮助和灵感，以及夏文老师和江仲鸣老师在进度上的跟踪。
+
+本项目使用GPL3.0协议，欢迎开发者使用该项目进行学习。

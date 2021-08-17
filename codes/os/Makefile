@@ -50,10 +50,10 @@ DISASM ?= -x
 build: env $(KERNEL_BIN)
 
 env:
-#	(rustup target list | grep "riscv64imac-unknown-none-elf (installed)") || rustup target add $(TARGET)
-#	cargo install cargo-binutils
-#	rustup component add rust-src
-#	rustup component add llvm-tools-preview
+	(rustup target list | grep "riscv64imac-unknown-none-elf (installed)") || rustup target add $(TARGET)
+	cargo install cargo-binutils
+	rustup component add rust-src
+	rustup component add llvm-tools-preview
 
 #(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
 #cargo install cargo-binutils
@@ -108,11 +108,6 @@ else
 	python3 -m serial.tools.miniterm --eol LF --dtr 0 --rts 0 --filter direct $(K210-SERIALPORT) 115200
 endif
 
-debug: build
-	@tmux new-session -d \
-		"qemu-system-riscv64 -machine virt -nographic -bios $(BOOTLOADER) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) -s -S" && \
-		tmux split-window -h "riscv64-unknown-elf-gdb -ex 'file $(KERNEL_ELF)' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'" && \
-		tmux -2 attach-session -d
 
 monitor:
 	riscv64-unknown-elf-gdb -ex 'file target/riscv64imac-unknown-none-elf/release/os' -ex 'set arch riscv:rv64' -ex 'target remote localhost:1234'
