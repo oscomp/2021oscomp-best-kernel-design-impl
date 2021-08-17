@@ -13,7 +13,7 @@
 #define BLOCKS_PER_PAGE (PAGE_SIZE/BLOCK_SIZE)
 
 #ifdef K210
-    #define INIT_KERNEL_STACK 0xffffffff804a0000lu
+    #define INIT_KERNEL_STACK 0xffffffff80430000lu
 #else
     #define INIT_KERNEL_STACK 0xffffffff80b00000lu
 #endif

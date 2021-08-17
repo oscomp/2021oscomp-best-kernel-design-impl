@@ -16,15 +16,16 @@
 /* default setup pcb */ 
 /* tid = pid */
 void init_pcb_default(pcb_t *pcb_underinit,task_type_t type) 
-{
+{    
     pcb_underinit->exec = 0;
     pcb_underinit->preempt_count = 0; 
     pcb_underinit->list.ptr = pcb_underinit; 
+    init_list_head(&pcb_underinit->wait_list);
+    pcb_underinit->is_waiting_all_children = 0;
     pcb_underinit->pid = process_id;
     pcb_underinit->pid_on_exec = process_id;
     pcb_underinit->tid = process_id++;
     pcb_underinit->type = type; 
-    init_list_head(&pcb_underinit->wait_list);
     pcb_underinit->is_waiting_all_children = 0;
     pcb_underinit->status = TASK_READY; 
     pcb_underinit->priority = DEFAULT_PRIORITY; 
@@ -57,9 +58,18 @@ void init_pcb_default(pcb_t *pcb_underinit,task_type_t type)
     pcb_underinit->scheduler_switch_time = 0;
     pcb_underinit->yield_switch_time = 0;
     /* itimer */
-    pcb->itimer.list.ptr = pcb;
-    pcb->itimer.callback_func = NULL;
-    pcb->itimer.parameter = NULL;
+    pcb_underinit->itimer.list.ptr = pcb;
+    pcb_underinit->itimer.callback_func = NULL;
+    pcb_underinit->itimer.parameter = NULL;
+    /* table of signal handlers */
+    for (uint32_t i = 0; i < NUM_SIG; i++){
+        pcb_underinit->sigactions[i].sa_handler = SIG_DFL;
+        memset(&(pcb_underinit->sigactions[i].sa_mask), 0, sizeof(sigset_t));
+        pcb_underinit->sigactions[i].sa_flags = 0;
+    }
+    pcb_underinit->sig_recv = 0lu;
+    pcb_underinit->sig_pend = 0lu;
+    pcb_underinit->sig_mask = 0lu;
 }
 
 void init_pcb_exec(pcb_t *pcb_underinit)
@@ -68,12 +78,6 @@ void init_pcb_exec(pcb_t *pcb_underinit)
     pcb_underinit->pid = pcb_underinit->pid_on_exec;
     pcb_underinit->type = USER_PROCESS;
     pcb_underinit->mode = AUTO_CLEANUP_ON_EXIT;
-    /* handle signal function should be reset */
-    for (uint32_t i = 0; i < NUM_SIG; i++){
-        pcb_underinit->siginfo[i].sigaction.sa_handler = SIG_DFL;
-        memset(&(pcb_underinit->siginfo[i].sigaction.sa_mask), 0, sizeof(sigset_t));
-        pcb_underinit->siginfo[i].sigaction.sa_flags = 0;
-    }
 }
 // static void copyout(uintptr_t pgdir, unsigned char *dst, unsigned char *src, size_t size)
 // {
@@ -359,15 +363,15 @@ static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_sta
 {
     uint64_t ker_stack_size, user_stack_size;
     /* kernel_sp is just at user context, but maybe not equal to register sp */
-    ker_stack_size = sizeof(regs_context_t) + sizeof(switchto_context_t);
+    ker_stack_size = KERNEL_STACK_SIZE - (current_running->kernel_sp % KERNEL_STACK_SIZE);
     log(0, "ker_stack_size: %lx", ker_stack_size);
     user_stack_size = current_running->user_stack_base + USER_STACK_INIT_SIZE - current_running->user_sp;
     log(0, "user_stack_base: %lx, user_stack_size:%lx", current_running->user_stack_base, user_stack_size);
     
-    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size; /* for user context */
+    pcb_underinit->kernel_sp = kernel_stack_top - ker_stack_size - sizeof(switchto_context_t); /* for user context */
     pcb_underinit->user_sp = user_stack_top - user_stack_size; /* no need to be aligned with user_sp */
     pcb_underinit->user_stack_base = user_stack_top - USER_STACK_INIT_SIZE;
-    memcpy(pcb_underinit->kernel_sp + sizeof(switchto_context_t), PAGE_ALIGNUP(current_running->kernel_sp) - sizeof(regs_context_t), sizeof(regs_context_t));
+    memcpy(pcb_underinit->kernel_sp + sizeof(switchto_context_t), current_running->kernel_sp, ker_stack_size);
     // memcpy(pcb_underinit->user_sp, current_running->user_sp, user_stack_size); /* copy tp, very essential */
 
     // copy fd
@@ -391,14 +395,11 @@ static void copy_parent_all_and_set_sp(pcb_t *pcb_underinit, uint64_t kernel_sta
     memcpy(&pcb_underinit->myelf_fd, &current_running->myelf_fd, sizeof(fd_t));
     for (int i = 0; i < NUM_PHDR_IN_PCB; i++)
         memcpy(&pcb_underinit->phdr[i], &current_running->phdr[i], sizeof(Elf64_Phdr));
-    for (int i = 0; i < NUM_SIG; i++)
-        memcpy(&pcb_underinit->siginfo[i], &current_running->siginfo[i], sizeof(struct pcb_siginfo));
+    /* copy table of signal handlers? */
 }
 
 static void init_clone_pcb_prop(pcb_t *pcb_underinit, uint32_t flag)
 {
-    pcb_underinit->type = USER_THREAD;
-    pcb_underinit->mode = ENTER_ZOMBIE_ON_EXIT;
     pcb_underinit->parent.parent = current_running;
     pcb_underinit->parent.flag = flag;
     pcb_underinit->user_addr_top = current_running->user_addr_top;
@@ -413,7 +414,7 @@ void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_
     copy_parent_all_and_set_sp(pcb_underinit, kernel_stack_top, user_stack_top);
     pcb_underinit->pgdir = pgdir;
     regs_context_t *pt_regs =
-        (regs_context_t *)(kernel_stack_top - sizeof(regs_context_t));
+        (regs_context_t *)(pcb_underinit->kernel_sp + sizeof(switchto_context_t));
     /* return 0 if child */
     pt_regs->regs[10] = 0;
     unsigned mode = SATP_MODE_SV39, asid = pcb_underinit->tid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;

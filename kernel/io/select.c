@@ -13,6 +13,7 @@ static int handle_select(fd_num_t fd, int mode, uint64_t timeout_ticks)
 
     fd_t *fdp = &current_running->fd[fd_index];
     uint64_t final_ticks = get_ticks() + timeout_ticks;
+    log(0, "fd is %d, mode is %d", fd, mode);
     log(0, "nowticks:%ld, final_ticks:%ld", get_ticks(), final_ticks);
 
     if (mode == SELECT_READ){
@@ -36,7 +37,7 @@ static int handle_select(fd_num_t fd, int mode, uint64_t timeout_ticks)
             return wait_ring_buffer_write(&(pipes[fdp->pip_num].rbuf), final_ticks);
         }
         else
-            assert(0);
+            return 0; /* Normal file is always OK to be written */
     }
     return -1;
 }

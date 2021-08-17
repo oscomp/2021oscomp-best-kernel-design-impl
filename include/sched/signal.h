@@ -4,25 +4,27 @@
 #include <type.h>
 
 /* for sigprocmask */
-#define SIG_BLCOK 0x0
+#define SIG_BLOCK 0x0
 #define SIG_UNBLOCK 0x1
 #define SIG_SETMASK 0x2
 
 /* size of sigset_t */
-#define _NSIG_WORDS 16
+#define _NSIG_WORDS 1
 
 /* signal */
 #define SIGHUP 1
 #define SIGINT 2
 #define SIGQUIT 3
+#define SIGKILL 9
+#define SIGUSR1 10
+#define SIGSEGV 11
+#define SIGUSR2 12
+#define SIGALRM 14
 #define SIGTERM 15
 #define SIGCHLD 17
-#define SIGKILL 9
+#define SIGCONT 18
 #define SIGSTOP 19      
 #define SIGTSTP 20
-#define SIGCONT 18
-#define SIGUSR1 10
-#define SIGUSR2 12
 
 #define SIG_DFL ((void(*)(int))0)
 #define SIG_IGN ((void(*)(int))1)
@@ -76,5 +78,25 @@ typedef struct sigaction{
     // void     (*sa_restorer)(void);
 }sigaction_t;
 #pragma pack()
+
+typedef struct signal_context{
+    reg_t regs[14];
+    reg_t kernel_sp;
+    reg_t user_sp;
+    uint64_t mask;
+}signal_context_t;
+
+#define ISSET_SIG(signum,pcb) \
+    ((pcb)->sig_recv & ( 1lu << ((signum) - 1) ) )
+
+#define CLEAR_SIG(signum,pcb) \
+    ((pcb)->sig_recv &= ~( 1lu << ((signum) - 1) ) )
+
+#define SET_SIG(signum,pcb) \
+    ((pcb)->sig_recv |= ( 1lu << ((signum) - 1) ) )
+
+typedef struct pcb pcb_t;
+void change_signal_mask(pcb_t *pcb, uint64_t newmask);
+void send_signal(int signum, pcb_t *pcb);
 
 #endif

@@ -17,7 +17,8 @@
 typedef struct pipe{
     struct ring_buffer rbuf;
     pid_t pid; // parent id
-    list_head wait_list;
+    list_head read_wait_list;
+    list_head write_wait_list;
     uint8 r_valid;
     uint8 w_valid;
     uint8 mode;

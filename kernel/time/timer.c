@@ -71,14 +71,25 @@ void timer_check()
     enable_preempt();
 }
 
+uint64_t test_timer_gp = 0;
+
 static void iteration_test_timer()
 {
-    printk_port("waiting\n");
-    timer_t *mytimer = alloc_timer();
-    assert(mytimer);
-    mytimer->timeout_tick = get_ticks() + 50000000;
-    mytimer->callback_func = &iteration_test_timer;
-    enable_timer(mytimer);
+    uint32_t i;
+    for (i = 1; i < NUM_MAX_TASK; i++)
+        if (pcb[i].status != TASK_EXITED){
+            printk_port("waiting %lds\n", ++test_timer_gp);
+            timer_t *mytimer = alloc_timer();
+            assert(mytimer);
+            mytimer->timeout_tick = get_ticks() + 50000000;
+            mytimer->callback_func = &iteration_test_timer;
+            enable_timer(mytimer);
+            break;
+        }
+    if (i == NUM_MAX_TASK){
+        printk_port("exit\n");
+        assert(0);
+    }
 }
 
 void do_set_test_timer()

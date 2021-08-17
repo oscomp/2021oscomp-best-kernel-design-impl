@@ -7,7 +7,10 @@
 int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 {
     debug();
-    log(0, "mmap start %lx, len %lx, fd %d %lx", start, len, fd, flags & MAP_SHARED);
+    log2(0, "pid is %d, tid is %d", current_running->pid, current_running->tid);
+    log2(0, "mmap start %lx, len %lx, fd %ld %lx %lx", start, len, fd);
+    log2(0, "flag is %lx, shared? %lx, private?%lx", flags, flags & MAP_SHARED, flags & MAP_PRIVATE);
+    log2(0, "prot is %d", prot);
     if (len <= 0)
         return SYSCALL_FAILED;
     /* just for page allocate */
@@ -27,35 +30,34 @@ int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
             alloc_page_helper(start + i, current_running->pgdir, _PAGE_ALL_MOD);
             do_mprotect(start + i, NORMAL_PAGE_SIZE, prot);
         }
-        log(0, "return is %lx", start);
-        return start;
     }
-    assert(0);
+    else{
+        int32_t fd_index;
+        if ((fd_index = get_fd_index(fd, current_running)) == -1)
+            return -1;
 
-    int32_t fd_index;
-    if ((fd_index = get_fd_index(fd, current_running)) == -1)
-        return -1;
+        if (!start){
+            start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
+            set_user_addr_top(current_running, start);
+        }
 
-    if (!start){
-        start = PAGE_ALIGN(get_user_addr_top(current_running) - len);
-        set_user_addr_top(current_running, start);
+        if (fat32_lseek(fd, off, SEEK_SET) == -1)
+            return -1;
+
+        for (uint64_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
+        {
+            alloc_page_helper(start + i, current_running->pgdir, _PAGE_ALL_MOD);
+            do_mprotect(start + i, NORMAL_PAGE_SIZE, prot);
+            fat32_read(fd, start + i, min(NORMAL_PAGE_SIZE, len - i));
+        }
+         
+        current_running->fd[fd_index].mmap.start = start;
+        current_running->fd[fd_index].mmap.len =len;
+        current_running->fd[fd_index].mmap.flags = flags;
+        current_running->fd[fd_index].mmap.off = off;
     }
 
-    if (fat32_lseek(fd, off, SEEK_SET) == -1)
-        return -1;
-
-    for (uint64_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
-    {
-        alloc_page_helper(start + i, current_running->pgdir, _PAGE_ALL_MOD);
-        do_mprotect(start + i, NORMAL_PAGE_SIZE, prot);
-        fat32_read(fd, start + i, min(NORMAL_PAGE_SIZE, len - i));
-    }
-     
-    current_running->fd[fd_index].mmap.start = start;
-    current_running->fd[fd_index].mmap.len =len;
-    current_running->fd[fd_index].mmap.flags = flags;
-    current_running->fd[fd_index].mmap.off = off;
-
+    log(0, "return is %lx", start);
     return start;
 }
 

@@ -3,7 +3,7 @@
 pid_t do_getpid()
 {
     debug();
-    return current_running->pid;
+    return current_running->tid;
 }
 
 pid_t do_getppid()
@@ -15,7 +15,7 @@ pid_t do_getppid()
     }
     else{
         log(0, "parent id is %d", current_running->parent.parent->pid);
-        return current_running->parent.parent->pid;
+        return current_running->parent.parent->tid;
     }
 }
 

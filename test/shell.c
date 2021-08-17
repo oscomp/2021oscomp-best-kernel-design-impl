@@ -5,7 +5,7 @@
 int main()
 {
 
-    char *argv[7], *envp[4];
+    char *argv[20], *envp[4];
     int argc;
     char str1[20];
     char str2[20];
@@ -36,17 +36,18 @@ int main()
     strcpy(str2, "sh");
     strcpy(str3, "lmbench_testcode.sh");
 
-    // lat_sig -P 1 install
-    // argc = 5;
+    // argc = 7;
     // strcpy(str1, "./lmbench_all");
-    // strcpy(str2, "lat_sig");
+    // strcpy(str2, "lat_ctx");
     // strcpy(str3, "-P");
     // strcpy(str4, "1");
-    // strcpy(str5, "install");
+    // strcpy(str5, "-s");
     // strcpy(str6, "32");
     // strcpy(str7, "2");
+    // strcpy(str8, "4");
+    // strcpy(str9, "8");
+    // strcpy(str10,"16");
 
-    // lmbench_all lat_ctx -P 1 -s 32 2
     argv[0] = str1; 
     if (argc > 1)
         argv[1] = str2;
@@ -62,6 +63,14 @@ int main()
         argv[6] = str7;
     if (argc > 7)
         argv[7] = str8;
+    if (argc > 8)
+        argv[8] = str9;
+    if (argc > 9)
+        argv[9] = str10;
+    if (argc > 10)
+        argv[10] = str11;
+    if (argc > 11)
+        argv[11] = str12;
     argv[argc] = NULL;
     envp[0] = NULL;
 

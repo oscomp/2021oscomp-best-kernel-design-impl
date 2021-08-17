@@ -41,9 +41,9 @@ void handle_memory_leak(void *pcb_void)
     pcb_t *pcb = (pcb_t *)pcb_void;
     assert(pcb->status == TASK_EXITED);
     uint64_t freemem = 0, allocatedmem = 0, mymem = 0;
-    // for (list_node_t *temp = freePageList.next; temp != &freePageList; temp = temp->next){
-    //     freemem += NORMAL_PAGE_SIZE;
-    // }
+    for (list_node_t *temp = freePageList.next; temp != &freePageList; temp = temp->next){
+        freemem += NORMAL_PAGE_SIZE;
+    }
     for (list_node_t *temp = freePagebackupList.next, *temp2 = freePagebackupList.next->next; 
         temp != &freePagebackupList; temp = temp2, temp2 = temp2->next){
         if (temp->tid == pcb->tid){
@@ -52,9 +52,9 @@ void handle_memory_leak(void *pcb_void)
             list_add(temp, &freePageList);
             // mymem += NORMAL_PAGE_SIZE;
         }
-        // allocatedmem += NORMAL_PAGE_SIZE;
+        allocatedmem += NORMAL_PAGE_SIZE;
     }
-    // printk_port("free memsize is %lx\n", mem);
+    // printk_port("free memsize is %lx, allocatedmem is %lx\n", freemem, allocatedmem);
     // printk_port("tid %d leek memsize is %lx\n", current_running->tid, mymem);
 }
 
@@ -497,6 +497,7 @@ uintptr_t free_page_helper(uintptr_t va, uintptr_t pgdir)
         *ptr = 0;
     }
     local_flush_tlb_all();
+    freePage(ret);
     return ret;
 }
 

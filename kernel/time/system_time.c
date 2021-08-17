@@ -36,12 +36,14 @@ int8_t do_gettimeofday(struct timespec *ts)
 int32_t do_clock_gettime(uint64_t clock_id, struct timespec *tp)
 {
     debug();
-    assert(clock_id == CLOCK_REALTIME);
-    if (clock_id == CLOCK_REALTIME){
+    switch (clock_id){
+        case CLOCK_REALTIME:
         return do_gettimeofday(tp);
+        case CLOCK_MONOTONIC:
+        return do_gettimeofday(tp);
+        default:
+        assert(0);
     }
-    else
-        return SYSCALL_FAILED;
 }
 
 int32_t do_getrusage(int32_t who, struct rusage *usage)
@@ -50,6 +52,8 @@ int32_t do_getrusage(int32_t who, struct rusage *usage)
     if (who == RUSAGE_SELF){
         tick_to_timeval(current_running->utime, &usage->ru_utime);
         tick_to_timeval(current_running->stime, &usage->ru_stime);
+        log(0, "utime: sec: %d, usec: %d", usage->ru_utime.tv_sec, usage->ru_utime.tv_usec);
+        log(0, "stime: sec: %d, usec: %d", usage->ru_stime.tv_sec, usage->ru_stime.tv_usec);
         usage->ru_maxrss = 752;
         usage->ru_ixrss = 0;
         usage->ru_idrss = 0;

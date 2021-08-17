@@ -1,5 +1,6 @@
 #include <os/fat32.h>
 #include <os/ring_buffer.h>
+#include <os/sched.h>
 
 pipe_t pipes[NUM_PIPE] = {0};
 /* init pipe */
@@ -60,7 +61,8 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
         if ((pipes[pip_num].r_valid | pipes[pip_num].w_valid) == PIPE_INVALID){
             pipes[pip_num].pid = current_running->pid;
             init_ring_buffer(&pipes[pip_num].rbuf);
-            init_list_head(&pipes[pip_num].wait_list);
+            init_list_head(&pipes[pip_num].read_wait_list);
+            init_list_head(&pipes[pip_num].write_wait_list);
             pipes[pip_num].r_valid = PIPE_VALID;
             pipes[pip_num].w_valid = PIPE_VALID;
             break;
@@ -95,14 +97,18 @@ int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
         log(0, "dangerous pipe read, more than 1 outlet");
     size_t readsize;
     while ((readsize = read_ring_buffer(&pipes[pip_num].rbuf, buf_kva, count)) <= 0){
-        if (pipes[pip_num].w_valid >= PIPE_VALID){
-            do_block(&current_running->list, &pipes[pip_num].wait_list);
+        if (pipes[pip_num].w_valid >= PIPE_VALID && !is_sig_recved(current_running)){
+            do_block(&current_running->list, &pipes[pip_num].read_wait_list);
             do_scheduler();
         }
         else{
             readsize = 0;
             break;
         }
+    }
+    /* someone may be waiting for writing pipe */
+    if (readsize > 0 && !list_empty(&pipes[pip_num].write_wait_list)){
+        do_unblock(pipes[pip_num].write_wait_list.next);
     }
     log(0, "pipe[%d] read %d", pip_num, readsize);
     return readsize;
@@ -116,10 +122,20 @@ ssize_t pipe_write(uchar *buf, pipe_num_t pip_num, size_t count)
         return -1;
     else if (pipes[pip_num].w_valid > PIPE_VALID)
         log(0, "dangerous pipe write, more than 1 inlet");
-    int64_t writesize = write_ring_buffer(&pipes[pip_num].rbuf, buf, count);
-    /* someone maybe waiting for read pipe */
-    if (writesize > 0 && !list_empty(&pipes[pip_num].wait_list)){
-        do_unblock(pipes[pip_num].wait_list.next);
+    int64_t writesize;
+    while((writesize = write_ring_buffer(&pipes[pip_num].rbuf, buf, count)) <= 0){
+        if (pipes[pip_num].r_valid >= PIPE_VALID && !is_sig_recved(current_running)){
+            do_block(&current_running->list, &pipes[pip_num].write_wait_list);
+            do_scheduler();
+        }
+        else{
+            writesize = 0;
+            break;
+        }
+    }
+    /* someone may be waiting for reading pipe */
+    if (writesize > 0 && !list_empty(&pipes[pip_num].read_wait_list)){
+        do_unblock(pipes[pip_num].read_wait_list.next);
     }
     /* someone maybe polling */
     log(0, "pipe[%d] write %d", pip_num, writesize);

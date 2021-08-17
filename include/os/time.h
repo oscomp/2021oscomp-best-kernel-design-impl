@@ -10,8 +10,7 @@
 
 #define MICRO 6
 #define NANO 9
-#define TIMEBASE 403000000
-#define TICKCOUNT 62
+#define TIMEBASE 10000000
 
 typedef void (*TimerCallback)(void *);
 
@@ -46,8 +45,9 @@ struct timeval {
     time_t  tv_sec;   
     time_t  tv_usec;
 };
-
-#define CLOCK_REALTIME 0x0
+/* clock_gettime */
+#define CLOCK_REALTIME 0
+#define CLOCK_MONOTONIC 1
 
 #define SECONDS_PER_MIN 60
 #define MIN_PER_HOUR 60

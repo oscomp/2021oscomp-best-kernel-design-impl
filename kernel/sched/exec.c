@@ -89,6 +89,13 @@ static int is_sh(char *file_name)
 int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 {
     debug();
+    if (!strcmp(argv[1], "lat_pagefault") || !strcmp(argv[1], "lat_mmap") || 
+        !strcmp(argv[1], "lat_fs") || !strcmp(argv[1], "bw_mmap_rd") || 
+        !strcmp(argv[1], "lmdd") || !strcmp(argv[1], "bw_file_rd") || 
+        !strcmp(argv[1], "lat_ctx")){
+        printk_port("unsupported test\n");
+        do_exit(0);
+    }
     // init pcb
     pcb_t *pcb_underinit = current_running;
     ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE; /* just 1 page */

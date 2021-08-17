@@ -137,14 +137,6 @@ typedef struct fd{
 #pragma pack()
 
 #pragma pack(8)
-struct pcb_siginfo{
-    sigaction_t sigaction;
-    reg_t sepc;
-    reg_t user_sp;
-};
-#pragma pack()
-
-#pragma pack(8)
 /* Process Control Block */
 struct pcb
 {
@@ -239,10 +231,10 @@ struct pcb
     timer_t itimer;
 
     /* signal handler */
-    struct pcb_siginfo siginfo[NUM_SIG];
-    uint8_t sig_recv[NUM_SIG];
-    uint8_t sig_pend[NUM_SIG];
-    uint8_t sig_mask[NUM_SIG];
+    sigaction_t sigactions[NUM_SIG];
+    uint64_t sig_recv;
+    uint64_t sig_pend;
+    uint64_t sig_mask;
 };
 #pragma pack()
 typedef struct pcb pcb_t;
@@ -445,4 +437,10 @@ static inline void detach_from_parent(pcb_t *pcb)
 {
     pcb->parent.parent = NULL;
 }
+
+static inline uint8_t is_sig_recved(pcb_t *pcb)
+{
+    return (pcb->sig_recv != 0);
+}
+
 #endif

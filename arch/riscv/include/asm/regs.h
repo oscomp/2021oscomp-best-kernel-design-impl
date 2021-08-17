@@ -88,4 +88,25 @@
 
 #define SWITCH_TO_SIZE   120
 
+/* offset in signal */
+#define SIGNAL_CONTEXT_RA     0
+#define SIGNAL_CONTEXT_SP     8
+#define SIGNAL_CONTEXT_S0     16
+#define SIGNAL_CONTEXT_S1     24
+#define SIGNAL_CONTEXT_S2     32
+#define SIGNAL_CONTEXT_S3     40
+#define SIGNAL_CONTEXT_S4     48
+#define SIGNAL_CONTEXT_S5     56
+#define SIGNAL_CONTEXT_S6     64
+#define SIGNAL_CONTEXT_S7     72
+#define SIGNAL_CONTEXT_S8     80
+#define SIGNAL_CONTEXT_S9     88
+#define SIGNAL_CONTEXT_S10    96
+#define SIGNAL_CONTEXT_S11    104
+#define SIGNAL_CONTEXT_KERNEL_SP 112
+#define SIGNAL_CONTEXT_USER_SP 120
+#define SIGNAL_CONTEXT_MASK   128
+
+#define SIGNAL_CONTEXT_SIZE 136
+
 #endif

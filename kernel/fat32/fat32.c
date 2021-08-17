@@ -298,15 +298,18 @@ int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 
                 for (uint8 i = 0; i < NUM_FD; ++i)
                 {
                     if (!set_fd(current_running, i, p, &dir_pos, flags)){
+                        log(0, "open success");
                         debug();                        
                         kfree(buf);
                         return current_running->fd[i].fd_num; // use i as index
                     }
                 }
                 // no available fd
+                return SYSCALL_FAILED;
             }
             // 2.create
             else if ((flags & O_CREAT) != 0){
+                log(0, "create fn:%s", temp1);
                 ientry_t new_clus = _create_new_file(temp1, now_clus, buf, &dir_pos, FILE_FILE);
                 assert(dir_pos.sec == BUFF_ALIGN(dir_pos.sec));
                 sd_read(buf, dir_pos.sec);
@@ -320,6 +323,7 @@ int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 
                     }
                 }
                 // no available fd
+                return SYSCALL_FAILED;
             }
             kfree(buf);
             return (int32_t)(-ENOENT);
@@ -502,6 +506,7 @@ uchar unicode2char(uint16_t unich)
 {
     return (unich >= 65 && unich <= 90)? unich - 65 + 'A' :
         (unich >= 97 && unich <= 122)? unich - 97 + 'a' :
+        (unich >= 30 && unich <= 39)? unich - 30 + '0':
         (unich == 95)? '_' : 
         (unich == 46)? '.':
         (unich == 0x20)? ' ':
@@ -512,6 +517,7 @@ unicode_t char2unicode(char ch)
 {
     return (ch >= 'A' && ch <= 'Z')? 65 + ch - 'A' :
             (ch >= 'a' && ch <= 'z')? 97 + ch - 'a':
+            (ch >= '0' && ch <= '9')? 30 + ch - '0':
             (ch == '_')? 95 :
             (ch == '.')? 46 :
             (ch == ' ')? 0x20:

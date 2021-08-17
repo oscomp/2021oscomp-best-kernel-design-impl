@@ -261,6 +261,9 @@ switch_to_restore:
 ENDPROC(switch_to)
 
 ENTRY(ret_from_exception)
+  sd sp, PCB_KERNEL_SP(tp)
+  call handle_signal
+  ld sp, PCB_KERNEL_SP(tp)
   RESTORE_CONTEXT
   sret
 ENDPROC(ret_from_exception)

@@ -123,8 +123,12 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     // printk_port("pgdir: %lx\n", current_running->pgdir);
     /* if not valid address, go handle other */
     if (stval >= 0xffffffff00000000lu || stval < current_running->elf.text_begin){
-        log(0, "invalid addr");
-        handle_other(regs,stval,cause);
+        if (stval == do_rt_sigreturn)
+            do_rt_sigreturn();
+        else{
+            log(0, "invalid addr");
+            handle_other(regs,stval,cause);
+        }
     }
     // uint64_t satp = read_satp();
     // uint64_t va = stval;
@@ -165,41 +169,36 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     //     // log(0, "1");
     //     if (!get_attribute(*ptr,_PAGE_SWAP)){
     //         // log(0, "2");
-            for (uint8_t i = 0; i < NUM_PHDR_IN_PCB; i++){
-                Elf64_Phdr *phdr = (Elf64_Phdr *)(&current_running->phdr[i]);
-                if (stval >= phdr->p_vaddr && stval < phdr->p_vaddr + phdr->p_memsz)
-                {
-                    /* it is in ELF file */
-                    fat32_lseekmy(PAGE_ALIGN(stval - phdr->p_vaddr + phdr->p_offset), SEEK_SET);
-                    alloc_page_helper(stval, current_running->pgdir, _PAGE_ALL_MOD); /* FOR NOW all mod */
-                    /* now we can access this address */
-                    unsigned char *stval_page_uva = PAGE_ALIGN(stval);
-                    fat32_readmy(stval_page_uva, NORMAL_PAGE_SIZE);
-                    uint64_t data_top = phdr->p_vaddr + phdr->p_filesz;
-                    if (phdr->p_filesz < phdr->p_memsz && stval >= PAGE_ALIGN(data_top)){
-                        /* should pad 0 for bss */                        
-                        if (PAGE_ALIGN(stval) == PAGE_ALIGN(data_top)){ 
-                            for (uint64_t pos = PAGE_OFFSET(data_top); pos < NORMAL_PAGE_SIZE; pos++)
-                                stval_page_uva[pos] = 0; /* just pad part of this page */
-                        }
-                        else
-                            for (uint64_t pos = 0; pos < NORMAL_PAGE_SIZE; pos++)
-                                stval_page_uva[pos] = 0; /* pad all page */
-                    }
-                    // if (i == 1 && stval == 0x121478){
-                    //     uint64_t test = get_kva_of(PAGE_ALIGN(stval), current_running->pgdir);
-                    //     uint64_t *test2 = (uint64_t *)test;
-                    //     for (uint64_t k = 0; k < NORMAL_PAGE_SIZE / 8; k++){
-                    //         log(0, "%lx:%lx", test2, *test2);
-                    //         test2++;
-                    //     }
-                    //     while(1);
-                    // }
-                    // log(0, "handle pgfault success");
-                    return ;
+
+    for (uint8_t i = 0; i < NUM_PHDR_IN_PCB; i++){
+        Elf64_Phdr *phdr = (Elf64_Phdr *)(&current_running->phdr[i]);
+        if (stval >= phdr->p_vaddr && stval < phdr->p_vaddr + phdr->p_memsz)
+        {
+            /* it is in ELF file */
+            fat32_lseekmy(PAGE_ALIGN(stval - phdr->p_vaddr + phdr->p_offset), SEEK_SET);
+            alloc_page_helper(stval, current_running->pgdir, _PAGE_ALL_MOD); /* FOR NOW all mod */
+            /* now we can access this address */
+            unsigned char *stval_page_uva = PAGE_ALIGN(stval);
+            fat32_readmy(stval_page_uva, NORMAL_PAGE_SIZE);
+            uint64_t data_top = phdr->p_vaddr + phdr->p_filesz;
+            if (phdr->p_filesz < phdr->p_memsz && stval >= PAGE_ALIGN(data_top)){
+                /* should pad 0 for bss */                        
+                if (PAGE_ALIGN(stval) == PAGE_ALIGN(data_top)){ 
+                    for (uint64_t pos = PAGE_OFFSET(data_top); pos < NORMAL_PAGE_SIZE; pos++)
+                        stval_page_uva[pos] = 0; /* just pad part of this page */
                 }
+                else
+                    for (uint64_t pos = 0; pos < NORMAL_PAGE_SIZE; pos++)
+                        stval_page_uva[pos] = 0; /* pad all page */
             }
-            handle_other(regs,stval,cause);
+            return ;
+        }
+    }
+    // handle_other(regs,stval,cause);
+    log2(0, "stval is %lx", stval);
+    local_flush_tlb_all();
+    do_kill(current_running->tid, SIGSEGV);
+    return ;
             // if (cause == EXCC_INST_ACCESS || cause == EXCC_INST_PAGE_FAULT)
             //     set_attribute(ptr,_PAGE_ALL_MOD|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_PRESENT|_PAGE_USER);
             // else if (cause == EXCC_LOAD_ACCESS || cause == EXCC_LOAD_PAGE_FAULT)
@@ -240,6 +239,7 @@ void handle_software()
 
 void handle_other(regs_context_t *regs, uint64_t stval, uint64_t cause)
 {
+    printk_port("pid is %d, tid is %d\n", current_running->pid, current_running->tid);
     char* reg_name[] = {
         "zero "," ra  "," sp  "," gp  "," tp  ",
         " t0  "," t1  "," t2  ","s0/fp"," s1  ",

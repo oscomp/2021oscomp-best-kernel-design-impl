@@ -21,7 +21,7 @@ ifeq ($(TARGET), qemu)
 	CFLAGS += -Iqemu
 	USER_CFLAGS += -Iqemu
 endif
-K210_SERIALPORT	= /dev/ttyUSB0
+K210_SERIALPORT	= /dev/ttyUSB5
 
 START_QEMU_ENTRY = 0x80200000
 
@@ -33,8 +33,9 @@ USER_CFLAGS += -Iarch/$(ARCH)/include
 USER_LDFLAGS = $(ARCH_DIR)/crt0.o
 
 SRC_HEAD	= $(ARCH_DIR)/kernel/head.S $(ARCH_DIR)/kernel/boot.c payload.c ./libs/string.c
-SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S $(ARCH_DIR)/sbi/common.c
-SRC_SCREEN	= ./drivers/screen.c
+SRC_ARCH	= $(ARCH_DIR)/kernel/trap.S $(ARCH_DIR)/kernel/entry.S $(ARCH_DIR)/kernel/start.S $(ARCH_DIR)/kernel/smp.S \
+			$(ARCH_DIR)/sbi/common.c $(ARCH_DIR)/kernel/signal.S
+SRC_SCREEN	= ./drivers/screen.c 
 SRC_SDCARD	= ${ARCH_SD}/sdcard.c ${ARCH_SD}/fpioa.c ${ARCH_SD}/gpiohs.c ${ARCH_SD}/spi.c ${ARCH_SD}/utils.c \
 				${ARCH_SD}/disk.c ${ARCH_SD}/plic.c
 SRC_SDCARD  += ${ARCH_SD}/virtio_disk.c

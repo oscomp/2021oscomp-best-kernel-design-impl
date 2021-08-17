@@ -169,7 +169,7 @@ int main()
     init_pcb();
     printk_port("> [INIT] PCB initialization succeeded.\n\r");
     // // read CPU frequency
-    time_base = TIMEBASE / TICKCOUNT;
+    time_base = TIMEBASE;
     // init interrupt (^_^)
     init_exception();
     printk_port("> [INIT] Interrupt processing initialization succeeded.\n\r");
@@ -225,7 +225,7 @@ int main()
     init_screen();
     printk("> [INIT] SCREEN initialization succeeded.\n\r");
     // Setup timer interrupt and enable all interrupt
-    sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY) * 100);
+    sbi_set_timer(get_ticks() + (time_base / PREEMPT_FREQUENCY));
     /* setup exception */
     clear_interrupt();
     setup_exception();
