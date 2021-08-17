@@ -1,108 +1,95 @@
-# 
-# The floating-point registers context.
-# 
-# When switching process, call here to save/restore the floating-point registers.
-# We don't bother to save those register during trap, since the kernel doesn't
-# touch any of them. But technically speaking, this should be trap's work.
-# 
-# Those registers are stored in trapframes.
-# 
 
-# void floatstore(struct trapframe *tf);
-.globl floatstore
-floatstore:
+	.globl floatstore 
+floatstore: 
+	addi	sp,sp,-16
+	sd	s0,8(sp)
+	sd	s1,0(sp)
+	addi	s0,sp,16
 
-	# Save them on trapframe, where is actully a page.
-	addi sp, sp, -16
-	sd s0, 8(sp)
-	sd s1, 0(sp)
-	addi s0, sp, 16
-
-	fsd ft0, 288(a0)
-	fsd ft1, 296(a0)
-	fsd ft2, 304(a0)
-	fsd ft3, 312(a0)
-	fsd ft4, 320(a0)
-	fsd ft5, 328(a0)
-	fsd ft6, 336(a0)
-	fsd ft7, 344(a0)
-	fsd fs0, 352(a0)
-	fsd fs1, 360(a0)
-	fsd fa0, 368(a0)
-	fsd fa1, 376(a0)
-	fsd fa2, 384(a0)
-	fsd fa3, 392(a0)
-	fsd fa4, 400(a0)
-	fsd fa5, 408(a0)
-	fsd fa6, 416(a0)
-	fsd fa7, 424(a0)
-	fsd fs2, 432(a0)
-	fsd fs3, 440(a0)
-	fsd fs4, 448(a0)
-	fsd fs5, 456(a0)
-	fsd fs6, 464(a0)
-	fsd fs7, 472(a0)
-	fsd fs8, 480(a0)
-	fsd fs9, 488(a0)
-	fsd fs10, 496(a0)
-	fsd fs11, 504(a0)
-	fsd ft8, 512(a0)
-	fsd ft9, 520(a0)
-	fsd ft10, 528(a0)
-	fsd ft11, 536(a0)
-
-	frcsr s1
-	sd s1, 544(a0)
-
-	ld s0, 8(sp)
-	ld s1, 0(sp)
-	addi sp, sp, 16
+	.word 	0x12053027
+	.word 	0x12153427
+	.word 	0x12253827
+	.word 	0x12353c27
+	.word 	0x14453027
+	.word 	0x14553427
+	.word 	0x14653827
+	.word 	0x14753c27
+	.word 	0x16853027
+	.word 	0x16953427
+	.word 	0x16a53827
+	.word 	0x16b53c27
+	.word 	0x18c53027
+	.word 	0x18d53427
+	.word 	0x18e53827
+	.word 	0x18f53c27
+	.word 	0x1b053027
+	.word 	0x1b153427
+	.word 	0x1b253827
+	.word 	0x1b353c27
+	.word 	0x1d453027
+	.word 	0x1d553427
+	.word 	0x1d653827
+	.word 	0x1d753c27
+	.word 	0x1f853027
+	.word 	0x1f953427
+	.word 	0x1fa53827
+	.word 	0x1fb53c27
+	.word 	0x21c53027
+	.word 	0x21d53427
+	.word 	0x21e53827
+	.word 	0x21f53c27
+  	
+	frcsr	s1
+  	sd	s1,544(a0)
+	
+	ld	s0,8(sp)
+	ld	s1,0(sp)
+	addi	sp,sp,16
+	
 	ret
 
-# void floatload(struct trapframe *tf);
-.globl floatload
-floatload:
+	.globl floatload
+floatload: 
+	addi	sp,sp,-16
+	sd	s0,8(sp)
+	addi	s0,sp,16
 
-	addi sp, sp, -16
-	sd s0, 8(sp)
-	addi s0, sp, 16
-
-	fld ft0, 288(a0)
-	fld ft1, 296(a0)
-	fld ft2, 304(a0)
-	fld ft3, 312(a0)
-	fld ft4, 320(a0)
-	fld ft5, 328(a0)
-	fld ft6, 336(a0)
-	fld ft7, 344(a0)
-	fld fs0, 352(a0)
-	fld fs1, 360(a0)
-	fld fa0, 368(a0)
-	fld fa1, 376(a0)
-	fld fa2, 384(a0)
-	fld fa3, 392(a0)
-	fld fa4, 400(a0)
-	fld fa5, 408(a0)
-	fld fa6, 416(a0)
-	fld fa7, 424(a0)
-	fld fs2, 432(a0)
-	fld fs3, 440(a0)
-	fld fs4, 448(a0)
-	fld fs5, 456(a0)
-	fld fs6, 464(a0)
-	fld fs7, 472(a0)
-	fld fs8, 480(a0)
-	fld fs9, 488(a0)
-	fld fs10, 496(a0)
-	fld fs11, 504(a0)
-	fld ft8, 512(a0)
-	fld ft9, 520(a0)
-	fld ft10, 528(a0)
-	fld ft11, 536(a0)
-
-	ld a0, 544(a0)
-	fscsr a0
-
-	ld s0, 8(sp)
-	addi sp, sp, 16
+	.word 	0x12053007
+	.word 	0x12853087
+	.word 	0x13053107
+	.word 	0x13853187
+	.word 	0x14053207
+	.word 	0x14853287
+	.word 	0x15053307
+	.word 	0x15853387
+	.word 	0x16053407
+	.word 	0x16853487
+	.word 	0x17053507
+	.word 	0x17853587
+	.word 	0x18053607
+	.word 	0x18853687
+	.word 	0x19053707
+	.word 	0x19853787
+	.word 	0x1a053807
+	.word 	0x1a853887
+	.word 	0x1b053907
+	.word 	0x1b853987
+	.word 	0x1c053a07
+	.word 	0x1c853a87
+	.word 	0x1d053b07
+	.word 	0x1d853b87
+	.word 	0x1e053c07
+	.word 	0x1e853c87
+	.word 	0x1f053d07
+	.word 	0x1f853d87
+	.word 	0x20053e07
+	.word 	0x20853e87
+	.word 	0x21053f07
+	.word 	0x21853f87
+	
+	ld	a0,544(a0)
+	fscsr	a0
+	
+	ld	s0,8(sp)
+	addi	sp,sp,16
 	ret
