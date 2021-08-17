@@ -1,5 +1,5 @@
-# platform	:= k210
-platform	:= qemu
+platform	:= k210
+# platform	:= qemu
 # mode 		:= debug
 mode		:= release
 
@@ -20,7 +20,8 @@ OBJDUMP	:= $(TOOLPREFIX)objdump
 QEMU	:= qemu-system-riscv64
 
 # flags
-CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -g
+# CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb -g
+CFLAGS = -Wall -O -fno-omit-frame-pointer -ggdb -g
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
