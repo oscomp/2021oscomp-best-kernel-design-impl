@@ -14,3 +14,6 @@
 [submodule "rCore-N"]
 	path = rCore-N
 	url = https://github.com/duskmoon314/rCore-N.git
+[submodule "labeled-RISC-V-N"]
+	path = labeled-RISC-V-N
+	url = https://github.com/Gallium70/labeled-RISC-V-N.git
