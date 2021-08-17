@@ -8,14 +8,15 @@
 #define SIGRTMAX	64
 
 // Some other signals 
-#define SIGTERM 	15
-#define SIGKILL		9
-#define SIGABRT		6
-#define SIGHUP		1
-#define SIGINT		2
-#define SIGQUIT		3
-#define SIGILL		4
-#define SIGTRAP		5
+#define SIGTERM 		15
+#define SIGCHLD 		20
+#define SIGKILL			9
+#define SIGABRT			6
+#define SIGHUP			1
+#define SIGINT			2
+#define SIGQUIT			3
+#define SIGILL			4
+#define SIGTRAP			5
 
 // Signal Flags
 #define SA_NOCLDSTOP	0x00000001
@@ -56,13 +57,15 @@ typedef struct __ksigaction_t {
 int set_sigaction(
 	int signum, 
 	struct sigaction const *act, 
-	struct sigaction *oldact
+	struct sigaction *oldact, 
+	int len
 );
 
 int sigprocmask(
 	int how, 
 	__sigset_t *set, 
-	__sigset_t *oldset
+	__sigset_t *oldset, 
+	int len
 );
 
 struct sig_frame {
