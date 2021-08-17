@@ -9,8 +9,8 @@ T := target
 BUILD_DIR := build
 
 # config toolchain
-# TOOLPREFIX 	:= riscv64-unknown-elf-
-TOOLPREFIX	:= riscv64-linux-gnu-
+TOOLPREFIX 	:= riscv64-unknown-elf-
+# TOOLPREFIX	:= riscv64-linux-gnu-
 CC 		:= $(TOOLPREFIX)gcc
 AS		:= $(TOOLPREFIX)gas
 LD		:= $(TOOLPREFIX)ld
