@@ -1,7 +1,7 @@
 # platform	:= k210
 platform	:= qemu
-mode 		:= debug
-# mode		:= release
+# mode 		:= debug
+mode		:= release
 
 K := kernel
 U := xv6-user
@@ -259,6 +259,12 @@ UPROGS=\
 	$U/_signal_test
 
 user: $(UPROGS)
+
+ostest: $U/ostest2.c $U/usys.o
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -I. -Ikernel -c $U/ostest2.c -o $U/ostest2.o
+	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o $U/ostest2.out $U/ostest2.o $U/usys.o
+	$(OBJCOPY) -S -O binary $U/ostest2.out $U/ostest2
+	$(OBJDUMP) -S $U/ostest2.o > $U/ostest2.asm
 
 dst=/mnt
 
