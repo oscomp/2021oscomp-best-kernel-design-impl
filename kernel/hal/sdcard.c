@@ -681,24 +681,22 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 						b->sectorno << 9 :
 						b->sectorno;
 
-	// int ret;
-	// sd_send_cmd(SD_CMD55, 0, 0);
-	// ret = sd_get_response_R1();
-	// sd_end_cmd();
-	// if (ret != 0) {
-	// 	printf(__ERROR("CMD55")" error\n");
-	// 	return -EIO;
-	// }
+	int ret;
+	sd_send_cmd(SD_CMD55, 0, 0);
+	ret = sd_get_response_R1();
+	sd_end_cmd();
+	if (ret != 0) {
+		printf(__ERROR("CMD55")" error\n");
+		return -EIO;
+	}
 
-	// sd_send_cmd(SD_ACMD23, nbuf, 0);
-	// ret = sd_get_response_R1();
-	// sd_end_cmd();
-	// if (ret != 0) {
-	// 	printf(__ERROR("ACMD23")" error\n");
-	// 	return -EIO;
-	// }
-
-	printf("nbuf = %d, sectorno = %d\n", nbuf, b->sectorno);
+	sd_send_cmd(SD_ACMD23, nbuf, 0);
+	ret = sd_get_response_R1();
+	sd_end_cmd();
+	if (ret != 0) {
+		printf(__ERROR("ACMD23")" error\n");
+		return -EIO;
+	}
 
 	sd_send_cmd(SD_CMD25, address, 0);
 	if (sd_get_response_R1() != 0) {
@@ -804,7 +802,7 @@ void sdcard_write_start(void)
 	int nbuf = 1;
 
 	uint32 sec = b->sectorno;
-	for (dl = dl->next; dl != &sd_wqueue.head; dl = dl->next) {
+	for (dl = dl->next; dl != &sd_wqueue.head && nbuf < 8; dl = dl->next) {
 		struct buf *next = container_of(dl, struct buf, list);
 		if (next->sectorno == ++sec)	// consecutive sector
 			nbuf++;
@@ -922,7 +920,7 @@ void sdcard_intr(void)
 		uint32 sec = bnext->sectorno;
 
 		// preview the consecutive count
-		for (dl = dl->next; dl != &sd_wqueue.head; dl = dl->next) {
+		for (dl = dl->next; dl != &sd_wqueue.head && nbuf < 8; dl = dl->next) {
 			struct buf *next = container_of(dl, struct buf, list);
 			if (next->sectorno == ++sec)	// consecutive sector
 				nbuf++;

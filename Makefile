@@ -173,7 +173,7 @@ $(SBI):
 # explicitly compile SBI 
 sbi: 
 	cd ./sbi/psicasbi && cargo build --no-default-features --features=$(platform)
-	cp ./sbi/psicasbi/target/riscv64imac-unknown-none-elf/$(mode)/psicasbi $(SBI)
+	cp ./sbi/psicasbi/target/riscv64imac-unknown-none-elf/debug/psicasbi $(SBI)
 
 # explicitly clean SBI 
 sbi-clean: 
