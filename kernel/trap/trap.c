@@ -124,6 +124,9 @@ usertrap(void)
 		trapframedump(p->trapframe);
 		printf("idlepages %d\n", idlepages());
 		p->killed = SIGTERM;
+
+		// sync files, so progresses won't be lost even if the panic happens
+		syncfs();
 	}
    
 	if (p->killed) {

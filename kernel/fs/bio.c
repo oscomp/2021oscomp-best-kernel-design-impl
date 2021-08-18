@@ -173,6 +173,7 @@ rescan:
 	 * the identical buf and wake up before us,
 	 * taking a buf then insert into the hash list.
 	 */
+	disk_write_start();
 	nwait++;
 	// printf("\n"__INFO("bget")" sleep\n");
 	sleep(&nwait, &bcachelock);

@@ -769,7 +769,7 @@ static void sdcard_multiple_write_stop(void)
 	}
 }
 
-#define	WRITE_SHRESHOLD	128
+#define	WRITE_SHRESHOLD	512
 
 void sdcard_write_start(void)
 {
@@ -919,7 +919,9 @@ void sdcard_intr(void)
 		sdcard_write(bnext);
 		goto out;
 	}
-	else if (sd_status.rpending || bnext == NULL) {	// race read
+	else if (sd_status.rpending || bnext == NULL ||
+			sd_wqueue_num < WRITE_SHRESHOLD / 4)
+	{	// race read
 		release(&sd_wqueue.lock);
 		sdcard_multiple_write_stop();
 	}
