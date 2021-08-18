@@ -1,0 +1,224 @@
+<svg host="65bd71144e" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1043px" height="642px" viewBox="-0.5 -0.5 1043 642" content="&lt;mxfile scale=&quot;2&quot; border=&quot;0&quot;&gt;&lt;diagram id=&quot;RuhH0QT3dxzTTS79PfAM&quot; name=&quot;第 1 页&quot;&gt;7Vltb5swEP41+TKpE29Jk48NbbpJrbQ1mvax8sABq8amxpRkv35nMAlgukYbSbemH5LA3fntueeOuzBy/WR9LVAa3/IQ05FjheuRezlynPPZGL6VYFMJPG9WCSJBwkpk7wRL8hNroaWlOQlx1jKUnFNJ0rYw4IzhQLZkSAhetM1WnLZXTVGEDcEyQNSUfiehjCvp1DnfyT9hEsX1yvZEny9BtbE+SRajkBcNkXs1cn3BuayukrWPqcKuxqUat3hGu92YwEzuM8CpBjwhmuuzjZzJyHEBaXfevqQw4TxLEVPblhuNxeQxV3udrziTZ1npqQswsJ10XQ6zKkVlrzSMiwTRhq7QSCmlZ1WLWRRLicUZLBcQFpkjJV7LM8LC8phKadXrlRopEMtWYF+PZLjSFlyE7Vm3A0OSpRRtKilhlNRjVpQj2ZmoPjZcRepXkCx4ug/S/D7k94TB3kWeyho1wL8CrjJ+DmKnhawjeA4HVI5S6iImEi9h50pbQFiBLJYJ4HFpK/wJpT6nXMC93qVCd4ESQlWULYhAML0PoQg/d1gShsCGoh+YzlHwEJWrdWZg/Ebp6yVgvo6BSTfNwCcswBENkabfNeYJlmIDJrV2okNB54Kpvi12gTWuoyVuBJVbC5EO5mg79Y7vcKEp309/16D/16vbbyAZf7QMfyhmtUHPpOAPuAu76QlEScTgNsCKGSBQ8BDIJxdakZAwVMv0ernNg328ehy3THu8MoRT6jlaSWng2BgAIUgdLYRsx4Roa9PCyBsCJPu/AMnzXhUk8/EmkYgwJOZFmbFPO8a3EaydMzN94x0qxs3M+5f03QOyA+UBu0Nx14TR7suVtjUEkGMDSH95l70T+yWXHIzZkzfLbGd8VGafG0DmQqXuZ8G0DwZms/SFet2yfL/sVNox1NQMAX/n2enaPfD3lcaD0HhqoB9jmkICgIYoZ4EknJ14kvH2iI6DuWdmuEe1LUQ8qhZYkChSnjrVSOnrVg7mivrZ0oyU4r3AbDXuxy8wXbPA/HLz2X/3x2vVRa7Xm7F6i9WTSVTbf1leSlRDdMOu2Q3/Bvl/ujL1xi8T+YCVqUnlQgBSIMpJejps9rpt1lHZ/Hb6rC6bj9tnuWaflaAgVq8/QEiE2XGd1DOzS/Kjlvmu2YXlSHnE+gAf73RTzd4V/h+kGlW7b1/AlrrGW2z36hc=&lt;/diagram&gt;&lt;/mxfile&gt;">
+    <defs/>
+    <g>
+        <rect x="0" y="0" width="1040" height="640" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="0" y="0" width="160" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 78px; height: 1px; padding-top: 10px; margin-left: 1px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                QEMU 5.0
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="40" y="14" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    QEMU 5.0
+                </text>
+            </switch>
+        </g>
+        <rect x="80" y="80" width="400" height="480" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="560" y="80" width="400" height="480" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="240" y="20" width="80" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 20px; margin-left: 121px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                target/riscv
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="140" y="24" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    target/...
+                </text>
+            </switch>
+        </g>
+        <rect x="100" y="100" width="360" height="200" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="240" y="100" width="80" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 60px; margin-left: 121px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                CSRs
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="140" y="64" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    CSRs
+                </text>
+            </switch>
+        </g>
+        <rect x="100" y="340" width="360" height="200" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="160" y="460" width="240" height="40" rx="6" ry="6" fill="none" stroke="#00cc00" stroke-width="2" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 240px; margin-left: 81px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #00CC00; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                uret
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="140" y="244" fill="#00CC00" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    uret
+                </text>
+            </switch>
+        </g>
+        <rect x="160" y="340" width="240" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 180px; margin-left: 81px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                helper function
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="140" y="184" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    helper function
+                </text>
+            </switch>
+        </g>
+        <rect x="160" y="400" width="240" height="40" rx="6" ry="6" fill="none" stroke="#00cc00" stroke-width="2" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 210px; margin-left: 81px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #00CC00; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                U irq trigger
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="140" y="214" fill="#00CC00" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    U irq trigger
+                </text>
+            </switch>
+        </g>
+        <rect x="720" y="20" width="80" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 20px; margin-left: 361px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                hw/riscv
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="380" y="24" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    hw/riscv
+                </text>
+            </switch>
+        </g>
+        <rect x="720" y="100" width="80" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 38px; height: 1px; padding-top: 60px; margin-left: 361px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                PLIC
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="380" y="64" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    PLIC
+                </text>
+            </switch>
+        </g>
+        <rect x="160" y="160" width="240" height="80" rx="12" ry="12" fill="none" stroke="#00cc00" stroke-width="2" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 100px; margin-left: 81px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #00CC00; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                U CSRs
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="140" y="104" fill="#00CC00" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    U CSRs
+                </text>
+            </switch>
+        </g>
+        <rect x="580" y="100" width="360" height="200" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="640" y="160" width="240" height="80" rx="12" ry="12" fill="none" stroke="#00cc00" stroke-width="2" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 100px; margin-left: 321px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #00CC00; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                write uip
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="380" y="104" fill="#00CC00" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    write uip
+                </text>
+            </switch>
+        </g>
+        <rect x="580" y="340" width="360" height="200" fill="none" stroke="#000000" stroke-width="2" pointer-events="all"/>
+        <rect x="640" y="340" width="240" height="40" fill="none" stroke="none" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 180px; margin-left: 321px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #000000; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                machine virt
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="380" y="184" fill="#000000" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    machine virt
+                </text>
+            </switch>
+        </g>
+        <rect x="640" y="400" width="240" height="80" rx="12" ry="12" fill="none" stroke="#00cc00" stroke-width="2" pointer-events="all"/>
+        <g transform="translate(-0.5 -0.5)scale(2)">
+            <switch>
+                <foreignObject style="overflow: visible; text-align: left;" pointer-events="none" width="100%" height="100%" requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style="display: flex; align-items: unsafe center; justify-content: unsafe center; width: 118px; height: 1px; padding-top: 220px; margin-left: 321px;">
+                        <div style="box-sizing: border-box; font-size: 0; text-align: center; ">
+                            <div style="display: inline-block; font-size: 12px; font-family: Fira Code Retina; color: #00CC00; line-height: 1.2; pointer-events: all; white-space: normal; word-wrap: normal; ">
+                                uart * 4
+                            </div>
+                        </div>
+                    </div>
+                </foreignObject>
+                <text x="380" y="224" fill="#00CC00" font-family="Fira Code Retina" font-size="12px" text-anchor="middle">
+                    uart * 4
+                </text>
+            </switch>
+        </g>
+    </g>
+    <switch>
+        <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility"/>
+        <a transform="translate(0,-5)" xlink:href="https://www.diagrams.net/doc/faq/svg-export-text-problems" target="_blank">
+            <text text-anchor="middle" font-size="10px" x="50%" y="100%">
+                Viewer does not support full SVG 1.1
+            </text>
+        </a>
+    </switch>
+</svg>

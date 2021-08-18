@@ -8,9 +8,13 @@
 
 出于稳定性考虑，我们选择以 [QEMU 的 5.0 稳定分支](https://github.com/qemu/qemu/tree/stable-5.0) 为基础，添加用户态中断所需的寄存器和相应的中断处理函数。
 
+![qemu](assets/qemu.png)
+
 - 添加寄存器 `ustatus` `uip` `uie` `sideleg` `sedeleg` `uepc` `utvec` `ucause` `utval` `uscratch`
 - 添加用户态中断的触发部分：符合条件时使上述处理器进入中断状态
 - 实现 `uret` 指令
+- 修改 PLIC 以支持用户态外部中断
+- 添加串口用于测试
 
 一个使用修改后的 QEMU 进行的用户态中断的简单测试结果：
 
