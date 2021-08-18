@@ -32,7 +32,7 @@ make -j
 
 ### rCore-N
 
-justfile 中默认将 QEMU 的两个串口映射到了 /dev/pts/1 和 /dev/pts/2 ，可以在 Linux 中新打开两个终端，执行 `tty` 指令查看对应的设备路径，替换掉 justfile 中 -serial 后面的参数，并在新终端中执行 [sleep.sh](../../rCore-N/sleep.sh) ，确保键盘输入传入了 QEMU 串口而非 shell 的 stdin/stdout 。
+justfile 中默认将 QEMU 的三个串口映射到了 /dev/pts/24、/dev/pts/25 和 /dev/pts/31，可以在 Linux 中新打开两个终端，执行 `tty` 指令查看对应的设备路径，替换掉 justfile 中 -serial 后面的参数，并在新终端中执行 [sleep.sh](../../rCore-N/sleep.sh) ，确保键盘输入传入了 QEMU 串口而非 shell 的 stdin/stdout 。
 后续可能使用 tmux 重写这一步骤，省去手动配置的过程。
 
 编译、运行：
