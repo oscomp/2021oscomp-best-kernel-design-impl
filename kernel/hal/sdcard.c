@@ -355,6 +355,7 @@ static struct {
 // Protected by their own locks.
 static struct wait_queue sd_rqueue;
 static struct wait_queue sd_wqueue;
+static int sd_wqueue_num;
 
 void sdcard_init(void) {
 	int result = sd_init();
@@ -365,6 +366,7 @@ void sdcard_init(void) {
 	sd_status.rpending = 0;
 	sd_status.wpending = 0;
 	sd_status.wcount = 0;
+	sd_wqueue_num = 0;
 
 	if (0 != result) {
 		panic("sdcard_init failed");
@@ -681,7 +683,7 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 						b->sectorno << 9 :
 						b->sectorno;
 
-	if (nbuf > 16) {
+	if (nbuf >= 16) {
 		int ret;
 		sd_send_cmd(SD_CMD55, 0, 0);
 		ret = sd_get_response_R1();
@@ -767,6 +769,7 @@ static void sdcard_multiple_write_stop(void)
 	}
 }
 
+#define	WRITE_SHRESHOLD	128
 
 void sdcard_write_start(void)
 {
@@ -774,7 +777,7 @@ void sdcard_write_start(void)
 
 	struct d_list *dl = sd_wqueue.head.next;
 	// is the queue empty?
-	if (dl == &sd_wqueue.head) {
+	if (dl == &sd_wqueue.head || sd_wqueue_num < WRITE_SHRESHOLD) {
 		release(&sd_wqueue.lock);
 		return;
 	}
@@ -851,6 +854,7 @@ int sdcard_submit(struct buf *b)
 	if (b->dirty == 0 && b->disk == 0) {
 		dlist_add_before(&sd_wqueue.head, &b->list);
 		res = 0x1;
+		sd_wqueue_num++;
 	}
 	b->dirty = 1;
 
@@ -896,6 +900,8 @@ void sdcard_intr(void)
 	if (b->dirty) {
 		redo = 1;
 		dlist_add_before(&sd_wqueue.head, dl);
+	} else {
+		sd_wqueue_num--;
 	}
 
 	dl = sd_wqueue.head.next;
@@ -903,10 +909,10 @@ void sdcard_intr(void)
 			container_of(dl, struct buf, list);
 	
 	if (--sd_status.wcount > 0) {
-		if (bnext == NULL || bnext->sectorno != b->sectorno + 1) {
-			sdcard_multiple_write_stop();
-			panic("sdcard_intr: bad sd_status.wcount");
-		}
+		// if (bnext == NULL || bnext->sectorno != b->sectorno + 1) {
+		// 	sdcard_multiple_write_stop();
+		// 	panic("sdcard_intr: bad sd_status.wcount");
+		// }
 		bnext->dirty = 0;
 		bnext->disk = 1;
 		release(&sd_wqueue.lock);
@@ -934,7 +940,7 @@ void sdcard_intr(void)
 		bnext->disk = 1;
 		release(&sd_wqueue.lock);
 		// printf("nbuf = %d\n", nbuf);
-		if (nbuf <= 2 && bnext->sectorno == b->sectorno + 1) {
+		if (nbuf < 16 && bnext->sectorno == b->sectorno + 1) {
 			sd_status.wcount = nbuf;
 			sdcard_write(bnext);
 		} else {
