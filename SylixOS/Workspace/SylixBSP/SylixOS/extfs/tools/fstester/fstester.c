@@ -29,8 +29,10 @@ List(FSTESTER_FUNC_NODE) _G_FuncNodeList;
 
 #define GET_ARG(ppcArgV, i)     *(ppcArgV + i);  
 #define IS_STR_SAME(str1, str2) (lib_strcmp(str1, str2) == 0)
+#define MOUNT_FILE_DIRTY_RATE       0.3
 #define CALC_TIME_DIFF(timeStart, timeEnd) (1000 * ((LONG)timeEnd.tv_sec - (LONG)timeStart.tv_sec) +      \
                                            ((timeEnd.tv_usec - timeStart.tv_usec) / 1000.0))              \
+
 /*********************************************************************************************************
 ** 函数名称: __fstester_write_test_file
 ** 功能描述: 写一个固定大小的文件
@@ -226,7 +228,9 @@ VOID fstester_generic_test(FS_TYPE fsType, TEST_TYPE testType, UINT uiLoopTimes,
         fstat(iFdTest, &stat);
     }
 
-    if(testType == TEST_TYPE_MOUNT){        /* 如果测试mount，那么立即关闭该文件 */
+    if(testType == TEST_TYPE_MOUNT){        
+        //! ZN 
+        // 随机写脏一个比例的数据，比例由宏定义MOUNT_FILE_DIRTY_RATE确定
         close(iFdTest);
     }
 

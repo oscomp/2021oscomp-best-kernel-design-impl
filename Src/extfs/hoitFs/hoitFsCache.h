@@ -65,9 +65,8 @@ static inline UINT32 hoitGetSectorOffset(UINT8 sector_no){
     return _G_am29LV160DB_sector_infos[sector_no].sector_start_offset - NOR_FLASH_START_OFFSET;
 }
 /*
-    获取一个flash sector 大小
+    获取一个flash sector 原始大小（64KB）
 */
-//! 2021-07-07 减去EBS区域
 static inline UINT hoitGetSectorSize(UINT8 sector_no){
     sector_no += GET_SECTOR_NO(NOR_FLASH_START_OFFSET);
 
@@ -177,7 +176,10 @@ UINT32              hoitSectorGetNextAddr(PHOIT_CACHE_HDR pcacheHdr,
                                             UINT i, 
                                             UINT32 *obsoleteFlag);
 BOOL                hoitCheckSectorCRC(PHOIT_CACHE_HDR pcacheHdr, 
-                                            UINT32 sector_no);                                                                                                        
+                                            UINT32 sector_no); 
+//! ZN 暂时用不上
+// inline UINT32       hoitPhysToFlash(PHOIT_CACHE_HDR pcacheHdr, 
+//                                             UINT32 phys_addr);                                                                                                       
 #ifdef HOIT_CACHE_TEST
 BOOL    test_hoit_cache();
 #endif

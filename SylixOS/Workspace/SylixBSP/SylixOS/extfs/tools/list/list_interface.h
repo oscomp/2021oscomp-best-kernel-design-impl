@@ -17,6 +17,7 @@
     list = (List##TYPE *)lib_malloc(sizeof(List##TYPE));\
     list->listHeader.next = LW_NULL;\
     list->listHeader.prev = LW_NULL;\
+    list->uiSize          = 0;\
     list->append = NAMESPACE##listAppend##TYPE;\
     list->insert = NAMESPACE##listInsert##TYPE;\
     list->removeIndex = NAMESPACE##listRemoveIndex##TYPE;\

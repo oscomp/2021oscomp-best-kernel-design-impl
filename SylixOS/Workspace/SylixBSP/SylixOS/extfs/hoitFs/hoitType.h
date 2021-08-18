@@ -59,11 +59,11 @@
 /*********************************************************************************************************
   HoitFs 特性宏控
 *********************************************************************************************************/
-// #define  MULTI_THREAD_ENABLE      /* 启用多线程 */
+#define  MULTI_THREAD_ENABLE      /* 启用多线程 */
 #define  EBS_ENABLE               /* 启用EBS */
 #define  WRITE_BUFFER_ENABLE      /* 启用WriteBuffer */
-// #define  BACKGOURND_GC_ENABLE     /* 启用后台GC */
-// #define  CRC_DATA_ENABLE          /*  CRC DATA特性 */
+#define  BACKGOURND_GC_ENABLE     /* 启用后台GC */
+#define  CRC_DATA_ENABLE          /*  CRC DATA特性 */
 //! 07-18 ZN 暂时注释log
 // #define  LOG_ENABLE
 
@@ -88,7 +88,7 @@
 #define HOIT_FLAG_OBSOLETE                  0x00000000
 #define HOIT_ERROR                          100
 #define HOIT_ROOT_DIR_INO                   1   /* HoitFs的根目录的ino为1 */
-#define HOIT_MAX_DATA_SIZE                  4096
+#define HOIT_MAX_DATA_SIZE                  (56*16)
 #define __HOIT_IS_OBSOLETE(pRawHeader)      ((pRawHeader->flag & HOIT_FLAG_NOT_OBSOLETE)    == 0)
 #define __HOIT_IS_TYPE_INODE(pRawHeader)    ((pRawHeader->flag & HOIT_FLAG_TYPE_INODE)  != 0)
 #define __HOIT_IS_TYPE_DIRENT(pRawHeader)   ((pRawHeader->flag & HOIT_FLAG_TYPE_DIRENT) != 0)
@@ -97,9 +97,21 @@
 #define __HOIT_VOLUME_LOCK(pfs)             API_SemaphoreMPend(pfs->HOITFS_hVolLock, \
                                             LW_OPTION_WAIT_INFINITE)
 #define __HOIT_VOLUME_UNLOCK(pfs)           API_SemaphoreMPost(pfs->HOITFS_hVolLock)
-#define GET_FREE_LIST(pfs)   pfs->HOITFS_freeSectorList
-#define GET_DIRTY_LIST(pfs)   pfs->HOITFS_dirtySectorList
-#define GET_CLEAN_LIST(pfs)   pfs->HOITFS_cleanSectorList
+
+#define __HOIT_DIRTY_LOCK(pfs)              API_SemaphoreMPend(pfs->HOITFS_dirtyLock, \
+                                            LW_OPTION_WAIT_INFINITE)
+#define __HOIT_DIRTY_UNLOCK(pfs)           API_SemaphoreMPost(pfs->HOITFS_dirtyLock)
+#define __HOIT_CLEAN_LOCK(pfs)              API_SemaphoreMPend(pfs->HOITFS_cleanLock, \
+                                            LW_OPTION_WAIT_INFINITE)
+#define __HOIT_CLEAN_UNLOCK(pfs)           API_SemaphoreMPost(pfs->HOITFS_cleanLock)
+#define __HOIT_FREE_LOCK(pfs)              API_SemaphoreMPend(pfs->HOITFS_freeLock, \
+                                            LW_OPTION_WAIT_INFINITE)
+#define __HOIT_FREE_UNLOCK(pfs)           API_SemaphoreMPost(pfs->HOITFS_freeLock)
+
+
+#define GET_FREE_LIST(pfs)                  pfs->HOITFS_freeSectorList
+#define GET_DIRTY_LIST(pfs)                 pfs->HOITFS_dirtySectorList
+#define GET_CLEAN_LIST(pfs)                 pfs->HOITFS_cleanSectorList
 #define __HOIT_MIN_4_TIMES(value)           ((value+3)/4*4) /* 将value扩展到4的倍数 */
 
 /*********************************************************************************************************
@@ -128,6 +140,7 @@ typedef struct HOIT_FULL_DIRENT           HOIT_FULL_DIRENT;
 typedef struct HOIT_INODE_CACHE           HOIT_INODE_CACHE;
 typedef struct HOIT_INODE_INFO            HOIT_INODE_INFO;
 typedef struct HOIT_ERASABLE_SECTOR       HOIT_ERASABLE_SECTOR;
+typedef struct HOIT_ERASABLE_SECTOR_REF   HOIT_ERASABLE_SECTOR_REF;
 typedef struct HOIT_LOG_SECTOR            HOIT_LOG_SECTOR;
 typedef struct hoit_rb_node               HOIT_RB_NODE;
 typedef struct hoit_rb_tree               HOIT_RB_TREE;
@@ -156,6 +169,7 @@ typedef HOIT_FULL_DIRENT*                 PHOIT_FULL_DIRENT;
 typedef HOIT_INODE_CACHE*                 PHOIT_INODE_CACHE;
 typedef HOIT_INODE_INFO*                  PHOIT_INODE_INFO;
 typedef HOIT_ERASABLE_SECTOR*             PHOIT_ERASABLE_SECTOR;
+typedef HOIT_ERASABLE_SECTOR_REF*         PHOIT_ERASABLE_SECTOR_REF;
 typedef HOIT_LOG_SECTOR*                  PHOIT_LOG_SECTOR;
 typedef HOIT_RB_NODE *                    PHOIT_RB_NODE;
 typedef HOIT_RB_TREE *                    PHOIT_RB_TREE;
@@ -176,9 +190,7 @@ typedef HOIT_MERGE_BUFFER *               PHOIT_MERGE_BUFFER;
 typedef HOIT_MERGE_ENTRY *                PHOIT_MERGE_ENTRY;
 DEV_HDR          HOITFS_devhdrHdr;
 
-DECLARE_LIST_TEMPLATE(HOIT_ERASABLE_SECTOR);
-DECLARE_LIST_TEMPLATE(HOIT_FRAG_TREE_NODE);
-
+DECLARE_LIST_TEMPLATE(HOIT_ERASABLE_SECTOR_REF);
 // USE_LIST_TEMPLATE(hoitType, HOIT_FRAG_TREE_NODE);
 /*********************************************************************************************************
   HoitFs super block类型
@@ -207,16 +219,21 @@ typedef struct HOIT_VOLUME{
     PHOIT_ERASABLE_SECTOR   HOITFS_now_sector;
     
                                                                            /*! GC 相关 */
-    PHOIT_ERASABLE_SECTOR           HOITFS_erasableSectorList;                     /* 可擦除Sector列表 */
-    List(HOIT_ERASABLE_SECTOR)      HOITFS_dirtySectorList;                     /* 含有obsolete的块 */ 
-    List(HOIT_ERASABLE_SECTOR)      HOITFS_cleanSectorList;                     /* 不含obsolete的块 */
-    List(HOIT_ERASABLE_SECTOR)      HOITFS_freeSectorList;                      /* 啥都不含的块 */
-    Iterator(HOIT_ERASABLE_SECTOR)  HOITFS_sectorIterator;                      /* 统一sector迭代器 */
+    PHOIT_ERASABLE_SECTOR           HOITFS_erasableSectorList;                  /* 可擦除Sector列表 */
+
+    List(HOIT_ERASABLE_SECTOR_REF)      HOITFS_dirtySectorList;                     /* 含有obsolete的块 */ 
+    List(HOIT_ERASABLE_SECTOR_REF)      HOITFS_cleanSectorList;                     /* 不含obsolete的块 */
+    List(HOIT_ERASABLE_SECTOR_REF)      HOITFS_freeSectorList;                      /* 啥都不含的块 */
+    Iterator(HOIT_ERASABLE_SECTOR_REF)  HOITFS_sectorIterator;                      /* 统一sector迭代器 */
     
+    LW_OBJECT_HANDLE                    HOITFS_dirtyLock;                 /* dirty 列表锁 */
+    LW_OBJECT_HANDLE                    HOITFS_cleanLock;                 /* dirty 列表锁 */
+    LW_OBJECT_HANDLE                    HOITFS_freeLock;                  /* dirty 列表锁 */
+
     PHOIT_ERASABLE_SECTOR   HOITFS_curGCSector;                            /* 当前正在GC的Sector */
     LW_OBJECT_HANDLE        HOITFS_GCMsgQ;                                 /* GC线程消息队列*/
     LW_OBJECT_HANDLE        HOITFS_hGCThreadId;                            /* GC总线程ID */
-    BOOL                    HOITFS_bShouldKillGC;
+    BOOL                    HOITFS_bShouldKillGC;                          /* 是否停止后台GC */
     
     ULONG                   ulGCForegroundTimes;                           /* GC前台计数 */
     ULONG                   ulGCBackgroundTimes;                           /* GC后台计数 */
@@ -357,6 +374,10 @@ struct HOIT_ERASABLE_SECTOR{  //100B
     PHOIT_RAW_INFO                HOITS_pRawInfoLastGC;                           /* 最后一块应当被GC的Raw Info */
   
     ULONG                         HOITS_tBornAge;                                 /* 当前Sector的出生时间 */                        
+};
+
+struct HOIT_ERASABLE_SECTOR_REF {
+    PHOIT_ERASABLE_SECTOR  pErasableSetcor;
 };
 
 struct HOIT_LOG_SECTOR{
@@ -555,6 +576,9 @@ static inline PVOID hoit_malloc(PHOIT_VOLUME pfs, size_t stNBytes){
 }
 
 static inline PVOID hoit_free(PHOIT_VOLUME pfs, PVOID pvPtr, size_t stNBytes){
+    if(pvPtr == LW_NULL){
+        return;
+    }
     pfs->HOITFS_ulCurBlk -= stNBytes;
     lib_free(pvPtr);
 }

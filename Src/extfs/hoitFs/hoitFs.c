@@ -108,7 +108,7 @@ INT  API_HoitFsDrvInstall(VOID)
                                            API 函数
 *********************************************************************************************************/
 #define NAMESPACE   hoitFs
-USE_LIST_TEMPLATE(NAMESPACE, HOIT_ERASABLE_SECTOR);
+USE_LIST_TEMPLATE(NAMESPACE, HOIT_ERASABLE_SECTOR_REF);
 LW_API
 INT  API_HoitFsDevCreate(PCHAR   pcName, PLW_BLK_DEV  pblkd)
 {
@@ -148,6 +148,32 @@ INT  API_HoitFsDevCreate(PCHAR   pcName, PLW_BLK_DEV  pblkd)
         return  (PX_ERROR);
     }
 
+    /* 建立三个链表锁 */
+    pfs->HOITFS_dirtyLock = API_SemaphoreMCreate("hoit_dirty_lock", LW_PRIO_DEF_CEILING,
+        LW_OPTION_WAIT_PRIORITY | LW_OPTION_DELETE_SAFE |
+        LW_OPTION_INHERIT_PRIORITY | LW_OPTION_OBJECT_GLOBAL,
+        LW_NULL);
+    if (!pfs->HOITFS_dirtyLock) {                                      /*  无法创建卷锁                */
+        hoit_free(pfs, pfs, sizeof(HOIT_VOLUME));
+        return  (PX_ERROR);
+    }
+    pfs->HOITFS_cleanLock = API_SemaphoreMCreate("hoit_clean_lock", LW_PRIO_DEF_CEILING,
+        LW_OPTION_WAIT_PRIORITY | LW_OPTION_DELETE_SAFE |
+        LW_OPTION_INHERIT_PRIORITY | LW_OPTION_OBJECT_GLOBAL,
+        LW_NULL);
+    if (!pfs->HOITFS_cleanLock) {                                      /*  无法创建卷锁                */
+        hoit_free(pfs, pfs, sizeof(HOIT_VOLUME));
+        return  (PX_ERROR);
+    }
+    pfs->HOITFS_freeLock = API_SemaphoreMCreate("hoit_free_lock", LW_PRIO_DEF_CEILING,
+        LW_OPTION_WAIT_PRIORITY | LW_OPTION_DELETE_SAFE |
+        LW_OPTION_INHERIT_PRIORITY | LW_OPTION_OBJECT_GLOBAL,
+        LW_NULL);
+    if (!pfs->HOITFS_freeLock) {                                      /*  无法创建卷锁                */
+        hoit_free(pfs, pfs, sizeof(HOIT_VOLUME));
+        return  (PX_ERROR);
+    }
+
     pfs->HOITFS_mode            = S_IFDIR | DEFAULT_DIR_PERM;
     pfs->HOITFS_uid             = getuid();
     pfs->HOITFS_gid             = getgid();
@@ -163,15 +189,16 @@ INT  API_HoitFsDevCreate(PCHAR   pcName, PLW_BLK_DEV  pblkd)
 
                                                                         /* GC相关 */
     pfs->HOITFS_curGCSector        = LW_NULL;
+    pfs->HOITFS_GCMsgQ             = PX_ERROR;
     pfs->ulGCBackgroundTimes       = 0;
     pfs->ulGCForegroundTimes       = 0;
     pfs->HOITFS_erasableSectorList = LW_NULL;
     pfs->HOITFS_bShouldKillGC      = LW_FALSE;
 
-    InitList(pfs->HOITFS_dirtySectorList,hoitFs, HOIT_ERASABLE_SECTOR); /* 初始化模板链表 */
-    InitList(pfs->HOITFS_cleanSectorList,hoitFs, HOIT_ERASABLE_SECTOR);
-    InitList(pfs->HOITFS_freeSectorList,hoitFs, HOIT_ERASABLE_SECTOR);
-    InitIterator(pfs->HOITFS_sectorIterator, hoitFs, HOIT_ERASABLE_SECTOR);
+    InitList(pfs->HOITFS_dirtySectorList,    NAMESPACE, HOIT_ERASABLE_SECTOR_REF); /* 初始化模板链表 */
+    InitList(pfs->HOITFS_cleanSectorList,    NAMESPACE, HOIT_ERASABLE_SECTOR_REF);
+    InitList(pfs->HOITFS_freeSectorList,     NAMESPACE, HOIT_ERASABLE_SECTOR_REF);
+    InitIterator(pfs->HOITFS_sectorIterator, NAMESPACE, HOIT_ERASABLE_SECTOR_REF);
 
                                                                         /* Log相关 */
     pfs->HOITFS_logInfo            = LW_NULL;
@@ -490,7 +517,10 @@ __re_umount_vol:
 
         iosDevDelete((LW_DEV_HDR *)pfs);                             /*  IO 系统移除设备             */
         API_SemaphoreMDelete(&pfs->HOITFS_hVolLock);
-         
+        API_SemaphoreMDelete(&pfs->HOITFS_dirtyLock);
+        API_SemaphoreMDelete(&pfs->HOITFS_cleanLock);
+        API_SemaphoreMDelete(&pfs->HOITFS_freeLock); 
+
         __hoit_unmount(pfs);
         hoit_free(pfs, pfs, sizeof(HOIT_VOLUME));
 
