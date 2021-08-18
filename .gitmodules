@@ -17,3 +17,7 @@
 [submodule "labeled-RISC-V-N"]
 	path = labeled-RISC-V-N
 	url = https://github.com/Gallium70/labeled-RISC-V-N.git
+[submodule "rustsbi-qemu"]
+	path = rustsbi-qemu
+	url = https://github.com/duskmoon314/rustsbi-qemu.git
+	branch = legacy-multicore
