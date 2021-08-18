@@ -20,3 +20,4 @@
 - [Labeled RISC-V Rust Bootloader GitHub 仓库](https://github.com/Gallium70/lrv-rust-bl)
 - [标签化 uCore-SMP GitHub 仓库](https://github.com/TianhuaTao/uCore-SMP/tree/label-riscv)
 - [labeled-RISC-V-boot GitHub 仓库](https://github.com/Gallium70/labeled-RISC-V-boot)
+- [K210 移植与多核支持总结报告](https://github.com/wyfcyx/osnotes/blob/master/rCore-Tutorial-v3/K210%E7%A7%BB%E6%A4%8D%E4%B8%8E%E5%A4%9A%E6%A0%B8%E6%94%AF%E6%8C%81%E6%8A%A5%E5%91%8A.md)
