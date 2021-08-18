@@ -12,6 +12,7 @@ We are team "HOIT-23o2" from **Harbin institute of technology, Shenzhen**. We ar
 - This is the **link** of all the reference files: [Reference](./Records/Reference)
 - This is the **link** of development records for design and some works: [Dev-Docs](./Records/Dev-Docs)
 - This is the **link** of our video description: [初赛HoitFS视频演示](./HoitFS介绍.mp4)
+- This is the **link** of our demo video: [HoitFS项目Demo](./HoitFS项目Demo.webm)
 - **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the **newest** repo, this repo is a replica of that, only for submit.
 
 ## Goals & Achievement
