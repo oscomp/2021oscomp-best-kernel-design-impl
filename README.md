@@ -9,8 +9,9 @@ We are team "HOIT-23o2" from **Harbin institute of technology, Shenzhen**. We ar
 - This is the **main doc** for **final stage** submit: [决赛文档-设计、实现与测试](./HoitFS.pdf) 
 - This is the **main doc** for **stage 1** submit: [初赛文档-设计开发](./HoitFS设计开发文档.pdf)
 - This is the **link** of development doc for stage 1 submit: [README_HOITFS](./README_HOITFS.md)
+- This is the **link** of all the reference files: [Reference](./Records/Reference)
 - This is the **link** of development records for design and some works: [Dev-Docs](./Records/Dev-Docs)
-- This is the **link** of our video description: [HoitFS视频演示](./HoitFS介绍.mp4)
+- This is the **link** of our video description: [初赛HoitFS视频演示](./HoitFS介绍.mp4)
 - **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the newest repo, this repo is a replica of that, only for submit.
 
 ## Goals & Achievement
@@ -36,31 +37,31 @@ Except above, we also achieved that:
 
 通过功能与性能测试，文件系统趋于稳定；
 
-
+<br>
 
 **2.Spiffs Capability**
 
 除了开发**HoitFS**，我们还完成了**SpifFS**的移植，使得我们能够进行**性能评测**；
 
-
+<br>
 
 **3.EBS + MT**
 
 我们完成了**EBS**与**多线程（MT）**挂载，使得挂载速率相比未采用该机制有了显著的提升；
 
-
+<br>
 
 **4.Background GC**
 
 我们加入了**后台GC**机制，使得我们在写入相同大小文件的情况下，能够相对减少**前台GC**次数，从而提升写效率；
 
-
+<br>
 
 **5.Mergeable Tree**
 
 为了解决小数据写入带来的内存爆炸性增长，我们设计并实现了**Mergeable Tree**，并能够大大缓解小数据写入带来的内存开销；
 
-
+<br>
 
 ## Where to see more details?
 
