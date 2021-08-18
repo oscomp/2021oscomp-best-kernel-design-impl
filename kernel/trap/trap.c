@@ -296,9 +296,6 @@ int handle_intr(uint64 scause) {
 		#ifndef QEMU 
 		w_sip(r_sip() & ~2);	// clear pending bit 
 		{
-			// if (SBI_SUCCESS != sbi_xv6_set_ext().error) {
-			// 	panic("sbi_xv6_set_ext() failed\n");
-			// }
 			sbi_xv6_set_ext();
 		}
 		#endif 
