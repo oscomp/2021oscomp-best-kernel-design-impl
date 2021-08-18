@@ -9,7 +9,7 @@
   - [QEMU 和 FPGA 中的 N 扩展支持](ch2_4_n_ext_on_qemu_and_fpga.md)
   - [启动器与 SBI](ch2_5_bootloader.md)
   - [内核对用户态中断的管理](ch2_6_user_trap_management.md)
-  - [用户态中断的使用方案](ch2_7_user_trap_usage.md)
+  - [用户态中断扩展的使用](ch2_7_user_trap_usage.md)
   - [rCore-N 的多核改造](ch2_8_rcore_n_smp.md)
 - [使用方法](ch3_0_user_guide.md)
 - [系统测试与演示程序](ch4_0_test_and_demo.md)
