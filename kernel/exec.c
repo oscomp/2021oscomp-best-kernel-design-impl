@@ -74,6 +74,9 @@ static int pushstack(pagetable_t pt, uint64 table[], char **utable, int maxc, ui
 		if (strncmp(buf, "lat_pagefault", arglen) == 0) {
 			goto bad;
 		}
+		if (strncmp(buf, "lat_mmap", arglen) == 0) {
+			goto bad;
+		}
 		__debug_info("pushstack", "arglen = %d\n", arglen);
 		if (arglen++ < 0) {                               // including '\0'
 			__debug_warn("pushstack", "didn't get null\n");

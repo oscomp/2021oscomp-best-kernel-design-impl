@@ -61,12 +61,12 @@ plic_claim(void)
 {
 	int hart = cpuid();
 	int irq;
-	// #ifndef QEMU
-	// irq = *(uint32*)PLIC_MCLAIM(hart);
-	// #else
-	// irq = *(uint32*)PLIC_SCLAIM(hart);
-	// #endif
+	#ifndef QEMU
+	irq = *(uint32*)PLIC_MCLAIM(hart);
+	#else
 	irq = *(uint32*)PLIC_SCLAIM(hart);
+	#endif
+	// irq = *(uint32*)PLIC_SCLAIM(hart);
 	return irq;
 }
 
@@ -75,11 +75,11 @@ void
 plic_complete(int irq)
 {
 	int hart = cpuid();
-	// #ifndef QEMU
-	// *(uint32*)PLIC_MCLAIM(hart) = irq;
-	// #else
-	// *(uint32*)PLIC_SCLAIM(hart) = irq;
-	// #endif
+	#ifndef QEMU
+	*(uint32*)PLIC_MCLAIM(hart) = irq;
+	#else
 	*(uint32*)PLIC_SCLAIM(hart) = irq;
+	#endif
+	// *(uint32*)PLIC_SCLAIM(hart) = irq;
 }
 
