@@ -359,9 +359,9 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 		if (n - tot < m) {
 			m = n - tot;
 		}
-		if (fat_rw_clus(ip->sb, clus, 1, user_src, src, off % bpc, m) != m) {
-			break;
-		}
+		// if (fat_rw_clus(ip->sb, clus, 1, user_src, src, off % bpc, m) != m) {
+		// 	break;
+		// }
 	}
 	if (n > 0 && off > entry->file_size) {
 		ip->size = entry->file_size = off;
