@@ -12,7 +12,7 @@ We are team "HOIT-23o2" from **Harbin institute of technology, Shenzhen**. We ar
 - This is the **link** of all the reference files: [Reference](./Records/Reference)
 - This is the **link** of development records for design and some works: [Dev-Docs](./Records/Dev-Docs)
 - This is the **link** of our video description: [初赛HoitFS视频演示](./HoitFS介绍.mp4)
-- **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the newest repo, this repo is a replica of that, only for submit.
+- **Note:** [repository](https://github.com/Hoit-23o2/HoitOS.git) in github maintains the **newest** repo, this repo is a replica of that, only for submit.
 
 ## Goals & Achievement
 
@@ -47,7 +47,7 @@ Except above, we also achieved that:
 
 **3.EBS + MT**
 
-我们完成了**EBS**与**多线程（MT）**挂载，使得挂载速率相比未采用该机制有了显著的提升；
+我们完成了**EBS**与**多线程**（MT）挂载，使得挂载速率相比未采用该机制有了显著的提升；
 
 <br>
 
