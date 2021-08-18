@@ -7,10 +7,10 @@
 int64 do_mmap(void *start, size_t len, int prot, int flags, int fd, off_t off)
 {
     debug();
-    log2(0, "pid is %d, tid is %d", current_running->pid, current_running->tid);
-    log2(0, "mmap start %lx, len %lx, fd %ld %lx %lx", start, len, fd);
-    log2(0, "flag is %lx, shared? %lx, private?%lx", flags, flags & MAP_SHARED, flags & MAP_PRIVATE);
-    log2(0, "prot is %d", prot);
+    log(0, "pid is %d, tid is %d", current_running->pid, current_running->tid);
+    log(0, "mmap start %lx, len %lx, fd %ld %lx %lx", start, len, fd);
+    log(0, "flag is %lx, shared? %lx, private?%lx", flags, flags & MAP_SHARED, flags & MAP_PRIVATE);
+    log(0, "prot is %d", prot);
     if (len <= 0)
         return SYSCALL_FAILED;
     /* just for page allocate */

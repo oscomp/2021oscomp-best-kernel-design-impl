@@ -21,7 +21,7 @@ ifeq ($(TARGET), qemu)
 	CFLAGS += -Iqemu
 	USER_CFLAGS += -Iqemu
 endif
-K210_SERIALPORT	= /dev/ttyUSB5
+K210_SERIALPORT	= /dev/ttyUSB2
 
 START_QEMU_ENTRY = 0x80200000
 
@@ -51,7 +51,8 @@ SRC_SYSCALL	= ./kernel/syscall/syscall.c
 SRC_ELF 	= ./kernel/elf/elf.c
 SRC_FAT32	= ./kernel/fat32/fat32.c ./kernel/fat32/mount.c ./kernel/fat32/read.c ./kernel/fat32/write.c \
 				./kernel/fat32/utils.c ./kernel/fat32/file.c ./kernel/fat32/pipe.c ./kernel/fat32/poll.c \
-				./kernel/fat32/safe.c ./kernel/fat32/link.c ./kernel/fat32/stat.c ./kernel/fat32/directory.c
+				./kernel/fat32/safe.c ./kernel/fat32/link.c ./kernel/fat32/stat.c ./kernel/fat32/directory.c \
+				./kernel/fat32/cache.c
 SRC_IO		= ./kernel/io/io.c ./kernel/io/select.c ./kernel/io/ring_buffer.c
 SRC_SYSTEM	= ./kernel/system/system.c ./kernel/system/uname.c ./kernel/system/resource.c ./kernel/system/vm86.c
 SRC_TIME	= ./kernel/time/timer.c ./kernel/time/utils.c ./kernel/time/system_time.c ./kernel/time/sleep.c \

@@ -38,12 +38,12 @@ int main()
 
     // argc = 7;
     // strcpy(str1, "./lmbench_all");
-    // strcpy(str2, "lat_ctx");
-    // strcpy(str3, "-P");
-    // strcpy(str4, "1");
-    // strcpy(str5, "-s");
-    // strcpy(str6, "32");
-    // strcpy(str7, "2");
+    // strcpy(str2, "lat_select");
+    // strcpy(str3, "-n");
+    // strcpy(str4, "100");
+    // strcpy(str5, "-P");
+    // strcpy(str6, "1");
+    // strcpy(str7, "file");
     // strcpy(str8, "4");
     // strcpy(str9, "8");
     // strcpy(str10,"16");

@@ -326,6 +326,7 @@ void clear_all_valid(fd_t *fdp);
 void handle_windows_switch_line(char *str);
 int32_t parse_filepath_init(char *path, fd_num_t dirfd, ientry_t *now_clus, char **temp1, char **temp2);
 void clear_all_garbage_clus_from_table(ientry_t cluster);
+unsigned char Upper2Low(unsigned char ch);
 
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
@@ -395,5 +396,27 @@ static inline void set_clusnum_of_dentry(dentry_t *p, ientry_t clus)
     p->HI_clusnum = (clus >> 16) & ((1lu << 16) - 1);      //21:20
     p->LO_clusnum = clus & ((1lu << 16) - 1);      //27:26
 }
+
+/* cache */
+#define _1st(a) (((a) & 0xf000lu) >> 12)
+#define _2nd(a) (((a) & 0x0f00lu) >> 8)
+#define _3rd(a) (((a) & 0x00f0lu) >> 4)
+#define _4th(a) (((a) & 0x000flu))
+#define IO_CACHE_BUFSIZ (1ul << 16)
+#define IO_CACHE_LINESIZ (512 * READ_BUF_CNT)
+#define IO_CACHE_BLOCKNUM (IO_CACHE_BUFSIZ/IO_CACHE_LINESIZ)
+#define IO_CACHE_WAYNUM 4       // 4路组相联
+#define IO_CACHE_BLOCKSIZ (IO_CACHE_WAYNUM*IO_CACHE_LINESIZ)
+#define IO_CACHE_RECNUM (IO_CACHE_BUFSIZ/(IO_CACHE_WAYNUM*IO_CACHE_LINESIZ))
+
+extern char iobuf[IO_CACHE_BUFSIZ];
+extern uint16 ioseqrec[IO_CACHE_BUFSIZ/2048];
+extern uint8 iodirty[IO_CACHE_BUFSIZ/2048][4];
+extern uint32_t iosecnum[IO_CACHE_BUFSIZ/2048][4];
+
+extern void do_iocache_write_back();
+void init_iocache();
+int sd_write_to_cache(char *buf, uint32_t sec);
+int sd_read_from_cache(char* buf, uint32_t sec);
 
 #endif

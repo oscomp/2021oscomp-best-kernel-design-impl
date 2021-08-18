@@ -51,7 +51,7 @@ void handle_signal()
         for (uint8_t i = 0; i < NUM_SIG; i++){
             /* i == signum - 1 */
             if (ISSET_SIG(i + 1, current_running)){
-                log2(0, "tid %d is handling signum %d", current_running->tid, i+1);
+                log(0, "tid %d is handling signum %d", current_running->tid, i+1);
                 // 1. clear this signal
                 CLEAR_SIG(i + 1, current_running);
 
@@ -66,11 +66,11 @@ void handle_signal()
                     /* kernel handle signal, no need to set trampoline */
                     switch (i+1){
                         case SIGKILL:
-                        log2(0, "tid %d is killed SIGKILL", current_running->tid);
+                        log(0, "tid %d is killed SIGKILL", current_running->tid);
                         do_exit(1);
                         assert(0); /* never return */
                         case SIGSEGV:
-                        log2(0, "tid %d is killed SIGSEGV", current_running->tid);
+                        log(0, "tid %d is killed SIGSEGV", current_running->tid);
                         do_exit(1);
                         assert(0); /* never return */
                         default:
@@ -110,15 +110,15 @@ void send_signal(int signum, pcb_t *pcb)
     }
     uintptr_t sig_value = (1lu << (signum - 1));
     if ((sig_value & pcb->sig_mask) != 0){
-        log2(0, "block this signal");
+        log(0, "block this signal");
         pcb->sig_pend |= sig_value;
     }
     else{
-        log2(0, "recv this signal");
+        log(0, "recv this signal");
         pcb->sig_recv |= sig_value;
     }
     if (pcb->status == TASK_BLOCKED){
-        log2(0, "receiver is unblocked", pcb->status);
+        log(0, "receiver is unblocked", pcb->status);
         do_unblock(&pcb->list);
     }
 }

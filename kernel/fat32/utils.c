@@ -49,7 +49,13 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 {
     /* if name[0] == 0, this time the file operation is for "/" */
     if (name[0] == 0){
-        *ignore = 1;
+        if (ignore)
+            *ignore = 1;
+        return NULL;
+    }
+    else if (mode != FILE_FILE && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus){
+        if (ignore)
+            *ignore = 1;
         return NULL;
     }
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
@@ -57,7 +63,6 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
     sd_read(buf, now_sec);
     // printk_port("5\n");
     dentry_t *p = (dentry_t *)buf;
-    uchar *filename = kalloc();
 
     *ignore = 0;
 
@@ -73,104 +78,125 @@ dentry_t *search(const uchar *name, uint32_t dir_first_clus, uchar *buf, search_
 
         long_dentry_t *q = (long_dentry_t *)p;
         uint8 item_num; /* dentry length */
-        
+        uint8 item_num_copy;
+        uint8 name_cnt; /* parse file name */
+        uint8_t name_len = strlen(name);
+
         // if long dentry
         if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
             item_num = q->sequence & 0x0f; // entry num
-
             /* get filename */
-            uint8 item_num_copy = item_num;
+            item_num_copy = item_num;
+            
+            if (item_num != ((name_len + LONG_DENTRY_NAME_LEN - 1) / LONG_DENTRY_NAME_LEN)){
+                goto _search_next_dentry;
+            }
+
             uint16_t unich; // unicode
 
-            while (item_num--){
-                uint8 name_cnt = 0;
-                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
+            while (item_num){
+                uint8 is_name_end = 0;
+                size_t prev_len = (item_num-1) * LONG_DENTRY_NAME_LEN; /* notice upside down */
+                name_cnt = 0;
+                // log2(0, "iteration item_num: %d, name_cnt now %d", item_num, name_cnt);
+                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN && !is_name_end; ++i){
                     // name1
-                    unich = q->name1[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                    if (unicode2char(q->name1[i]) != *(name + prev_len + name_cnt)){
+                        goto _search_next_dentry; 
+                    }
+                    else if (*(name + prev_len + name_cnt) == 0){
+                        is_name_end = 1;
                         break;
                     }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
                     name_cnt++;           
                 }
-                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
+                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN && !is_name_end; ++i){
                     // name2
-                    unich = q->name2[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                    if (unicode2char(q->name2[i]) != *(name + prev_len + name_cnt)){
+                        goto _search_next_dentry; 
+                    }
+                    else if (*(name + prev_len + name_cnt) == 0){
+                        is_name_end = 1;
                         break;
                     }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
-                    name_cnt++;            
+                    name_cnt++;           
                 }
-                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
+                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN && !is_name_end; ++i){
                     // name3
-                    unich = q->name3[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                    if (unicode2char(q->name3[i]) != *(name + prev_len + name_cnt)){
+                        goto _search_next_dentry;  
+                    }
+                    else if (*(name + prev_len + name_cnt) == 0){
                         break;
                     }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);  
-                    name_cnt++;             
+                    name_cnt++;           
                 }
                 p = get_next_dentry(p, buf, &now_clus, &now_sec);
                 q = (long_dentry_t *)p;
-                if (item_num == 0 && name_cnt == LONG_DENTRY_NAME_LEN){
-                    /* need to give a 0 in the end */
-                    filename[item_num_copy*LONG_DENTRY_NAME_LEN] = 0;
-                }
+                item_num--;
             }
+            /* name success */
         }
         // short dentry
         else{
             item_num = 0;
-            /* filename */
-            uint8 name_cnt = 0;
+            item_num_copy = item_num;
+            name_cnt = 0;
             for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
             {
-                if (p->filename[i] == ' ') break;
-                else filename[name_cnt++] = p->filename[i];
+                if (p->filename[i] == ' '){
+                    if (*(name + name_cnt) != 0 && *(name + name_cnt) != '.')
+                        goto _search_next_dentry;
+                    else
+                        break;
+                }
+                else if (Upper2Low(p->filename[i]) != Upper2Low(*(name + name_cnt)))
+                    goto _search_next_dentry;
+                name_cnt++;
             }
-            if (p->extname[0] != ' ') filename[name_cnt++] = '.';
+            if (p->extname[0] != ' ' && *(name + name_cnt) != '.')
+                goto _search_next_dentry;
+            else if (p->extname[0] == ' ')
+                if (*(name + name_cnt) != 0)
+                    goto _search_next_dentry;
+                else
+                    goto _search_name_success;
+            name_cnt++;
             for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
             {
-                if (p->extname[i] == ' ') break;
-                else filename[name_cnt++] = p->extname[i];
+                if (p->extname[i] == ' ')
+                    if (*(name + name_cnt) != 0)
+                        goto _search_next_dentry;
+                    else
+                        goto  _search_name_success;
+                else if (Upper2Low(p->extname[i]) != Upper2Low(*(name + name_cnt)) )
+                    goto _search_next_dentry;
+                name_cnt++;
             }
-            filename[name_cnt++] = 0;
+            if (*(name + name_cnt))/* not end, too long */
+                goto _search_next_dentry;
         }
-
-        int32_t cmp_result = filenamecmp(filename, name);
-        if ( ((p->attribute & FILE_ATTRIBUTE_CHDIR) != 0 && mode == SEARCH_DIR && !cmp_result) || 
-             ((p->attribute & FILE_ATTRIBUTE_CHDIR) == 0 && mode == SEARCH_FILE && !cmp_result) ||
-             (mode == SEARCH_ALL && !cmp_result)
+_search_name_success:
+        if ( ((p->attribute & FILE_ATTRIBUTE_CHDIR) != 0 && mode == SEARCH_DIR) || 
+             ((p->attribute & FILE_ATTRIBUTE_CHDIR) == 0 && mode == SEARCH_FILE) ||
+             (mode == SEARCH_ALL)
         ){
             if (pos){
                 pos->offset = (void*)p - (void*)buf;
-                pos->len = item_num + 1;
-                log(0, "offset %lx, len %d", pos->offset, pos->len);
-                log(0, "nowsec: %d aligned:%d", now_sec, first_sec_of_clus(clus_of_sec(now_sec)));
+                pos->len = item_num_copy + 1;
                 pos->sec = BUFF_ALIGN(now_sec);
-                log(0, "result sec: %d", pos->sec);
-                log(0, "now clus is %d", now_clus);
             }
-            kfree(filename);
             return p;
         }
-        else
+_search_next_dentry:
+        item_num++;
+        while (item_num--){
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
+        }
     }
     
-    if (ignore){
-        if (mode != FILE_FILE && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus)
-            *ignore = 1;
-        else 
-            *ignore = 0;
-    }
     log(0, "search not found");  
 
-    kfree(filename);
     return NULL;
 }
 
@@ -183,7 +209,13 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
 {
     /* if name[0] == 0, this time the file operation is for "/" */
     if (name[0] == 0){
-        *ignore = 1;
+        if (ignore)
+            *ignore = 1;
+        return NULL;
+    }
+    else if (mode != FILE_FILE && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus){
+        if (ignore)
+            *ignore = 1;
         return NULL;
     }
     // printk_port("p addr: %lx, buf: %lx\n", *pp, buf);
@@ -197,7 +229,6 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
 
     dentry_t *top_pt; /* ret */
     isec_t top_sec;
-    size_t top_len;
 
     while (!is_zero_dentry(p)){
 
@@ -213,102 +244,126 @@ dentry_t *search2(const uchar *name, uint32_t dir_first_clus, uchar *buf, search
         top_sec = now_sec;
 
         long_dentry_t *q = (long_dentry_t *)p;
+        uint8 item_num; /* dentry length */
+        uint8 item_num_copy;
+        uint8 name_cnt; /* parse file name */
+        uint8_t name_len = strlen(name);
+
         // if long dentry
         if (q->attribute == 0x0f && (q->sequence & 0x40) == 0x40){
-            uint8 item_num = q->sequence & 0x0f; // entry num
-            top_len = item_num + 1;
+            item_num = q->sequence & 0x0f; // entry num
             /* get filename */
+            item_num_copy = item_num;
+
+            if (item_num != ((name_len + LONG_DENTRY_NAME_LEN - 1) / LONG_DENTRY_NAME_LEN)){
+                goto _search2_next_dentry;
+            }
+
             uint16_t unich; // unicode
 
-            while (item_num--){
-                uint8 name_cnt = 0;
-                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN; ++i){
+            while (item_num){
+                uint8 is_name_end = 0;
+                size_t prev_len = (item_num-1) * LONG_DENTRY_NAME_LEN; /* notice upside down */
+                name_cnt = 0;
+                // log2(0, "iteration item_num: %d, name_cnt now %d", item_num, name_cnt);
+                for (uint8 i = 0; i < LONG_DENTRY_NAME1_LEN && !is_name_end; ++i){
                     // name1
-                    unich = q->name1[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                    if (unicode2char(q->name1[i]) != *(name + prev_len + name_cnt)){
+                        goto _search2_next_dentry; 
+                    }
+                    else if (*(name + prev_len + name_cnt) == 0){
+                        is_name_end = 1;
                         break;
                     }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
                     name_cnt++;           
                 }
-                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN; ++i){
-                    // name1
-                    unich = q->name2[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                for (uint8 i = 0; i < LONG_DENTRY_NAME2_LEN && !is_name_end; ++i){
+                    // name2
+                    if (unicode2char(q->name2[i]) != *(name + prev_len + name_cnt)){
+                        goto _search2_next_dentry; 
+                    }
+                    else if (*(name + prev_len + name_cnt) == 0){
+                        is_name_end = 1;
                         break;
                     }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);   
-                    name_cnt++;            
+                    name_cnt++;           
                 }
-                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN; ++i){
-                    // name1
-                    unich = q->name3[i];
-                    if (unich == 0x0000 || unich == 0xffffu){
-                        filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = 0;
+                for (uint8 i = 0; i < LONG_DENTRY_NAME3_LEN && !is_name_end; ++i){
+                    // name3
+                    if (unicode2char(q->name3[i]) != *(name + prev_len + name_cnt)){
+                        goto _search2_next_dentry;  
+                    }
+                    else if (*(name + prev_len + name_cnt) == 0){
                         break;
                     }
-                    else filename[item_num*LONG_DENTRY_NAME_LEN + name_cnt] = unicode2char(unich);  
-                    name_cnt++;             
+                    name_cnt++;           
                 }
                 p = get_next_dentry(p, buf, &now_clus, &now_sec);
                 q = (long_dentry_t *)p;
-                if (item_num == 0 && name_cnt == LONG_DENTRY_NAME_LEN){
-                    /* need to give a 0 in the end */
-                    filename[(top_len - 1)*LONG_DENTRY_NAME_LEN] = 0;
-                }
+                item_num--;
             }
+            /* name success */
         }
         // short dentry
         else{
-            top_len = 1;
-            /* filename */
-            uint8 name_cnt = 0;
+            item_num = 0;
+            item_num_copy = item_num;
+            name_cnt = 0;
             for (uint8 i = 0; i < SHORT_DENTRY_FILENAME_LEN; ++i)
             {
-                if (p->filename[i] == ' ') break;
-                else filename[name_cnt++] = p->filename[i];
+                if (p->filename[i] == ' '){
+                    if (*(name + name_cnt) != 0 && *(name + name_cnt) != '.')
+                        goto _search2_next_dentry;
+                    else
+                        break;
+                }
+                else if (Upper2Low(p->filename[i]) != Upper2Low(*(name + name_cnt)))
+                    goto _search2_next_dentry;
+                name_cnt++;
             }
-            if (p->extname[0] != ' ') filename[name_cnt++] = '.';
+            if (p->extname[0] != ' ' && *(name + name_cnt) != '.')
+                goto _search2_next_dentry;
+            else if (p->extname[0] == ' ')
+                if (*(name + name_cnt) != 0)
+                    goto _search2_next_dentry;
+                else
+                    goto _search2_name_success;
+            name_cnt++;
             for (uint8 i = 0; i < SHORT_DENTRY_EXTNAME_LEN; ++i)
             {
-                if (p->extname[i] == ' ') break;
-                else filename[name_cnt++] = p->extname[i];
+                if (p->extname[i] == ' ')
+                    if (*(name + name_cnt) != 0)
+                        goto _search2_next_dentry;
+                    else
+                        goto  _search2_name_success;
+                else if (Upper2Low(p->extname[i]) != Upper2Low(*(name + name_cnt)) )
+                    goto _search2_next_dentry;
+                name_cnt++;
             }
-            filename[name_cnt++] = 0;
+            if (*(name + name_cnt))/* not end, too long */
+                goto _search2_next_dentry;
         }
-
-        int32_t cmp_result = filenamecmp(filename, name);
-        if (((p->attribute & 0x10) != 0 && mode == SEARCH_DIR && !cmp_result) || 
-            ((p->attribute & 0x10) == 0 && mode == SEARCH_FILE && !cmp_result) || 
-            (mode == SEARCH_ALL && !cmp_result)
-            ){
+_search2_name_success:
+        if ( ((p->attribute & FILE_ATTRIBUTE_CHDIR) != 0 && mode == SEARCH_DIR) || 
+             ((p->attribute & FILE_ATTRIBUTE_CHDIR) == 0 && mode == SEARCH_FILE) ||
+             (mode == SEARCH_ALL)
+        ){
             if (pos){
                 pos->offset = (void*)top_pt - (void*)buf;
-                log(0, "offset is %lx", pos->offset);
-                log(0, "sec is %d, first sec of this clus is %d", top_sec, first_sec_of_clus(clus_of_sec(top_sec)));
+                pos->len = item_num_copy + 1;
                 pos->sec = BUFF_ALIGN(top_sec);
-                log(0, "buf-aligned sec is %d", pos->sec);
-                log(0, "now clus is %d", now_clus);
-                pos->len = top_len;
             }
-            kfree(filename);
             return p;
         }
-        else
+_search2_next_dentry:
+        item_num++;
+        while (item_num--){
             p = get_next_dentry(p, buf, &now_clus, &now_sec);
+        }
     }
     
-    if (ignore){
-        if (mode != FILE_FILE && (!strcmp(name, ".") || !strcmp(name, "..")) && dir_first_clus == root_first_clus)
-            *ignore = 1;
-        else 
-            *ignore = 0;
-    }
-    log(0, "search2 not found");  
+    log(0, "search not found");  
 
-    kfree(filename);
     return NULL;
 }
 
@@ -1065,4 +1120,12 @@ void clear_all_garbage_clus_from_table(ientry_t cluster)
     } while (now_clus != LAST_CLUS_OF_FILE);
 
     kfree(buf);
+}
+
+
+unsigned char Upper2Low(unsigned char ch)
+{
+    if (ch <= 'Z' && ch >= 'A')
+        ch = ch - 'A' + 'a';
+    return ch;
 }

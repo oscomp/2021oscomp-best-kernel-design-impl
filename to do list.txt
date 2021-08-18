@@ -1,5 +1,0 @@
-fat32_close不能重复
-如果有多核，exec释放内核栈后，需要加锁
-search和search2算法是对的，但可以明显加快0xE5的判断
-getdents64的文件名长度不能大于4KB
-clone对正在信号处理的进程有问题

@@ -7,6 +7,7 @@
 #include <os/elf.h>
 #include <user_programs.h>
 #include <os/sched.h>
+#include <os/irq.h>
 
 fat_t fat;
 uchar root_buf[NORMAL_PAGE_SIZE];
@@ -51,6 +52,8 @@ uint8_t fat32_init()
 
     /* init pipe */
     init_pipe();
+    /* init cache */
+    init_iocache();
 
     kfree(b);
 
@@ -204,7 +207,7 @@ int8 fat32_read_test(const char *filename)
 int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
     debug();
-    log(0, "fd:%d path:%s, len:%d, flags:%lx %d", fd, path_const, strlen(path_const), flags, flags & O_CREAT);
+    log2(0, "fd:%d path:%s, len:%d, flags:%lx %d", fd, path_const, strlen(path_const), flags, flags & O_CREAT);
     assert(fd == AT_FDCWD);
     /* O_CREAT | O_DIRECTORY is not defined */
     if ((flags & (O_CREAT | O_DIRECTORY)) == (O_CREAT | O_DIRECTORY))
@@ -501,7 +504,7 @@ int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence)
     return current_running->fd[fd_index].pos;
 }
 
-
+/* must assure that 0x0000 and 0xffff return 0 */
 uchar unicode2char(uint16_t unich)
 {
     return (unich >= 65 && unich <= 90)? unich - 65 + 'A' :
@@ -865,23 +868,45 @@ void free_all_fds(pcb_t *pcb)
 /* read as many sectors as we can */
 void sd_read(char *buf, uint32_t sec)
 {
-    sd_read_sector(buf, sec, READ_BUF_CNT);
+    if (sec >= fat.first_data_sec && sec != BUFF_ALIGN(sec)){
+        printk_port("read sec is %d, buff align is %d", sec, BUFF_ALIGN(sec));
+        assert(0);
+    }
+    if (sec >= fat.first_data_sec)
+        sd_read_sector(buf, sec, READ_BUF_CNT);
+        // sd_read_from_cache(buf, sec);
+    else
+        sd_read_sector(buf, sec, READ_BUF_CNT);
 }
 
 /* write as many sectors as we can */
 void sd_write(char *buf, uint32_t sec)
 {
-    for (int i = 0; i < READ_BUF_CNT; ++i)
-    {
-        sd_write_sector(buf, sec, 1);
-        buf += SECTOR_SIZE;
-        sec++;
-    }    
+    if (sec >= fat.first_data_sec && sec != BUFF_ALIGN(sec)){
+        printk_port("write sec is %d, buff align is %d", sec, BUFF_ALIGN(sec));
+        assert(0);
+    }
+    if (sec >= fat.first_data_sec)
+        for (int i = 0; i < READ_BUF_CNT; ++i)
+        {
+            sd_write_sector(buf, sec, 1);
+            buf += SECTOR_SIZE;
+            sec++;
+        }    
+        // sd_write_to_cache(buf, sec);
+    else        
+        for (int i = 0; i < READ_BUF_CNT; ++i)
+        {
+            sd_write_sector(buf, sec, 1);
+            buf += SECTOR_SIZE;
+            sec++;
+        }    
 }
 
 /* cache write back */
 int fat32_fsync(fd_num_t fd)
 {
     debug();
+    do_iocache_write_back();
     return SYSCALL_SUCCESSED;
 }

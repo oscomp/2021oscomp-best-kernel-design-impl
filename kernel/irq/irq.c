@@ -195,7 +195,7 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
         }
     }
     // handle_other(regs,stval,cause);
-    log2(0, "stval is %lx", stval);
+    // printk_port("stval is %lx", stval);
     local_flush_tlb_all();
     do_kill(current_running->tid, SIGSEGV);
     return ;

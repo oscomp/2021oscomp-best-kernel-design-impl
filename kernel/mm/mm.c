@@ -75,7 +75,7 @@ ptr_t allocPage()
         //     ret = memCurr - NORMAL_PAGE_SIZE;
         // }
         else{
-            log2(0, "I'm pid %d tid %d and I'm blocked\n", current_running->pid, current_running->tid);
+            printk_port("I'm pid %d tid %d and I'm blocked\n", current_running->pid, current_running->tid);
             do_block(&current_running->list, &waitPageList);
             do_scheduler();
         }
@@ -250,7 +250,7 @@ void freePage(ptr_t baseAddr)
             }
         }
         if (smallest_pid_blocked_proc){
-            log2(0, "pid %d tid %d is to be unblocked", smallest_pid_blocked_proc->pid, smallest_pid_blocked_proc->tid);
+            printk_port("pid %d tid %d is to be unblocked", smallest_pid_blocked_proc->pid, smallest_pid_blocked_proc->tid);
             do_unblock(smallest_pid_blocked_proc);
         }
     }

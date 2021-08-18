@@ -330,14 +330,14 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
 void do_exit(int32_t exit_status)
 {
     debug();
-    log2(0, "tid %d is exiting", current_running->tid);
+    log(0, "tid %d is exiting", current_running->tid);
     // check if some other thread is waiting
     // if there is, unblock them
 
     pcb_t *pt_pcb = NULL, *q = NULL;
     list_for_each_entry_safe(pt_pcb, q, &current_running->wait_list, list){
         if (pt_pcb->status != TASK_EXITED){
-            log2(0, "unblock %d", pt_pcb->tid);
+            log(0, "unblock %d", pt_pcb->tid);
             if (pt_pcb->tid == 5)
                 debuger = 1;
             do_unblock(&pt_pcb->list);
@@ -345,7 +345,7 @@ void do_exit(int32_t exit_status)
     }
 
     if (current_running->parent.parent && current_running->parent.parent->is_waiting_all_children){
-        log2(0, "unblock %d", current_running->parent.parent->tid);
+        log(0, "unblock %d", current_running->parent.parent->tid);
         do_unblock(&(current_running->parent.parent->list));
         current_running->parent.parent->is_waiting_all_children = 0;
         current_running->parent.parent->unblock_child_pid = current_running->tid;
@@ -355,21 +355,22 @@ void do_exit(int32_t exit_status)
     /* check if there are child process who is terminated and its source is waiting to be free */
     for (int i = 0; i < NUM_MAX_TASK; ++i)
         if (is_my_child(&pcb[i])){
-            log2(0, "tid %d parent exited\n", pcb[i].tid);
+            log(0, "tid %d parent exited\n", pcb[i].tid);
             if (is_exited(&pcb[i]))
                 /* pcb[i].parent is of no use, should be freed */
                 detach_from_parent(&pcb[i]);
             else{
-                log2(0, "tid %d should ENTER_ZOMBIE_ON_EXIT", pcb[i].tid);
+                log(0, "tid %d should ENTER_ZOMBIE_ON_EXIT", pcb[i].tid);
                 pcb[i].mode = ENTER_ZOMBIE_ON_EXIT;
             }
         }
     // decide terminal state by mode
     if (current_running->mode == ENTER_ZOMBIE_ON_EXIT){
-        log2(0, "tid %d is detaching\n", current_running->tid);
+        log(0, "tid %d is detaching\n", current_running->tid);
         detach_from_parent(current_running);
     }
-    log2(0, "exited finish");
+    log(0, "exited finish");
+    do_iocache_write_back();
     do_scheduler();
 }
 
@@ -383,7 +384,7 @@ void do_exit(int32_t exit_status)
 int32_t do_kill(pid_t pid, int32_t sig)
 {
     debug();
-    log2(0, "tid %d send signum %d to tid %d", current_running->tid, sig, pid);
+    log(0, "tid %d send signum %d to tid %d", current_running->tid, sig, pid);
     uint8_t ret = 0;
     for (uint32_t i = 0; i < NUM_MAX_TASK; i++){
         if (pid > 0 && pcb[i].tid == pid){
