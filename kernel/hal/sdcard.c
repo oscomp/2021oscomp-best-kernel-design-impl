@@ -124,7 +124,7 @@ static void sd_end_cmd(void) {
  */
 static uint8 sd_get_response_R1(void) {
 	uint8 result = 0xff;
-	uint16 timeout = 0xff;
+	uint64 timeout = 0xfffff;
 
 	while (timeout--) {
 		sd_read_data(&result, 1);
