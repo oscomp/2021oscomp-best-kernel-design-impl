@@ -336,7 +336,7 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 {
 	struct fat32_entry *entry = i2fat(ip);
 
-	if (/*off > entry->file_size || */off + n < off || (uint64)off + n > 0x80000
+	if (off > entry->file_size || off + n < off || (uint64)off + n > 0x80000
 		|| (entry->attribute & ATTR_READ_ONLY)) {
 		return -1;
 	}
@@ -349,7 +349,10 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 	}
 
 	uint tot, m;
-	uint32 const bpc = sb2fat(ip->sb)->byts_per_clus;
+	struct superblock *sb = ip->sb;
+	struct fat32_sb *fat = sb2fat(sb);
+	uint32 const bpc = fat->byts_per_clus;
+	uint32 const bps = fat->bpb.byts_per_sec;
 	uint32 clus;
 	for (tot = 0; tot < n; tot += m, off += m, src += m) {
 		if ((clus = reloc_clus(ip, off, 1)) == 0) {
@@ -359,9 +362,14 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 		if (n - tot < m) {
 			m = n - tot;
 		}
-		// if (fat_rw_clus(ip->sb, clus, 1, user_src, src, off % bpc, m) != m) {
-		// 	break;
-		// }
+		if (off >= ip->size && m < bpc) {
+			int nsec = m / bps;
+			uint32 sec = first_sec_of_clus(sb, clus) + nsec;
+			sb->op.clear(sb, sec, fat->bpb.sec_per_clus - nsec);
+		}
+		if (fat_rw_clus(sb, clus, 1, user_src, src, off % bpc, m) != m) {
+			break;
+		}
 	}
 	if (n > 0 && off > entry->file_size) {
 		ip->size = entry->file_size = off;
