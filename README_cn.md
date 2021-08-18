@@ -1,6 +1,7 @@
 # XV6-RISCV On K210
 在 `K210` 开发板上运行 `xv6-riscv` 操作系统  
 [English](./README.md) | [中文](./README_cn.md)   
+[总言](./doc/总言.md)
 
 ```
  (`-')           (`-')                   <-.(`-')                            

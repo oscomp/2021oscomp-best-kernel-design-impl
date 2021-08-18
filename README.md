@@ -1,6 +1,7 @@
 # XV6-RISCV On K210
 Run xv6-riscv on k210 board  
 [English](./README.md) | [中文](./README_cn.md)   
+[总言](./doc/总言.md)
 
 ```
  (`-')           (`-')                   <-.(`-')                            

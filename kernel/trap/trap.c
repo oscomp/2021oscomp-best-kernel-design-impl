@@ -121,8 +121,8 @@ usertrap(void)
 	else {
 		printf("\nusertrap(): unexpected scause %p pid=%d %s\n", cause, p->pid, p->name);
 		printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-		trapframedump(p->trapframe);
-		printf("idlepages %d\n", idlepages());
+		// trapframedump(p->trapframe);
+		// printf("idlepages %d\n", idlepages());
 		p->killed = SIGTERM;
 
 		// sync files, so progresses won't be lost even if the panic happens
