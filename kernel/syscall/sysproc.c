@@ -284,8 +284,10 @@ sys_getrusage(void)
 	struct rusage r;
 	struct proc *p = myproc();
 
-	if (argint(0, &who) < 0 || argaddr(1, &addr) < 0)
-		return -1;
+	// if (argint(0, &who) < 0 || argaddr(1, &addr) < 0)
+	// 	return -1;
+	argint(0, &who);
+	argaddr(1, &addr);
 
 	memset(&r, 0, sizeof(r));
 	switch (who)

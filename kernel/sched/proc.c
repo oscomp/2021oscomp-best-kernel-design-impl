@@ -1000,6 +1000,7 @@ void userinit(void) {
 	safestrcpy(p->name, "initcode", sizeof(p->name));
 
 	p->tmask = 0;
+	// p->tmask = 1;
 	p->elf = NULL;
 
 	for (int i = 0; i < SIGSET_LEN; i ++) {

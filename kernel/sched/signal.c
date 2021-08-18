@@ -231,15 +231,15 @@ start_handle:
 	__assert("sigdetect", NULL != tf, "alloc tf failed\n");
 
 	// copy mask 
-	for (int i = 0; i < SIGSET_LEN; i ++) {
-		frame->mask.__val[i] = p->sig_set.__val[i];
-		if (NULL == sigact) {
-			p->sig_set.__val[i] = 0;
-		}
-		else {
-			p->sig_set.__val[i] &= sigact->sigact.sa_mask.__val[i];
-		}
-	}
+	// for (int i = 0; i < SIGSET_LEN; i ++) {
+	// 	frame->mask.__val[i] = p->sig_set.__val[i];
+	// 	if (NULL == sigact) {
+	// 		p->sig_set.__val[i] = 0;
+	// 	}
+	// 	else {
+	// 		p->sig_set.__val[i] &= sigact->sigact.sa_mask.__val[i];
+	// 	}
+	// }
 
 	// store proc's trapframe 
 	frame->tf = p->trapframe;
@@ -271,9 +271,9 @@ void sigreturn(void) {
 	__debug_info("sigreturn", "pid %d sigreturn\n", p->pid);
 
 	struct sig_frame *frame = p->sig_frame;
-	for (int i = 0; i < SIGSET_LEN; i ++) {
-		p->sig_set.__val[i] = frame->mask.__val[i];
-	}
+	// for (int i = 0; i < SIGSET_LEN; i ++) {
+	// 	p->sig_set.__val[i] = frame->mask.__val[i];
+	// }
 	kfree(p->trapframe);
 	p->trapframe = frame->tf;
 

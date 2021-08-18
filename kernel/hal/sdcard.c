@@ -681,21 +681,23 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 						b->sectorno << 9 :
 						b->sectorno;
 
-	int ret;
-	sd_send_cmd(SD_CMD55, 0, 0);
-	ret = sd_get_response_R1();
-	sd_end_cmd();
-	if (ret != 0) {
-		printf(__ERROR("CMD55")" error\n");
-		return -EIO;
-	}
+	if (nbuf > 16) {
+		int ret;
+		sd_send_cmd(SD_CMD55, 0, 0);
+		ret = sd_get_response_R1();
+		sd_end_cmd();
+		if (ret != 0) {
+			printf(__ERROR("CMD55")" error\n");
+			return -EIO;
+		}
 
-	sd_send_cmd(SD_ACMD23, nbuf, 0);
-	ret = sd_get_response_R1();
-	sd_end_cmd();
-	if (ret != 0) {
-		printf(__ERROR("ACMD23")" error\n");
-		return -EIO;
+		sd_send_cmd(SD_ACMD23, nbuf, 0);
+		ret = sd_get_response_R1();
+		sd_end_cmd();
+		if (ret != 0) {
+			printf(__ERROR("ACMD23")" error\n");
+			return -EIO;
+		}
 	}
 
 	sd_send_cmd(SD_CMD25, address, 0);
@@ -727,13 +729,13 @@ static void sdcard_multiple_write_wait(void)
 	int64 timeout;
 	for (timeout = 0xffffff; timeout >= 0 && (result & 0x1f) != 0x5; timeout--)
 		sd_read_data(&result, 1);
-	if (timeout < 0)
-		panic("sdcard_intr: response 1");	// really don't know what to do
+	// if (timeout < 0)
+	// 	panic("sdcard_intr: response 1");	// really don't know what to do
 	
 	for (timeout = 0xffffff, result = 0; timeout >= 0 && result == 0; timeout--)
 		sd_read_data(&result, 1);
-	if (timeout < 0)
-		panic("sdcard_intr: response 2");	// really don't know what to do
+	// if (timeout < 0)
+	// 	panic("sdcard_intr: response 2");	// really don't know what to do
 }
 
 
