@@ -93,8 +93,8 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 |   |   |-- 2021-03-15.md -- 2021年3月15日纪要
 |   |   |-- 2021-03-23.md -- 2021年3月23日纪要
 |   |   |-- 2021-03-29.md -- 2021年3月29日纪要
-|	|	|-- 2021-05-18.md -- 2021年5月18日纪要
-|	|	|-- 2021-05-31.md -- 2021年5月31日纪要
+|   |   |-- 2021-05-18.md -- 2021年5月18日纪要
+|   |   |-- 2021-05-31.md -- 2021年5月31日纪要
 |   |   `-- README.md
 |   |-- Dev-Docs -- 开发文档
 |   |   |-- 00-Prepare.md
@@ -126,13 +126,13 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 |   |   |-- 10-HoitFsDev-Part3.md
 |   |   |-- 11-HoitFsDev-CacheTest-Part3.md
 |   |   |-- 11-HoitFsDev-Stage2-Part1.md
-|	|	|-- 12-HoitFsEval-Stage1-Part1.md
+|   |   |-- 12-HoitFsEval-Stage1-Part1.md
 |   |   |-- README.md
 |   |   `-- images
 |   |-- Reference           -- 相关参考文档
 |-- SPECIFICATION.md        -- 代码风格说明
 |-- Src 					     -- 主要贡献代码
-|	|-- Am29LV160DB-nor-driver   -- Am29LV160DB驱动
+|   |-- Am29LV160DB-nor-driver   -- Am29LV160DB驱动
 |   |-- extfs				     -- 核心代码：HOITFS、SPIFFS以及FSTESTER工具、对象链表实现等
 |	|-- fake-nor			     -- SST39VF1601模拟驱动，前期开发编写，已弃用
 |	|-- lFs					     -- 简单的LFS源码，参考Berkeley LFS实验在SylixOS上予以实现，一个很好的Demo
@@ -201,13 +201,13 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 |           |   |   |-- hoitFsTree.h
 |           |   |   |-- hoitFsTreeUtil.c 	  -- 红黑树结构工具
 |           |   |   |-- hoitFsTreeUtil.h
-|		 	|	|	|-- hoitFsMergeBuffer.c   -- MergeBuffer实现
-|			|	|	|-- hoitFsMergeBuffer.h
+|           |   |   |-- hoitFsMergeBuffer.c   -- MergeBuffer实现
+|           |   |   |-- hoitFsMergeBuffer.h
 |           |   |   `-- hoitType.h 			  -- HoitFS类型声明
 |           |   |-- spifFs 
-|			|	|	|-- spifFs.c		      -- spiffs上层接口
-|			|	|	|-- spifFs.h
-|			|	|	|-- spifFsCache.c         -- spiffs缓存层
+|           |   |   |-- spifFs.c		      -- spiffs上层接口
+|           |   |   |-- spifFs.h
+|           |   |   |-- spifFsCache.c         -- spiffs缓存层
 |           |   |   |-- spifFsCache.h 
 |           |   |   |-- spifFsCmd.c           -- spiffs命令接口
 |           |   |   |-- spifFsCmd.h
