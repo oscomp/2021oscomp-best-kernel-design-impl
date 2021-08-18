@@ -136,7 +136,7 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 |   |-- Am29LV160DB-nor-driver                -- Am29LV160DB驱动
 |   |-- extfs                                 -- 核心代码：HOITFS、SPIFFS以及FSTESTER工具、对象链表实现等
 |	|-- fake-nor                              -- SST39VF1601模拟驱动，前期开发编写，已弃用
-|	|-- lFs                                   -- 简单的LFS源码，参考Berkeley LFS实验在SylixOS上予以实现，一个很好的Demo         
+|	|-- lFs                                   -- 简单的LFS源码，参考Berkeley LFS实验在SylixOS上予以实现，一个很好的Demo
 |	|-- spiffs-master                         -- SPIFFS移植参考代码
 |	|-- test-painter                          -- Python自动解析绘图工具，已弃用
 |	|-- test-res                              -- HOITFS项目所有测试结果
