@@ -16,5 +16,4 @@
 - [开发计划与进展](ch5_0_plan_and_progress.md)
 - [遇到的主要问题和解决方法](ch6_0_problem_and_solutions.md)
 - [分工与协作](ch7_0_cooperation.md)
-- [提交仓库目录和文件描述](ch8_0_repo_structure.md)
-- [比赛收获](ch9_0_summary.md)
+- [比赛收获](ch8_0_summary.md)
