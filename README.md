@@ -74,30 +74,30 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 ## File Organization
 
 ```
-|-- Bin -- MINI2440测试程序
+|-- Bin                                       -- MINI2440测试程序
 |   |-- 2440test_A70.bin
 |   `-- u-boot.bin
 |-- LICENSE
-|-- README.md -- README
-|-- README_BAKUP.md  -- 主仓库README副本
-|-- README_HOITFS.md -- 主仓库README
+|-- README.md                                 -- README
+|-- README_BAKUP.md                           -- 主仓库README副本
+|-- README_HOITFS.md                          -- 主仓库README
 |-- Records
-|   |-- Meeting -- 会议纪要
-|   |   |-- 2021-01-12.md -- 2021年1月12日纪要
-|   |   |-- 2021-01-14.md -- 2021年1月14日纪要
-|   |   |-- 2021-01-24.md -- 2021年1月24日纪要
-|   |   |-- 2021-01-31.md -- 2021年1月31日纪要
-|   |   |-- 2021-02-07.md -- 2021年2月07日纪要
-|   |   |-- 2021-02-23.md -- 2021年2月23日纪要
-|   |   |-- 2021-03-01.md -- 2021年3月01日纪要
-|   |   |-- 2021-03-08.md -- 2021年3月08日纪要
-|   |   |-- 2021-03-15.md -- 2021年3月15日纪要
-|   |   |-- 2021-03-23.md -- 2021年3月23日纪要
-|   |   |-- 2021-03-29.md -- 2021年3月29日纪要
-|   |   |-- 2021-05-18.md -- 2021年5月18日纪要
-|   |   |-- 2021-05-31.md -- 2021年5月31日纪要
+|   |-- Meeting                               -- 会议纪要
+|   |   |-- 2021-01-12.md                     -- 2021年1月12日纪要
+|   |   |-- 2021-01-14.md                     -- 2021年1月14日纪要
+|   |   |-- 2021-01-24.md                     -- 2021年1月24日纪要
+|   |   |-- 2021-01-31.md                     -- 2021年1月31日纪要
+|   |   |-- 2021-02-07.md                     -- 2021年2月07日纪要
+|   |   |-- 2021-02-23.md                     -- 2021年2月23日纪要
+|   |   |-- 2021-03-01.md                     -- 2021年3月01日纪要
+|   |   |-- 2021-03-08.md                     -- 2021年3月08日纪要
+|   |   |-- 2021-03-15.md                     -- 2021年3月15日纪要
+|   |   |-- 2021-03-23.md                     -- 2021年3月23日纪要
+|   |   |-- 2021-03-29.md                     -- 2021年3月29日纪要
+|   |   |-- 2021-05-18.md                     -- 2021年5月18日纪要
+|   |   |-- 2021-05-31.md                     -- 2021年5月31日纪要
 |   |   `-- README.md
-|   |-- Dev-Docs -- 开发文档
+|   |-- Dev-Docs                              -- 开发文档
 |   |   |-- 00-Prepare.md
 |   |   |-- 01-SettleDown.md
 |   |   |-- 02-PreResearch-Part1.md
@@ -130,83 +130,83 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 |   |   |-- 12-HoitFsEval-Stage1-Part1.md
 |   |   |-- README.md
 |   |   `-- images
-|   |-- Reference           -- 相关参考文档
-|-- SPECIFICATION.md        -- 代码风格说明
-|-- Src 					     -- 主要贡献代码
-|   |-- Am29LV160DB-nor-driver   -- Am29LV160DB驱动
-|   |-- extfs				     -- 核心代码：HOITFS、SPIFFS以及FSTESTER工具、对象链表实现等
-|	|-- fake-nor			     -- SST39VF1601模拟驱动，前期开发编写，已弃用
-|	|-- lFs					     -- 简单的LFS源码，参考Berkeley LFS实验在SylixOS上予以实现，一个很好的Demo
-|	|-- spiffs-master		     -- SPIFFS移植参考代码
-|	|-- test-painter		     -- Python自动解析绘图工具，已弃用
-|	|-- test-res			     -- HOITFS项目所有测试结果
-|	`-- README.md 			     -- README
+|   |-- Reference                             -- 相关参考文档
+|-- SPECIFICATION.md                          -- 代码风格说明
+|-- Src                                       -- 主要贡献代码
+|   |-- Am29LV160DB-nor-driver                -- Am29LV160DB驱动
+|   |-- extfs                                 -- 核心代码：HOITFS、SPIFFS以及FSTESTER工具、对象链表实现等
+|	|-- fake-nor                              -- SST39VF1601模拟驱动，前期开发编写，已弃用
+|	|-- lFs                                   -- 简单的LFS源码，参考Berkeley LFS实验在SylixOS上予以实现，一个很好的Demo         
+|	|-- spiffs-master                         -- SPIFFS移植参考代码
+|	|-- test-painter                          -- Python自动解析绘图工具，已弃用
+|	|-- test-res                              -- HOITFS项目所有测试结果
+|	`-- README.md                             -- README
 |-- SylixOS -- BSP文件
 |   `-- Workspace -- 工作目录
 |       `-- SylixBSP -- 源文件
 |           |-- bsp -- bsp文件夹
-|           |   |-- 2440addr.h   -- 2440声明
-|           |   |-- bspInit.c    -- 硬件初始化
-|           |   |-- bspLib.c     -- 相关库
-|           |   |-- bspMap.h     -- 存储映射
-|           |   |-- config.h     -- 配置
-|           |   |-- startup.S    -- 引导程序
-|           |   |-- symbol.c     -- 符号表
-|           |   |-- symbol.h     -- 符号表
-|           |   |-- targetInit.c -- 初始化
-|           |   `-- targetInit.h -- 初始化
+|           |   |-- 2440addr.h                -- 2440声明
+|           |   |-- bspInit.c                 -- 硬件初始化
+|           |   |-- bspLib.c                  -- 相关库
+|           |   |-- bspMap.h                  -- 存储映射
+|           |   |-- config.h                  -- 配置
+|           |   |-- startup.S                 -- 引导程序
+|           |   |-- symbol.c                  -- 符号表
+|           |   |-- symbol.h                  -- 符号表
+|           |   |-- targetInit.c              -- 初始化
+|           |   `-- targetInit.h              -- 初始化
 |           |-- driver
 |           |   |-- README
-|           |   |-- dma          -- dma驱动
-|           |   |-- gpio 		 -- gpio驱动
-|           |   |-- i2c 		 -- i2c驱动
-|           |   |-- lcd 		 -- lcd驱动
-|           |   |-- mtd 		 -- mtd文件
-|           |   |   |-- nand 	 -- nand驱动
-|           |   |   `-- nor 	 -- nor驱动
-|           |   |       |-- Am29LV160DB.h -- Am29LV160DB相关参数 
-|           |   |       |-- fake_nor.c 	  -- 虚拟Nor驱动
-|           |   |       |-- fake_nor.h 	  -- 虚拟Nor驱动
-|           |   |       |-- nor.c 		  -- 真实Nor驱动
-|           |   |       |-- nor.h 		  -- 真实Nor驱动
-|           |   |       |-- nor_cmd.c	  -- 命令行实现
-|           |   |       |-- nor_cmd.h 	  -- 命令行实现
-|           |   |       |-- nor_util.c 	  -- 相关工具
-|           |   |       `-- nor_util.h 	  -- 相关工具
-|           |   |-- netif -- netif驱动
-|           |   |-- pm -- pm驱动
-|           |   |-- rtc -- rtc驱动
-|           |   |-- sdi -- sdi驱动
-|           |   |-- timer -- timer驱动
-|           |   |-- touchscr -- touchscr驱动
-|           |   `-- tty -- tty驱动
+|           |   |-- dma                       -- dma驱动
+|           |   |-- gpio                      -- gpio驱动
+|           |   |-- i2c                       -- i2c驱动
+|           |   |-- lcd                       -- lcd驱动
+|           |   |-- mtd                       -- mtd文件
+|           |   |   |-- nand                  -- nand驱动
+|           |   |   `-- nor                   -- nor驱动
+|           |   |       |-- Am29LV160DB.h     -- Am29LV160DB相关参数 
+|           |   |       |-- fake_nor.c        -- 虚拟Nor驱动
+|           |   |       |-- fake_nor.h        -- 虚拟Nor驱动
+|           |   |       |-- nor.c             -- 真实Nor驱动
+|           |   |       |-- nor.h             -- 真实Nor驱动
+|           |   |       |-- nor_cmd.c         -- 命令行实现
+|           |   |       |-- nor_cmd.h         -- 命令行实现
+|           |   |       |-- nor_util.c        -- 相关工具
+|           |   |       `-- nor_util.h        -- 相关工具
+|           |   |-- netif                     -- netif驱动
+|           |   |-- pm                        -- pm驱动
+|           |   |-- rtc                       -- rtc驱动
+|           |   |-- sdi                       -- sdi驱动
+|           |   |-- timer                     -- timer驱动
+|           |   |-- touchscr                  -- touchscr驱动
+|           |   `-- tty                       -- tty驱动
 |           |-- extfs -- 拓展文件系统
 |           |   |-- hoitFs -- HoitFS文件系统
-|           |   |   |-- hoitFs.c      	 	  -- 上层接口
+|           |   |   |-- hoitFs.c              -- 上层接口
 |           |   |   |-- hoitFs.h
-|           |   |   |-- hoitFsCache.c 	 	  -- 缓存层
+|           |   |   |-- hoitFsCache.c         -- 缓存层
 |           |   |   |-- hoitFsCache.h
-|           |   |   |-- hoitFsCmd.c   		  -- 命令行功能额
+|           |   |   |-- hoitFsCmd.c           -- 命令行功能额
 |           |   |   |-- hoitFsCmd.h
-|           |   |   |-- hoitFsFDLib.c 	 	  -- FullDNode管理层
+|           |   |   |-- hoitFsFDLib.c         -- FullDNode管理层
 |           |   |   |-- hoitFsFDLib.h
-|           |   |   |-- hoitFsGC.c    		  -- GC
+|           |   |   |-- hoitFsGC.c            -- GC
 |           |   |   |-- hoitFsGC.h
-|           |   |   |-- hoitFsLib.c   	 	  -- 逻辑层
+|           |   |   |-- hoitFsLib.c           -- 逻辑层
 |           |   |   |-- hoitFsLib.h
-|           |   |   |-- hoitFsLog.c   	 	  -- 日志层，已弃用
+|           |   |   |-- hoitFsLog.c           -- 日志层，已弃用
 |           |   |   |-- hoitFsLog.h
-|           |   |   |-- hoitFsTest.c  	 	  -- 测试脚本
+|           |   |   |-- hoitFsTest.c          -- 测试脚本
 |           |   |   |-- hoitFsTest.h
-|           |   |   |-- hoitFsTree.c  	 	  -- FragTree管理层
+|           |   |   |-- hoitFsTree.c          -- FragTree管理层
 |           |   |   |-- hoitFsTree.h
-|           |   |   |-- hoitFsTreeUtil.c 	  -- 红黑树结构工具
+|           |   |   |-- hoitFsTreeUtil.c      -- 红黑树结构工具
 |           |   |   |-- hoitFsTreeUtil.h
 |           |   |   |-- hoitFsMergeBuffer.c   -- MergeBuffer实现
 |           |   |   |-- hoitFsMergeBuffer.h
-|           |   |   `-- hoitType.h 			  -- HoitFS类型声明
+|           |   |   `-- hoitType.h            -- HoitFS类型声明
 |           |   |-- spifFs 
-|           |   |   |-- spifFs.c		      -- spiffs上层接口
+|           |   |   |-- spifFs.c              -- spiffs上层接口
 |           |   |   |-- spifFs.h
 |           |   |   |-- spifFsCache.c         -- spiffs缓存层
 |           |   |   |-- spifFsCache.h 
@@ -231,13 +231,13 @@ To learn more about our project, visit [here](https://github.com/oscomp/proj32-N
 |           `-- user -- 用户程序
 |               `-- main.c
 |-- Tools -- 工具
-|   |-- Mini2440Tools.zip -- mini2440工具包
-|   |-- auto_complete.py -- Eclipse自动补全工具（已废弃）
-|   |-- readme_title_generator.py -- 自动生成README标题工具
-|   `-- winhex -- WINHEX工具
-|-- UpdateREADME.bat -- 自动生成README标题工具
-|-- images -- 图片
-|-- tree.exe -- 文件树生成程序
+|   |-- Mini2440Tools.zip                     -- mini2440工具包
+|   |-- auto_complete.py                      -- Eclipse自动补全工具（已废弃）
+|   |-- readme_title_generator.py             -- 自动生成README标题工具
+|   `-- winhex                                -- WINHEX工具
+|-- UpdateREADME.bat                          -- 自动生成README标题工具
+|-- images                                    -- 图片
+|-- tree.exe                                  -- 文件树生成程序
 `-- HoitFS设计开发文档.pdf
 ```
 
