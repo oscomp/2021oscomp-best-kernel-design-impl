@@ -1,7 +1,7 @@
 # Summary
 
 - [简介](intro.md)
-- [项目背景](ch1_0_background.md)
+- [项目背景与现有工作](ch1_0_background.md)
 - [系统设计](ch2_0_design.md)
   - [N 扩展规范草案](ch2_1_n_ext_spec.md)
   - [用户态中断的处理流程](ch2_2_user_trap_handle_flow.md)
