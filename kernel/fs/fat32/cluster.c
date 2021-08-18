@@ -73,7 +73,7 @@ uint32 alloc_clus(struct superblock *sb)
 	fat_update_next_free(sb);
 	releasesleep(&sb->sb_lock);
 
-	sb->op.clear(sb, first_sec_of_clus(fat, newclus), fat->bpb.sec_per_clus);
+	// sb->op.clear(sb, first_sec_of_clus(fat, newclus), fat->bpb.sec_per_clus);
 	return newclus;
 }
 
@@ -99,7 +99,8 @@ static inline struct clus_table *rb_clus_table(struct rb_node *node)
 
 // static struct clus_table *search_clus_table(struct rb_node *node, uint64
 
-static int fill_clus_table(struct superblock *sb, struct clus_table *table, uint32 preclus, int alloc_end_idx)
+static int fill_clus_table(struct superblock *sb, struct clus_table *table,
+					uint32 preclus, int alloc_end_idx, int erase)
 {
 	uint32 clus;
 	int i;
@@ -113,12 +114,16 @@ static int fill_clus_table(struct superblock *sb, struct clus_table *table, uint
 		clus = read_fat(sb, preclus);	// get next cluster number
 		// __debug_info("fill_clus_table", "read: i=%d, clus=0x%x, base=%d\n", i, clus, table->base);
 		if (clus >= FAT32_EOC) {
+			struct fat32_sb *fat = sb2fat(sb);
 			while (i <= alloc_end_idx) {
 				if ((clus = alloc_clus(sb)) == 0 || write_fat(sb, preclus, clus) < 0) {
 					if (clus)
 						write_fat(sb, clus, 0);
 					table->num = i;
 					return -1;
+				}
+				if (erase) {
+					sb->op.clear(sb, first_sec_of_clus(fat, clus), fat->bpb.sec_per_clus);
 				}
 				preclus = table->clus[i] = clus;
 				// __debug_info("fill_clus_table", "write: i=%d, clus=0x%x\n", i, clus);
@@ -177,7 +182,7 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 		idx = alloc ? 
 				(table->base == dst_key ? dst_idx : CLUS_TABLE_SIZE - 1) : -1;
 		
-		idx = fill_clus_table(ip->sb, table, 0, idx);
+		idx = fill_clus_table(ip->sb, table, 0, idx, alloc > 1);
 		if (idx < 0)						// case: allocation fail
 			goto fail;
 		else if (idx < CLUS_TABLE_SIZE)		// case: meet end of fat chain
@@ -200,7 +205,7 @@ static struct clus_table *expand_rb_clus(struct inode *ip, uint off, int alloc)
 		// __debug_info("expand_rb_clus", "newtable: base=%d, pre-clus=0x%x\n", base_key, clus);
 		idx = alloc ? 
 				(table->base == dst_key ? dst_idx : CLUS_TABLE_SIZE - 1) : -1;
-		idx = fill_clus_table(ip->sb, table, clus, idx);
+		idx = fill_clus_table(ip->sb, table, clus, idx, alloc > 1);
 		if (idx < 0) {						// case: allocation fail
 			if (table->num == 0)
 				kfree(table);
@@ -271,7 +276,7 @@ uint32 reloc_clus(struct inode *ip, uint off, int alloc)
 		// __debug_info("reloc_clus", "get table, base=%d, off=%p\n", table->base, off);
 		if (!alloc)
 			goto fail;
-		if (fill_clus_table(ip->sb, table, 0, idx) < 0)
+		if (fill_clus_table(ip->sb, table, 0, idx, alloc > 1) < 0)
 			goto fail;
 	}
 

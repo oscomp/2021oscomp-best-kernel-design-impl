@@ -64,7 +64,7 @@ _freepage(void *pa)
 		panic("freepage");
 
 	// Fill with junk to catch dangling refs.
-	memset(pa, 1, PGSIZE);
+	// memset(pa, 1, PGSIZE);
 
 	r = (struct run*)pa;
 
@@ -91,10 +91,10 @@ _allocpage(void)
 	}
 	release(&kmem.lock);
 
-	#ifdef DEBUG 
-	if (r)
-		memset((char*)r, 5, PGSIZE); // fill with junk
-	#endif 
+	// #ifdef DEBUG 
+	// if (r)
+	// 	memset((char*)r, 5, PGSIZE); // fill with junk
+	// #endif 
 
 	return (void*)r;
 }

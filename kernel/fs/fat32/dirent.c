@@ -147,7 +147,7 @@ int fat_make_entry(struct inode *dir, struct fat32_entry *ep, char *filename, ui
 					case 11:    w = (uint8 *)de.lne.name3; break;
 				}
 			}
-			clus = reloc_clus(dir, off, 1);
+			clus = reloc_clus(dir, off, 2);
 			// __debug_info("fat_make_entry", "name:%s clus:%d off:%d\n", ep->filename, dp->cur_clus, off2);
 			if (!clus || fat_rw_clus(dir->sb, clus, 1, 0, (uint64)&de, off % bpc, sizeof(de)) != sizeof(de))
 				return -1;
@@ -160,7 +160,7 @@ int fat_make_entry(struct inode *dir, struct fat32_entry *ep, char *filename, ui
 	de.sne.fst_clus_hi = (uint16)(ep->first_clus >> 16);      // first clus high 16 bits
 	de.sne.fst_clus_lo = (uint16)(ep->first_clus & 0xffff);     // low 16 bits
 	de.sne.file_size = ep->file_size;                         // filesize is updated in eupdate()
-	clus = reloc_clus(dir, off, 1);
+	clus = reloc_clus(dir, off, 2);
 	// __debug_info("fat_make_entry", "name:%s clus:%d off:%d\n", ep->filename, dp->cur_clus, off2);
 	if (!clus || fat_rw_clus(dir->sb, clus, 1, 0, (uint64)&de, off % bpc, sizeof(de)) != sizeof(de))
 		return -1;
