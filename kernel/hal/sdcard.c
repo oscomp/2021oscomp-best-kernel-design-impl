@@ -719,8 +719,6 @@ static void sdcard_multiple_write_wait(void)
 	dmac_ch_clear_intr(DMAC_CHANNEL0, 0);
 	spi_send_data_dma_clean_up(SPI_DEVICE_0);
 
-	intr_on();
-
 	uint8 dummy_crc[2] = {0xff, 0xff};
 	sd_write_data(dummy_crc, 2);
 

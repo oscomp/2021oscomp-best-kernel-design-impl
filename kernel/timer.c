@@ -40,20 +40,20 @@ set_next_timeout() {
 	// __debug_assert("set_next_timeout", SBI_SUCCESS == result.error, "SBI call failed");
 	uint64 now = readtime();
 	static uint64 last = 0;
-	if (cpuid() == 0) {
-	// 	// ticks++;
-	// 	// wakeup(&ticks);
-		
-		if (now - last >= CLK_FREQ * 5) {
+	static int64 const MAX_TIME = CLK_FREQ * 200;
+	if (now < MAX_TIME) {
+		if (cpuid() == 0) {	
+			if (now - last >= CLK_FREQ * 5) {
+				last = now;
+				// printf("%d s\n", now / CLK_FREQ);
+				printf(" ");
+			}
+		}
+		else if (now - last >= CLK_FREQ * 8) {
 			last = now;
 			// printf("%d s\n", now / CLK_FREQ);
 			printf(" ");
 		}
-	}
-	else if (now - last >= CLK_FREQ * 8) {
-		last = now;
-		// printf("%d s\n", now / CLK_FREQ);
-		printf(" ");
 	}
 	// struct sbiret result;
 	// result.value = readtime();	// don't need to trap for time
