@@ -716,7 +716,7 @@ uint64 kern_pgfault_escape(uint64 badaddr)
 	return save_point;
 }
 
-static uint64 safememmove(char *dst, char *src, uint64 len)
+static uint64 safememmove(char *dst, char *src, uint64 len, int srcinc)
 {
 	struct proc * volatile p = myproc();
 	uint64 volatile old = p->badaddr;			// p->badaddr might store the stval later
@@ -734,8 +734,14 @@ static uint64 safememmove(char *dst, char *src, uint64 len)
 	uint64 badaddr = p->badaddr;
 	if (badaddr == old) {
 		permit_usr_mem();
-		while (len--) {         // There is no overlap between user and kernel space
-			*dst++ = *src++;  // this is possible to raise a page fault
+		if (srcinc) {
+			while (len--) {         // There is no overlap between user and kernel space
+				*dst++ = *src++;  // this is possible to raise a page fault
+			}
+		} else {
+			while (len --) {
+				*dst++ = *src;
+			}
 		}
 		badaddr = 0;
 	} else {
@@ -745,6 +751,11 @@ static uint64 safememmove(char *dst, char *src, uint64 len)
 	
 	__debug_info("do_safememmove", "badaddr=0x%x\n", badaddr);
 	return badaddr;
+}
+
+int copyout_noinc_nocheck(uint64 dstva, char *src, uint64 len)
+{
+	return safememmove((char *)dstva, src, len, 0) == 0 ? 0 : -1;
 }
 
 // Copy from kernel to user.
@@ -781,7 +792,7 @@ copyout2(uint64 dstva, char *src, uint64 len)
 		// __debug_warn("copyout2", "%p, %p, %d\n", s, dstva, len);
 		return -1;
 	}
-	uint64 badaddr = safememmove((char *)dstva, src, len);
+	uint64 badaddr = safememmove((char *)dstva, src, len, 1);
 	return badaddr == 0 ? 0 : -1;
 }
 
@@ -792,7 +803,7 @@ copyout2(uint64 dstva, char *src, uint64 len)
  */
 int copyout_nocheck(uint64 dstva, char *src, uint64 len)
 {
-	return safememmove((char *)dstva, src, len) == 0 ? 0 : -1;
+	return safememmove((char *)dstva, src, len, 1) == 0 ? 0 : -1;
 }
 
 // Copy from user to kernel.
@@ -830,7 +841,7 @@ copyin2(char *dst, uint64 srcva, uint64 len)
 	if (s == NULL) {
 		return -1;
 	}
-	uint64 badaddr = safememmove(dst, (char *)srcva, len);
+	uint64 badaddr = safememmove(dst, (char *)srcva, len, 1);
 	return badaddr == 0 ? 0 : -1;
 }
 
@@ -841,7 +852,7 @@ copyin2(char *dst, uint64 srcva, uint64 len)
  */
 int copyin_nocheck(char *dst, uint64 srcva, uint64 len)
 {
-	return safememmove(dst, (char *)srcva, len) == 0 ? 0 : -1;
+	return safememmove(dst, (char *)srcva, len, 1) == 0 ? 0 : -1;
 }
 
 // Copy a null-terminated string from user to kernel.

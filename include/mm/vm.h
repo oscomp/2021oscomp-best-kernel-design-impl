@@ -67,6 +67,7 @@ int             copyinstr(pagetable_t, char *, uint64, uint64);
 int             copyout2(uint64 dstva, char *src, uint64 len);
 int             copyin2(char *dst, uint64 srcva, uint64 len);
 int             copyinstr2(char *dst, uint64 srcva, uint64 max);
+int copyout_noinc_nocheck(uint64 dstva, char *src, uint64 len);
 void            vmprint(pagetable_t pagetable);
 int				copyout_nocheck(uint64 dstva, char *src, uint64 len);
 int				copyin_nocheck(char *dst, uint64 srcva, uint64 len);

@@ -84,32 +84,36 @@ int zero_read(struct inode *ip, int usr, uint64 dst, uint off, uint n)
 #define ZBUFSZ		128
 #define ZBIGBUFSZ	512
 
-	uint bufsz = ZBUFSZ;
-	char sbuf[ZBUFSZ];
-	char *buf = sbuf;
+	// uint bufsz = ZBUFSZ;
+	// char sbuf[ZBUFSZ];
+	// char *buf = sbuf;
 
-	if (n > ZBUFSZ * 8) {
-		buf = kmalloc(ZBIGBUFSZ);
-		if (buf == NULL)
-			buf = sbuf;
-		else
-			bufsz = ZBIGBUFSZ;
-	}
+	// if (n > ZBUFSZ * 8) {
+	// 	buf = kmalloc(ZBIGBUFSZ);
+	// 	if (buf == NULL)
+	// 		buf = sbuf;
+	// 	else
+	// 		bufsz = ZBIGBUFSZ;
+	// }
 
-	memset(buf, 0, bufsz);
+	// memset(buf, 0, bufsz);
 
-	uint tot, m = bufsz;
-	for (tot = 0; tot < n; tot += m, dst += m) {
-		if (n - tot < m)
-			m = n - tot;
-		if (either_copyout_nocheck(usr, dst, buf, m) < 0)
-			break;
-	}
+	// uint tot, m = bufsz;
+	// for (tot = 0; tot < n; tot += m, dst += m) {
+	// 	if (n - tot < m)
+	// 		m = n - tot;
+	// 	if (either_copyout_nocheck(usr, dst, buf, m) < 0)
+	// 		break;
+	// }
 
-	if (bufsz == ZBIGBUFSZ)
-		kfree(buf);
+	// if (bufsz == ZBIGBUFSZ)
+	// 	kfree(buf);
 
-	return tot;
+	char c = 0;
+	if (copyout_noinc_nocheck(dst, &c, n) < 0)
+		return -EFAULT;
+
+	return n;
 }
 
 

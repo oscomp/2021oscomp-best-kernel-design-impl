@@ -180,9 +180,10 @@ sys_fstatat(void)
 		return -ENOENT;
 
 	struct kstat st;
-	ilock(ip);
+	// ilock(ip);
 	ip->op->getattr(ip, &st);
-	iunlockput(ip);
+	// iunlockput(ip);
+	iput(ip);
 	
 	if (copyout2(staddr, (char *)&st, sizeof(st)) < 0)
 		return -EFAULT;
