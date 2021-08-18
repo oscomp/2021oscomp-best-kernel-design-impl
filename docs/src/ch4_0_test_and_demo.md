@@ -23,3 +23,11 @@
 二者运行序列图如下：
 
 ![demo_seq](assets/demo_seq.svg)
+
+在 QEMU 上运行的截图如下，其中调试信息串口 "DEBUG" 和 "INFO" 后的数字表示硬件线程编号：
+
+![demo_qemu](assets/demo_qemu.png)
+
+在 FPGA 上运行的截图如下，与前者内容基本相同：
+
+![demo_fpga](assets/demo_fpga.png)
