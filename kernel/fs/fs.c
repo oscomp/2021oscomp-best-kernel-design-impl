@@ -169,6 +169,7 @@ void iput(struct inode *ip)
 		acquiresleep(&ip->lock);
 		release(&sb->cache_lock);
 
+		imapdel(ip);
 		// This file is removed, so its dentry should have been
 		// deleted from the dentry tree.
 		// This inode is invisible, just free it.

@@ -60,6 +60,7 @@ struct mmap_page {
 
 void mmapdel(struct seg *seg, int sync);
 void mmapdup(struct seg *seg);
+void imapdel(struct inode *ip);
 uint64 do_mmap(uint64 start, uint64 len, int prot, int flags, struct file *f, int64 off);
 int do_munmap(uint64 start, uint64 len);
 int do_msync(uint64 addr, uint64 len, int flags);

@@ -16,13 +16,14 @@ struct pipe {
 	struct wait_queue	rqueue;
 	uint	nread;			// number of bytes read
 	uint	nwrite;			// number of bytes written
-	int		readopen;		// read fd is still open
-	int		writeopen;		// write fd is still open
+	uint8	readopen;		// read fd is still open
+	uint8	writeopen;		// write fd is still open
+	uint8	writing;
 	// char	data[PIPESIZE];
-	char data[];
+	char	data[];
 };
 
-#define PIPESIZE 	(PGSIZE - sizeof(struct pipe))
+#define PIPESIZE (PGSIZE - sizeof(struct pipe))
 
 int pipealloc(struct file **f0, struct file **f1);
 void pipeclose(struct pipe *pi, int writable);

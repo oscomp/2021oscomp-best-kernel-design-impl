@@ -536,7 +536,7 @@ int main(int argc, char *argv[]){
         { shareprivate, "shareprivate" },
         { ruinheap, "ruinheap" },
         { mmaploop, "mmaploop" },
-        { mmapswap, "mmapswap" },
+        // { mmapswap, "mmapswap" },
         { 0, 0 },
     };
 
