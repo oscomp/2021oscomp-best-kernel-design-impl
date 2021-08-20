@@ -135,6 +135,46 @@ static struct mmap_page *get_adjacent_page(struct mmap_page *map, int prev)
 	return rb_entry(node, struct mmap_page, rb);
 }
 
+void imapdel(struct inode *ip)
+{
+	struct rb_node *parent = NULL;
+	struct rb_node *node = ip->mapping.rb_node;
+	struct mmap_page *map;
+
+	if (node == NULL)
+		return;
+
+	acquire(&ip->ilock);
+	while (node != NULL) {
+		if (node->rb_left)
+			node = node->rb_left;
+		else if (node->rb_right)
+			node = node->rb_right;
+		else {
+			parent = rb_parent(node);
+			if (parent) {
+				if (node == parent->rb_left)
+					parent->rb_left = NULL;
+				else
+					parent->rb_right = NULL;
+			}
+			map = rb_entry(node, struct mmap_page, rb);
+			if (map->ref != 0)
+				panic("imapdel: mmap page ref");
+			if (map->pa) {
+				if (pageput((uint64)map->pa) != 0)
+					panic("imapdel: page ref");
+				freepage(map->pa);
+			}
+			kfree(map);
+			node = parent;
+		}
+	}
+
+	ip->mapping.rb_node = NULL;
+	release(&ip->ilock);
+}
+
 /**
  * Functions applied when processes fork or exit.
  */
@@ -173,18 +213,21 @@ static void __file_mmapdel(struct seg *seg, int sync)
 	struct inode *ip = fp->ip;
 	uint64 off = seg->f_off;
 	uint64 end = off + seg->sz;
+	struct mmap_page *map;
 
 	acquire(&ip->ilock);
-	for (; off < end; off += PGSIZE) {
-		struct mmap_page *map = get_mmap_page(&ip->mapping, off);
-		if (map == NULL)
-			panic("__file_mmapdel: no map node\n");
-		
-		__debug_info("__file_mmapdel", "v=%d, off=%p, len=%d\n",
-					map->valid, off, map->f_len);
+	
+	while ((map = get_mmap_page(&ip->mapping, off)) == NULL) {
+		off += PGSIZE;
+		if (off >= end)
+			break;
+	}
+	while (map && (off = map->f_off) < end) {
 		if (sync && (seg->flag & PTE_W) && map->pa && off < ip->size) {
-			uint64 len = (ip->size - off < map->f_len) ?
-							ip->size - off : map->f_len;
+			// uint64 len = (ip->size - off < map->f_len) ?
+			// 				ip->size - off : map->f_len;
+			uint64 len = (ip->size - off < PGSIZE) ?
+							ip->size - off : PGSIZE;
 			release(&ip->ilock);
 			ilock(ip);
 		
@@ -197,7 +240,8 @@ static void __file_mmapdel(struct seg *seg, int sync)
 			acquire(&ip->ilock);
 		}
 
-		put_mmap_page(map, &ip->mapping);
+		map->ref--;
+		map = get_adjacent_page(map, 0);
 	}
 	release(&ip->ilock);
 
@@ -248,13 +292,15 @@ static void __file_mmapdup(struct seg *seg)
 	struct inode *ip = fp->ip;
 	uint64 off = seg->f_off;
 	uint64 end = off + seg->sz;
+	struct mmap_page *map;
 
 	acquire(&ip->ilock);
-	struct mmap_page *map = get_mmap_page(&ip->mapping, off);
-	for (; off < end; off += PGSIZE) {
-		if (map == NULL || map->f_off != off)
-			panic("__file_mmapdup: no map node\n");
-		
+	while ((map = get_mmap_page(&ip->mapping, off)) == NULL) {
+		off += PGSIZE;
+		if (off >= end)
+			break;
+	}
+	while (map && map->f_off < end) {
 		map->ref++;
 		map = get_adjacent_page(map, 0);
 	}
@@ -542,7 +588,7 @@ static int lookup_segment(uint64 sz, struct seg **pprev, struct seg **pnewseg)
 
 static int mmap_file(struct seg *s, uint64 len, int flags, struct file *f, int64 off)
 {
-	struct inode *ip = f->ip;
+	// struct inode *ip = f->ip;
 
 	s->f_off = off;
 	s->f_sz = 0;	// this is for elf, we don't care about it here
@@ -550,7 +596,7 @@ static int mmap_file(struct seg *s, uint64 len, int flags, struct file *f, int64
 
 	if (!(flags & MAP_SHARED))
 		return 0;
-
+/*
 	uint64 n;
 	struct mmap_page *map;
 	struct rb_node *parent;
@@ -576,10 +622,11 @@ static int mmap_file(struct seg *s, uint64 len, int flags, struct file *f, int64
 		}
 	}
 	release(&ip->ilock);
-
+*/
 	s->mmap |= MMAP_SHARE_FLAG;
 	return 0;
 
+/*
 fail:
 	for (n -= PGSIZE; n >= 0; n -= PGSIZE) {
 		map = get_mmap_page(&ip->mapping, off + n);
@@ -588,6 +635,7 @@ fail:
 	release(&ip->ilock);
 	fileclose(f);
 	return -ENOMEM;
+*/
 }
 
 static int mmap_anonymous(struct seg *s, int flags)
@@ -777,8 +825,10 @@ int do_msync(uint64 addr, uint64 len, int flags)
 		return 0;
 
 	// MS_INVALIDATE does nothing on our system
-	if (!(flags & (MS_ASYNC|MS_SYNC)))
-		goto out;
+	if (!(flags & (MS_ASYNC|MS_SYNC))) {
+		return -EPERM;
+		// goto out;
+	}
 
 	struct file *f = MMAP_FILE(s->mmap);
 	struct inode *ip = f->ip;
@@ -810,7 +860,7 @@ int do_msync(uint64 addr, uint64 len, int flags)
 	}
 	release(&ip->ilock);
 
-out:
+// out:
 	return ret;
 }
 
@@ -850,7 +900,7 @@ static int handle_anonymous_shared(uint64 badaddr, struct seg *s)
 	sfence_vma();
 	return 0;
 }
-
+/*
 static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 {
 	struct proc *p = myproc();
@@ -918,7 +968,7 @@ static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 
 	return page;
 }
-
+*/
 static int __page_file_read(struct inode *ip, uint64 off, uint64 page)
 {
 	if (off >= ip->size) {	// offset out of file size
@@ -945,15 +995,36 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 	struct inode *ip = fp->ip;
 	uint64 off = s->f_off + (PGROUNDDOWN(badaddr) - s->addr);
 	struct mmap_page *map;
+	struct rb_node *parent = NULL;
+	struct rb_node **plink = NULL;
 	void *pa;
 
 	acquire(&ip->ilock);
-	map = get_mmap_page(&ip->mapping, off);
+	map = get_mmap_with_parent(&ip->mapping, off, &parent, &plink);
 
 	if (share) {
-		if (map == NULL)
-			panic("handle_file_mmap: no map node");
-		
+		if (map) {
+			map->ref++;
+		} else {
+			if (off >= ip->size) {
+				release(&ip->ilock);
+				return -EIO;
+			}
+			map = kmalloc(sizeof(struct mmap_page));
+			if (map == NULL) {
+				release(&ip->ilock);
+				return -ENOMEM;
+			}
+
+			map->f_off =off;
+			// map->f_len = (PGSIZE < len - n) ? PGSIZE : len - n;
+			map->f_len = PGSIZE;
+			map->pa = NULL;
+			map->ref = 1;
+			map->valid = 0;
+			rb_link_node(&map->rb, parent, plink);
+			rb_insert_color(&map->rb, &ip->mapping);
+		}
 		/**
 		 * Here is another problem. The first fault allocates a page here,
 		 * then releases the ilock to read the file. At this moment, the
@@ -966,18 +1037,18 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 			pa = allocpage();
 			if (pa == NULL) {
 				release(&ip->ilock);
-				pa = __page_file_swap(ip, off, badaddr);
-				if (pa == NULL)
+				// pa = __page_file_swap(ip, off, badaddr);
+				// if (pa == NULL)
 					return -ENOMEM;
 
-				acquire(&ip->ilock);
-				if (map->pa == NULL) {
-					pagereg((uint64)pa, 1);
-					map->pa = pa;
-				} else {
-					freepage(pa);
-					pa = map->pa;
-				}
+				// acquire(&ip->ilock);
+				// if (map->pa == NULL) {
+				// 	pagereg((uint64)pa, 1);
+				// 	map->pa = pa;
+				// } else {
+				// 	freepage(pa);
+				// 	pa = map->pa;
+				// }
 			} else {
 				pagereg((uint64)pa, 1);		// keep refs on shared mappings
 				map->pa = pa;

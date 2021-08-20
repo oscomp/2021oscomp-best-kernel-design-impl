@@ -14,6 +14,7 @@
 #include "fs/pipe.h"
 #include "mm/kmalloc.h"
 #include "mm/vm.h"
+#include "mm/pm.h"
 #include "utils/debug.h"
 #include "errno.h"
 #include "fs/poll.h"
@@ -43,7 +44,8 @@ pipealloc(struct file **pf0, struct file **pf1)
 
 	if ((f0 = filealloc()) == NULL ||
 		(f1 = filealloc()) == NULL ||
-		(pi = kmalloc(sizeof(struct pipe))) == NULL)
+		// (pi = kmalloc(sizeof(struct pipe))) == NULL)
+		(pi = allocpage()) == NULL)
 	{
 		goto bad;
 	}
@@ -52,6 +54,7 @@ pipealloc(struct file **pf0, struct file **pf1)
 	pi->writeopen = 1;
 	pi->nwrite = 0;
 	pi->nread = 0;
+	pi->writing = 0;
 
 	initlock(&pi->lock, "pipe");
 	wait_queue_init(&pi->wqueue, "pipewritequeue");
@@ -75,7 +78,8 @@ pipealloc(struct file **pf0, struct file **pf1)
 
  bad:
 	if (pi)
-		kfree(pi);
+		freepage(pi);
+		// kfree(pi);
 	if (f0)
 		fileclose(f0);
 	if (f1)
@@ -148,7 +152,8 @@ pipeclose(struct pipe *pi, int writable)
 	}
 	if (pi->readopen == 0 && pi->writeopen == 0) {
 		release(&pi->lock);
-		kfree(pi);
+		// kfree(pi);
+		freepage(pi);
 	} else
 		release(&pi->lock);
 }
@@ -177,9 +182,16 @@ static int pipewritable(struct pipe *pi)
 	 * In a word, when waking up the other end, hold pi->lock.
 	 */
 	acquire(&pi->lock);
+	pi->writing = 1;
 	while ((m = pi->nwrite - pi->nread) == PIPESIZE) {		// pipe is full
-		if (pi->readopen == 0 || pr->killed) {
-			m = -1;
+		if (pr->killed) {
+			pi->writing = 0;
+			m = -EINTR;
+			break;
+		}
+		if (pi->readopen == 0) {
+			pi->writing = 0;
+			m = -EPIPE;
 			break;
 		}
 		pipewakeup(pi, PIPE_READER);
@@ -189,7 +201,7 @@ static int pipewritable(struct pipe *pi)
 	return m;
 }
 
-static int pipereadable(struct pipe *pi)
+static int pipereadable(struct pipe *pi, int immediate)
 {
 	struct proc *pr = myproc();
 	struct wait_node *wait;
@@ -199,12 +211,22 @@ static int pipereadable(struct pipe *pi)
 	wait = wait_queue_next(&pi->rqueue);
 
 	acquire(&pi->lock);
-	while ((m = pi->nwrite - pi->nread) == 0 && pi->writeopen) {	// pipe is empty
+	while ((m = pi->nwrite - pi->nread) == 0) {	// pipe is empty
 		if (pr->killed) {
-			m = -1;
+			m = -EINTR;
 			break;
 		}
-		sleep(wait->chan, &pi->lock);
+		if (pi->writeopen == 0) {
+			m = -EPIPE;
+			break;
+		}
+		pipewakeup(pi, PIPE_WRITER);
+		if (!pi->writing && immediate) {
+			m = -1;
+			break;
+		} else {
+			sleep(wait->chan, &pi->lock);
+		}
 	}
 	release(&pi->lock);
 	return m;
@@ -216,13 +238,11 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 	int i, m;
 	char *const pipebound = pi->data + PIPESIZE;
 	struct wait_node wait;
-
-	// pwait = waitinit(&wait);
 	wait.chan = &wait;
 	pipelock(pi, &wait, PIPE_WRITER);		// block other writers
 	for (i = 0; i < n;) {
 		if ((m = pipewritable(pi)) < 0) {
-			i = -EPIPE;
+			i = m;
 			goto out;
 		}
 		m = (PIPESIZE - m < n - i) ?	// amount of bytes to write
@@ -232,17 +252,18 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 			char *paddr = pi->data + pi->nwrite % PIPESIZE;
 			int count = (pipebound - paddr < m) ? pipebound - paddr : m;
 
-			if (copyin_nocheck(paddr, addr + i, count) < 0)
+			if (copyin_nocheck(paddr, addr + i, count) < 0) {
+				n = 0;
 				break;
+			}
 			i += count;
 			pi->nwrite += count;
 			m -= count;
 		}
-		if (m > 0)
-			break;
 	}
 	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_READER);
+	pi->writing = 0;
 	release(&pi->lock);
 out:
 	pipeunlock(pi, &wait, PIPE_WRITER);
@@ -253,27 +274,32 @@ out:
 int
 piperead(struct pipe *pi, uint64 addr, int n)
 {
-	int i = -1, m;
+	int tot = 0, m;
 	char *const pipebound = pi->data + PIPESIZE;
 	struct wait_node wait;
-
-	// pwait = waitinit(&wait);
 	wait.chan = &wait;
 	pipelock(pi, &wait, PIPE_READER);	// block other readers
 
-	if ((m = pipereadable(pi)) < 0) {
-		goto out;
-	}
-	if (m > n)
-		m = n;
-	for (i = 0; i < m;) {
-		char *paddr = pi->data + pi->nread % PIPESIZE;
-		int count = (pipebound - paddr < m - i) ? pipebound - paddr : m - i;
+	while (tot < n) {
+		if ((m = pipereadable(pi, tot > 0)) < 0) {
+			if (tot == 0)
+				tot = m;
+			goto out;
+		}
+		if (m > n - tot)
+			m = n - tot;
+		for (int i = 0; i < m;) {
+			char *paddr = pi->data + pi->nread % PIPESIZE;
+			int count = (pipebound - paddr < m - i) ? pipebound - paddr : m - i;
 
-		if (copyout_nocheck(addr + i, paddr, count) < 0)
-			break;
-		pi->nread += count;
-		i += count;
+			if (copyout_nocheck(addr + i, paddr, count) < 0) {
+				n = 0;			// halt the do-while loop
+				break;
+			}
+			pi->nread += count;
+			i += count;
+			tot += count;
+		}
 	}
 	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_WRITER);
@@ -281,7 +307,7 @@ piperead(struct pipe *pi, uint64 addr, int n)
 out:
 	pipeunlock(pi, &wait, PIPE_READER);
 	// __debug_info("piperead", "read %d\n", i);
-	return i;
+	return tot;
 }
 
 int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
@@ -324,6 +350,7 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 out1:
 	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_READER);
+	pi->writing = 0;
 	release(&pi->lock);
 out2:
 	pipeunlock(pi, &wait, PIPE_WRITER);
@@ -340,7 +367,7 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 	wait.chan = &wait;
 	pipelock(pi, &wait, PIPE_READER);	// block other readers
 
-	if ((ndata = pipereadable(pi)) < 0) {
+	if ((ndata = pipereadable(pi, 0)) < 0) {
 		ret = -EPIPE;
 		goto out2;
 	}
