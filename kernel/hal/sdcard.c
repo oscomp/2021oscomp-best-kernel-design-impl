@@ -28,14 +28,14 @@ void SD_CS_LOW(void) {
 
 void SD_HIGH_SPEED_ENABLE(void) {
     // spi_set_clk_rate(SPI_DEVICE_0, 10000000);
-	// spi_set_baudr(SPI_DEVICE_0, 38);
-	spi_set_baudr(SPI_DEVICE_0, 76);
+	// spi_set_baudr(SPI_DEVICE_0, 16);
+	// spi_set_baudr(SPI_DEVICE_0, 76);
 }
 
 static void sd_lowlevel_init(uint8 spi_index) {
     gpiohs_set_drive_mode(7, GPIO_DM_OUTPUT);
     // spi_set_clk_rate(SPI_DEVICE_0, 200000);     /*set clk rate*/
-	spi_set_baudr(SPI_DEVICE_0, 1900);
+	// spi_set_baudr(SPI_DEVICE_0, 1900);
 }
 
 static void sd_write_data(uint8 const *data_buff, uint32 length) {
@@ -419,7 +419,7 @@ static int sd_init(void) {
 		return 0xff;
 	SD_HIGH_SPEED_ENABLE();
 
-	check_sdcard_size();
+	// check_sdcard_size();
 	return 0;
 }
 
@@ -1008,13 +1008,12 @@ void sdcard_intr(void)
 		sdcard_write(bnext);
 		goto out;
 	}
-	// else if (sd_status.rpending || bnext == NULL)
-	// 		// sd_wqueue_num < WRITE_SHRESHOLD / 4)
-	// {	// race read
-	// 	release(&sd_wqueue.lock);
-	// 	sdcard_multiple_write_stop();
-	// }
-	/*
+	else if (sd_status.rpending || bnext == NULL)
+			// sd_wqueue_num < WRITE_SHRESHOLD / 4)
+	{	// race read
+		release(&sd_wqueue.lock);
+		sdcard_multiple_write_stop();
+	}
 	else {
 		int nbuf = 1;
 		uint32 sec = bnext->sectorno;
@@ -1032,10 +1031,10 @@ void sdcard_intr(void)
 		bnext->disk = 1;
 		release(&sd_wqueue.lock);
 		// printf("nbuf = %d\n", nbuf);
-		// if (nbuf < 16 && bnext->sectorno == b->sectorno + 1) {
-		// 	sd_status.wcount = nbuf;
-		// 	sdcard_write(bnext);
-		// } else {
+		if (nbuf < 16 && bnext->sectorno == b->sectorno + 1) {
+			sd_status.wcount = nbuf;
+			sdcard_write(bnext);
+		} else {
 			sdcard_multiple_write_stop();
 
 			if (sdcard_multiple_write(bnext, nbuf) < 0) {
@@ -1046,13 +1045,13 @@ void sdcard_intr(void)
 				release(&sd_wqueue.lock);
 				goto stop_out;
 			}
-		// }
+		}
 		goto out;
-	}*/
-	else {
-		release(&sd_wqueue.lock);
-		sdcard_multiple_write_stop();
 	}
+	// else {
+	// 	release(&sd_wqueue.lock);
+	// 	sdcard_multiple_write_stop();
+	// }
 
 stop_out:
 	acquire(&sdcard_lock.lk);
