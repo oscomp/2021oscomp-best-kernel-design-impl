@@ -50,7 +50,7 @@ __alltraps:
     # switch to kernel space
     # csrw satp, t0
     # sfence.vma
-    sfence.vma zero, zero
+    #sfence.vma zero, zero
     # jump to trap_handler
     jr t1
 
@@ -59,7 +59,7 @@ __restore:
     # switch to user space
     # csrw satp, a1
     # sfence.vma
-    sfence.vma zero, zero
+    #sfence.vma zero, zero
     csrw sscratch, a0
     mv sp, a0
     # now sp points to TrapContext in user space, start restoring based on it

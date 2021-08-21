@@ -424,13 +424,13 @@ impl ArgMachine{
         testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
         testsuits.push("busybox\0echo\0END\0lat_proc_fork\0$?");
         
-        //testsuits.push("busybox\0echo\0START\0lat_proc_exec");
-        //testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
-        //testsuits.push("busybox\0echo\0END\0lat_proc_exec\0$?");
+        testsuits.push("busybox\0echo\0START\0lat_proc_exec");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
+        testsuits.push("busybox\0echo\0END\0lat_proc_exec\0$?");
         
-        //testsuits.push("busybox\0echo\0START\0bw_pipe");
-        //testsuits.push("lmbench_all\0bw_pipe\0-P\01");  
-        //testsuits.push("busybox\0echo\0END\0bw_pipe\0$?"      );
+        ////testsuits.push("busybox\0echo\0START\0bw_pipe");
+        ////testsuits.push("lmbench_all\0bw_pipe\0-P\01");  
+        ////testsuits.push("busybox\0echo\0END\0bw_pipe\0$?"      );
         
         testsuits.push("busybox\0echo\0START\0lat_pipe");
         testsuits.push("lmbench_all\0lat_pipe\0-P\01");    

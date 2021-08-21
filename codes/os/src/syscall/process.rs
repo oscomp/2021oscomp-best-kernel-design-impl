@@ -410,6 +410,10 @@ pub fn sys_fork(flags: usize, stack_ptr: usize, ptid: usize, ctid: usize, newtls
     trap_cx.x[10] = 0;
     // add new task to scheduler
     add_task(new_task);
+    unsafe {
+        llvm_asm!("sfence.vma" :::: "volatile");
+        llvm_asm!("fence.i" :::: "volatile");
+    }
     gdb_println!(SYSCALL_ENABLE,"sys_fork(flags: {:?}, stack_ptr: 0x{:X}, ptid: {}, ctid: {}, newtls: {}) = {}", flags, stack_ptr, ptid, ctid, newtls, new_pid);
     new_pid as isize
 }
@@ -454,7 +458,10 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
         // drop fd
         let mut inner = task.acquire_inner_lock();
         inner.fd_table[fd].take();
-        
+        unsafe {
+            llvm_asm!("sfence.vma" :::: "volatile");
+            llvm_asm!("fence.i" :::: "volatile");
+        }
         gdb_println!(SYSCALL_ENABLE, "sys_exec(path: {}, args: {:?}) = {}", path, args_vec_copy, argc);
         0 
     } else {
@@ -505,7 +512,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
             drop(inner);
             drop(task);
             gdb_print!(BLANK_ENABLE," ");
-            //print!("\n");
+            print!("\n");
             //print!(" ");
             suspend_current_and_run_next();
             // continue;
@@ -588,6 +595,10 @@ pub fn sys_mprotect(addr: usize, len: usize, prot: isize) -> isize{
             // if fail
             panic!("sys_mprotect: No such pte");
         }
+    }
+    unsafe {
+        llvm_asm!("sfence.vma" :::: "volatile");
+        llvm_asm!("fence.i" :::: "volatile");
     }
     0
 }

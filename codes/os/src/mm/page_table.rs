@@ -320,6 +320,10 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
             // println!{"preparing into checking lazy..."}
             //println!("check_lazy 3");
             current_task().unwrap().check_lazy(start_va, true);
+            unsafe {
+                llvm_asm!("sfence.vma" :::: "volatile");
+                llvm_asm!("fence.i" :::: "volatile");
+            }
             //println!{"preparing into checking lazy..."}
         }
         let ppn = page_table
@@ -369,6 +373,10 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
         // println!{"preparing into checking lazy..."}
         //println!("check_lazy 2");
         current_task().unwrap().check_lazy(vaddr,true);
+        unsafe {
+            llvm_asm!("sfence.vma" :::: "volatile");
+            llvm_asm!("fence.i" :::: "volatile");
+        }
     }
     let pa = page_table.translate_va(VirtAddr::from(vaddr));
     // print!("[translated_refmut pa:{:?}]",pa);
