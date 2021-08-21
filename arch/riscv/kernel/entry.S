@@ -119,10 +119,10 @@ _from_kernel:
   fsd fs10, OFFSET_FREG_FS10(sp)
   fsd fs11, OFFSET_FREG_FS11(sp)
 
-  fsd f28, OFFSET_FREG_FT8(sp)
-  fsd f29, OFFSET_FREG_FT9(sp)
-  fsd f30, OFFSET_FREG_FT10(sp)
-  fsd f31, OFFSET_FREG_FT11(sp)
+  # fsd f28, OFFSET_FREG_FT8(sp)
+  # fsd f29, OFFSET_FREG_FT9(sp)
+  # fsd f30, OFFSET_FREG_FT10(sp)
+  # fsd f31, OFFSET_FREG_FT11(sp)
 
 .endm
 
@@ -198,10 +198,10 @@ _from_kernel:
   fld fs10, OFFSET_FREG_FS10(sp)
   fld fs11, OFFSET_FREG_FS11(sp)
 
-  fld f28, OFFSET_FREG_FT8(sp)
-  fld f29, OFFSET_FREG_FT9(sp)
-  fld f30, OFFSET_FREG_FT10(sp)
-  fld f31, OFFSET_FREG_FT11(sp)
+  # fld f28, OFFSET_FREG_FT8(sp)
+  # fld f29, OFFSET_FREG_FT9(sp)
+  # fld f30, OFFSET_FREG_FT10(sp)
+  # fld f31, OFFSET_FREG_FT11(sp)
 
   ld s0, OFFSET_REG_SSTATUS(sp)
   csrw CSR_SSTATUS, s0
