@@ -406,7 +406,7 @@ int main()
     else{
         sys_exec(argv[0], argv, envp);
     }
-    strcpy(str_echo, "END lat_mmap\n");
+    strcpy(str_echo, "END lat_mmap 0\n");
     sys_write(2, str_echo, strlen(str_echo));
 
     strcpy(str_echo, "shell success\n");
