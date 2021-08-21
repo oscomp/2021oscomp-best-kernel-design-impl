@@ -846,7 +846,7 @@ static void sdcard_multiple_write_stop(void)
 }
 
 // #define	WRITE_SHRESHOLD	1000
-#define WRITE_SHRESHOLD 	2000
+// #define WRITE_SHRESHOLD 	2000
 
 void sdcard_write_start(void)
 {
@@ -854,7 +854,8 @@ void sdcard_write_start(void)
 
 	struct d_list *dl = sd_wqueue.head.next;
 	// is the queue empty?
-	if (dl == &sd_wqueue.head || sd_wqueue_num < WRITE_SHRESHOLD) {
+	// if (dl == &sd_wqueue.head || sd_wqueue_num < WRITE_SHRESHOLD) {
+	if (dl == &sd_wqueue.head) {
 		release(&sd_wqueue.lock);
 		return;
 	}
@@ -996,12 +997,13 @@ void sdcard_intr(void)
 		sdcard_write(bnext);
 		goto out;
 	}
-	else if (sd_status.rpending || bnext == NULL)
-			// sd_wqueue_num < WRITE_SHRESHOLD / 4)
-	{	// race read
-		release(&sd_wqueue.lock);
-		sdcard_multiple_write_stop();
-	}
+	// else if (sd_status.rpending || bnext == NULL)
+	// 		// sd_wqueue_num < WRITE_SHRESHOLD / 4)
+	// {	// race read
+	// 	release(&sd_wqueue.lock);
+	// 	sdcard_multiple_write_stop();
+	// }
+	/*
 	else {
 		int nbuf = 1;
 		uint32 sec = bnext->sectorno;
@@ -1035,6 +1037,10 @@ void sdcard_intr(void)
 			}
 		// }
 		goto out;
+	}*/
+	else {
+		release(&sd_wqueue.lock);
+		sdcard_multiple_write_stop();
 	}
 
 stop_out:

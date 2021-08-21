@@ -221,8 +221,8 @@ bwrite(struct buf *b)
 	releasesleep(&b->lock);
 	if ((res & 0x1) == 0)
 		bput(b);
-	// if ((res & 0x2) == 0)
-	// 	disk_write_start();
+	if ((res & 0x2) == 0)
+		disk_write_start();
 }
 
 // Release a locked buffer.
