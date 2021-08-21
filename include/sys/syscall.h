@@ -28,5 +28,7 @@ int8_t sys_exec(const char* file_name, char* argv[], char *const envp[]);
 pid_t sys_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid);
 int8_t sys_test(const char* filename);
 pid_t sys_wait4(pid_t pid, uint16_t *status, int32_t options);
+void sys_set_test_timer();
+void sys_stop_test_timer();
 
 #endif

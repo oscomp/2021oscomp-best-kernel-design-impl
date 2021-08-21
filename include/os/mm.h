@@ -15,9 +15,9 @@
 #define BLOCKS_PER_PAGE (PAGE_SIZE/BLOCK_SIZE)
 
 #ifdef K210
-    #define INIT_KERNEL_STACK 0xffffffff80400000lu
+    #define INIT_KERNEL_STACK 0xffffffff80280000lu
 #else
-    #define INIT_KERNEL_STACK 0xffffffff80b00000lu
+    #define INIT_KERNEL_STACK 0xffffffff80980000lu
 #endif
 
 #define FREEMEM (INIT_KERNEL_STACK+4*PAGE_SIZE)

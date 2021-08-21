@@ -110,5 +110,6 @@
 #define SYS_set_test_timer 499
 #define SYSCALL_TESTDISK 500
 #define SYSCALL_TEST 501
+#define SYS_stop_test_timer 502
 
 #endif

@@ -119,6 +119,8 @@ extern list_head timers;
 extern list_head available_timers;
 void timer_create(TimerCallback func, void* parameter, uint64_t tick);
 void do_set_test_timer();
+void do_stop_test_timer();
+
 // this should be called by handle_int
 void timer_check(void);
 timer_t *alloc_timer();

@@ -27,19 +27,14 @@ void init_screen()
 /* reflush all the buffer */
 void screen_reflush()
 {
-    /* FOR NOW assure that fd[1] is stdout and fd[2] is stderr */
     /* 1. stdout */
-    if (current_running->fd[1].used && !current_running->fd[1].redirected){
-        size_t count = read_ring_buffer(&stdout_buf, &screen_buf, RING_BUFFER_SIZE);
-        for (uint64_t i = 0; i < count; i++)
-            sbi_console_putchar(screen_buf[i]);
-    }
+    size_t count = read_ring_buffer(&stdout_buf, &screen_buf, RING_BUFFER_SIZE);
+    for (uint64_t i = 0; i < count; i++)
+        sbi_console_putchar(screen_buf[i]);
     /* 2. stderr */
-    if (current_running->fd[2].used && !current_running->fd[2].redirected){
-        size_t count = read_ring_buffer(&stderr_buf, &screen_buf, RING_BUFFER_SIZE);
-        for (uint64_t i = 0; i < count; i++)
-            sbi_console_putchar(screen_buf[i]);
-    }
+    count = read_ring_buffer(&stderr_buf, &screen_buf, RING_BUFFER_SIZE);
+    for (uint64_t i = 0; i < count; i++)
+        sbi_console_putchar(screen_buf[i]);
 }
 
 /* just go to assert */

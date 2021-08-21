@@ -403,19 +403,17 @@ uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint3
 
     pcb_under->fd[i].nlink = 1;
 
-    pcb_under->fd[i].uid = 0;
-    pcb_under->fd[i].gid = 0;
+    // pcb_under->fd[i].uid = 0;
+    // pcb_under->fd[i].gid = 0;
 
-    pcb_under->fd[i].rdev = DEFAULT_DEV;
+    // pcb_under->fd[i].blksize = CLUSTER_SIZE;
 
-    pcb_under->fd[i].blksize = CLUSTER_SIZE;
-
-    pcb_under->fd[i].atime_sec = 1383584112;
-    pcb_under->fd[i].atime_nsec = 0;
-    pcb_under->fd[i].mtime_sec = 1383584112;
-    pcb_under->fd[i].mtime_nsec = 0;
-    pcb_under->fd[i].ctime_sec = 1383584112;
-    pcb_under->fd[i].ctime_nsec = 0;
+    // pcb_under->fd[i].atime_sec = 1383584112;
+    // pcb_under->fd[i].atime_nsec = 0;
+    // pcb_under->fd[i].mtime_sec = 1383584112;
+    // pcb_under->fd[i].mtime_nsec = 0;
+    // pcb_under->fd[i].ctime_sec = 1383584112;
+    // pcb_under->fd[i].ctime_nsec = 0;
     // printk_port("i: %d, used: %d\n", i, pcb_under->fd[1].used);
     return 0;
 }

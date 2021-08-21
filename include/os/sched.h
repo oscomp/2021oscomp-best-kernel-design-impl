@@ -85,34 +85,23 @@ typedef struct fd{
     uint8 is_pipe_read;
     uint8 is_pipe_write;
 
-    /* poll status */
-    poll_status_t poll_status;
-
-    /* mmap */
-    struct {
-        void *start;
-        size_t len;
-        int flags;
-        off_t off;
-    }mmap;
-
     /* links */
     uint8 nlink;
 
-    /* status */
-    uid_t uid;
-    gid_t gid;
+    // /* status */
+    // uid_t uid;
+    // gid_t gid;
 
-    dev_t rdev;
+    // dev_t rdev;
 
-    blksize_t blksize;
+    // blksize_t blksize;
 
-    long atime_sec;
-    long atime_nsec;
-    long mtime_sec;
-    long mtime_nsec;
-    long ctime_sec;
-    long ctime_nsec;
+    // long atime_sec;
+    // long atime_nsec;
+    // long mtime_sec;
+    // long mtime_nsec;
+    // long ctime_sec;
+    // long ctime_nsec;
 }fd_t;
 #pragma pack()
 
@@ -140,7 +129,7 @@ struct pcb
     list_node_t list;
     list_head wait_list;
     uint8_t is_waiting_all_children;
-    pid_t unblock_child_pid;
+    struct pcb *unblock_child;
 
     /* process id */
     pid_t pid;

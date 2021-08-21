@@ -170,12 +170,12 @@ int32_t do_utimensat(fd_num_t dirfd, const char *pathname, const struct timespec
         int32_t fd_index;
         assert((fd_index = get_fd_index(fd, current_running)) != -1);
         fd_t *fdp = &current_running->fd[fd_index];
-        fdp->atime_sec = 1383584112;
-        fdp->atime_nsec = 0;
-        fdp->mtime_sec = 1383584112;
-        fdp->mtime_nsec = 0;
-        fdp->ctime_sec = 1383584112;
-        fdp->ctime_nsec = 0;
+        // fdp->atime_sec = 1383584112;
+        // fdp->atime_nsec = 0;
+        // fdp->mtime_sec = 1383584112;
+        // fdp->mtime_nsec = 0;
+        // fdp->ctime_sec = 1383584112;
+        // fdp->ctime_nsec = 0;
         fat32_close(fd);
         log(0, "success utimenat");
         return SYSCALL_SUCCESSED;

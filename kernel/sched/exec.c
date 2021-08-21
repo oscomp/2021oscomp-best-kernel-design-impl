@@ -89,12 +89,8 @@ static int is_sh(char *file_name)
 int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 {
     debug();
-    if (!strcmp(argv[1], "lat_pagefault")){
-        printk_port("unsupported test\n");
-        do_exit(0);
-    }
-    else if (!strcmp(argv[1], "lat_ctx"))
-        argv[9] = NULL;
+    if (!strcmp(argv[1], "lat_ctx"))
+        argv[11] = NULL;
 
     // printk_port("argv[1] is %s\n", argv[1]);
     // if (argv[2])

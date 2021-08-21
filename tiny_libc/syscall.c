@@ -47,3 +47,8 @@ void sys_set_test_timer()
 {
     invoke_syscall(SYS_set_test_timer, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
 }
+
+void sys_stop_test_timer()
+{
+    invoke_syscall(SYS_stop_test_timer, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
+}

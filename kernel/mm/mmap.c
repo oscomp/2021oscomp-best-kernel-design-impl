@@ -113,27 +113,40 @@ int64 do_munmap(void *start, size_t len)
 int do_msync(void *addr, size_t length, int flags)
 {
     debug();
+    return 0;
     if (((uintptr_t)addr % NORMAL_PAGE_SIZE) != 0){
         printk_port("msync addr not page aligned, %lx\n", addr);
         return -EINVAL;
     }
     uintptr_t page_kva;
     size_t i;
-    /* check if all addr are valid and mapped */
-    for (i = 0; i < length; i += NORMAL_PAGE_SIZE){
-        if ((page_kva = probe_kva_of(addr + i, current_running->pgdir)) == NULL){
-            printk_port("msync addr is not valid, %lx\n", addr+i);
-            return -EPERM;
-        }
-        if (!is_page_kva_file_mapped(page_kva)){
-            printk_port("msync addr not mapped, %lx, len %lx\n", addr+i, length);
-            return -ENOMEM;
-        }
-    }
+    // /* check if all addr are valid and mapped */
+    // for (i = 0; i < length; i += NORMAL_PAGE_SIZE){
+    //     if ((page_kva = probe_kva_of(addr + i, current_running->pgdir)) == NULL){
+    //     }
+    //     if (!is_page_kva_file_mapped(page_kva)){
+    //         printk_port("msync addr not mapped, %lx, len %lx\n", addr+i, length);
+    //         return -ENOMEM;
+    //     }
+    // }
 
     /* all address are valid and file mapped */
-    for (i = 0; i < length; i += NORMAL_PAGE_SIZE)
-        file_map_write_back_page_kva( probe_kva_of(addr + i, current_running->pgdir) );
+    for (i = 0; i < length; i += NORMAL_PAGE_SIZE){
+        page_kva = probe_kva_of(addr + i, current_running->pgdir);
+        /* FOR NOW don't do test, trust addr and length */
+        // if (!page_kva){
+        //     printk_port("msync addr is not valid, %lx\n", addr+i);
+        //     return -EPERM;
+        // }
+        // else if (!is_page_kva_file_mapped(page_kva)){
+        //     printk_port("msync addr not mapped, %lx, len %lx\n", addr+i, length);
+        //     return -ENOMEM;
+        // }
+        if (is_page_kva_file_map_dirty(page_kva)){
+            printk_port("dirty\n");
+            file_map_write_back_page_kva( page_kva );
+        }
+    }
 
     return 0;
 }

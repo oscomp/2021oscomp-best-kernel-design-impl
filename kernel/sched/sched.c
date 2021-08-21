@@ -224,8 +224,8 @@ int64_t do_wait4(pid_t pid, uint16_t *status, int32_t options)
             current_running->is_waiting_all_children = 1;
             do_block(&current_running->list, &general_block_queue);
             do_scheduler();
-
-            return current_running->unblock_child_pid;
+            detach_from_parent(current_running->unblock_child);
+            return current_running->unblock_child->tid;
         }
         else{
             log(0, "no child_still_running");
@@ -336,7 +336,7 @@ void do_exit(int32_t exit_status)
         log(0, "unblock %d", current_running->parent.parent->tid);
         do_unblock(&(current_running->parent.parent->list));
         current_running->parent.parent->is_waiting_all_children = 0;
-        current_running->parent.parent->unblock_child_pid = current_running->tid;
+        current_running->parent.parent->unblock_child = current_running;
     }
     current_running->exit_status = exit_status;
     freeproc(current_running);
@@ -393,57 +393,6 @@ int32_t do_kill(pid_t pid, int32_t sig)
             return 0;
         }
     }
-    // if (pid > 0 || pid < -1){
-    //     if (pid < 0)
-    //         pid = -pid;
-    //     for (int i = 0; i < NUM_MAX_TASK; ++i)
-    //     {
-    //         if (pcb[i].tid == pid){
-    //             if (!is_exited(&pcb[i]) && !is_zombie(&pcb[i])){
-    //                 list_node_t *temp = pcb[i].wait_list.next;
-
-    //                 while (temp != &pcb[i].wait_list)
-    //                 {
-    //                     list_node_t *tempnext = temp->next;
-    //                     list_del(temp);
-
-    //                     pcb_t *pt_pcb = list_entry(temp, pcb_t, list);
-    //                     if (pt_pcb->status != TASK_EXITED){
-    //                         do_unblock(temp);
-    //                     }
-                        
-    //                     temp = tempnext;
-    //                 }
-
-    //                 if (pcb[i].parent.parent && pcb[i].parent.parent->is_waiting_all_children){
-    //                     do_unblock(&(pcb[i].parent.parent->list));
-    //                     pcb[i].parent.parent->is_waiting_all_children = 0;
-    //                     pcb[i].parent.parent->unblock_child_pid = pcb[i].tid;
-    //                 }
-    //                 pcb[i].exit_status = 1;
-    //                 freeproc(&pcb[i]);
-    //                 /* check if there are child process who is terminated and its source is waiting to be free */
-    //                 for (int j = 0; j < NUM_MAX_TASK; ++j)
-    //                     if (pcb[j].parent.parent == &pcb[i]){
-    //                         log(0, "tid %d parent exited\n", pcb[j].tid);
-    //                         if (is_exited(&pcb[j]))
-    //                             detach_from_parent(&pcb[j]);
-    //                         else
-    //                             pcb[j].mode = ENTER_ZOMBIE_ON_EXIT;
-    //                     }
-    //                 // decide terminal state by mode
-    //                 if (pcb[i].mode == ENTER_ZOMBIE_ON_EXIT){
-    //                     log(0, "tid %d is detaching\n", current_running->tid);
-    //                     detach_from_parent(&pcb[i]);
-    //                 }
-    //             }
-    //             else{
-    //                 log(0, "tid %d has already died", pcb[i].tid);
-    //             }
-    //             return 0;
-    //         }
-    //     }
-    // }
     if (ret > 0)
         return SYSCALL_SUCCESSED;
     else{

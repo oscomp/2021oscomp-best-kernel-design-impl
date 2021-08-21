@@ -156,6 +156,7 @@ static void init_syscall(void)
     syscall[SYS_tgkill] = &do_tgkill;
     syscall[SYS_vm86] = &do_vm86;
     syscall[SYS_set_test_timer] = &do_set_test_timer;
+    syscall[SYS_stop_test_timer] = &do_stop_test_timer;
 }
 
 // The beginning of everything >_< ~~~~~~~~~~~~~~
