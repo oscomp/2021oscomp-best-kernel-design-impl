@@ -159,8 +159,8 @@ void imapdel(struct inode *ip)
 					parent->rb_right = NULL;
 			}
 			map = rb_entry(node, struct mmap_page, rb);
-			if (map->ref != 0)
-				panic("imapdel: mmap page ref");
+			// if (map->ref != 0)
+			// 	panic("imapdel: mmap page ref");
 			if (map->pa) {
 				if (pageput((uint64)map->pa) != 0)
 					panic("imapdel: page ref");
@@ -240,7 +240,7 @@ static void __file_mmapdel(struct seg *seg, int sync)
 			acquire(&ip->ilock);
 		}
 
-		map->ref--;
+		// map->ref--;
 		map = get_adjacent_page(map, 0);
 	}
 	release(&ip->ilock);
@@ -286,27 +286,27 @@ static void __anon_mmapdup(struct seg *seg)
 static void __file_mmapdup(struct seg *seg)
 {
 	struct file *fp = MMAP_FILE(seg->mmap);
-	if (!MMAP_SHARE(seg->mmap))
-		goto out;
+	// if (!MMAP_SHARE(seg->mmap))
+	// 	goto out;
 
-	struct inode *ip = fp->ip;
-	uint64 off = seg->f_off;
-	uint64 end = off + seg->sz;
-	struct mmap_page *map;
+	// struct inode *ip = fp->ip;
+	// uint64 off = seg->f_off;
+	// uint64 end = off + seg->sz;
+	// struct mmap_page *map;
 
-	acquire(&ip->ilock);
-	while ((map = get_mmap_page(&ip->mapping, off)) == NULL) {
-		off += PGSIZE;
-		if (off >= end)
-			break;
-	}
-	while (map && map->f_off < end) {
-		map->ref++;
-		map = get_adjacent_page(map, 0);
-	}
-	release(&ip->ilock);
+	// acquire(&ip->ilock);
+	// while ((map = get_mmap_page(&ip->mapping, off)) == NULL) {
+	// 	off += PGSIZE;
+	// 	if (off >= end)
+	// 		break;
+	// }
+	// while (map && map->f_off < end) {
+	// 	map->ref++;
+	// 	map = get_adjacent_page(map, 0);
+	// }
+	// release(&ip->ilock);
 
-out:
+// out:
 	filedup(fp);
 }
 
@@ -829,8 +829,9 @@ int do_msync(uint64 addr, uint64 len, int flags)
 
 	// MS_INVALIDATE does nothing on our system
 	if (!(flags & (MS_ASYNC|MS_SYNC))) {
-		return -EPERM;
+		// return -EPERM;
 		// goto out;
+		return 0;
 	}
 
 	struct file *f = MMAP_FILE(s->mmap);
@@ -903,10 +904,6 @@ static int handle_anonymous_shared(uint64 badaddr, struct seg *s)
 	sfence_vma();
 	return 0;
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> benchmark
 /*
 static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 {
@@ -979,10 +976,7 @@ static void *__page_file_swap(struct inode *ip, uint64 foff, uint64 badaddr)
 	return page;
 }
 */
-<<<<<<< HEAD
 
-=======
->>>>>>> benchmark
 static int __page_file_read(struct inode *ip, uint64 off, uint64 page)
 {
 	if (off >= ip->size) {	// offset out of file size
@@ -1018,7 +1012,7 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 
 	if (share) {
 		if (map) {
-			map->ref++;
+			// map->ref++;
 		} else {
 			if (off >= ip->size) {
 				release(&ip->ilock);
@@ -1034,7 +1028,7 @@ static int handle_file_mmap(uint64 badaddr, struct seg *s)
 			// map->f_len = (PGSIZE < len - n) ? PGSIZE : len - n;
 			map->f_len = PGSIZE;
 			map->pa = NULL;
-			map->ref = 1;
+			// map->ref = 1;
 			map->valid = 0;
 			rb_link_node(&map->rb, parent, plink);
 			rb_insert_color(&map->rb, &ip->mapping);

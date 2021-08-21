@@ -10,7 +10,7 @@ int fork(void);
 char *argv[] = {
 	"busybox", 
 	"sh", 
-	"lmbench_testcode.sh", 
+	"testcode_scene.sh", 
 	0
 };
 

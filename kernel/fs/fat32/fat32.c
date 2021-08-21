@@ -335,12 +335,12 @@ int fat_read_file_vec(struct inode *ip, struct iovec *iovecs, int count, uint of
 int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 {
 	struct fat32_entry *entry = i2fat(ip);
-	static int whatever_flag = 1;
+	// static int whatever_flag = 1;
 
-	if ((uint64)off + n > 0x80000) {
-		whatever_flag = 0;
-		return -1;
-	}
+	// if ((uint64)off + n > 0x80000) {
+	// 	whatever_flag = 0;
+	// 	return -1;
+	// }
 	if (off > entry->file_size || off + n < off || (uint64)off + n > 0xffffffff
 		|| (entry->attribute & ATTR_READ_ONLY)) {
 		return -1;
@@ -368,7 +368,7 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 			m = n - tot;
 		}
 
-		if (!whatever_flag) {
+		// if (!whatever_flag) {
 			if (off >= ip->size && m < bpc) {
 				int nsec = m / bps;
 				uint32 sec = first_sec_of_clus(sb, clus) + nsec;
@@ -377,7 +377,7 @@ int fat_write_file(struct inode *ip, int user_src, uint64 src, uint off, uint n)
 			if (fat_rw_clus(sb, clus, 1, user_src, src, off % bpc, m) != m) {
 				break;
 			}
-		}
+		// }
 	}
 	if (n > 0 && off > entry->file_size) {
 		ip->size = entry->file_size = off;
