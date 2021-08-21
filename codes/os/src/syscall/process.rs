@@ -505,7 +505,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
             drop(inner);
             drop(task);
             gdb_print!(BLANK_ENABLE," ");
-            print!("\n");
+            //print!("\n");
             //print!(" ");
             suspend_current_and_run_next();
             // continue;
