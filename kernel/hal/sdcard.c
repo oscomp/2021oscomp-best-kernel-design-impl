@@ -28,7 +28,7 @@ void SD_CS_LOW(void) {
 
 void SD_HIGH_SPEED_ENABLE(void) {
     // spi_set_clk_rate(SPI_DEVICE_0, 10000000);
-	spi_set_baudr(SPI_DEVICE_0, 16);
+	spi_set_baudr(SPI_DEVICE_0, 38);
 }
 
 static void sd_lowlevel_init(uint8 spi_index) {
@@ -919,8 +919,8 @@ void sdcard_intr(void)
 		sdcard_write(bnext);
 		goto out;
 	}
-	else if (sd_status.rpending || bnext == NULL ||
-			sd_wqueue_num < WRITE_SHRESHOLD / 4)
+	else if (sd_status.rpending || bnext == NULL)
+			// sd_wqueue_num < WRITE_SHRESHOLD / 4)
 	{	// race read
 		release(&sd_wqueue.lock);
 		sdcard_multiple_write_stop();
