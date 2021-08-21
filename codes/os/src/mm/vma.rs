@@ -137,7 +137,7 @@ impl MmapSpace{
 
     pub fn lazy_map_page(&mut self, page_start: VirtAddr, fd_table: FdTable, token: usize) {
         let offset: usize = self.offset - self.oaddr.0 + page_start.0;
-        //println!("map file，0x{:X} = 0x{:X} - 0x{:X} + 0x{:X}", offset, self.offset, self.oaddr.0, page_start.0);
+        //println!("map file 0x{:X} = 0x{:X} - 0x{:X} + 0x{:X}", offset, self.offset, self.oaddr.0, page_start.0);
         self.map_file(page_start, PAGE_SIZE, offset, fd_table, token);
     }
 

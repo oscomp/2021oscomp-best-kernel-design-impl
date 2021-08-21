@@ -505,7 +505,7 @@ pub fn sys_wait4(pid: isize, wstatus: *mut i32, option: isize) -> isize {
             drop(inner);
             drop(task);
             gdb_print!(BLANK_ENABLE," ");
-            // print!(" ");
+            print!(" ");
             suspend_current_and_run_next();
             // continue;
         }
@@ -623,23 +623,39 @@ pub fn sys_prlimit(pid:usize, resource:i32, new_limit: *const RLimit, old_limit:
     };
 
     let token = current_user_token();
+    let mut olimit_buf = {
+        if old_limit as usize != 0 {
+            UserBuffer::new(translated_byte_buffer(token, old_limit as usize as *const u8, size_of::<RLimit>()))
+        } else {
+            UserBuffer::empty()
+        }
+    };
+
+    let mut nlimit_buf = {
+        if new_limit as usize != 0 {
+            UserBuffer::new(translated_byte_buffer(token, new_limit as usize as *const u8, size_of::<RLimit>()))
+        } else {
+            UserBuffer::empty()
+        }
+    };
+
+
     let mut inner = task.acquire_inner_lock();
-    
     if resource != RLIMIT_NOFILE {
         panic!("[sys_prlimit64] resource {} has not been not supported yet!", resource);
     }
-
+    
     let limit = &mut inner.resource_list[resource as usize];
-
+    //drop(inner);
     /* copy old limit from proc's limit */
     if old_limit as usize != 0 {
-        let mut olimit_buf = UserBuffer::new(translated_byte_buffer(token, old_limit as usize as *const u8, size_of::<RLimit>()));
+        //let mut olimit_buf = UserBuffer::new(translated_byte_buffer(token, old_limit as usize as *const u8, size_of::<RLimit>()));
         olimit_buf.write( limit.as_bytes() );
     }
 
     /* set new limit to proc's limit */
     if new_limit as usize != 0 {
-        let mut nlimit_buf = UserBuffer::new(translated_byte_buffer(token, new_limit as usize as *const u8, size_of::<RLimit>()));
+        //let mut nlimit_buf = UserBuffer::new(translated_byte_buffer(token, new_limit as usize as *const u8, size_of::<RLimit>()));
         nlimit_buf.read( limit.as_bytes_mut() );
     }  
 

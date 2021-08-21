@@ -567,9 +567,10 @@ impl MemorySet {
     pub fn lazy_mmap (&mut self, stval: VirtAddr) -> isize {
         for mmap_chunk in self.mmap_chunks.iter() {
             if stval >= mmap_chunk.mmap_start && stval < mmap_chunk.mmap_end {
-                if (mmap_chunk.map_perm & MapPermission::W).bits == 0 {
-                    return -1;
-                }
+                // read only can also be mapped!!??
+                //if (mmap_chunk.map_perm & MapPermission::W).bits == 0 {
+                //    return -1;
+                //}
                 self.push_chunk(stval.floor());
                 return 0
             }

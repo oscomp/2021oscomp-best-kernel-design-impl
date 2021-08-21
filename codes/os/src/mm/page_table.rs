@@ -224,7 +224,6 @@ impl PageTable {
     #[allow(unused)]
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).unwrap();
-        // if pte.is_valid()
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
@@ -315,11 +314,13 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     while start < end {
         let start_va = VirtAddr::from(start);
         let mut vpn = start_va.floor();
-        // println!("vpn = 0x{:X}", vpn.0);
+        //println!("tbb vpn = 0x{:X}", vpn.0);
         // let ppn: PhysPageNum;
         if page_table.translate(vpn).is_none() {
             // println!{"preparing into checking lazy..."}
+            //println!("check_lazy 3");
             current_task().unwrap().check_lazy(start_va, true);
+            //println!{"preparing into checking lazy..."}
         }
         let ppn = page_table
             .translate(vpn)
@@ -366,6 +367,7 @@ pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
     let vaddr = VirtAddr::from(va);
     if page_table.translate_va(vaddr).is_none() {
         // println!{"preparing into checking lazy..."}
+        //println!("check_lazy 2");
         current_task().unwrap().check_lazy(vaddr,true);
     }
     let pa = page_table.translate_va(VirtAddr::from(vaddr));

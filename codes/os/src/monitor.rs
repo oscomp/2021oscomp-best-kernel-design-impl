@@ -23,8 +23,8 @@ pub const BLANK_ENABLE:usize        = MEMORY_GDB_START + 8;
 // pub const PROCESSOR_ENABLE:usize  = 1;
 // pub const EXIT_ENABLE:usize       = 1;
 // pub const EXEC_ENABLE:usize       = 1;
-// pub const SYSCALL_ENABLE:usize    = 1; //always open
-//pub const TIMER_ENABLE:usize   = 1;
+//pub const SYSCALL_ENABLE:usize    = 1; //always open
+// pub const TIMER_ENABLE:usize   = 1;
 // pub const SIGNAL_ENABLE:usize        = 1;
 
 #[macro_export]

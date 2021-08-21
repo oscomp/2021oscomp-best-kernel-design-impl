@@ -163,6 +163,7 @@ pub fn trap_handler() -> ! {
             if va > TRAMPOLINE.into() {
                 panic!("VirtAddr out of range!");
             }
+            //println!("check_lazy 1");
             let lazy = current_task().unwrap().check_lazy(va, is_load);
             if lazy != 0 {
                 // page fault exit code

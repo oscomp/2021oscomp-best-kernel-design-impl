@@ -351,8 +351,9 @@ pub fn sys_ls(path: *const u8) -> isize{
 pub fn sys_getcwd(buf: *mut u8, len: usize)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
-    let inner = task.acquire_inner_lock();
     let buf_vec = translated_byte_buffer(token, buf, len);
+    let inner = task.acquire_inner_lock();
+    
     let mut userbuf = UserBuffer::new(buf_vec);
     let current_offset:usize = 0;
     if buf as usize == 0 {
@@ -393,8 +394,8 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
     //println!("=====================================");
     let token = current_user_token();
     let task = current_task().unwrap();
-    let inner = task.acquire_inner_lock();
     let buf_vec = translated_byte_buffer(token, buf, len);
+    let inner = task.acquire_inner_lock();
     let dent_len = size_of::<Dirent>();
     //let max_num = len / dent_len;
     let mut total_len:usize = 0;
@@ -458,8 +459,8 @@ pub fn sys_getdents64(fd:isize, buf: *mut u8, len:usize)->isize{
 pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
-    let inner = task.acquire_inner_lock();
     let mut buf_vec = translated_byte_buffer(token, buf, size_of::<Kstat>());
+    let inner = task.acquire_inner_lock();
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut kstat = Kstat::empty();
@@ -507,9 +508,9 @@ pub fn sys_fstat(fd:isize, buf: *mut u8)->isize{
 pub fn sys_newfstatat(fd:isize, path: *const u8, buf: *mut u8, flag: u32)->isize{
     let token = current_user_token();
     let task = current_task().unwrap();
+    let mut buf_vec = translated_byte_buffer(token, buf, size_of::<NewStat>());
     let inner = task.acquire_inner_lock();
     //println!("size = {}", size_of::<NewStat>());
-    let mut buf_vec = translated_byte_buffer(token, buf, size_of::<NewStat>());
     // 使用UserBuffer结构，以便于跨页读写
     let mut userbuf = UserBuffer::new(buf_vec);
     let mut stat = NewStat::empty();
@@ -1035,6 +1036,16 @@ pub fn sys_pselect(
 
     };
     ubuf_wfds.read(wfd_set.as_bytes_mut());
+
+    let mut ubuf_efds = {
+        if exceptfds as usize != 0 {
+            UserBuffer::new(
+                translated_byte_buffer(token, exceptfds, size_of::<FdSet>())
+            )
+        } else {
+            UserBuffer::empty()
+        }  
+    };
     
     drop(task);
     while !time_up {
@@ -1145,9 +1156,9 @@ pub fn sys_pselect(
 
         /* Cannot handle exceptfds for now */
         if exceptfds as usize != 0 {
-            let mut ubuf_efds = UserBuffer::new(
-                translated_byte_buffer(token, exceptfds, size_of::<FdSet>())
-            );
+            //let mut ubuf_efds = UserBuffer::new(
+            //    translated_byte_buffer(token, exceptfds, size_of::<FdSet>())
+            //);
             let mut efd_set = FdSet::new();
             ubuf_efds.read(efd_set.as_bytes_mut());
             e_ready_count = efd_set.count() as isize;

@@ -47,7 +47,7 @@ macro_rules! cursor_move_right {
     };
 }
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use user_lib::*;
 use user_lib::console::getchar;
@@ -391,8 +391,101 @@ impl ArgMachine{
     
     pub fn auto_run_testsuites( ){
         // ArgMachine::auto_run_busybox();
-        ArgMachine::auto_run_lmbench();
+        //ArgMachine::auto_run_lmbench();
+        ArgMachine::final_ten_hours();
+    }
 
+
+    pub fn final_ten_hours(){
+        let mut exit_code = 0;
+    
+        println!("!!!!!!!!!AUTORUN!!!!!!!!!");
+        mkdir("/var");
+        mkdir("/var/tmp");
+        open("/var/tmp/lmbench", OpenFlags::CREATE);
+        mkdir("/tmp");
+        
+        let mut testsuits :Vec<&str>= Vec::new();
+        testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
+
+        testsuits.push("busybox\0echo\0START\0bw_file_rd_io_only");
+        testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0io_only\0/var/tmp/XXX");   //ok  
+        testsuits.push("busybox\0echo\0END\0bw_file_rd\0io_only\0$?");
+        
+        testsuits.push("busybox\0echo\0START\0bw_file_rd_open2close");
+        testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0open2close\0/var/tmp/XXX");//ok  
+        testsuits.push("busybox\0echo\0END\0bw_file_rd\0open2close\0$?");
+        
+        testsuits.push("busybox\0echo\0START\0lat_ctx");
+        testsuits.push("lmbench_all\0lat_ctx\0-P\01\0-s\032\02\04\08\016\024\032"); // wait for kill
+        testsuits.push("busybox\0echo\0END\0lat_ctx\0$?"      );
+        
+        testsuits.push("busybox\0echo\0START\0lat_proc_fork");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
+        testsuits.push("busybox\0echo\0END\0lat_proc_fork\0$?");
+        
+        testsuits.push("busybox\0echo\0START\0lat_proc_exec");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
+        testsuits.push("busybox\0echo\0END\0lat_proc_exec\0$?");
+        
+        testsuits.push("busybox\0echo\0START\0bw_pipe");
+        testsuits.push("lmbench_all\0bw_pipe\0-P\01");  
+        testsuits.push("busybox\0echo\0END\0bw_pipe\0$?"      );
+        
+        testsuits.push("busybox\0echo\0START\0lat_pipe");
+        testsuits.push("lmbench_all\0lat_pipe\0-P\01");    
+        testsuits.push("busybox\0echo\0END\0lat_pipe\0$?"     );
+
+        testsuits.push("busybox\0echo\0START\0lat_pagefault");
+        testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
+
+        // testsuits.push("busybox\0echo\0START\0lat_pagefault");
+        // testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        // testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
+
+        // testsuits.push("busybox\0echo\0START\0lat_pagefault");
+        // testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        // testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
+
+        testsuits.push("busybox\0echo\0START\0lat_mmap");
+        testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
+        testsuits.push("busybox\0echo\0END\0lat_mmap\0$?"     );
+        
+        println!("scan str iter");
+        for programname_op in testsuits.iter() {
+            let exec_str = String::new() +programname_op;
+            let exec_str = str::replace(exec_str.as_str(), "$?", exit_code.to_string().as_str());
+            let args: Vec<&str> = exec_str.split('\0').into_iter().collect();
+            let args_string: Vec<String> = args.iter().map(
+                |str|{
+                    let mut string = String::new();
+                    string.push_str(str);
+                    string.push('\0');
+                    string
+                }
+            )
+            .collect();
+
+            let mut args_addr: Vec<*const u8> = Vec::new();
+            for i in 0..args.len() {
+                args_addr.push(args_string[i].as_ptr() as usize as *const u8);
+            }
+            args_addr.push(0 as *const u8 );
+            let pid = fork();
+            if pid == 0 {
+                //println!("exec");
+                if exec(args_string[0].as_str(), args_addr.as_slice()) == -1 {
+                    println!("Error when executing autorun_testsuites!");
+                    ls("/");
+                    shutdown();
+                }
+                unreachable!();
+            } else {
+                waitpid(pid as usize, &mut exit_code);
+            }
+        }
+        shutdown();  
     }
 
     pub fn auto_run_lmbench(){
@@ -431,7 +524,7 @@ impl ArgMachine{
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
 
         testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
-//
+
         testsuits.push("lmbench_all\0lat_sig\0-P\01\0prot\0lat_sig");         
         testsuits.push("lmbench_all\0lat_pipe\0-P\01");                                  // 需要SIGKILL
         // testsuits.push("busybox\0echo\0file\0system\0latency"); 
