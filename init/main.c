@@ -45,9 +45,9 @@ static void init_pcb()
     get_elf_file("shell",&_elf_shell,&length);
     uintptr_t pgdir = allocPage();
     clear_pgdir(pgdir);
-    alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-    alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-
+    for (uint64_t i = user_stack - NORMAL_PAGE_SIZE; i >= user_stack - USER_STACK_INIT_SIZE; i -= NORMAL_PAGE_SIZE)
+        alloc_page_helper(i,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
+    
     uintptr_t test_shell = (uintptr_t)load_elf(_elf_shell,length,pgdir,alloc_page_helper, &pcb_underinit->elf);
     pcb_underinit->edata = pcb_underinit->elf.edata;
     shell_pgdir = pgdir;
@@ -86,7 +86,6 @@ static void init_syscall(void)
     syscall[SYS_exit_group] = &do_exit_group;
 
     syscall[SYS_write] = &fat32_write;
-    syscall[SYSCALL_TEST] = &fat32_read_test;
     syscall[SYS_getpid] = &do_getpid;
     syscall[SYS_uname] = &do_uname;
 
@@ -229,6 +228,7 @@ int main()
     /* setup exception */
     clear_interrupt();
     setup_exception();
+    enable_float_point_inst();
     enable_interrupt();
 
     while (1) {

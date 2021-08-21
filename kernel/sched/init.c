@@ -319,7 +319,7 @@ void init_pcb_stack(
     pcb->kernel_sp = (reg_t)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     pcb->user_sp = (void*)user_stack;
     pcb->user_stack_base = (void*)user_stack - USER_STACK_INIT_SIZE;
-    pcb->user_addr_top = user_stack - USER_STACK_INIT_SIZE;
+    pcb->user_addr_top = user_stack - USER_STACK_INIT_SIZE - NORMAL_PAGE_SIZE;
     pcb->pgdir = pgdir;
 
     reg_t *regs = pt_regs->regs;    
@@ -335,12 +335,11 @@ void init_pcb_stack(
 
     pt_regs->sepc = ra;
     unsigned mode = SATP_MODE_SV39, asid = pcb->tid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;
-    pt_regs->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
     
     switchto_context_t *switch_to_reg = 
         (switchto_context_t *)(kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t));
     switch_to_reg->regs[0] = &ret_from_exception;
-    switch_to_reg->satp = pt_regs->satp;
+    switch_to_reg->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
 
     /* 注意，user_stack并未分配页面 */
     uint64_t user_stack_kva = get_kva_of(user_stack - NORMAL_PAGE_SIZE, pgdir) + NORMAL_PAGE_SIZE;
@@ -418,12 +417,11 @@ void init_clone_pcb(uint64_t pgdir, pcb_t *pcb_underinit, uint64_t kernel_stack_
     /* return 0 if child */
     pt_regs->regs[10] = 0;
     unsigned mode = SATP_MODE_SV39, asid = pcb_underinit->tid, ppn = kva2pa(pgdir) >> NORMAL_PAGE_SHIFT;
-    pt_regs->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
 
     // prepare switch context under user context
     switchto_context_t *switch_to_reg = 
         (switchto_context_t *)(pcb_underinit->kernel_sp);
     // kernel stack should be different
     switch_to_reg->regs[0] = &ret_from_exception;
-    switch_to_reg->satp = pt_regs->satp;
+    switch_to_reg->satp = (unsigned long)(((unsigned long)mode << SATP_MODE_SHIFT) | ((unsigned long)asid << SATP_ASID_SHIFT) | ppn);
 }

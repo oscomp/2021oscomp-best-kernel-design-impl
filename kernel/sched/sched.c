@@ -165,7 +165,7 @@ static void freeproc(pcb_t *pcb)
     pcb->status = TASK_EXITED;
     free_all_pages(pcb->pgdir, PAGE_ALIGN(pcb->kernel_sp));
     free_all_fds(pcb);
-    handle_memory_leak(pcb);
+    // handle_memory_leak(pcb);
     list_add_tail(&pcb->list,&available_queue);
 }
 
@@ -280,37 +280,25 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
             if (stack) assert(0);
             ptr_t user_stack_top = USER_STACK_ADDR;
 
-            /* spawn num is very essential, we can't allocate the same addr to two different children */
-            /* things can be complicated when many children are spawned */
-            // current_running->spawn_num++;
-            // for (uint j = 1; j < NUM_MAX_TASK; j++)
-            //     if (pcb[j].pid == current_running->pid)
-            //         pcb[j].spawn_num = current_running->spawn_num;
-
-            // ptr_t user_stack_top = (stack)? stack : USER_STACK_ADDR + PAGES_PER_USER_STACK * (current_running->spawn_num) * NORMAL_PAGE_SIZE;
-
             // pgdir
             uint64_t pgdir = allocPage();
-            clear_pgdir(pgdir);
-            share_pgtable(pgdir, pa2kva(PGDIR_PA));
+            copy_page_table(pgdir, current_running->pgdir, current_running->user_stack_base);
+            // /* user low space */
+            // for (uint64_t i = current_running->elf.text_begin; i < current_running->edata; i += NORMAL_PAGE_SIZE){
+            //     // log2(0, "111");
+            //     uint64_t page_kva;
+            //     if ((page_kva = probe_kva_of(i, current_running->pgdir)) != NULL){
+            //         /* copy it */
+            //         uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_ALL_MOD);
+            //         // log2(0, "clone_page_kva is %lx", clone_page_kva);
+            //         memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
+            //     }
+            // }
 
-            /* user low space */
-            for (uint64_t i = current_running->elf.text_begin; i < current_running->edata; i += NORMAL_PAGE_SIZE){
-                // log2(0, "111");
-                if (probe_kva_of(i, current_running->pgdir)){
-                    /* copy it */
-                    uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_ALL_MOD);
-                    // log2(0, "clone_page_kva is %lx", clone_page_kva);
-                    memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
-                }
-            }
-
-            /* user high space (including stack) */
-            for (uint64_t i = get_user_addr_top(current_running); i < USER_STACK_ADDR; i += NORMAL_PAGE_SIZE){
-                if (probe_kva_of(i, current_running->pgdir)){
-                    uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_READ|_PAGE_WRITE);
-                    memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
-                }
+            /* user stack */
+            for (uint64_t i = current_running->user_stack_base; i < USER_STACK_ADDR; i += NORMAL_PAGE_SIZE){
+                uint64_t clone_page_kva = alloc_page_helper(i, pgdir, _PAGE_READ|_PAGE_WRITE);
+                memcpy(clone_page_kva, get_kva_of(i, current_running->pgdir), NORMAL_PAGE_SIZE);
             }
 
             /* set up pcb */
@@ -370,7 +358,6 @@ void do_exit(int32_t exit_status)
         detach_from_parent(current_running);
     }
     log(0, "exited finish");
-    do_iocache_write_back();
     do_scheduler();
 }
 

@@ -4,6 +4,8 @@
 int16 fat32_link()
 {
     debug();
+    printk_port("fat32_link hasn't implemented\n");
+    assert(0);
     return -1;
 }
 

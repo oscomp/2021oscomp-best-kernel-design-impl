@@ -12,6 +12,7 @@ static void fat32_read_myelf()
     isec_t now_sec = first_sec_of_clus(now_clus);
     uintptr_t elf_point = allocproc();
     size_t readcount = 0, length = current_running->myelf_fd.length;
+    assert(elf_point + length <= KERNEL_ENTRYPOINT);
 
     while (readcount < length){
         size_t readsize = min(BUFSIZE, length - readcount);

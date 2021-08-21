@@ -87,6 +87,7 @@ int do_pselect6(int nfds, fd_set *readfds, fd_set *writefds,
                 break;
             }
             else{
+                log(0, "timeout");
                 FD_CLR(fd, readfds);
             }
         }
@@ -102,6 +103,7 @@ int do_pselect6(int nfds, fd_set *readfds, fd_set *writefds,
                 break;
             }
             else{
+                log(0, "timeout");
                 FD_CLR(fd, readfds);
             }
         }

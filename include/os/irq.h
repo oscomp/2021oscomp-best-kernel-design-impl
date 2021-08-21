@@ -34,6 +34,16 @@ enum ExcCode
     EXCC_COUNT
 };
 
+#ifdef K210
+    #define EXCC_INST_PAGE_FAULT EXCC_INST_ACCESS
+    #define EXCC_LOAD_PAGE_FAULT EXCC_LOAD_ACCESS
+    #define EXCC_STORE_PAGE_FAULT EXCC_STORE_ACCESS
+#else
+    #define EXCC_INST_PAGE_FAULT EXCC_INST_PAGE_FAULT
+    #define EXCC_LOAD_PAGE_FAULT EXCC_LOAD_PAGE_FAULT
+    #define EXCC_STORE_PAGE_FAULT EXCC_STORE_PAGE_FAULT
+#endif
+
 #define TIMER_INTERVAL 150000
 #define PREEMPT_FREQUENCY 50
 
@@ -42,7 +52,7 @@ typedef void (*handler_t)(regs_context_t*, uint64_t, uint64_t);
 extern handler_t irq_table[IRQC_COUNT];
 extern handler_t exc_table[EXCC_COUNT];
 
-extern void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause, uint64_t tp);
+extern void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause);
 
 /* exception handler entery */
 extern void exception_handler_entry(void);
@@ -63,6 +73,8 @@ extern void disable_interrupt(void);
 extern void clear_interrupt(void);
 extern void enable_preempt(void);
 extern void disable_preempt(void);
+
+extern void enable_float_point_inst(void);
 
 extern uint64_t read_satp();
 

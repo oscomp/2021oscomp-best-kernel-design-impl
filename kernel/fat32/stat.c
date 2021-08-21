@@ -71,6 +71,7 @@ int fat32_fstatat(fd_num_t dirfd, const char *pathname, struct stat *statbuf, in
     statbuf->st_blksize = SECTOR_SIZE;
     statbuf->st_blocks = (fdp->length % SECTOR_SIZE)? fdp->length / SECTOR_SIZE + 1 : fdp->length / SECTOR_SIZE;
     statbuf->st_size = fdp->length;
+    log(0, "file length is %ld", statbuf->st_size);
     statbuf->st_atim.tv_sec=1628233081;
     statbuf->st_atim.tv_nsec=386050164;
     statbuf->st_mtim.tv_sec=1628233079;

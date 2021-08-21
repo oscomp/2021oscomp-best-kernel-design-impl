@@ -54,10 +54,48 @@
 #define OFFSET_REG_SEPC         264
 #define OFFSET_REG_SBADADDR     272
 #define OFFSET_REG_SCAUSE       280
-#define OFFSET_REG_SATP         288
+
+/* float point register */
+#define OFFSET_FREG_FT0         288
+#define OFFSET_FREG_FT1         296
+#define OFFSET_FREG_FT2         304
+#define OFFSET_FREG_FT3         312
+#define OFFSET_FREG_FT4         320
+#define OFFSET_FREG_FT5         328
+#define OFFSET_FREG_FT6         336
+#define OFFSET_FREG_FT7         344
+
+#define OFFSET_FREG_FS0         352
+#define OFFSET_FREG_FS1         360
+
+#define OFFSET_FREG_FA0         368
+#define OFFSET_FREG_FA1         376
+#define OFFSET_FREG_FA2         384
+#define OFFSET_FREG_FA3         392
+#define OFFSET_FREG_FA4         400
+#define OFFSET_FREG_FA5         408
+#define OFFSET_FREG_FA6         416
+#define OFFSET_FREG_FA7         424
+
+#define OFFSET_FREG_FS2         432
+#define OFFSET_FREG_FS3         440
+#define OFFSET_FREG_FS4         448
+#define OFFSET_FREG_FS5         456
+#define OFFSET_FREG_FS6         464
+#define OFFSET_FREG_FS7         472
+#define OFFSET_FREG_FS8         480
+#define OFFSET_FREG_FS9         488
+#define OFFSET_FREG_FS10        496
+#define OFFSET_FREG_FS11        504
+
+#define OFFSET_FREG_FT8         512
+#define OFFSET_FREG_FT9         520
+#define OFFSET_FREG_FT10        528
+#define OFFSET_FREG_FT11        536
 
 /* Size of stack frame, word/double word alignment */
-#define OFFSET_SIZE             296
+#define OFFSET_SIZE             544
+
 #ifndef KERNEL_STACK_SIZE
     #define KERNEL_STACK_SIZE 4096
 #endif

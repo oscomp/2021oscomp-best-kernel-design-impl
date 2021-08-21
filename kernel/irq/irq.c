@@ -28,7 +28,7 @@ void reset_irq_timer()
     do_scheduler();
 }
 
-void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause, uint64_t tp)
+void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t cause)
 {
     /* user time count */
     user_time_count();
@@ -66,15 +66,11 @@ void init_exception()
     exc_table[EXCC_SYSCALL] = &handle_syscall;
     exc_table[EXCC_INST_MISALIGNED] = &handle_other; 
     exc_table[EXCC_BREAKPOINT] = &handle_other;
-    #ifdef K210  
-    exc_table[EXCC_INST_ACCESS] = &handle_pgfault;
-    exc_table[EXCC_LOAD_ACCESS] = &handle_pgfault;
-    exc_table[EXCC_STORE_ACCESS] = &handle_pgfault; 
-    #else
     exc_table[EXCC_INST_ACCESS] = &handle_other;
     exc_table[EXCC_LOAD_ACCESS] = &handle_other;
     exc_table[EXCC_STORE_ACCESS] = &handle_other; 
-    #endif
+    /* ifdef K210, the next three line override the three lines before */
+    /* ifndef K210, set qemu page fault exception */
     exc_table[EXCC_INST_PAGE_FAULT] = &handle_pgfault; 
     exc_table[EXCC_LOAD_PAGE_FAULT] = &handle_pgfault;   
     exc_table[EXCC_STORE_PAGE_FAULT] = &handle_pgfault;
@@ -108,19 +104,9 @@ void handle_sext(regs_context_t *regs, uint64_t interrupt, uint64_t cause)
     return ;
 }
 
-
 void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
 {
-    // for (uint32 i = 0; i < 30000000; ++i)
-    // {
-    //     printk_port("stval: %lx\n", regs->sbadaddr);
-    //     printk_port("scause: %lx\n", regs->scause);
-    //     printk_port("sepc: %lx\n", regs->sepc);
-    //     printk_port("ra: %lx", regs->regs[1]);
-    // }
-    // log(0, "pgfault stval:%lx, cause:%d\n", stval, cause);
-    // printk_port("current pid is %d, tid is %d\n", current_running->pid, current_running->tid);
-    // printk_port("pgdir: %lx\n", current_running->pgdir);
+    // log2(0, "pgfault stval:%lx, cause:%d\n", stval, cause);
     /* if not valid address, go handle other */
     if (stval >= 0xffffffff00000000lu || stval < current_running->elf.text_begin){
         if (stval == do_rt_sigreturn)
@@ -130,104 +116,99 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
             handle_other(regs,stval,cause);
         }
     }
-    // uint64_t satp = read_satp();
-    // uint64_t va = stval;
-    // uint64_t pgdir = (satp&0xffffffffffflu) << NORMAL_PAGE_SHIFT;
-
-    // uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-    // uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-    // uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
-    // PTE *ptr = pa2kva(pgdir) + vpn2*sizeof(PTE);
-    // // 2
-    // if (!get_attribute(*ptr,_PAGE_PRESENT))
-    // {
-    //     uintptr_t pgdir2 = allocPage();
-    //     clear_pgdir(pgdir2);
-    //     uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-    //     set_pfn(ptr,pfn2);
-    //     set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-    //     ptr = pgdir2 + vpn1*sizeof(PTE);
-    // }
-    // else
-    //     ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
-    // // 1
-    // if (!get_attribute(*ptr,_PAGE_PRESENT))
-    // {
-    //     uintptr_t pgdir2 = allocPage();
-    //     clear_pgdir(pgdir2);
-    //     uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-    //     set_pfn(ptr,pfn2);
-    //     set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-    //     ptr = pgdir2 + vpn0*sizeof(PTE);
-    // }
-    // else
-    //     ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
-
-    // // 0
-    // if (!get_attribute(*ptr,_PAGE_PRESENT))
-    // {
-    //     // log(0, "1");
-    //     if (!get_attribute(*ptr,_PAGE_SWAP)){
-    //         // log(0, "2");
-
-    for (uint8_t i = 0; i < NUM_PHDR_IN_PCB; i++){
-        Elf64_Phdr *phdr = (Elf64_Phdr *)(&current_running->phdr[i]);
-        if (stval >= phdr->p_vaddr && stval < phdr->p_vaddr + phdr->p_memsz)
-        {
-            /* it is in ELF file */
-            fat32_lseekmy(PAGE_ALIGN(stval - phdr->p_vaddr + phdr->p_offset), SEEK_SET);
-            alloc_page_helper(stval, current_running->pgdir, _PAGE_ALL_MOD); /* FOR NOW all mod */
-            /* now we can access this address */
-            unsigned char *stval_page_uva = PAGE_ALIGN(stval);
-            fat32_readmy(stval_page_uva, NORMAL_PAGE_SIZE);
-            uint64_t data_top = phdr->p_vaddr + phdr->p_filesz;
-            if (phdr->p_filesz < phdr->p_memsz && stval >= PAGE_ALIGN(data_top)){
-                /* should pad 0 for bss */                        
-                if (PAGE_ALIGN(stval) == PAGE_ALIGN(data_top)){ 
-                    for (uint64_t pos = PAGE_OFFSET(data_top); pos < NORMAL_PAGE_SIZE; pos++)
-                        stval_page_uva[pos] = 0; /* just pad part of this page */
+    /* allocate memory, or handle memory exception */
+    uint64_t page_kva;
+    if ((page_kva = probe_kva_of(stval, current_running->pgdir)) != NULL){
+        // log2(0, "writable? %d, readable? %d", is_page_kva_file_map_writable(page_kva), is_page_kva_file_map_readable(page_kva));
+        if (cause == EXCC_STORE_PAGE_FAULT){
+            /* copy on write */
+            if (is_page_kva_copy_on_write(page_kva)){
+                // log2(0, "copy on write, tid is %d", current_running->tid);
+                // log2(0, "page_kva is %lx", page_kva);
+                // log2(0, "share_num is %d", get_page_kva_share_num(page_kva));
+                if (get_page_kva_share_num(page_kva) == 1){
+                    /* only one, just set it to be writable */
+                    clear_copy_on_write(page_kva);
+                    // log2(0, "clear page_uva is %lx, share_num is %d", stval, get_page_kva_share_num(page_kva));
+                    // log2(0, "clear Copy-on-Write is %d", is_copy_on_write(page_kva));
+                    assert(add_page_uva_attribute(stval, current_running->pgdir, _PAGE_WRITE) != 0);
                 }
-                else
-                    for (uint64_t pos = 0; pos < NORMAL_PAGE_SIZE; pos++)
-                        stval_page_uva[pos] = 0; /* pad all page */
+                else{
+                    /* need to do Copy-on-Write */
+                    PTE ret = 0;
+                    assert(ret = free_page_helper(stval, current_running->pgdir));
+                    uintptr_t new_page_kva = alloc_page_helper(stval, current_running->pgdir, get_all_attribute(ret) | _PAGE_WRITE);
+                    memcpy(new_page_kva, PTE2kva(ret), NORMAL_PAGE_SIZE);
+                }                
+                return ;
             }
-            return ;
+            else if (is_page_kva_file_map_writable(page_kva)){
+                /* the first member should read in, others just add attribute */
+                if (!is_page_kva_file_map_accessed(page_kva)){
+                    // log2(0, "set page_uva %lx accessed and dirty", stval);
+                    file_map_read_in(get_page_kva_file_map_info(page_kva));
+                    set_page_kva_file_map_accessed(page_kva);
+                    set_page_kva_file_map_dirty(page_kva);
+                }
+                else if (!is_page_kva_file_map_dirty(page_kva)){
+                    /* accessed, but not dirty */
+                    // log2(0, "set page_uva %lx dirty", stval);
+                    set_page_kva_file_map_dirty(page_kva);
+                }
+                assert(add_page_uva_attribute(stval, current_running->pgdir, _PAGE_READ|_PAGE_WRITE) != 0);
+                return ;
+            }
+        }
+        else if (cause == EXCC_LOAD_PAGE_FAULT){
+            /* the first member should read in, others just add attribute */
+            if (is_page_kva_file_map_readable(page_kva)){
+                if (!is_page_kva_file_map_accessed(page_kva)){
+                    // log2(0, "set page_uva %lx accessed", stval);
+                    file_map_read_in(get_page_kva_file_map_info(page_kva));
+                    set_page_kva_file_map_accessed(page_kva);
+                }
+                assert(add_page_uva_attribute(stval, current_running->pgdir, _PAGE_READ) != 0);
+                return ;
+            }
+        }
+        else{
+            printk_port("stval is %lx, other protected\n", stval);
+            handle_other(regs, stval, cause);
+        }
+    }
+    else{
+        for (uint8_t i = 0; i < NUM_PHDR_IN_PCB; i++){
+            Elf64_Phdr *phdr = (Elf64_Phdr *)(&current_running->phdr[i]);
+            if (stval >= phdr->p_vaddr && stval < phdr->p_vaddr + phdr->p_memsz)
+            {
+                /* it is in ELF file */
+                fat32_lseekmy(PAGE_ALIGN(stval - phdr->p_vaddr + phdr->p_offset), SEEK_SET);
+                alloc_page_helper(stval, current_running->pgdir, _PAGE_ALL_MOD); /* FOR NOW all mod */
+                /* now we can access this address */
+                unsigned char *stval_page_uva = PAGE_ALIGN(stval);
+                fat32_readmy(stval_page_uva, NORMAL_PAGE_SIZE);
+                uint64_t data_top = phdr->p_vaddr + phdr->p_filesz;
+                if (phdr->p_filesz < phdr->p_memsz && stval >= PAGE_ALIGN(data_top)){
+                    /* should pad 0 for bss */                        
+                    if (PAGE_ALIGN(stval) == PAGE_ALIGN(data_top)){ 
+                        for (uint64_t pos = PAGE_OFFSET(data_top); pos < NORMAL_PAGE_SIZE; pos++)
+                            stval_page_uva[pos] = 0; /* just pad part of this page */
+                    }
+                    else
+                        for (uint64_t pos = 0; pos < NORMAL_PAGE_SIZE; pos++)
+                            stval_page_uva[pos] = 0; /* pad all page */
+                }
+                return ;
+            }
         }
     }
     // handle_other(regs,stval,cause);
-    // printk_port("stval is %lx", stval);
+    if (stval < current_running->user_stack_base && stval >= current_running->user_stack_base + NORMAL_PAGE_SIZE)
+        printk_port("user stack requirement too large\n");
+    printk_port("stval is %lx, SIGSEGV\n", stval);
     local_flush_tlb_all();
     do_kill(current_running->tid, SIGSEGV);
     return ;
-            // if (cause == EXCC_INST_ACCESS || cause == EXCC_INST_PAGE_FAULT)
-            //     set_attribute(ptr,_PAGE_ALL_MOD|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_PRESENT|_PAGE_USER);
-            // else if (cause == EXCC_LOAD_ACCESS || cause == EXCC_LOAD_PAGE_FAULT)
-            //     set_attribute(ptr,_PAGE_ALL_MOD|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_PRESENT|_PAGE_USER);
-            // else if (cause == EXCC_STORE_ACCESS || cause == EXCC_STORE_PAGE_FAULT)
-            //     set_attribute(ptr,_PAGE_ALL_MOD|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_PRESENT|_PAGE_USER);
-    //     }
-    //     else assert(0);
-    // }
-    // else if (cause == 15 && !get_attribute(*ptr,_PAGE_WRITE))
-    // {
-    //     printk_port("Segmentation fault\n");        assert(0);
-    // }
-    // else if (cause == 13 && !get_attribute(*ptr,_PAGE_READ)) // read/write on inst
-    // {
-    //     printk_port("Segmentation fault\n");        assert(0);
-    // }
-    // else if (cause == 12 && !get_attribute(*ptr,_PAGE_EXEC)) // inst on read/write
-    // {
-    //     printk_port("Segmentation fault\n");        assert(0);
-    // }
-    // else
-    // {
-    //     assert(0);
-    //     if (cause == 12 || cause == 13)
-    //         set_attribute(ptr,_PAGE_ACCESSED);
-    //     else if (cause == 15)
-    //         set_attribute(ptr,_PAGE_ACCESSED|_PAGE_DIRTY);
-    // }
 }
 
 void handle_software()

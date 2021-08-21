@@ -6,7 +6,7 @@
 #include <os/ring_buffer.h>
 
 /* pipe */
-#define NUM_PIPE 16
+#define NUM_PIPE 128
 #define PIPE_INVALID 0
 #define PIPE_VALID 1
 #define PIPE_ERROR 2

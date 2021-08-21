@@ -8,14 +8,9 @@
 #include <os/system.h>
 #include <os/ring_buffer.h>
 #include <os/pipe.h>
-
-#ifndef max
-#define max(x,y) (((x) > (y)) ? (x) : (y))
-#endif
-
-#ifndef min
-#define min(x,y) (((x) > (y)) ? (y) : (x))
-#endif
+#include <fat32/cache.h>
+#include <fat32/mmap.h>
+#include <utils/utils.h>
 
 #define BUFSIZE (min(NORMAL_PAGE_SIZE, CLUSTER_SIZE))
 #define READ_BUF_CNT (BUFSIZE/SECTOR_SIZE)
@@ -245,8 +240,6 @@ extern ientry_t cwd_clus, root_clus, root_first_clus;
 extern isec_t cwd_sec, root_sec;
 extern pipe_t pipes[NUM_PIPE];
 
-int8 fat32_read_test(const char *filename);
-
 int fat32_openat(fd_num_t fd, const uchar *path, uint32 flags, uint32 mode);
 int64 fat32_close(fd_num_t fd);
 void free_all_fds(pcb_t *pcb);
@@ -270,7 +263,7 @@ int64 fat32_getdents64(fd_num_t fd, char *buf, uint32_t len);
 
 int16 fat32_pipe2(fd_num_t fd[], int32 mode);
 
-int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence);
+int64_t fat32_lseek(fd_num_t fd, ssize_t off, uint32_t whence);
 
 int16 fat32_link();
 int32_t fat32_unlinkat(fd_num_t dirfd, const char* path, uint32_t flags);
@@ -328,6 +321,11 @@ int32_t parse_filepath_init(char *path, fd_num_t dirfd, ientry_t *now_clus, char
 void clear_all_garbage_clus_from_table(ientry_t cluster);
 unsigned char Upper2Low(unsigned char ch);
 
+void sd_read(char *buf, isec_t sec);
+void sd_read_meta(char *buf, isec_t sec);
+void sd_write(char *buf, isec_t sec);
+void sd_write_meta(char *buf, isec_t sec);
+
 /* get the first sector num of this cluster */
 static inline uint32 first_sec_of_clus(uint32 cluster)
 {
@@ -352,12 +350,6 @@ static inline uint32 fat2_sec_of_clus(uint32 cluster)
 static inline uint32 fat_offset_of_clus(uint32 cluster)
 {
     return ((cluster) * 4) % fat.bpb.byts_per_sec;
-}
-
-/* get sector number, this sector is in cluster, and offset */
-static inline uint32 get_sec_from_clus_and_offset(uint32_t cluster, uint64_t offset)
-{
-    return first_sec_of_clus(cluster) + offset / fat.bpb.byts_per_sec;
 }
 
 static inline uint32 get_cluster_from_dentry(dentry_t *p)
@@ -390,6 +382,11 @@ static inline uint32_t get_clus_from_len(uint32_t cluster, uint32_t length)
         cluster = get_next_cluster(cluster);
     return cluster;
 }
+/* get sector number, this sector is in cluster, and offset */
+static inline uint32 get_sec_from_clus_and_offset(uint32_t cluster, uint64_t offset)
+{
+    return first_sec_of_clus(cluster) + offset / fat.bpb.byts_per_sec;
+}
 
 static inline void set_clusnum_of_dentry(dentry_t *p, ientry_t clus)
 {
@@ -397,26 +394,15 @@ static inline void set_clusnum_of_dentry(dentry_t *p, ientry_t clus)
     p->LO_clusnum = clus & ((1lu << 16) - 1);      //27:26
 }
 
-/* cache */
-#define _1st(a) (((a) & 0xf000lu) >> 12)
-#define _2nd(a) (((a) & 0x0f00lu) >> 8)
-#define _3rd(a) (((a) & 0x00f0lu) >> 4)
-#define _4th(a) (((a) & 0x000flu))
-#define IO_CACHE_BUFSIZ (1ul << 16)
-#define IO_CACHE_LINESIZ (512 * READ_BUF_CNT)
-#define IO_CACHE_BLOCKNUM (IO_CACHE_BUFSIZ/IO_CACHE_LINESIZ)
-#define IO_CACHE_WAYNUM 4       // 4路组相联
-#define IO_CACHE_BLOCKSIZ (IO_CACHE_WAYNUM*IO_CACHE_LINESIZ)
-#define IO_CACHE_RECNUM (IO_CACHE_BUFSIZ/(IO_CACHE_WAYNUM*IO_CACHE_LINESIZ))
-
-extern char iobuf[IO_CACHE_BUFSIZ];
-extern uint16 ioseqrec[IO_CACHE_BUFSIZ/2048];
-extern uint8 iodirty[IO_CACHE_BUFSIZ/2048][4];
-extern uint32_t iosecnum[IO_CACHE_BUFSIZ/2048][4];
-
-extern void do_iocache_write_back();
-void init_iocache();
-int sd_write_to_cache(char *buf, uint32_t sec);
-int sd_read_from_cache(char* buf, uint32_t sec);
+/* from first_clus_number and position, get sector number where the pos is at(not buf aligned) */
+static inline isec_t get_sec_from_clus_and_length(ientry_t first_clus, size_t pos)
+{
+    return get_sec_from_clus_and_offset(get_clus_from_len(first_clus, pos), pos % CLUSTER_SIZE);
+}
+/* return buf-aligned sector number from first_clus and position */
+static inline isec_t get_buf_aligned_sec_from_clus_and_length(ientry_t first_clus, size_t pos)
+{
+    return BUFF_ALIGN(get_sec_from_clus_and_length(first_clus, pos));
+}
 
 #endif

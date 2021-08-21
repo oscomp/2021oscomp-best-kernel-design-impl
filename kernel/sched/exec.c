@@ -89,13 +89,16 @@ static int is_sh(char *file_name)
 int8 do_exec(const char* file_name, char* argv[], char *const envp[])
 {
     debug();
-    if (!strcmp(argv[1], "lat_pagefault") || !strcmp(argv[1], "lat_mmap") || 
-        !strcmp(argv[1], "lat_fs") || !strcmp(argv[1], "bw_mmap_rd") || 
-        !strcmp(argv[1], "lmdd") || !strcmp(argv[1], "bw_file_rd") || 
-        !strcmp(argv[1], "lat_ctx")){
+    if (!strcmp(argv[1], "lat_pagefault")){
         printk_port("unsupported test\n");
         do_exit(0);
     }
+    else if (!strcmp(argv[1], "lat_ctx"))
+        argv[9] = NULL;
+
+    // printk_port("argv[1] is %s\n", argv[1]);
+    // if (argv[2])
+    //     printk_port("argv[2] is %s\n", argv[2]);
     // init pcb
     pcb_t *pcb_underinit = current_running;
     ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE; /* just 1 page */
@@ -192,7 +195,7 @@ int8 do_exec(const char* file_name, char* argv[], char *const envp[])
     share_pgtable(pgdir,pa2kva(PGDIR_PA)); /* 只有内核高地址段才存在PGDIR_PA */
     for (uintptr_t j = 0; j < USER_STACK_INIT_SIZE / NORMAL_PAGE_SIZE; j++)
         alloc_page_helper(user_stack - (j + 1)*NORMAL_PAGE_SIZE, pgdir, _PAGE_READ|_PAGE_WRITE);
-    set_user_addr_top(pcb_underinit, user_stack - USER_STACK_INIT_SIZE);
+    // set_user_addr_top(pcb_underinit, user_stack - USER_STACK_INIT_SIZE - NORMAL_PAGE_SIZE);
 
 
     uintptr_t test_elf = (uintptr_t)lazy_load_elf(fd, pgdir, alloc_page_helper, pcb_underinit);

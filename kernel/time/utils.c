@@ -85,7 +85,7 @@ uint64_t timeval_to_tick(struct timeval *tv)
 
 void tick_to_timespec(time_t time, struct timespec *ts)
 {
-    time /= 10;
+    // time /= 10;
     ts->tv_sec = time / time_base;
     uint64_t left = time % time_base;
     ts->tv_nsec = 0;
@@ -98,7 +98,7 @@ void tick_to_timespec(time_t time, struct timespec *ts)
 
 void tick_to_timeval(time_t time, struct timeval *tv)
 {
-    time /= 10;
+    // time /= 10;
     tv->tv_sec = time / time_base; /* compute second */
 
     uint64_t left = time % time_base; /* compute micro seconds */

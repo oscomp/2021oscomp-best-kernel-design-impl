@@ -16,6 +16,8 @@
 #define NORMAL_PAGE_SIZE (1lu << NORMAL_PAGE_SHIFT)
 #define LARGE_PAGE_SHIFT 21lu
 #define LARGE_PAGE_SIZE (1lu << LARGE_PAGE_SHIFT)
+#define SUPER_PAGE_SHIFT 30lu
+#define SUPER_PAGE_SIZE (1lu << SUPER_PAGE_SHIFT)
 
 #define PAGE_OFFSET(ptr) \
     ( (ptr) & (NORMAL_PAGE_SIZE - 1lu) )
@@ -27,22 +29,23 @@
 #define START_ENTRYPOINT 0xffffffff80000000lu
 
 #ifdef K210
-    #define KERNEL_ENTRYPOINT 0xffffffff80200000lu
+    #define KERNEL_ENTRYPOINT 0xffffffff80150000lu
     #define KERNEL_END 0xffffffff80600000lu
 #else
     #define KERNEL_ENTRYPOINT 0xffffffff80600000lu
     #define KERNEL_END 0xffffffff80d00000lu
 #endif
 
+/* level1 pgdir */
 #ifdef K210
-    #define BOOT_KERNEL 0x80000000lu
-    #define BOOT_KERNEL_END 0x80600000lu
+    #define PGDIR_PA ((KERNEL_ENTRYPOINT & 0xfffffffflu) - 0x3000) 
 #else
-    #define BOOT_KERNEL 0x80200000lu
-    #define BOOT_KERNEL_END 0x80600000lu
+    #define PGDIR_PA ((KERNEL_ENTRYPOINT & 0xfffffffflu) - 0x10000)
 #endif
 
 
+#define BOOT_KERNEL (START_ENTRYPOINT & 0xfffffffflu)
+#define BOOT_KERNEL_END (KERNEL_END & 0xfffffffflu)
 
 /* mprotect */
 #define PROT_NONE 0x0
@@ -60,7 +63,7 @@
  */
 static inline void local_flush_tlb_all(void)
 {
-    __asm__ __volatile__ ("fence\nfence.i\nsfence.vma\nfence\nfence.i" : : : "memory");
+    __asm__ __volatile__ ("fence\nfence.i\nsfence.vma" : : : "memory");
 }
 
 /* Flush one page from local TLB */
@@ -69,10 +72,21 @@ static inline void local_flush_tlb_page(unsigned long addr)
     __asm__ __volatile__ ("sfence.vma %0" : : "r" (addr) : "memory");
 }
 
+static inline void local_flush_cache_all(void)
+{
+    __asm__ __volatile__ ("fence\nfence.i" ::: "memory");
+}
+
 static inline void local_flush_icache_all(void)
 {
     __asm__ __volatile__ ("fence.i" ::: "memory");
 }
+
+static inline void local_flush_dcache_all(void)
+{
+    __asm__ __volatile__ ("fence" ::: "memory");
+}
+
 
 static inline void flush_icache_all(void)
 {
@@ -106,12 +120,6 @@ static inline void set_satp(
 //         (unsigned long)(((unsigned long)asid << 38) | ppn);
 //     __asm__ __volatile__("fence\nfence.i\nsfence.vm\nfence\nfence.i\ncsrw satp, %0\nfence\nfence.i\nsfence.vm\nfence\nfence.i" : : "rK"(__v) : "memory");
 // }
-
-#ifdef K210
-    #define PGDIR_PA 0x801fd000  // LEVEL 1 PGDIR
-#else
-    #define PGDIR_PA 0x805f0000
-#endif
 
 /*
  * PTE format:
@@ -164,11 +172,15 @@ static inline uint64_t get_pa(PTE entry)
     return 0;
 }
 
+static inline uint64_t kva2pfn(uintptr_t kva)
+{
+    return (kva2pa(kva) & VA_MASK) >> NORMAL_PAGE_SHIFT;
+}
 
 /* Get/Set page frame number of the `entry` */
 static inline uint64_t get_pfn(PTE entry)
 {
-    return entry >> _PAGE_PFN_SHIFT;
+    return (entry >> _PAGE_PFN_SHIFT) & VA_MASK;
 }
 
 static inline void set_pfn(PTE *entry, uint64_t pfn)
@@ -176,14 +188,32 @@ static inline void set_pfn(PTE *entry, uint64_t pfn)
     *entry = (*entry & ((1<<_PAGE_PFN_SHIFT)-1)) | (pfn << _PAGE_PFN_SHIFT);
 }
 
+static inline uint64_t PTE2pa(PTE entry)
+{
+    return get_pfn(entry) << NORMAL_PAGE_SHIFT;
+}
+
+static inline uint64_t PTE2kva(PTE entry)
+{
+    return pa2kva(PTE2pa(entry));
+}
+
 /* Get/Set attribute(s) of the `entry` */
 static inline long get_attribute(PTE entry, uint64_t mask)
 {
     return entry & mask;
 }
-static inline void set_attribute(PTE *entry, uint64_t bits)
+static inline void set_attribute(PTE *entry, uint64_t mask)
 {
-    *entry = *entry | bits;
+    *entry = *entry | (mask & ((1lu << _PAGE_PFN_SHIFT) - 1));
+}
+static inline void add_attribute(PTE *entry, uint64_t mask)
+{
+    *entry |= (mask & ((1lu << _PAGE_PFN_SHIFT) - 1));
+}
+static inline long get_all_attribute(PTE entry)
+{
+    return entry & ((1lu << _PAGE_PFN_SHIFT) - 1);
 }
 
 static inline void clear_attribute(PTE *entry, uint64_t bits)
@@ -203,5 +233,6 @@ static inline void clear_pgdir(uintptr_t pgdir_addr)
 
 uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va);
 uintptr_t probe_kva_of(uintptr_t va, uintptr_t pgdir_kva);
+void copy_page_table(uint64_t dest, uint64_t source, uint64_t user_addr_top);
 
 #endif  // PGTABLE_H

@@ -10,6 +10,41 @@
 #include <os/io.h>
 #include <screen.h>
 
+/* write truncated bytes to file */
+static void write_truncate(fd_t *fdp)
+{
+    /* now cur_sec is set to be buff aligned position, acoording to fat32_lseek */
+    size_t mycount = 0;
+    size_t realcount = fdp->pos - fdp->length; // write as many as possible
+    size_t temp_pos = fdp->length; /* start from length, temp_pos is in accordance with cur_sec */
+    uchar *tempbuff = kalloc();
+
+    while (mycount < realcount){
+        size_t pos_offset_in_buf = temp_pos % BUFSIZE;
+        size_t writesize = min(BUFSIZE - pos_offset_in_buf, realcount - mycount);
+        /* still need to read-in to reserve non-truncated area, and set 0 to truncated area */
+        sd_read(tempbuff, fdp->cur_sec);
+        memset(tempbuff + pos_offset_in_buf, 0, writesize);
+        sd_write(tempbuff,fdp->cur_sec);
+        mycount += writesize;
+        temp_pos += writesize;
+        if (temp_pos % CLUSTER_SIZE == 0){
+            ientry_t old_clus = clus_of_sec(fdp->cur_sec);
+            ientry_t new_clus = get_next_cluster(old_clus);
+            if (new_clus == LAST_CLUS_OF_FILE){
+                // new clus should be assigned
+                new_clus = search_empty_clus(tempbuff);
+                write_fat_table(old_clus, new_clus, tempbuff);
+            }
+            fdp->cur_sec = first_sec_of_clus(new_clus);
+        }
+        else
+            fdp->cur_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
+    }
+    kfree(tempbuff);
+    /* no need to update length, fat32_write will do that (no matter whether really write something )*/
+}
+
 /* write count bytes from buff to file in fd */
 /* return count: success
           -1: fail
@@ -23,65 +58,68 @@ int64 fat32_write(fd_num_t fd, uchar *buff, uint64_t count)
         return -1;
     log(0, "fd_index:%d, dev:%d", fd_index, current_running->fd[fd_index].dev);
 
-    if (current_running->fd[fd_index].dev == STDOUT){    
+    fd_t *fdp = &current_running->fd[fd_index];
+
+    if (fdp->dev == STDOUT){    
         return write_ring_buffer(&stdout_buf, buff, count);
     }
-    else if (current_running->fd[fd_index].dev == STDERR)
+    else if (fdp->dev == STDERR)
     {
         return write_ring_buffer(&stderr_buf, buff, count);
     }
-    else if (current_running->fd[fd_index].dev == DEV_NULL){
+    else if (fdp->dev == DEV_NULL){
         log(0, "it's NULL");
         memset(buff, 0, count);
         return count;
     } 
+    else if (fdp->piped == FD_PIPED){ // 如果是管道，就调用pipe_write
+        return pipe_write(buff, fdp->pip_num, count);
+    }
     else{
-        // 如果是管道，就调用pipe_write
-        if (current_running->fd[fd_index].piped == FD_PIPED){
-            return pipe_write(buff, current_running->fd[fd_index].pip_num, count);
+
+        if (fdp->pos > fdp->length){
+            /* now cur_sec is not valid (in accordance with length, not with pos) */
+            write_truncate(fdp);
         }
 
+        /* now cur_sec is valid */
         size_t mycount = 0;
         size_t realcount = count; // write as many as possible
         uchar *tempbuff = kalloc();
-        ientry_t now_clus = get_clus_from_len(current_running->fd[fd_index].first_clus_num, current_running->fd[fd_index].pos);
-        isec_t now_sec = BUFF_ALIGN( get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE) );
-        log(0, "sec is %d", now_sec);
-        ientry_t old_clus = now_clus;
 
         while (mycount < realcount){
-            size_t pos_offset_in_buf = current_running->fd[fd_index].pos % BUFSIZE;
+            size_t pos_offset_in_buf = fdp->pos % BUFSIZE;
             size_t writesize = min(BUFSIZE - pos_offset_in_buf, realcount - mycount);
-            log(0, "this time pos is %d, writesize is %d", current_running->fd[fd_index].pos, writesize);
-            sd_read(tempbuff,now_sec);
+            log(0, "this time pos is %d, writesize is %d", fdp->pos, writesize);
+            sd_read(tempbuff, fdp->cur_sec);
             memcpy(tempbuff + pos_offset_in_buf, buff, writesize);
-            sd_write(tempbuff,now_sec);
+            sd_write(tempbuff,fdp->cur_sec);
             buff += writesize;
             mycount += writesize;
-            current_running->fd[fd_index].pos += writesize;
-            if (current_running->fd[fd_index].pos % CLUSTER_SIZE == 0){
-                old_clus = now_clus;
-                now_clus = get_next_cluster(now_clus);
-                if (now_clus == LAST_CLUS_OF_FILE){
+            fdp->pos += writesize;
+            if (fdp->pos % CLUSTER_SIZE == 0){
+                ientry_t old_clus = clus_of_sec(fdp->cur_sec);
+                ientry_t new_clus = get_next_cluster(old_clus);
+                if (new_clus == LAST_CLUS_OF_FILE){
                     // new clus should be assigned
-                    now_clus = search_empty_clus(tempbuff);
-                    write_fat_table(old_clus, now_clus, tempbuff);
+                    new_clus = search_empty_clus(tempbuff);
+                    write_fat_table(old_clus, new_clus, tempbuff);
                 }
-                now_sec = first_sec_of_clus(now_clus);
+                fdp->cur_sec = first_sec_of_clus(new_clus);
             }
             else
-                now_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
+                fdp->cur_sec += READ_BUF_CNT;  // writesize / BUFSIZE == READ_BUF_CNT until last write
         }
-        if (current_running->fd[fd_index].pos > current_running->fd[fd_index].length){
-            fd_t *fdp = &current_running->fd[fd_index];
+        /* update length */
+        if (fdp->pos > fdp->length){
+            /* update length in file descriptor */
             fdp->length = fdp->pos;
-            /* update dentry */
-            log(0, "dir info: sec :%d, offset: %lx, len: %d", fdp->dir_pos.sec, fdp->dir_pos.offset, fdp->dir_pos.len);
+            /* read dentry */
             sd_read(tempbuff, fdp->dir_pos.sec);
             dentry_t *p = tempbuff + fdp->dir_pos.offset;
-            log(0, "filename: %s, new length is %d", p->filename, fdp->length);
+            /* update length in dentry */
             set_dentry_from_fd(p, fdp);
-            log(0, "dentry new length is %d", p->length);
+            /* write dentry back */
             sd_write(tempbuff, fdp->dir_pos.sec);
         }
 

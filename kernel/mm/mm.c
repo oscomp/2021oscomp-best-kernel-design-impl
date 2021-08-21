@@ -8,6 +8,7 @@
 #include <string.h>
 #include <screen.h>
 #include <log.h>
+#include <os/fat32.h>
 
 ptr_t memCurr = FREEMEM;
 // ptr_t memTop = KERNEL_END;
@@ -25,17 +26,55 @@ static uint64_t swap_page();
 static uint64_t find_swap_page_kva(uint64_t pgdir);
 
 #define NUM_REC ((KERNEL_END - FREEMEM) / NORMAL_PAGE_SIZE)
-list_node_t pageRecyc[NUM_REC];
+#define PAGE_KVA_TO_PAGE_NODE_INDEX(kva) \
+    (((kva) - FREEMEM) / NORMAL_PAGE_SIZE)
+
+page_node_t pageRecyc[NUM_REC];
 
 void init_recyc()
 {
     for (uint32 i = 0; i < NUM_REC; ++i){
-        pageRecyc[i].ptr = FREEMEM + i * NORMAL_PAGE_SIZE;
-        pageRecyc[i].tid = 0;
+        pageRecyc[i].list.ptr = FREEMEM + i * NORMAL_PAGE_SIZE;
         list_add_tail(&pageRecyc[i], &freePageList);
     }
 }
 
+/* put page_node into freePagebackupList */
+/* share num = 1, file map = NULL */
+/* return page kva */
+static uint64_t alloc_page_node(page_node_t *page_node)
+{
+    page_node->share_num = 1;
+    page_node->copy_on_write = 0;
+    page_node->file_map_info.len = 0;
+    page_node->is_shared = 0;
+    page_node->is_swapped = 0;
+    list_del(&page_node->list);
+    list_add(&page_node->list, &freePagebackupList);
+    return page_node->list.ptr;
+}
+
+/* free this page node */
+/* share num--, if = 0, file map = NULL */
+/* if real freed, return 0; else return 1 */
+static uint64_t free_page_node(page_node_t *page_node)
+{
+    page_node->share_num--;
+    if (page_node->share_num == 0){
+        if (page_node->file_map_info.len != 0 && page_node->is_file_map_dirty){
+            // printk_port("write back");
+            file_map_write_back(&page_node->file_map_info);
+            // page_node->file_map_info.len = 0;
+            // assert(0);
+        }
+        list_del(&page_node->list);
+        list_add(&page_node->list, &freePageList);
+        return 0;
+    }
+    return 1;
+}
+
+/* check memory usage, don't call it */
 void handle_memory_leak(void *pcb_void)
 {
     pcb_t *pcb = (pcb_t *)pcb_void;
@@ -44,36 +83,28 @@ void handle_memory_leak(void *pcb_void)
     for (list_node_t *temp = freePageList.next; temp != &freePageList; temp = temp->next){
         freemem += NORMAL_PAGE_SIZE;
     }
-    for (list_node_t *temp = freePagebackupList.next, *temp2 = freePagebackupList.next->next; 
-        temp != &freePagebackupList; temp = temp2, temp2 = temp2->next){
-        if (temp->tid == pcb->tid){
-            // printk_port("memory at %lx is not released\n", temp->ptr);
-            list_del(temp);
-            list_add(temp, &freePageList);
-            // mymem += NORMAL_PAGE_SIZE;
+    page_node_t *page_node, *q;
+    list_for_each_entry_safe(page_node, q, &freePagebackupList, list){
+        if (page_node->list.tid == pcb->tid && page_node->share_num == 1){
+            mymem += NORMAL_PAGE_SIZE;
+            // free_page_node(page_node);
         }
         allocatedmem += NORMAL_PAGE_SIZE;
     }
-    // printk_port("free memsize is %lx, allocatedmem is %lx\n", freemem, allocatedmem);
-    // printk_port("tid %d leek memsize is %lx\n", current_running->tid, mymem);
+    printk_port("free memsize is %lx, allocatedmem is %lx\n", freemem, allocatedmem);
+    printk_port("tid %d leek memsize is %lx\n", pcb->tid, mymem);
 }
 
+/* return page kva */
 ptr_t allocPage()
 {
     // log(0, "memCurr %lx, memalloc %lx", memCurr, memalloc);
     ptr_t ret = 0;
     while (!ret){
         if (!list_empty(&freePageList)){
-            list_node_t *tmp = freePageList.next;
-            tmp->tid = current_running->tid;
-            list_del(tmp);
-            list_add(tmp, &freePagebackupList);
-            ret = tmp->ptr;
+            page_node_t *page_node = list_entry(freePageList.next, page_node_t, list);        
+            ret = alloc_page_node(page_node);
         }
-        // else if (memCurr < memalloc){
-        //     memCurr += NORMAL_PAGE_SIZE;
-        //     ret = memCurr - NORMAL_PAGE_SIZE;
-        // }
         else{
             printk_port("I'm pid %d tid %d and I'm blocked\n", current_running->pid, current_running->tid);
             do_block(&current_running->list, &waitPageList);
@@ -82,6 +113,347 @@ ptr_t allocPage()
     }
     // log(DEBUG, "alloc: %lx by tid %d\n",ret, current_running->tid);
     return ret;
+}
+
+/* free this page: baseAddr */
+void freePage(ptr_t baseAddr)
+{   
+    // for (list_node_t *temp = freePageList.next; temp != &freePageList; temp = temp->next){
+    //     if (baseAddr == temp->ptr)
+    //         assert(0);
+    // }
+    page_node_t *page_node = &pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(baseAddr)];
+    uint8_t ret = free_page_node(page_node);
+    /* unblock the process whose pid is the smallest in the list */
+    /* threads have the same pid, but it will be blocked to list end (see do_block) */
+    /* so here we choose the first one, if several processes are blocked */
+    if (!ret){
+        pcb_t *blocked_proc = NULL, *smallest_pid_blocked_proc = NULL;
+        pid_t smallest_pid = 0; /* every process has pid larger than 0 */
+        list_for_each_entry(blocked_proc, &waitPageList, list){
+            if (smallest_pid == 0 || smallest_pid > blocked_proc->pid){
+                smallest_pid = blocked_proc->pid;
+                smallest_pid_blocked_proc = blocked_proc;
+            }
+        }
+        if (smallest_pid_blocked_proc){
+            printk_port("pid %d tid %d is to be unblocked", smallest_pid_blocked_proc->pid, smallest_pid_blocked_proc->tid);
+            do_unblock(smallest_pid_blocked_proc);
+        }
+    }
+}
+
+void *kmalloc(size_t size)
+{
+    debug();
+    log(0, "dangerous malloc");
+    memalloc -= size;
+    memalloc -= 64 - (size%64);
+    return memalloc;
+}
+
+/* set this page to be COW */
+uintptr_t set_page_kva_copy_on_write(uint64_t page_kva, int is_writable)
+{
+    page_node_t *page_node = &pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)];
+    page_node->share_num++;
+    if (!page_node->is_shared && is_writable)
+        page_node->copy_on_write = 1;
+}
+
+/* set file_map_info point to file map information(a page kva) */
+/* set dirty = 0 */
+uintptr_t set_page_kva_file_map_info(uintptr_t page_kva, void *file_map_info)
+{
+    memcpy(&pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info, file_map_info, sizeof(fat32_file_map_info_t));
+    pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_file_map_accessed = 0;
+    pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_file_map_dirty = 0;
+}
+
+void map_normal_page(uint64_t va, uint64_t kva, uint64_t pgdir, uint64_t mask)
+{
+    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
+    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
+    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
+    PTE *ptr = pgdir + vpn2*sizeof(PTE);
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+    {
+        uintptr_t pgdir2 = allocPage();
+        clear_pgdir(pgdir2);
+        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
+        set_pfn(ptr,pfn2);
+        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
+        ptr = pgdir2 + vpn1*sizeof(PTE);
+    }
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+    {
+        uintptr_t pgdir2 = allocPage();
+        clear_pgdir(pgdir2);
+        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
+        set_pfn(ptr,pfn2);
+        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
+        ptr = pgdir2 + vpn0*sizeof(PTE);
+    }
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
+    uint64_t pfn2 = (kva2pa(kva)&VA_MASK) >> NORMAL_PAGE_SHIFT;
+    assert(*ptr == 0);
+    set_pfn(ptr,pfn2);
+    set_attribute(ptr, _PAGE_PRESENT|_PAGE_USER|mask|_PAGE_ACCESSED|_PAGE_DIRTY);
+}
+
+/* add attribute to this virtual address */
+/* return mask if success, 0 if fail */
+uint64_t add_page_uva_attribute(uint64_t va, uint64_t pgdir, uint64_t mask)
+{
+    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
+    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
+    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
+    PTE *ptr = pgdir + vpn2*sizeof(PTE);
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+        return 0;
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+        return 0;
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
+    add_attribute(ptr, mask);
+    local_flush_tlb_all();
+    return mask;
+}
+
+/* map this uva to kva for all threads in current_running */
+/* cannot be used for clone */
+uintptr_t share_page_helper(uintptr_t uva, uintptr_t kva, uintptr_t mask)
+{
+    pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(kva)].is_shared = 1;
+    // for (uint32_t j = 0; j < NUM_MAX_TASK; j++){
+    //     if (!is_exited(&pcb[j]) && current_running != &pcb[j] && pcb[j].pid == current_running->pid){
+    //         map_normal_page(uva, kva, pcb[j].pgdir, mask);
+    //         pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(kva)].share_num++;
+    //     }
+    // }
+}
+
+// pgdir and kernel_stack_base are kva
+void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base)
+{
+    // make sure no page fault
+    // set_satp(SATP_MODE_SV39,0,PGDIR_PA >> NORMAL_PAGE_SHIFT);
+    // local_flush_tlb_all();
+    // free page
+    for (uint32_t i = 0; i < NUM_PTE_ENTRY; i++)
+    {
+        // int clear1 = 1;
+        PTE *ptr1 = pgdir + i*sizeof(PTE);
+        if (get_attribute(*ptr1,_PAGE_PRESENT)&&get_attribute(*ptr1,_PAGE_USER)){
+            // level1 valid, goto level2
+            for (uint32_t j = 0; j < NUM_PTE_ENTRY; j++){
+                PTE* ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT) + j*sizeof(PTE);
+                if (get_attribute(*ptr2,_PAGE_PRESENT)&&get_attribute(*ptr2,_PAGE_USER)){
+                    // level2 valid, goto level3
+                    for (uint32_t k = 0; k < NUM_PTE_ENTRY; k++){
+                        PTE* ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
+                        if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)){
+                            //level3 valid, goto free
+                            freePage(pa2kva(get_pfn(*ptr3) << NORMAL_PAGE_SHIFT));
+                        }
+                    }
+                    freePage(pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT));
+                }
+            }
+            freePage(pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT));
+        }
+    }
+    freePage(pgdir);
+    freePage(kernel_stack_base);
+}
+
+/**
+ this is used for mapping kernel virtual address into user page table 
+ if page is valid, then no share
+ guarantee ioremap
+ */
+void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir)
+{
+    PTE* dest = dest_pgdir, *src = src_pgdir;
+    for (int i = 0; i < NUM_PTE_ENTRY; ++i)
+    {
+        PTE *tmp1 = src + i, *tmp2 = dest + i;
+        if (get_attribute(*tmp1,_PAGE_PRESENT) && !get_attribute(*tmp2,_PAGE_PRESENT))
+            *tmp2 = *tmp1;
+    }
+}
+
+/* allocate physical page for `va`, mapping it into `pgdir`,
+   return the kernel virtual address for the page.
+   */
+/* User are set */
+uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
+{
+    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
+    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
+    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
+    PTE *ptr = pgdir + vpn2*sizeof(PTE);
+    // 2  
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+    {
+        uintptr_t pgdir2 = allocPage();
+        clear_pgdir(pgdir2);
+        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
+        set_pfn(ptr,pfn2);
+        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
+        ptr = pgdir2 + vpn1*sizeof(PTE);
+    }
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
+    // 1
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+    {
+        uintptr_t pgdir2 = allocPage();
+        clear_pgdir(pgdir2);
+        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
+        set_pfn(ptr,pfn2);
+        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
+        ptr = pgdir2 + vpn0*sizeof(PTE);
+    }
+    else
+        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
+    // 0
+    uint64_t ret;
+    if (!get_attribute(*ptr,_PAGE_PRESENT))
+    {
+        uintptr_t pgdir2 = allocPage();
+        clear_pgdir(pgdir2);
+        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
+        set_pfn(ptr,pfn2);
+        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER|mask|_PAGE_ACCESSED|_PAGE_DIRTY);
+        ret = pgdir2;
+    }
+    else
+        ret = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT);
+    local_flush_tlb_all();
+    return ret;
+}
+
+/* free page using page user addr */
+PTE free_page_helper(uintptr_t va, uintptr_t pgdir)
+{
+    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
+    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
+    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
+    PTE *ptr1 = pgdir + vpn2*sizeof(PTE);
+    PTE *ptr2, *ptr3;
+    PTE ret = 0;
+    // 2  
+    if (!get_attribute(*ptr1,_PAGE_PRESENT))
+        return ret;
+    else
+        ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
+    // 1
+    if (!get_attribute(*ptr2,_PAGE_PRESENT))
+        return ret;
+    else
+        ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
+    // 0
+    if (!get_attribute(*ptr3,_PAGE_PRESENT))
+        return ret;
+    else{
+        ret = *ptr3;
+        // a. free real page
+        *ptr3 = 0;
+        freePage(PTE2kva(ret));
+    }
+    // b. free 3 level page
+    ptr3 = (PTE *)PAGE_ALIGN((uintptr_t)ptr3);
+    uint32_t i;
+    for (i = 0; i < NUM_PTE_ENTRY; i++)
+        if (*(ptr3 + i))
+            break;
+    if (i < NUM_PTE_ENTRY){
+        /* somebody else still use this page table */
+        local_flush_tlb_all();
+        return ret;
+    }
+    /* this page table is all zero */
+    *ptr2 = 0;
+    freePage(ptr3);
+    // c. free 2 level page
+    ptr2 = (PTE *)PAGE_ALIGN((uintptr_t)ptr2);
+    for (i = 0; i < NUM_PTE_ENTRY; i++)
+        if (*(ptr2 + i))
+            break;
+    if (i < NUM_PTE_ENTRY){
+        /* somebody else still use this page table */
+        local_flush_tlb_all();
+        return ret;
+    }
+    /* this page table is all zero */
+    *ptr1 = 0;
+    freePage(ptr2);
+
+    /* pgdir should never be freed */
+
+    local_flush_tlb_all();
+    return ret;
+}
+
+/* return pcb's free space */
+static uintptr_t find_my_free_space(pcb_t *pcb, size_t len)
+{
+    uintptr_t start = pcb->user_stack_base - 2*NORMAL_PAGE_SIZE; /* pile start */
+    uint64_t temp = 0;
+    uintptr_t page_kva = NULL;
+    while (temp < len){
+        if (probe_kva_of(start, pcb->pgdir))
+            temp = 0;
+        else
+            temp += NORMAL_PAGE_SIZE;
+        start -= NORMAL_PAGE_SIZE;
+    }
+    return start + NORMAL_PAGE_SIZE;
+}
+/* find free space for mmap */
+/* if shared, must find a space that all threads are available on */
+uintptr_t find_free_space_and_set(size_t len)
+{
+    uintptr_t ret = find_my_free_space(current_running, len);
+    if (ret < get_user_addr_top(current_running))
+        set_user_addr_top(current_running, ret);
+    
+    // log2(0, "final free space is at %lx", ret);
+    return ret;
+}
+
+uintptr_t directmap(uintptr_t kva, uintptr_t pgdir)
+{
+    return kva;
+}
+
+// Allocate one 4096-byte page of physical memory.
+// Returns a pointer that the kernel can use.
+// Returns 0 if the memory cannot be allocated.
+void *kalloc(void)
+{
+    return (void *)allocPage();
+}
+
+void kfree(void *p)
+{
+    freePage(p);
+}
+
+void *allocproc()
+{
+    return MEM_FOR_PROC;
+}
+
+void allocfree()
+{
+    return ;
 }
 
 /* Only swap its own unshared page
@@ -212,320 +584,81 @@ static uint64_t find_swap_page_kva(uint64_t pgdir)
     return NULL;
 }
 
-void freePage(ptr_t baseAddr)
-{   
-    uint8_t clear = 1;
-    for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
-    {
-        assert(0);
-        shm_page_node_t *temp = i->ptr;
-        if (temp->page_basekva == baseAddr){
-            if (temp->totalnum > 1){
-                temp->totalnum--;clear = 0;
-            }
-            else
-                list_del(&temp->list);
-            break;
-        }
-    }
-    if (clear){
-        int cnt = 0;
-        list_node_t *temp = NULL;
-        for (temp = freePagebackupList.next; temp != &freePagebackupList; temp = temp->next)
-            if (temp->ptr == baseAddr){
-                list_del(temp);
-                list_add(temp,&freePageList);
-                break;
-            }
-        assert(temp != &freePagebackupList && temp != NULL);
-        /* unblock the process whose pid is the smallest in the list */
-        /* threads have the same pid, but it will be blocked to list end (see do_block) */
-        /* so here we choose the first one, if several processes are blocked */
-        pcb_t *blocked_proc = NULL, *smallest_pid_blocked_proc = NULL;
-        pid_t smallest_pid = 0; /* every process has pid larger than 0 */
-        list_for_each_entry(blocked_proc, &waitPageList, list){
-            if (smallest_pid == 0 || smallest_pid > blocked_proc->pid){
-                smallest_pid = blocked_proc->pid;
-                smallest_pid_blocked_proc = blocked_proc;
-            }
-        }
-        if (smallest_pid_blocked_proc){
-            printk_port("pid %d tid %d is to be unblocked", smallest_pid_blocked_proc->pid, smallest_pid_blocked_proc->tid);
-            do_unblock(smallest_pid_blocked_proc);
-        }
-    }
-    else
-        assert(0);
+/* file map write back using page kva */
+/* success return 0, fail return 1 */
+uint8_t file_map_write_back_page_kva(uintptr_t page_kva)
+{
+    return file_map_write_back(&pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info);
 }
 
-void *kmalloc(size_t size)
+uint8_t is_page_kva_copy_on_write(uintptr_t page_kva)
 {
-    debug();
-    log(0, "dangerous malloc");
-    memalloc -= size;
-    memalloc -= 64 - (size%64);
-    return memalloc;
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].copy_on_write;
 }
 
-uint64_t find_freepage_uva(uint64_t pgdir)
+void clear_copy_on_write(uintptr_t page_kva)
 {
-    uint64_t vpn2,vpn1,vpn0;
-    for (int i = 0; i < NUM_USER_PTE_ENTRY; ++i)
-    {
-        PTE *ptr1 = pgdir + i*sizeof(PTE);
-        if (!get_attribute(*ptr1,_PAGE_PRESENT)&&!get_attribute(*ptr1,_PAGE_SWAP)){
-            vpn2 = i; vpn1 = 0; vpn0 = 0;
-            return (vpn2 << VA_VPN2_SHIFT)|(vpn1<<VA_VPN1_SHIFT)|(vpn0<<VA_VPN0_SHIFT);
-        }
-        else{
-            for (int j = 0; j < NUM_PTE_ENTRY; ++j){
-                PTE *ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT) + j*sizeof(PTE);
-                if (!get_attribute(*ptr2,_PAGE_PRESENT)&&!get_attribute(*ptr2,_PAGE_SWAP)){
-                    vpn2 = i; vpn1 = j; vpn0 = 0;
-                    return (vpn2 << VA_VPN2_SHIFT)|(vpn1<<VA_VPN1_SHIFT)|(vpn0<<VA_VPN0_SHIFT);
-                }
-                else{                   
-                    for (int k = (i+j==0)? 1 : 0; k < NUM_PTE_ENTRY; ++k)
-                    {
-                        PTE *ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
-                        if (!get_attribute(*ptr3,_PAGE_PRESENT)&&!get_attribute(*ptr3,_PAGE_SWAP)){
-                            vpn2 = i; vpn1 = j; vpn0 = k;
-                            return (vpn2 << VA_VPN2_SHIFT)|(vpn1<<VA_VPN1_SHIFT)|(vpn0<<VA_VPN0_SHIFT);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // log2(0, "clear copy on write: %lx %d", page_kva, current_running->tid);
+    pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].copy_on_write = 0;
+}
+uint8_t is_page_kva_shared(uintptr_t page_kva)
+{
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_shared;
 }
 
-uintptr_t shm_page_get(int key)
+uint8_t is_page_kva_swapped(uintptr_t page_kva)
 {
-    uint64_t freepage_base_uva = find_freepage_uva(current_running->pgdir);
-    for (list_node_t* i = shmPageList.next; i != &shmPageList; i=i->next)
-    {
-        shm_page_node_t *temp = i->ptr;
-        if (temp->key == key){        
-            mapping_page(freepage_base_uva,temp->page_basekva,current_running->pgdir);
-            temp->totalnum++;
-            return freepage_base_uva;
-        } //found
-    }
-    shm_page_node_t *new = (shm_page_node_t*)kmalloc(sizeof(shm_page_node_t));
-    new->totalnum = 1;
-    new->page_basekva = alloc_page_helper(freepage_base_uva,current_running->pgdir,_PAGE_READ|_PAGE_WRITE);
-    mapping_page(freepage_base_uva,new->page_basekva,current_running->pgdir);
-    new->key = key;
-    new->list.ptr = new;
-    list_add_tail(&new->list,&shmPageList);
-    return freepage_base_uva;
+    return 0;
 }
 
-void shm_page_dt(uintptr_t addr)
+uint8_t is_page_kva_free(uintptr_t page_kva)
 {
-    freePage(get_kva_of(addr,current_running->pgdir));
-    uint64_t va = addr;
-    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
-    PTE *ptr = current_running->pgdir + vpn2*sizeof(PTE);
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_SWAP)) assert(0)
-    else ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_SWAP)) assert(0)
-    else ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_SWAP)) assert(0)
-    else *ptr = 0;
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].share_num == 0;
 }
 
-void mapping_page(uint64_t va,uint64_t kva,uint64_t pgdir)
+uint8_t is_page_kva_file_mapped(uintptr_t page_kva)
 {
-    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
-    PTE *ptr = pgdir + vpn2*sizeof(PTE);
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_SWAP))
-    {
-        uintptr_t pgdir2 = allocPage();
-        clear_pgdir(pgdir2);
-        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-        set_pfn(ptr,pfn2);
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-        ptr = pgdir2 + vpn1*sizeof(PTE);
-    }
-    else
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
-    if (!get_attribute(*ptr,_PAGE_PRESENT)&&!get_attribute(*ptr,_PAGE_SWAP))
-    {
-        uintptr_t pgdir2 = allocPage();
-        clear_pgdir(pgdir2);
-        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-        set_pfn(ptr,pfn2);
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-        ptr = pgdir2 + vpn0*sizeof(PTE);
-    }
-    else
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
-    uint64_t pfn2 = (kva2pa(kva)&VA_MASK) >> NORMAL_PAGE_SHIFT;
-    set_pfn(ptr,pfn2);
-    set_attribute(ptr,_PAGE_SHARE|_PAGE_READ|_PAGE_WRITE|_PAGE_PRESENT|_PAGE_USER);
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info.len != 0;
 }
 
-// pgdir and kernel_stack_base are kva
-void free_all_pages(uint64_t pgdir, uint64_t kernel_stack_base)
+uint8_t is_page_kva_file_map_writable(uintptr_t page_kva)
 {
-    // make sure no page fault
-    set_satp(SATP_MODE_SV39,0,PGDIR_PA >> NORMAL_PAGE_SHIFT);
-    local_flush_tlb_all();
-    // free page
-    for (uint32_t i = 0; i < NUM_PTE_ENTRY; ++i)
-    {
-        // int clear1 = 1;
-        PTE *ptr1 = pgdir + i*sizeof(PTE);
-        if (get_attribute(*ptr1,_PAGE_PRESENT)&&get_attribute(*ptr1,_PAGE_USER)){
-            // level1 valid, goto level2
-            for (uint32_t j = 0; j < NUM_PTE_ENTRY; ++j){
-                PTE* ptr2 = pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT) + j*sizeof(PTE);
-                if (get_attribute(*ptr2,_PAGE_PRESENT)&&get_attribute(*ptr2,_PAGE_USER)){
-                    // level2 valid, goto level3
-                    for (uint32_t k = 0; k < NUM_PTE_ENTRY; ++k){
-                        PTE* ptr3 = pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT) + k*sizeof(PTE);
-                        if (get_attribute(*ptr3,_PAGE_PRESENT)&&get_attribute(*ptr3,_PAGE_USER)){
-                            //level3 valid, goto free
-                            freePage(pa2kva(get_pfn(*ptr3) << NORMAL_PAGE_SHIFT));
-                        }
-                    }
-                    freePage(pa2kva(get_pfn(*ptr2) << NORMAL_PAGE_SHIFT));
-                }
-            }
-            freePage(pa2kva(get_pfn(*ptr1) << NORMAL_PAGE_SHIFT));
-        }
-    }
-    freePage(pgdir);
-    freePage(kernel_stack_base);
+    return (pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info.len != 0 )
+            && ((pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info.flags & O_WRONLY) != 0);
 }
 
-/**
- this is used for mapping kernel virtual address into user page table 
- if page is valid, then no share
- guarantee ioremap
- */
-void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir)
+uint8_t is_page_kva_file_map_readable(uintptr_t page_kva)
 {
-    PTE* dest = dest_pgdir, *src = src_pgdir;
-    for (int i = 0; i < NUM_PTE_ENTRY; ++i)
-    {
-        PTE *tmp1 = src + i, *tmp2 = dest + i;
-        if (get_attribute(*tmp1,_PAGE_PRESENT) && !get_attribute(*tmp2,_PAGE_PRESENT))
-            *tmp2 = *tmp1;
-    }
+    return (pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info.len != 0 )
+            && ((pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info.flags & O_RDONLY) != 0);
 }
 
-/* allocate physical page for `va`, mapping it into `pgdir`,
-   return the kernel virtual address for the page.
-   */
-/* User are set */
-uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir, uint64_t mask)
+uint8_t is_page_kva_file_map_accessed(uintptr_t page_kva)
 {
-    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
-    PTE *ptr = pgdir + vpn2*sizeof(PTE);
-    // 2  
-    if (!get_attribute(*ptr,_PAGE_PRESENT))
-    {
-        uintptr_t pgdir2 = allocPage();
-        clear_pgdir(pgdir2);
-        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-        set_pfn(ptr,pfn2);
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-        ptr = pgdir2 + vpn1*sizeof(PTE);
-    }
-    else
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
-    // 1
-    if (!get_attribute(*ptr,_PAGE_PRESENT))
-    {
-        uintptr_t pgdir2 = allocPage();
-        clear_pgdir(pgdir2);
-        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-        set_pfn(ptr,pfn2);
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER);
-        ptr = pgdir2 + vpn0*sizeof(PTE);
-    }
-    else
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
-    // 0
-    uint64_t ret;
-    if (!get_attribute(*ptr,_PAGE_PRESENT))
-    {
-        uintptr_t pgdir2 = allocPage();
-        clear_pgdir(pgdir2);
-        uint64_t pfn2 = (kva2pa(pgdir2)&VA_MASK) >> NORMAL_PAGE_SHIFT;        
-        set_pfn(ptr,pfn2);
-        set_attribute(ptr,_PAGE_PRESENT|_PAGE_USER|mask|_PAGE_ACCESSED|_PAGE_DIRTY);
-        ret = pgdir2;
-    }
-    else
-        ret = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT);
-    local_flush_tlb_all();
-    return ret;
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_file_map_accessed;
 }
 
-/* free page using page user addr */
-uintptr_t free_page_helper(uintptr_t va, uintptr_t pgdir)
+uint8_t is_page_kva_file_map_dirty(uintptr_t page_kva)
 {
-    uint64_t vpn2 = (va&VA_MASK) >> VA_VPN2_SHIFT;
-    uint64_t vpn1 = ((va&VA_MASK) >> VA_VPN1_SHIFT) & (NUM_PTE_ENTRY - 1);
-    uint64_t vpn0 = ((va&VA_MASK) >> VA_VPN0_SHIFT) & (NUM_PTE_ENTRY - 1);
-    PTE *ptr = pgdir + vpn2*sizeof(PTE);
-    uintptr_t ret = 0;
-    // 2  
-    if (!get_attribute(*ptr,_PAGE_PRESENT))
-        return ret;
-    else
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn1*sizeof(PTE);
-    // 1
-    if (!get_attribute(*ptr,_PAGE_PRESENT))
-        return ret;
-    else
-        ptr = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT) + vpn0*sizeof(PTE);
-    // 0
-    if (!get_attribute(*ptr,_PAGE_PRESENT))
-        return ret;
-    else{
-        ret = pa2kva(get_pfn(*ptr) << NORMAL_PAGE_SHIFT);
-        *ptr = 0;
-    }
-    local_flush_tlb_all();
-    freePage(ret);
-    return ret;
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_file_map_dirty;
 }
 
-
-uintptr_t directmap(uintptr_t kva, uintptr_t pgdir)
+uint8_t set_page_kva_file_map_accessed(uintptr_t page_kva)
 {
-    return kva;
+    pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_file_map_accessed = 1;
 }
 
-// Allocate one 4096-byte page of physical memory.
-// Returns a pointer that the kernel can use.
-// Returns 0 if the memory cannot be allocated.
-void *kalloc(void)
+uint8_t set_page_kva_file_map_dirty(uintptr_t page_kva)
 {
-    return (void *)allocPage();
+    pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].is_file_map_dirty = 1;
 }
 
-void kfree(void *p)
+fat32_file_map_info_t *get_page_kva_file_map_info(uintptr_t page_kva)
 {
-    freePage(p);
+    return &(pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].file_map_info);
 }
 
-void *allocproc()
+uint32_t get_page_kva_share_num(uint64_t page_kva)
 {
-    return MEM_FOR_PROC;
-}
-
-void allocfree()
-{
-    return ;
+    return pageRecyc[PAGE_KVA_TO_PAGE_NODE_INDEX(page_kva)].share_num;
 }

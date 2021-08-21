@@ -54,7 +54,7 @@ uint8_t fat32_init()
     init_pipe();
     /* init cache */
     init_iocache();
-
+    init_metacache();
     kfree(b);
 
     return 0;
@@ -74,131 +74,6 @@ void init_inode()
     sd_read(root_buf, cwd_sec);    
 }
 
-/* read file from sd card and put it into readyqueue*/
-/*  1: continue to read
-   -1: busy
-    0: end
-    */ 
-int8 fat32_read_test(const char *filename)
-{
-    /* busy */
-    for (uint i = 1; i < NUM_MAX_TASK; ++i)
-    {
-        if (pcb[i].status != TASK_EXITED)
-            return -1;
-    }
-
-    uchar *_elf_binary;
-    uint32_t length;
-
-#ifdef K210
-
-    static dentry_t *p = (dentry_t *)root_buf;
-    // 0x0f: long dentry
-    while (p->attribute == 0x0f || 0xE5 == p->filename[0]){
-        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-    }
-    /* now we are at a real dentry */
-
-    // 0x00: time to end
-    uint8_t index;
-    if (is_zero_dentry(p)){
-        printk_port("<return success>");
-        return 0;
-    }
-    // no length or deleted
-    // if (p->length == 0) {
-    //     // printk_port("<cause 1>\n");
-    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec); 
-    //     return 1;
-    // }
-    // not rw-able
-    // if (p->attribute != FILE_ATTRIBUTE_ARCH){ 
-    //     // printk_port("<cause 2>\n");
-    //     p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-    //     return 1;
-    // }
-    printk_port("%s\n", p->filename);
-    printk_port("length:%d\n", p->length);
-    p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-    return 1;
-
-    if (!memcmp(p->filename, "TEST_",5) || !memcmp(p->filename,"TEXT",4) ||
-        !memcmp(p->filename, "RUN", 3)){
-        p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-        return 1;
-    }
-    /* Now we must read file */
-    // readfile
-    uint32_t cluster = get_cluster_from_dentry(p);
-    uint32_t sec = first_sec_of_clus(cluster); // make sure you know the start addr
-    uchar *file = allocproc(); // make sure space is enough
-    uchar *temp = file; // for future use
-    for (uint32_t i = 0; i < p->length; )
-    {
-        // 1. read 1 cluster
-        sd_read(temp, sec);
-        i += BUFSIZE;
-        temp += BUFSIZE;
-        // 2. compute sec number of next buf-size datablock
-        if (i % CLUSTER_SIZE == 0){
-            cluster = get_next_cluster(cluster);
-            sec = first_sec_of_clus(cluster);
-        }
-        else
-            sec += READ_BUF_CNT;
-    }
-
-    /* set elf_binary and length */
-    _elf_binary = file;
-    length = p->length;
-
-    cwd_first_clus = root_first_clus;
-    cwd_clus = first_sec_of_clus(cwd_first_clus);
-
-#else
-
-    get_elf_file(filename,&_elf_binary,&length);
-
-#endif
-
-    for (uint i = 1; i < NUM_MAX_TASK; ++i)
-        if (pcb[i].status == TASK_EXITED)
-        {
-            // init pcb
-            pcb_t *pcb_underinit = &pcb[i];
-            ptr_t kernel_stack = allocPage() + NORMAL_PAGE_SIZE;
-            ptr_t user_stack = USER_STACK_ADDR;
-
-            init_pcb_default(pcb_underinit, USER_PROCESS);
-
-            // load file to memory
-            uintptr_t pgdir = allocPage();
-            clear_pgdir(pgdir);
-
-            alloc_page_helper(user_stack - NORMAL_PAGE_SIZE,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-            alloc_page_helper(user_stack,pgdir,_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_READ|_PAGE_WRITE|_PAGE_USER);
-
-            uint64_t test_elf = (uintptr_t)load_elf(_elf_binary,length,pgdir,alloc_page_helper,&pcb_underinit->elf);
-            pcb_underinit->edata = pcb_underinit->elf.edata;            
-            share_pgtable(pgdir,pa2kva(PGDIR_PA));
-
-            // prepare stack
-            init_pcb_stack(pgdir, kernel_stack, user_stack, test_elf, NULL, NULL, NULL, pcb_underinit);
-            // add to ready_queue
-            list_del(&pcb_underinit->list);
-            list_add_tail(&pcb_underinit->list,&ready_queue);
-
-            #ifdef K210
-            // free resource
-            allocfree();
-            p = get_next_dentry(p, root_buf, &root_clus, &root_sec);
-            #endif
-
-            return -1;
-        }
-    assert(0);
-}
 
 /* write count bytes from buff to file in fd */
 /* return fd_num: success
@@ -207,7 +82,7 @@ int8 fat32_read_test(const char *filename)
 int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 mode)
 {
     debug();
-    log2(0, "fd:%d path:%s, len:%d, flags:%lx %d", fd, path_const, strlen(path_const), flags, flags & O_CREAT);
+    log(0, "fd:%d path:%s, len:%d, flags:%lx %d", fd, path_const, strlen(path_const), flags, flags & O_CREAT);
     assert(fd == AT_FDCWD);
     /* O_CREAT | O_DIRECTORY is not defined */
     if ((flags & (O_CREAT | O_DIRECTORY)) == (O_CREAT | O_DIRECTORY))
@@ -302,7 +177,6 @@ int32_t fat32_openat(fd_num_t fd, const uchar *path_const, uint32 flags, uint32 
                 {
                     if (!set_fd(current_running, i, p, &dir_pos, flags)){
                         log(0, "open success");
-                        debug();                        
                         kfree(buf);
                         return current_running->fd[i].fd_num; // use i as index
                     }
@@ -482,10 +356,11 @@ fd_num_t fat32_dup3(fd_num_t old, fd_num_t new, uint8 no_use)
 
 /* seek pos */
 /* return pos if success, fail return -1 */
-int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence)
+int64_t fat32_lseek(fd_num_t fd, ssize_t off, uint32_t whence)
 {
     debug();
     int32_t fd_index = get_fd_index(fd, current_running);
+    log(0, "start pos is %lx, sec is %d", current_running->fd[fd_index].pos, current_running->fd[fd_index].cur_sec);
     if (fd_index < 0 || !current_running->fd[fd_index].used)
         return -1;
     switch(whence){
@@ -501,6 +376,13 @@ int64_t fat32_lseek(fd_num_t fd, size_t off, uint32_t whence)
         default: assert(0);
         break;
     }
+    if (current_running->fd[fd_index].pos > current_running->fd[fd_index].length)
+        current_running->fd[fd_index].cur_sec = get_buf_aligned_sec_from_clus_and_length(current_running->fd[fd_index].first_clus_num, 
+            current_running->fd[fd_index].length);
+    else
+        current_running->fd[fd_index].cur_sec = get_buf_aligned_sec_from_clus_and_length(current_running->fd[fd_index].first_clus_num, 
+            current_running->fd[fd_index].pos);
+    log(0, "end pos is %lx, sec is %d", current_running->fd[fd_index].pos, current_running->fd[fd_index].cur_sec);
     return current_running->fd[fd_index].pos;
 }
 
@@ -684,26 +566,26 @@ void write_fat_table(uint32_t old_clus, uint32_t new_clus, uchar *buff)
     uint32_t *clusat;
     if (old_clus){
         /* TABLE 1*/
-        sd_read(buff, fat1_sec_of_clus(old_clus));
+        sd_read_meta(buff, fat1_sec_of_clus(old_clus));
         clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(old_clus));
         *clusat = 0xffffffffu & new_clus;
-        sd_write(buff, fat1_sec_of_clus(old_clus));
+        sd_write_meta(buff, fat1_sec_of_clus(old_clus));
         /* TABLE 0*/
-        sd_read(buff, fat2_sec_of_clus(old_clus));
+        sd_read_meta(buff, fat2_sec_of_clus(old_clus));
         clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(old_clus));
         *clusat = 0xffffffffu & new_clus;
-        sd_write(buff, fat2_sec_of_clus(old_clus));
+        sd_write_meta(buff, fat2_sec_of_clus(old_clus));
     }
     /* TABLE 1*/
-    sd_read(buff, fat1_sec_of_clus(new_clus));
+    sd_read_meta(buff, fat1_sec_of_clus(new_clus));
     clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(new_clus));
     *clusat = LAST_CLUS_OF_FILE;
-    sd_write(buff, fat1_sec_of_clus(new_clus));
+    sd_write_meta(buff, fat1_sec_of_clus(new_clus));
     /* TABLE 0*/
-    sd_read(buff, fat2_sec_of_clus(new_clus));
+    sd_read_meta(buff, fat2_sec_of_clus(new_clus));
     clusat = (uint32_t *)((char*)buff + fat_offset_of_clus(new_clus));
     *clusat = LAST_CLUS_OF_FILE;
-    sd_write(buff, fat2_sec_of_clus(new_clus));
+    sd_write_meta(buff, fat2_sec_of_clus(new_clus));
 }
 
 /* get current working dir name */
@@ -866,41 +748,49 @@ void free_all_fds(pcb_t *pcb)
 }
 
 /* read as many sectors as we can */
-void sd_read(char *buf, uint32_t sec)
+void sd_read(char *buf, isec_t sec)
 {
-    if (sec >= fat.first_data_sec && sec != BUFF_ALIGN(sec)){
+    if (sec < fat.first_data_sec){
+        printk_port("read sec is %d, first sec is %d", sec, fat.first_data_sec);
+        assert(0)
+    }
+    else if (sec != BUFF_ALIGN(sec)){
         printk_port("read sec is %d, buff align is %d", sec, BUFF_ALIGN(sec));
         assert(0);
     }
-    if (sec >= fat.first_data_sec)
-        sd_read_sector(buf, sec, READ_BUF_CNT);
-        // sd_read_from_cache(buf, sec);
-    else
-        sd_read_sector(buf, sec, READ_BUF_CNT);
+    sd_read_from_cache(buf, sec);
+}
+
+/* read meta data, only for sector size */
+void sd_read_meta(char *buf, isec_t sec)
+{
+    sd_read_from_meta_cache(buf, sec);
 }
 
 /* write as many sectors as we can */
-void sd_write(char *buf, uint32_t sec)
+void sd_write(char *buf, isec_t sec)
 {
-    if (sec >= fat.first_data_sec && sec != BUFF_ALIGN(sec)){
+    if (sec < fat.first_data_sec){
+        printk_port("write sec is %d, first sec is %d", sec, fat.first_data_sec);
+        assert(0)
+    }
+    else if (sec != BUFF_ALIGN(sec)){
         printk_port("write sec is %d, buff align is %d", sec, BUFF_ALIGN(sec));
         assert(0);
     }
-    if (sec >= fat.first_data_sec)
-        for (int i = 0; i < READ_BUF_CNT; ++i)
-        {
-            sd_write_sector(buf, sec, 1);
-            buf += SECTOR_SIZE;
-            sec++;
-        }    
-        // sd_write_to_cache(buf, sec);
-    else        
-        for (int i = 0; i < READ_BUF_CNT; ++i)
-        {
-            sd_write_sector(buf, sec, 1);
-            buf += SECTOR_SIZE;
-            sec++;
-        }    
+        // for (int i = 0; i < READ_BUF_CNT; ++i)
+        // {
+        //     sd_write_sector(buf, sec, 1);
+        //     buf += SECTOR_SIZE;
+        //     sec++;
+        // }    
+    sd_write_to_cache(buf, sec);
+}
+
+/* write meta data, only for sector size */
+void sd_write_meta(char *buf, isec_t sec)
+{
+    sd_write_to_meta_cache(buf, sec); 
 }
 
 /* cache write back */
@@ -908,5 +798,6 @@ int fat32_fsync(fd_num_t fd)
 {
     debug();
     do_iocache_write_back();
+    do_meta_cache_write_back();
     return SYSCALL_SUCCESSED;
 }

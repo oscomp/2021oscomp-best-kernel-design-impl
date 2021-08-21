@@ -34,7 +34,7 @@ uint32_t get_next_cluster(uint32_t cluster)
 {
     uchar *buf2 = kalloc();
     // printk_port("buf2 is %lx\n", buf2);
-    sd_read(buf2, fat1_sec_of_clus(cluster));
+    sd_read_meta(buf2, fat1_sec_of_clus(cluster));
     uint32_t ret = (*(uint32_t*)((char*)buf2 + fat_offset_of_clus(cluster)));
     kfree(buf2);
     return ret;
@@ -390,6 +390,10 @@ uint8 set_fd(void *pcb_underinit, uint i, dentry_t *p, dir_pos_t *dir_pos, uint3
 
     /* if append, pos = length; else, pos = 0 */
     pcb_under->fd[i].pos = (flags & O_APPEND) ? pcb_under->fd[i].length : 0;
+
+    pcb_under->fd[i].cur_sec = (flags & O_APPEND) ? get_buf_aligned_sec_from_clus_and_length(pcb_under->fd[i].first_clus_num, 
+                                                    pcb_under->fd[i].pos) :
+                                        first_sec_of_clus(pcb_under->fd[i].first_clus_num);
 
     pcb_under->fd[i].used = 1;
 
@@ -875,23 +879,22 @@ ientry_t _create_new_dentry(uchar *temp1, ientry_t now_clus, uchar *tempbuf, dir
 uint32_t search_empty_clus(uchar *buf)
 {
     uint32_t now_sec = fat.first_data_sec - 2*fat.bpb.fat_sz;
-    log(0, "now_sec is %d", now_sec);
-    sd_read(buf, now_sec);
-    uint j = 0;
+    sd_read_meta(buf, now_sec);
+    uint32_t j = 0;
     while (1){
-        uint i;
+        uint8_t i;
         for (i = 0; i < 4; ++i)
         {
-            if (*(buf + i + (j % BUFSIZE))){
+            if (*(buf + i + (j % SECTOR_SIZE))){
                 // log2(0, "i is %d, j is %d, val is %x", i,j,*(buf + i + (j % BUFSIZE)));
                 break;
             }
         }
         if (i == 4) break;
         else j += 4;
-        if (j % BUFSIZE == 0){
-            now_sec += READ_BUF_CNT;
-            sd_read(buf, now_sec);
+        if (j % SECTOR_SIZE == 0){
+            now_sec += 1;
+            sd_read_meta(buf, now_sec);
         }
     }
     write_fat_table(0, j/4, buf);
@@ -1098,14 +1101,14 @@ void clear_all_garbage_clus_from_table(ientry_t cluster)
 
         isec_t sec = fat1_sec_of_clus(now_clus);
         /* table 1 */
-        sd_read(buf, sec);
+        sd_read_meta(buf, sec);
         clusat = (uint32_t *)((char*)buf + fat_offset_of_clus(now_clus));
         *clusat = 0;
-        sd_write(buf, sec);
+        sd_write_meta(buf, sec);
         /* table 2 */
-        sd_read(buf, sec + fat.bpb.fat_sz);
+        sd_read_meta(buf, sec + fat.bpb.fat_sz);
         *clusat = 0;
-        sd_write(buf, sec + fat.bpb.fat_sz);
+        sd_write_meta(buf, sec + fat.bpb.fat_sz);
 
         // uchar *testbuf = kalloc();
         // sd_read(testbuf, sec);

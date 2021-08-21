@@ -86,8 +86,43 @@ _from_kernel:
   sd s0, OFFSET_REG_SBADADDR(sp)
   csrr s0, CSR_SCAUSE
   sd s0, OFFSET_REG_SCAUSE(sp)
-  csrr s0, CSR_SATP
-  sd s0, OFFSET_REG_SATP(sp)
+
+  fsd ft0, OFFSET_FREG_FT0(sp)
+  fsd ft1, OFFSET_FREG_FT1(sp)
+  fsd ft2, OFFSET_FREG_FT2(sp)
+  fsd ft3, OFFSET_FREG_FT3(sp)
+  fsd ft4, OFFSET_FREG_FT4(sp)
+  fsd ft5, OFFSET_FREG_FT5(sp)
+  fsd ft6, OFFSET_FREG_FT6(sp)
+  fsd ft7, OFFSET_FREG_FT7(sp)
+
+  fsd fs0, OFFSET_FREG_FS0(sp)
+  fsd fs1, OFFSET_FREG_FS1(sp)
+
+  fsd fa0, OFFSET_FREG_FA0(sp)
+  fsd fa1, OFFSET_FREG_FA1(sp)
+  fsd fa2, OFFSET_FREG_FA2(sp)
+  fsd fa3, OFFSET_FREG_FA3(sp)
+  fsd fa4, OFFSET_FREG_FA4(sp)
+  fsd fa5, OFFSET_FREG_FA5(sp)
+  fsd fa6, OFFSET_FREG_FA6(sp)
+  fsd fa7, OFFSET_FREG_FA7(sp)
+
+  fsd fs2, OFFSET_FREG_FS2(sp)
+  fsd fs3, OFFSET_FREG_FS3(sp)
+  fsd fs4, OFFSET_FREG_FS4(sp)
+  fsd fs5, OFFSET_FREG_FS5(sp)
+  fsd fs6, OFFSET_FREG_FS6(sp)
+  fsd fs7, OFFSET_FREG_FS7(sp)
+  fsd fs8, OFFSET_FREG_FS8(sp)
+  fsd fs9, OFFSET_FREG_FS9(sp)
+  fsd fs10, OFFSET_FREG_FS10(sp)
+  fsd fs11, OFFSET_FREG_FS11(sp)
+
+  fsd ft8, OFFSET_FREG_FT8(sp)
+  fsd ft9, OFFSET_FREG_FT9(sp)
+  fsd ft10, OFFSET_FREG_FT10(sp)
+  fsd ft11, OFFSET_FREG_FT11(sp)
 
 .endm
 
@@ -131,23 +166,47 @@ _from_kernel:
   ld t5, OFFSET_REG_T5(sp)
   ld t6, OFFSET_REG_T6(sp)
 
-  
+  fld ft0, OFFSET_FREG_FT0(sp)
+  fld ft1, OFFSET_FREG_FT1(sp)
+  fld ft2, OFFSET_FREG_FT2(sp)
+  fld ft3, OFFSET_FREG_FT3(sp)
+  fld ft4, OFFSET_FREG_FT4(sp)
+  fld ft5, OFFSET_FREG_FT5(sp)
+  fld ft6, OFFSET_FREG_FT6(sp)
+  fld ft7, OFFSET_FREG_FT7(sp)
+
+  fld fs0, OFFSET_FREG_FS0(sp)
+  fld fs1, OFFSET_FREG_FS1(sp)
+
+  fld fa0, OFFSET_FREG_FA0(sp)
+  fld fa1, OFFSET_FREG_FA1(sp)
+  fld fa2, OFFSET_FREG_FA2(sp)
+  fld fa3, OFFSET_FREG_FA3(sp)
+  fld fa4, OFFSET_FREG_FA4(sp)
+  fld fa5, OFFSET_FREG_FA5(sp)
+  fld fa6, OFFSET_FREG_FA6(sp)
+  fld fa7, OFFSET_FREG_FA7(sp)
+
+  fld fs2, OFFSET_FREG_FS2(sp)
+  fld fs3, OFFSET_FREG_FS3(sp)
+  fld fs4, OFFSET_FREG_FS4(sp)
+  fld fs5, OFFSET_FREG_FS5(sp)
+  fld fs6, OFFSET_FREG_FS6(sp)
+  fld fs7, OFFSET_FREG_FS7(sp)
+  fld fs8, OFFSET_FREG_FS8(sp)
+  fld fs9, OFFSET_FREG_FS9(sp)
+  fld fs10, OFFSET_FREG_FS10(sp)
+  fld fs11, OFFSET_FREG_FS11(sp)
+
+  fld ft8, OFFSET_FREG_FT8(sp)
+  fld ft9, OFFSET_FREG_FT9(sp)
+  fld ft10, OFFSET_FREG_FT10(sp)
+  fld ft11, OFFSET_FREG_FT11(sp)
+
   ld s0, OFFSET_REG_SSTATUS(sp)
   csrw CSR_SSTATUS, s0
   ld s0, OFFSET_REG_SEPC(sp)
   csrw CSR_SEPC, s0
-  ld s0, OFFSET_REG_SATP(sp)
-  fence
-  fence.i
-  sfence.vma
-  fence
-  fence.i
-  csrw CSR_SATP, s0
-  fence
-  fence.i
-  sfence.vma
-  fence
-  fence.i
 
   ld s0, OFFSET_REG_S0(sp)
 
@@ -196,10 +255,17 @@ ENTRY(disable_interrupt)
   jr ra
 ENDPROC(disable_interrupt)
 
+ENTRY(enable_float_point_inst)
+  li t0, SR_FS
+  csrs CSR_SSTATUS, t0
+  jr ra
+ENDPROC(enable_float_point_inst)
+
 // the address of previous pcb in a0
 // the address of next pcb in a1
 ENTRY(switch_to)
-  beqz a0, switch_to_restore
+  beqz a0, switch_to_restore /* if previous_running is NULL, just switch to current_running */
+  beq a0, a1, switch_to_ret /* if a0 is equal to a1, no need to switch */
   addi tp, a0, 0
   // save all callee save registers on kernel stack
   addi sp, sp, -(SWITCH_TO_SIZE)
@@ -229,17 +295,10 @@ switch_to_restore:
   ld sp, PCB_KERNEL_SP(tp)  
 
   ld s0, SWITCH_TO_SATP(sp)
-  fence
-  fence.i
-  sfence.vma
-  fence
-  fence.i
   csrw CSR_SATP, s0
   fence
   fence.i
   sfence.vma
-  fence
-  fence.i
   
   ld s0, SWITCH_TO_S0(sp)
   ld s1, SWITCH_TO_S1(sp)
@@ -257,6 +316,7 @@ switch_to_restore:
 
   ld ra, SWITCH_TO_RA(sp)
   addi sp, sp, SWITCH_TO_SIZE
+switch_to_ret:
   jr ra
 ENDPROC(switch_to)
 
@@ -294,10 +354,8 @@ ENTRY(exception_handler_entry)
   ld a0, PCB_KERNEL_SP(tp)
   csrr a1, CSR_STVAL
   csrr a2, CSR_SCAUSE
-  mv a3, tp
 
-  la t0, interrupt_helper
-  jr t0
+  j interrupt_helper
 
 ENDPROC(exception_handler_entry)
 

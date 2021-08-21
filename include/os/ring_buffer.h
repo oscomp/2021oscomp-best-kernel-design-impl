@@ -6,7 +6,7 @@
 #include <os/lock.h>
 #include <type.h>
 
-#define RING_BUFFER_SIZE NORMAL_PAGE_SIZE
+#define RING_BUFFER_SIZE 256
 #pragma pack(8)
 struct ring_buffer {
 	mutex_lock_t lock; /* FOR NOW no use */

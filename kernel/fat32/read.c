@@ -32,7 +32,7 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
         return count;
     }
     // 如果是管道，就读取管道输出
-    if (current_running->fd[fd_index].piped == FD_PIPED){
+    else if (current_running->fd[fd_index].piped == FD_PIPED){
         log(0, "it's a pipe fd");
         ssize_t ret = pipe_read(buf, current_running->fd[fd_index].pip_num, count);
         log(0, "ret is %d %c", ret, buf[0]);
@@ -72,26 +72,25 @@ int64 fat32_read(fd_num_t fd, uchar *buf, size_t count)
     log(0, "realcount is %d, length is %d, pos is %d", realcount, fdp->length, fdp->pos);
     if (realcount <= 0)
         return 0;
+    /* pos > length is avoided */
+
     uchar *buff = kalloc();
 
-    ientry_t now_clus = get_clus_from_len(current_running->fd[fd_index].first_clus_num, current_running->fd[fd_index].pos);
-    isec_t now_sec = BUFF_ALIGN( get_sec_from_clus_and_offset(now_clus, current_running->fd[fd_index].pos % CLUSTER_SIZE) );
-    // log(0, "now_clus:%d, now_sec:%d", now_clus, now_sec);
+    log(0, "now_sec:%d", fdp->cur_sec);
 
     while (mycount < realcount){
-        size_t pos_offset_in_buf = current_running->fd[fd_index].pos % BUFSIZE;
+        size_t pos_offset_in_buf = fdp->pos % BUFSIZE;
         size_t readsize = min(BUFSIZE - pos_offset_in_buf, realcount - mycount);
-        sd_read(buff, now_sec);
+        sd_read(buff, fdp->cur_sec);
         memcpy(buf, buff + pos_offset_in_buf, readsize);
         buf += readsize;
         mycount += readsize;
-        current_running->fd[fd_index].pos += readsize;
-        if (current_running->fd[fd_index].pos % CLUSTER_SIZE == 0){
-            now_clus = get_next_cluster(now_clus);
-            now_sec = first_sec_of_clus(now_clus);
+        fdp->pos += readsize;
+        if (fdp->pos % CLUSTER_SIZE == 0){
+            fdp->cur_sec = first_sec_of_clus(get_next_cluster(clus_of_sec(fdp->cur_sec)));
         }
         else{
-            now_sec += READ_BUF_CNT ; // readsize / BUFSIZE == READ_BUF_CNT until last read
+            fdp->cur_sec += READ_BUF_CNT ; // readsize / BUFSIZE == READ_BUF_CNT until last read
         }
     }
 

@@ -17,7 +17,10 @@ uintptr_t alloc_page()
 {
     pagetop += NORMAL_PAGE_SIZE;
 }
-
+static void debugger()
+{
+    sbi_console_putchar('6');
+}
 void itoa(uint64_t num,char *str)
 {
     while (num)
@@ -82,7 +85,6 @@ void setup_vm()
     }
     // enable virtual memory
     enable_vm();
-    sbi_console_putchar('6');
 }
 
 uintptr_t directmap(uintptr_t kva, uintptr_t pgdir)
@@ -203,7 +205,6 @@ uintptr_t load_elf(
 
     return ehdr->e_entry;
 }
-
 
 /*********** start here **************/
 int boot_kernel(unsigned long mhartid, uintptr_t riscv_dtb)

@@ -4,6 +4,7 @@
 
 
 #include <type.h>
+#include <context.h>
 #include <os/list.h>
 #include <os/mm.h>
 #include <os/smp.h>
@@ -12,28 +13,6 @@
 #include <sched/signal.h>
 
 #define NUM_MAX_TASK 72
-
-/* used to save register infomation */
-typedef struct regs_context
-{
-    /* Saved main processor registers.*/
-    reg_t regs[32];
-
-    /* Saved special registers. */
-    reg_t sstatus;
-    reg_t sepc;
-    reg_t sbadaddr;
-    reg_t scause;
-    reg_t satp;
-} regs_context_t;
-
-/* used to save register infomation in switch_to */
-typedef struct switchto_context
-{
-    /* Callee saved registers.*/
-    reg_t regs[14];
-    reg_t satp
-} switchto_context_t;
 
 typedef enum {
     TASK_BLOCKED,
@@ -83,6 +62,7 @@ typedef struct fd{
     uint8 flags;
     /* position */
     uint64 pos;
+    uint32 cur_sec;
     /* length */
     uint32 length;
     /* dir_pos */
@@ -363,6 +343,14 @@ static inline uint64_t get_user_addr_top(pcb_t *pcb)
     //     pcb = pcb->parent.parent;
     return pcb->user_addr_top;
 }
+
+// static inline uint64_t get_all_users_addr_top(pcb_t *pcb){
+//     uint64_t ret = 0xffffffff00000000lu;
+//     for (int i = 0; i < NUM_MAX_TASK; ++i)
+//     {
+//         if (ret > get_user_addr_top())
+//     }
+// }
 
 static inline void set_user_addr_top(pcb_t *pcb, uint64_t user_addr_top)
 {

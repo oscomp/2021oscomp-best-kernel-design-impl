@@ -3,6 +3,7 @@
 #include <os/irq.h>
 #include <os/system.h>
 #include <type.h>
+#include <os/fat32.h>
 
 #include <stdio.h>
 #include <os/sched.h>
@@ -88,6 +89,7 @@ static void iteration_test_timer()
         }
     if (i == NUM_MAX_TASK){
         printk_port("exit\n");
+        // fat32_fsync(0);
         assert(0);
     }
 }

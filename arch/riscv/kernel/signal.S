@@ -143,9 +143,6 @@ ENTRY(set_signal_trampoline)
     ld a2, OFFSET_REG_SCAUSE(a0)
     sd a2, OFFSET_REG_SCAUSE(sp)
 
-    ld a2, OFFSET_REG_SATP(a0)
-    sd a2, OFFSET_REG_SATP(sp)
-
     sd sp, PCB_KERNEL_SP(tp)
 
     /* 3. copy kernel stack */

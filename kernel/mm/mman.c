@@ -9,12 +9,9 @@
 
 /* addr 必须对齐4K */
 /* 成功返回0, 失败返回-1 */
-int do_mprotect(void *addr, size_t len, int prot)
+uint64_t prot_to_mask(int prot)
 {
-    debug();
-    if ((uintptr_t)addr % NORMAL_PAGE_SIZE) return -1;
     uint64_t mask = 0lu;
-
     if (prot & PROT_READ)
         mask |= _PAGE_READ;
     if (prot & PROT_WRITE)
@@ -24,6 +21,14 @@ int do_mprotect(void *addr, size_t len, int prot)
 
     if (prot != PROT_NONE)
         mask |= _PAGE_ACCESSED | _PAGE_DIRTY;
+    return mask;
+}
+
+int do_mprotect(void *addr, size_t len, int prot)
+{
+    debug();
+    if ((uintptr_t)addr % NORMAL_PAGE_SIZE) return -1;
+    uint64_t mask = prot_to_mask(prot);
 
     for (uintptr_t i = 0; i < len; i += NORMAL_PAGE_SIZE)
     {
@@ -64,8 +69,10 @@ int do_mprotect(void *addr, size_t len, int prot)
                 alloc_page_helper(uva_bottom, current_running->pgdir, _PAGE_ALL_MOD);
             }
         }
-        if (reset_va_page_attribute(uva, current_running->pgdir, mask))
+        if (reset_va_page_attribute(uva, current_running->pgdir, mask)){
+            log(0, "do_mprotect failed");
             return -1;
+        }
     }
     return 0;
 }
