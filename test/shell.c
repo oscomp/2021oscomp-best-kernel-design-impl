@@ -198,37 +198,6 @@ int main()
     // strcpy(str_echo, "START lat_ctx\n");
     // sys_write(1, str_echo, strlen(str_echo));
 
-    // argc = 7;
-    // strcpy(str1, "./lmbench_all");
-    // strcpy(str2, "lat_ctx");
-    // strcpy(str3, "-P");
-    // strcpy(str4, "1");
-    // strcpy(str5, "-s");
-    // strcpy(str6, "32");
-    // strcpy(str7, "2");
-    // argv[0] = str1; 
-    // argv[1] = str2;
-    // argv[2] = str3;
-    // argv[3] = str4;
-    // argv[4] = str5;
-    // argv[5] = str6;
-    // argv[6] = str7;
-    // // argv[7] = str8;
-    // // argv[8] = str9;
-    // // argv[9] = str10;
-    // // argv[10] = str11;
-    // // argv[11] = str12;
-    // argv[argc] = NULL;
-    // envp[0] = NULL;
-    // if ((tid = sys_clone(0,0,0,0,0)) != 0){
-    //     sys_wait4(tid,0,0);
-    // }
-    // else{
-    //     sys_exec(argv[0], argv, envp);
-    // }
-    // strcpy(str_echo, "END lat_ctx\n");
-    // sys_write(1, str_echo, strlen(str_echo));
-
     // // lmbench_all lat_proc -P 1 fork
     // strcpy(str_echo, "START lat_proc_fork\n");
     // sys_write(1, str_echo, strlen(str_echo));
@@ -409,8 +378,47 @@ int main()
     strcpy(str_echo, "END lat_mmap 0\n");
     sys_write(2, str_echo, strlen(str_echo));
 
+    strcpy(str_echo, "START lat_ctx\n");
+    sys_write(2, str_echo, strlen(str_echo));
+    argc = 12;
+    strcpy(str1, "./lmbench_all");
+    strcpy(str2, "lat_ctx");
+    strcpy(str3, "-P");
+    strcpy(str4, "1");
+    strcpy(str5, "-s");
+    strcpy(str6, "32");
+    strcpy(str7, "2");
+    strcpy(str8, "4");
+    strcpy(str9, "8");
+    strcpy(str10, "16");
+    strcpy(str11, "24");
+    strcpy(str12, "32");
+    argv[0] = str1; 
+    argv[1] = str2;
+    argv[2] = str3;
+    argv[3] = str4;
+    argv[4] = str5;
+    argv[5] = str6;
+    argv[6] = str7;
+    argv[7] = str8;
+    argv[8] = str9;
+    argv[9] = str10;
+    argv[10] = str11;
+    argv[11] = str12;
+    argv[argc] = NULL;
+    envp[0] = NULL;
+    if ((tid = sys_clone(0,0,0,0,0)) != 0){
+        sys_wait4(tid,0,0);
+    }
+    else{
+        sys_exec(argv[0], argv, envp);
+    }
+    strcpy(str_echo, "END lat_ctx 0\n");
+    sys_write(2, str_echo, strlen(str_echo));
+
     strcpy(str_echo, "shell success\n");
     sys_write(2, str_echo, 14);
+
 
     sys_stop_test_timer();
         

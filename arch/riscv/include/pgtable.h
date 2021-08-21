@@ -29,7 +29,7 @@
 #define START_ENTRYPOINT 0xffffffff80000000lu
 
 #ifdef K210
-    #define KERNEL_ENTRYPOINT 0xffffffff80150000lu
+    #define KERNEL_ENTRYPOINT 0xffffffff80134000lu
     #define KERNEL_END 0xffffffff80600000lu
 #else
     #define KERNEL_ENTRYPOINT 0xffffffff80600000lu

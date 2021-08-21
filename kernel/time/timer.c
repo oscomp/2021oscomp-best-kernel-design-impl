@@ -80,7 +80,7 @@ uint8_t test_timer_stop = 0;
 static void iteration_test_timer()
 {
     if (!test_timer_stop){
-        printk_port("waiting %lds\n", ++test_timer_gp);
+        printk_port("waiting %lds\n", (++test_timer_gp) * 5);
         timer_t *mytimer = alloc_timer();
         assert(mytimer);
         mytimer->timeout_tick = get_ticks() + 50000000;

@@ -311,6 +311,7 @@ pid_t do_clone(uint32_t flag, uint64_t stack, pid_t ptid, void *tls, pid_t ctid,
             // log(0, "child process usp base is %lx", pcb_underinit->user_stack_base);
             return pcb_underinit->tid;
         }
+    printk_port("no pcb available\n");
     return -1;
 }
 

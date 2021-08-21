@@ -1,6 +1,7 @@
 #include <os/fat32.h>
 #include <os/ring_buffer.h>
 #include <os/sched.h>
+#include <os/stdio.h>
 
 pipe_t pipes[NUM_PIPE] = {0};
 /* init pipe */
@@ -70,7 +71,7 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
     }
 
     if (pip_num == NUM_PIPE){
-        log(0, "no pipe available");
+        printk_port("no pipe available");
         return SYSCALL_FAILED;
     }
 

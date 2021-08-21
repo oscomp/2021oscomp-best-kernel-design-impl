@@ -12,7 +12,7 @@
 #include <os/elf.h>
 #include <sched/signal.h>
 
-#define NUM_MAX_TASK 72
+#define NUM_MAX_TASK 36
 
 typedef enum {
     TASK_BLOCKED,
