@@ -114,6 +114,7 @@ impl BlockCacheManager {
     pub fn read_block_cache(
         &self,
         block_id: usize,
+        //block_device: Arc<dyn BlockDevice>,
     ) -> Option<Arc<RwLock<BlockCache>>>{
         if let Some(pair) = self.queue
             .iter()
@@ -121,6 +122,25 @@ impl BlockCacheManager {
                 Some(Arc::clone(&pair.1))
         }else{
             None
+            // substitute
+            // if self.queue.len() == BLOCK_CACHE_SIZE {
+            //     // from front to tail
+            //     if let Some((idx, _)) = self.queue
+            //         .iter()
+            //         .enumerate()
+            //         .find(|(_, pair)| Arc::strong_count(&pair.1) == 1) {
+            //         self.queue.drain(idx..=idx);
+            //     } else {
+            //         panic!("Run out of BlockCache!");
+            //     }
+            // }
+            // // load block into mem and push back
+            // let block_cache = Arc::new(RwLock::new(
+            //     BlockCache::new(block_id, Arc::clone(&block_device))
+            // ));
+            // self.queue.push_back((block_id, Arc::clone(&block_cache)));
+            // //println!("blkcache: {:?}", block_cache.read().cache);
+            // Some(block_cache)
         }
     }
 
@@ -190,15 +210,15 @@ pub fn get_block_cache(
     let phy_blk_id = DATA_BLOCK_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
-        if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-            return blk
-        }
+        //if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+        //    return blk
+        //}
         DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
-        if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-            return blk
-        }
+        //if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+        //    return blk
+        //}
         DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }
@@ -212,15 +232,15 @@ pub fn get_info_cache(
     let phy_blk_id = INFO_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
-        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-            return blk
-        }
+        //if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+        //    return blk
+        //}
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
-        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-            return blk
-        }
+        //if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+        //    return blk
+        //}
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }
