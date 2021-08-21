@@ -21,7 +21,7 @@ ifeq ($(TARGET), qemu)
 	CFLAGS += -Iqemu
 	USER_CFLAGS += -Iqemu
 endif
-K210_SERIALPORT	= /dev/ttyUSB3
+K210_SERIALPORT	= /dev/ttyUSB4
 
 START_QEMU_ENTRY = 0x80200000
 
