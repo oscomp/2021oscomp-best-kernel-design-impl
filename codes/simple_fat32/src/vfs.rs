@@ -57,6 +57,11 @@ impl VFile{
         }
     }
 
+    pub fn clear_cache(&self){
+        let fat = self.fs.read();
+        fat.cache_write_back();
+    }
+
     pub fn get_name(&self)->&str {
         self.name.as_str()
     }

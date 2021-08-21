@@ -70,6 +70,10 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let mut initproc_inner = INITPROC.acquire_inner_lock();
     let task = take_current_task().unwrap();
     // println!("strong count of pid{} = {}", task.pid.0, Arc::strong_count(&task));
+    //if task.pid.0 == 2{
+    //    crate::fs::clear_cache();
+    //}
+
     //send signal SIGCHLD to parent
     {
         let parent_task = task.get_parent().unwrap(); // this will acquire inner of current task

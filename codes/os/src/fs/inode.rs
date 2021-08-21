@@ -504,7 +504,11 @@ pub fn ch_dir(work_path: &str, path: &str) -> isize{
         -1
     }
 }
- 
+
+pub fn clear_cache(){
+    ROOT_INODE.clear_cache();
+}
+
 // TODO: 不急 
 // 复制文件/目录
 //pub fn fcopy(src_inode_id: u32, src_path: &str, dst_inode_id: u32, dst_path: &str )->bool{

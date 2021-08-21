@@ -92,13 +92,15 @@ const BLOCK_CACHE_SIZE: usize = 20;
 //const DIRENT_CACHE_SIZE: usize = 4;
 pub struct BlockCacheManager {
     start_sec: usize,
+    limit: usize,
     queue: VecDeque<(usize, Arc<RwLock<BlockCache>>)>,
 }
 
 impl BlockCacheManager {
-    pub fn new() -> Self {
+    pub fn new(limit:usize) -> Self {
         Self { 
             start_sec: 0,
+            limit,
             queue: VecDeque::new() 
         }
     }
@@ -155,7 +157,7 @@ impl BlockCacheManager {
                 Arc::clone(&pair.1)
         } else {
             // substitute
-            if self.queue.len() == BLOCK_CACHE_SIZE {
+            if self.queue.len() == self.limit/*BLOCK_CACHE_SIZE*/ {
                 // from front to tail
                 if let Some((idx, _)) = self.queue
                     .iter()
@@ -185,13 +187,13 @@ impl BlockCacheManager {
 
 lazy_static! {
     pub static ref DATA_BLOCK_CACHE_MANAGER: RwLock<BlockCacheManager> = RwLock::new(
-        BlockCacheManager::new()
+        BlockCacheManager::new(1034)
     );
 }
 
 lazy_static! {
     pub static ref INFO_CACHE_MANAGER: RwLock<BlockCacheManager> = RwLock::new(
-        BlockCacheManager::new()
+        BlockCacheManager::new(10)
     );
 }
 
@@ -210,15 +212,15 @@ pub fn get_block_cache(
     let phy_blk_id = DATA_BLOCK_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
-        //if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-        //    return blk
-        //}
+        if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
-        //if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-        //    return blk
-        //}
+        if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }
@@ -232,15 +234,15 @@ pub fn get_info_cache(
     let phy_blk_id = INFO_CACHE_MANAGER.read().get_start_sec() + block_id;
     if rw_mode == CacheMode::READ {
         // make sure the blk is in cache
-        //if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-        //    return blk
-        //}
+        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
         INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
-        //if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
-        //    return blk
-        //}
+        if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
+            return blk
+        }
         INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
     }
 }
