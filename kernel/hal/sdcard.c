@@ -107,6 +107,7 @@ static void sd_end_cmd(void) {
 
 #define SD_CMD0 	0 
 #define SD_CMD8 	8
+#define SD_CMD9		9		// Take CSD
 #define SD_CMD58 	58 		// READ_OCR
 #define SD_CMD55 	55 		// APP_CMD
 #define SD_ACMD41 	41 		// SD_SEND_OP_COND
@@ -134,6 +135,27 @@ static uint8 sd_get_response_R1(void) {
 
 	// timeout!
 	return 0xff;
+}
+
+/* 
+ * Read CSD Register. 
+ * This should be called after CMD8 is sent and R1 response is received. 
+ */
+static void sd_get_response_csd_rest(uint8 *frame) {
+	uint8 dummy_crc[2];
+	uint8 result = 0xff;
+	int timeout = 0xffffff;
+
+	while (timeout -- && 0xfe != result) {
+		sd_read_data(&result, 1);
+	}
+	if (0xfe != result) {
+		printf(__WARN("sd_csd")" %d\n", result);
+		return ;
+	}
+
+	sd_read_data(frame, 16);
+	sd_read_data(dummy_crc, 2);
 }
 
 /* 
@@ -309,6 +331,58 @@ static int check_block_size(void) {
 	return 0xff;
 }
 
+static void check_sdcard_size(void) {
+	uint8 result = 0xff;
+	uint8 csd[16];
+	uint64 size = 0;
+
+	int timeout = 0xffffff;
+	while (timeout --) {
+		sd_send_cmd(SD_CMD9, 0, 0);
+		result = sd_get_response_R1();
+		sd_get_response_csd_rest(csd);
+		sd_end_cmd();
+
+		for (int i = 0; i < 16; i ++) {
+			printf("%x ", csd[i]);
+		}
+		printf("\n");
+		if (0 == result) {	// let's calc sdcard size 
+			// the calculation of SD card capacity differs between 
+			// SC and SDHC/SDXC
+			uint64 capacity;
+			if (is_standard_sd) {
+				uint16 c_size = // CSD[73:62]
+						(((uint16)csd[7] & 0xc0) >> 6) | 	// CSD[63:62]
+						((uint16)csd[8] << 2) | 			// CSD[71:64]
+						(((uint16)csd[9] & 0x3) << 10);		// CSD[73:72]
+				uint16 c_size_mult = // CSD[49:47]
+						((uint16)csd[6] >> 7)	|			// CSD[47]
+						(((uint16)csd[7] & 0x3) << 1);		// CSD[49:48]
+				uint16 read_bl_len = // CSD[83:80]
+						((uint16)csd[10] & 0xf);
+
+				uint64 mult = 1 << (c_size_mult + 2);
+				uint64 blocknr = (c_size + 1) * mult;
+				uint64 block_len = 1 << read_bl_len;
+
+				capacity = blocknr * block_len;
+			}
+			else {
+				uint64 c_size = // CSD[69:48]
+						((uint64)csd[6]) | 					// [55:48]
+						((uint64)csd[7] << 8) | 			// [63:56]
+						(((uint64)csd[8] & 0x3f) << 16);	// [69:64]
+				capacity = (c_size + 1) * (512 * 1024);
+				printf("c_size = %p\n", c_size);
+			}
+			printf("capacity: %dGB\n", capacity >> 30);
+			printf("capacity = %d\n", capacity);
+			break;
+		}
+	}
+}
+
 /*
  * @brief  Initializes the SD/SD communication.
  * @param  None
@@ -339,6 +413,8 @@ static int sd_init(void) {
 	if (0 != check_block_size()) 
 		return 0xff;
 	SD_HIGH_SPEED_ENABLE();
+
+	check_sdcard_size();
 	return 0;
 }
 
@@ -769,7 +845,8 @@ static void sdcard_multiple_write_stop(void)
 	}
 }
 
-#define	WRITE_SHRESHOLD	1000
+// #define	WRITE_SHRESHOLD	1000
+#define WRITE_SHRESHOLD 	2000
 
 void sdcard_write_start(void)
 {
@@ -942,10 +1019,10 @@ void sdcard_intr(void)
 		bnext->disk = 1;
 		release(&sd_wqueue.lock);
 		// printf("nbuf = %d\n", nbuf);
-		if (nbuf < 16 && bnext->sectorno == b->sectorno + 1) {
-			sd_status.wcount = nbuf;
-			sdcard_write(bnext);
-		} else {
+		// if (nbuf < 16 && bnext->sectorno == b->sectorno + 1) {
+		// 	sd_status.wcount = nbuf;
+		// 	sdcard_write(bnext);
+		// } else {
 			sdcard_multiple_write_stop();
 
 			if (sdcard_multiple_write(bnext, nbuf) < 0) {
@@ -956,7 +1033,7 @@ void sdcard_intr(void)
 				release(&sd_wqueue.lock);
 				goto stop_out;
 			}
-		}
+		// }
 		goto out;
 	}
 
