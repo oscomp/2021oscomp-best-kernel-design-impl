@@ -63,14 +63,14 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		printf("hart 0 init done\n");
 
 		// we need IPI to wake up other hart(s)
-		// for (int i = 1; i < NCPU; i ++) {
-		// 	unsigned long mask = 1 << i;
-		// 	// struct sbiret res = sbi_send_ipi(mask, 0);
-		// 	sbi_send_ipi(mask, 0);
-		// 	__debug_assert("main", SBI_SUCCESS == res.error, "sbi_send_ipi failed");
-		// }
-		// __sync_synchronize();
-		// started = 1;
+		for (int i = 1; i < NCPU; i ++) {
+			unsigned long mask = 1 << i;
+			// struct sbiret res = sbi_send_ipi(mask, 0);
+			sbi_send_ipi(mask, 0);
+			__debug_assert("main", SBI_SUCCESS == res.error, "sbi_send_ipi failed");
+		}
+		__sync_synchronize();
+		started = 1;
 	}
 	else
 	{
@@ -81,7 +81,7 @@ main(unsigned long hartid, unsigned long dtb_pa)
 		floatinithart();
 		kvminithart();
 		trapinithart();
-		plicinithart();  // ask PLIC for device interrupts
+		// plicinithart();  // ask PLIC for device interrupts
 		printf("hart 1 init done\n");
 	}
 	__debug_info("main", "hart %d enter main()...\n", hartid);

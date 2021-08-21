@@ -45,6 +45,11 @@ plicinithart(void)
 	uint32 *hart0_m_int_enable_hi = hart_m_enable + 1;
 	*(hart0_m_int_enable_hi) = readd(hart0_m_int_enable_hi) | (1 << (UART_IRQ % 32));
 
+	uint32 *hart1_m_enable = (uint32*)PLIC_MENABLE(1);
+	uint32 *hart1_m_enable_hi = hart1_m_enable + 1;
+	*(hart1_m_enable) = 0;
+	*(hart1_m_enable_hi) = 0;
+
 	// Sometimes on k210 the PLIC may not be initialized correctly, 
 	// and may enable external interrupts on Supervisor as described above. 
 	// Disable Supervisor External Interrupts on PLIC.

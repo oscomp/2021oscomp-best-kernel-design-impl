@@ -748,8 +748,8 @@ out:
 
 static void sdcard_write(struct buf *b)
 {
-	uint8 start_token = 0xfe;
-	// uint8 start_token = 0xfc;
+	// uint8 start_token = 0xfe;
+	uint8 start_token = 0xfc;
 	sd_write_data(&start_token, 1);
 
 	// we don't block inside
@@ -783,8 +783,8 @@ static int sdcard_multiple_write(struct buf *b, int nbuf)
 		}
 	}
 
-	// sd_send_cmd(SD_CMD25, address, 0);
-	sd_send_cmd(SD_CMD24, address, 0);
+	sd_send_cmd(SD_CMD25, address, 0);
+	// sd_send_cmd(SD_CMD24, address, 0);
 	if (sd_get_response_R1() != 0) {
 		sd_end_cmd();
 		printf(__ERROR("CMD25")" error\n");
@@ -894,16 +894,16 @@ void sdcard_write_start(void)
 	struct buf *b = container_of(dl, struct buf, list);
 	int nbuf = 1;
 
-	// #define __NBUF_WRITE	32
+	#define __NBUF_WRITE	32
 
-	// uint32 sec = b->sectorno;
-	// for (dl = dl->next; dl != &sd_wqueue.head && nbuf < __NBUF_WRITE; dl = dl->next) {
-	// 	struct buf *next = container_of(dl, struct buf, list);
-	// 	if (next->sectorno == ++sec)	// consecutive sector
-	// 		nbuf++;
-	// 	else
-	// 		break;
-	// }
+	uint32 sec = b->sectorno;
+	for (dl = dl->next; dl != &sd_wqueue.head && nbuf < __NBUF_WRITE; dl = dl->next) {
+		struct buf *next = container_of(dl, struct buf, list);
+		if (next->sectorno == ++sec)	// consecutive sector
+			nbuf++;
+		else
+			break;
+	}
 	
 	b->disk = 1;
 	b->dirty = 0;
