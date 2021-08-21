@@ -88,7 +88,7 @@ impl Drop for BlockCache {
 // 5-7 DirEntry
 // 8-19 DATA
 
-const BLOCK_CACHE_SIZE: usize = 20;
+const BLOCK_CACHE_SIZE: usize = 512;
 //const DIRENT_CACHE_SIZE: usize = 4;
 pub struct BlockCacheManager {
     start_sec: usize,

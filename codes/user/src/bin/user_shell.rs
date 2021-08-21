@@ -432,21 +432,21 @@ impl ArgMachine{
         //testsuits.push("lmbench_all\0bw_pipe\0-P\01");  
         //testsuits.push("busybox\0echo\0END\0bw_pipe\0$?"      );
         
-        testsuits.push("busybox\0echo\0START\0lat_pipe");
-        testsuits.push("lmbench_all\0lat_pipe\0-P\01");    
-        testsuits.push("busybox\0echo\0END\0lat_pipe\0$?"     );
+        //testsuits.push("busybox\0echo\0START\0lat_pipe");
+        //testsuits.push("lmbench_all\0lat_pipe\0-P\01");    
+        //testsuits.push("busybox\0echo\0END\0lat_pipe\0$?"     );
 
         testsuits.push("busybox\0echo\0START\0lat_pagefault");
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
         testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
 
-        testsuits.push("busybox\0echo\0START\0lat_pagefault");
-        testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
-        testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
-
-        testsuits.push("busybox\0echo\0START\0lat_pagefault");
-        testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
-        testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
+        // testsuits.push("busybox\0echo\0START\0lat_pagefault");
+        // testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        // testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
+        //
+        // testsuits.push("busybox\0echo\0START\0lat_pagefault");
+        // testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
+        // testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
 
         testsuits.push("busybox\0echo\0START\0lat_mmap");
         testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
