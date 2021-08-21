@@ -213,8 +213,8 @@ pub fn get_block_cache(
         //if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
         //    return blk
         //}
-        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
-        DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
+        DATA_BLOCK_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
+        //DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
         //if let Some(blk) = INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
         //    return blk
@@ -235,8 +235,8 @@ pub fn get_info_cache(
         //if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
         //    return blk
         //}
-        INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device);
-        INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
+        INFO_CACHE_MANAGER.write().get_block_cache(phy_blk_id, block_device)
+        //INFO_CACHE_MANAGER.read().read_block_cache(phy_blk_id).unwrap()
     } else {
         //if let Some(blk) = DATA_BLOCK_CACHE_MANAGER.read().read_block_cache(phy_blk_id){
         //    return blk
