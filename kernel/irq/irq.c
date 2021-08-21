@@ -205,7 +205,7 @@ void handle_pgfault(regs_context_t *regs, uint64_t stval, uint64_t cause)
     // handle_other(regs,stval,cause);
     if (stval < current_running->user_stack_base && stval >= current_running->user_stack_base + NORMAL_PAGE_SIZE)
         printk_port("user stack requirement too large\n");
-    printk_port("stval is %lx, SIGSEGV\n", stval);
+    // printk_port("stval is %lx, SIGSEGV\n", stval);
     local_flush_tlb_all();
     do_kill(current_running->tid, SIGSEGV);
     return ;

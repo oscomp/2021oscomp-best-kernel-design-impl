@@ -68,6 +68,14 @@ void debuger_print()
         sbi_console_putchar('6');
 }
 
+enum{
+    SCHDULE_MODE_FIFO = 0,
+    SCHDULE_MODE_PRIORITY = 1,
+};
+
+// #define SCHDULE_MODE_FIFO SCHDULE_MODE_FIFO
+#define SCHDULE_MODE_PRIORITY SCHDULE_MODE_PRIORITY
+
 /* decide who is the next running process */
 /* current_running->exec could be 1, which means we come here from do_execve() */
 void do_scheduler(void)
@@ -81,6 +89,7 @@ void do_scheduler(void)
     {        
         previous_running->status = TASK_READY;
         previous_running->temp_priority = previous_running->priority;
+        /* if is a clone switch, we should let child run first */
         list_add_tail(&previous_running->list,&ready_queue);
     }
 
@@ -89,9 +98,9 @@ void do_scheduler(void)
     scheduler_switch_time_count();
 
     // choose next running
-    /* priority schedule*/
+#ifdef SCHDULE_MODE_PRIORITY
+    // /* priority schedule */
     current_running = NULL;
-    /*priority schedule*/
     list_node_t *pt_readyqueue = ready_queue.next;
     pcb_t *pt_pcb;
 
@@ -109,25 +118,19 @@ void do_scheduler(void)
         }
         pt_readyqueue = pt_readyqueue->next;
     }
-
-    if (current_running != NULL){
-        current_running->status = TASK_RUNNING;
-        list_del(&current_running->list);
-    }
-
-    // regs_context_t *pt_regs =
-    //     (regs_context_t *)(0xffffffff80505000 - sizeof(regs_context_t));
-    // prints("sepc: %lx \n", pt_regs->sepc);
-    // prints("sstatus: %lx \n", pt_regs->sstatus);
-    // prints("ra: %lx \n", pt_regs->regs[1]);
-    // prints("sp: %lx \n", current_running->user_sp);
-    // prints("gp: %lx \n", pt_regs->regs[3]);
-    // prints("tp: %lx \n", pt_regs->regs[4]);
-    // prints("scause:%lx\n", pt_regs->scause);
-    // prints("sbadaddr: %lx\n", pt_regs->sbadaddr);
-    // screen_move_cursor(1,1);
+#else
+    /* FIFO schedule */
+    current_running = list_entry(ready_queue.next, pcb_t, list);
+#endif
+/*****************************************************************************************************************/  
+    /* current running cannot be NULL, at least we have shell */
+    current_running->status = TASK_RUNNING;
+    list_del(&current_running->list);
+/*****************************************************************************************************************/    
 
     // we have delete current running, now modify temp_priority
+    /* only do this when use priority schedule */
+#ifdef SCHDULE_MODE_PRIORITY
     pt_readyqueue = ready_queue.next;
     while (pt_readyqueue != &ready_queue)
     {
@@ -135,14 +138,9 @@ void do_scheduler(void)
         pt_pcb->temp_priority++;
         pt_readyqueue = pt_readyqueue->next;
     }
+#endif
 
-    if (!current_running)
-        current_running = &pid0_pcb;
-    /* end schedule */
-    // #ifndef K210
-    // vt100_move_cursor(current_running->cursor_x,
-    //                   current_running->cursor_y);
-    // #endif
+    /* if exec is set, previous running is no longer available */
     if (previous_running->exec){
         previous_running->exec = 0;
         previous_running = NULL;
@@ -327,8 +325,6 @@ void do_exit(int32_t exit_status)
     list_for_each_entry_safe(pt_pcb, q, &current_running->wait_list, list){
         if (pt_pcb->status != TASK_EXITED){
             log(0, "unblock %d", pt_pcb->tid);
-            if (pt_pcb->tid == 5)
-                debuger = 1;
             do_unblock(&pt_pcb->list);
         }
     }

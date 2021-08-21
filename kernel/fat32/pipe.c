@@ -91,13 +91,13 @@ int16 fat32_pipe2(fd_num_t *fd, int32 mode)
 /* return read count */
 int64 pipe_read(uchar *buf, pipe_num_t pip_num, size_t count)
 {
-    uint64_t buf_kva = get_kva_of(buf, current_running->pgdir); /* in case thread changes */
+    // uint64_t buf_kva = get_kva_of(buf, current_running->pgdir); /* in case thread changes */
     if (pipes[pip_num].r_valid < PIPE_VALID)
         return -1;
-    else if (pipes[pip_num].r_valid > PIPE_VALID)
-        log(0, "dangerous pipe read, more than 1 outlet");
+    // else if (pipes[pip_num].r_valid > PIPE_VALID)
+    //     log(0, "dangerous pipe read, more than 1 outlet");
     size_t readsize;
-    while ((readsize = read_ring_buffer(&pipes[pip_num].rbuf, buf_kva, count)) <= 0){
+    while ((readsize = read_ring_buffer(&pipes[pip_num].rbuf, buf, count)) <= 0){
         if (pipes[pip_num].w_valid >= PIPE_VALID && !is_sig_recved(current_running)){
             do_block(&current_running->list, &pipes[pip_num].read_wait_list);
             do_scheduler();
