@@ -408,6 +408,14 @@ impl ArgMachine{
         let mut testsuits :Vec<&str>= Vec::new();
         testsuits.push("lmbench_all\0lmdd\0label=\"File /var/tmp/XXX write bandwidth:\"\0of=/var/tmp/XXX\0move=1m\0fsync=1\0print=3");
 
+        testsuits.push("busybox\0echo\0START\0lat_proc_exec");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
+        testsuits.push("busybox\0echo\0END\0lat_proc_exec\0$?");
+
+        testsuits.push("busybox\0echo\0START\0lat_proc_fork");
+        testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
+        testsuits.push("busybox\0echo\0END\0lat_proc_fork\0$?");
+
         testsuits.push("busybox\0echo\0START\0bw_file_rd_io_only");
         testsuits.push("lmbench_all\0bw_file_rd\0-P\01\0512k\0io_only\0/var/tmp/XXX");   //ok  
         testsuits.push("busybox\0echo\0END\0bw_file_rd\0io_only\0$?");
@@ -419,19 +427,7 @@ impl ArgMachine{
         testsuits.push("busybox\0echo\0START\0lat_ctx");
         testsuits.push("lmbench_all\0lat_ctx\0-P\01\0-s\032\02\04\08\016\024\032"); // wait for kill
         testsuits.push("busybox\0echo\0END\0lat_ctx\0$?"      );
-        
-        testsuits.push("busybox\0echo\0START\0lat_proc_fork");
-        testsuits.push("lmbench_all\0lat_proc\0-P\01\0fork");
-        testsuits.push("busybox\0echo\0END\0lat_proc_fork\0$?");
-        
-        testsuits.push("busybox\0echo\0START\0lat_proc_exec");
-        testsuits.push("lmbench_all\0lat_proc\0-P\01\0exec");
-        testsuits.push("busybox\0echo\0END\0lat_proc_exec\0$?");
-        
-        ////testsuits.push("busybox\0echo\0START\0bw_pipe");
-        ////testsuits.push("lmbench_all\0bw_pipe\0-P\01");  
-        ////testsuits.push("busybox\0echo\0END\0bw_pipe\0$?"      );
-        
+                
         testsuits.push("busybox\0echo\0START\0lat_pipe");
         testsuits.push("lmbench_all\0lat_pipe\0-P\01");    
         testsuits.push("busybox\0echo\0END\0lat_pipe\0$?");
@@ -440,17 +436,13 @@ impl ArgMachine{
         testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
         testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
 
-        // testsuits.push("busybox\0echo\0START\0lat_pagefault");
-        // testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
-        // testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
-        //
-        // testsuits.push("busybox\0echo\0START\0lat_pagefault");
-        // testsuits.push("lmbench_all\0lat_pagefault\0-P\01\0/var/tmp/XXX");   //latency too short???
-        // testsuits.push("busybox\0echo\0END\0lat_pagefault\0$?");
-
         testsuits.push("busybox\0echo\0START\0lat_mmap");
         testsuits.push("lmbench_all\0lat_mmap\0-P\01\0512k\0/var/tmp/XXX");  //ok
         testsuits.push("busybox\0echo\0END\0lat_mmap\0$?"     );
+
+        testsuits.push("busybox\0echo\0START\0bw_pipe");
+        testsuits.push("lmbench_all\0bw_pipe\0-P\01");  
+        testsuits.push("busybox\0echo\0END\0bw_pipe\0$?");
         
         println!("scan str iter");
         for programname_op in testsuits.iter() {
