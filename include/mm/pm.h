@@ -11,17 +11,17 @@
 /* init the allocator */
 void kpminit(void);
 
-// /* allocate n physical page(s) */
-// void *allocpage_n(uint64 n);
+/* allocate n physical page(s) */
+void *allocpage_n(uint64 n);
 
-// /* free n allocated physical page(s) */
-// void freepage_n(uint64 start, uint64 n);
+/* free n allocated physical page(s) */
+void freepage_n(uint64 start, uint64 n);
 
 /* allocate 1 physicl page */
-void* _allocpage(void);
+uint64 _allocpage(void);
 
 /* free 1 allocated physical page */
-void _freepage(void* start);
+void _freepage(uint64 start);
 
 // static inline void *allocpage(void) {
 // 	return (void*)_allocpage();
@@ -30,11 +30,10 @@ void _freepage(void* start);
 // static inline void freepage(void *start) {
 // 	_freepage((uint64)start);
 // }
-#define freepage(start) 	_freepage((void*)(start))
+#define freepage(start) 	_freepage((uint64)(start))
 
 uint64 idlepages(void);
 
-// void pm_dump(void);
-#define pm_dump() do {} while (0)
+void pm_dump(void);
 
 #endif

@@ -769,7 +769,7 @@ static void sdcard_multiple_write_stop(void)
 	}
 }
 
-#define	WRITE_SHRESHOLD	512
+#define	WRITE_SHRESHOLD	1000
 
 void sdcard_write_start(void)
 {

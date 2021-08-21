@@ -44,8 +44,8 @@ pipealloc(struct file **pf0, struct file **pf1)
 
 	if ((f0 = filealloc()) == NULL ||
 		(f1 = filealloc()) == NULL ||
-		// (pi = kmalloc(sizeof(struct pipe))) == NULL)
-		(pi = allocpage()) == NULL)
+		(pi = kmalloc(sizeof(struct pipe))) == NULL)
+		// (pi = allocpage()) == NULL)
 	{
 		goto bad;
 	}
@@ -55,6 +55,8 @@ pipealloc(struct file **pf0, struct file **pf1)
 	pi->nwrite = 0;
 	pi->nread = 0;
 	pi->writing = 0;
+	pi->pdata = pi->data;
+	pi->size_shift = 0;
 
 	initlock(&pi->lock, "pipe");
 	wait_queue_init(&pi->wqueue, "pipewritequeue");
@@ -78,8 +80,8 @@ pipealloc(struct file **pf0, struct file **pf1)
 
  bad:
 	if (pi)
-		freepage(pi);
-		// kfree(pi);
+		kfree(pi);
+		// freepage(pi);
 	if (f0)
 		fileclose(f0);
 	if (f1)
@@ -153,8 +155,10 @@ pipeclose(struct pipe *pi, int writable)
 	}
 	if (pi->readopen == 0 && pi->writeopen == 0) {
 		release(&pi->lock);
-		// kfree(pi);
-		freepage(pi);
+		if (pi->size_shift)
+			freepage_n(pi->pdata, 4);
+		kfree(pi);
+		// freepage(pi);
 	} else
 		release(&pi->lock);
 }
@@ -184,7 +188,7 @@ static int pipewritable(struct pipe *pi)
 	 */
 	acquire(&pi->lock);
 	pi->writing = 1;
-	while ((m = pi->nwrite - pi->nread) == PIPESIZE) {		// pipe is full
+	while ((m = pi->nwrite - pi->nread) == PIPESIZE(pi)) {		// pipe is full
 		if (pr->killed) {
 			pi->writing = 0;
 			m = -EINTR;
@@ -237,31 +241,53 @@ int
 pipewrite(struct pipe *pi, uint64 addr, int n)
 {
 	int i, m;
-	char *const pipebound = pi->data + PIPESIZE;
 	struct wait_node wait;
 	wait.chan = &wait;
 	pipelock(pi, &wait, PIPE_WRITER);		// block other writers
+
+	if (!pi->size_shift && n > PIPE_SIZE && 
+		pi->nread == pi->nwrite)
+	{
+		char *bigger = allocpage_n(4);
+		if (bigger) {
+			pi->nwrite = pi->nread = 0;
+			pi->pdata = bigger;
+			pi->size_shift = 5;
+		}
+
+	}
+
+	char *const pipebound = pi->pdata + PIPESIZE(pi);
 	for (i = 0; i < n;) {
 		if ((m = pipewritable(pi)) < 0) {
 			i = m;
 			goto out;
 		}
-		m = (PIPESIZE - m < n - i) ?	// amount of bytes to write
-			PIPESIZE - m : n - i;
+		m = (PIPESIZE(pi) - m < n - i) ?	// amount of bytes to write
+			PIPESIZE(pi) - m : n - i;
 
+		int mm = m > PIPESIZE(pi) / 2 ? (PIPESIZE(pi) / 2) : m;
 		while (m > 0) {					// pipe is a loop in a buf
-			char *paddr = pi->data + pi->nwrite % PIPESIZE;
-			int count = (pipebound - paddr < m) ? pipebound - paddr : m;
+			m -= mm;
+			while (mm > 0) {
+				char *paddr = pi->pdata + pi->nwrite % PIPESIZE(pi);
+				int count = (pipebound - paddr < mm) ? pipebound - paddr : mm;
 
-			if (copyin_nocheck(paddr, addr + i, count) < 0) {
-				n = 0;
-				break;
+				if (copyin_nocheck(paddr, addr + i, count) < 0) {
+					// n = 0;
+					// break;
+					goto out2;
+				}
+				i += count;
+				pi->nwrite += count;
+				mm -= count;
 			}
-			i += count;
-			pi->nwrite += count;
-			m -= count;
+			if ((mm = m) > 0) {
+				pipewakeup(pi, PIPE_READER);
+			}
 		}
 	}
+out2:
 	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_READER);
 	pi->writing = 0;
@@ -276,7 +302,6 @@ int
 piperead(struct pipe *pi, uint64 addr, int n)
 {
 	int tot = 0, m;
-	char *const pipebound = pi->data + PIPESIZE;
 	struct wait_node wait;
 	wait.chan = &wait;
 	pipelock(pi, &wait, PIPE_READER);	// block other readers
@@ -289,19 +314,30 @@ piperead(struct pipe *pi, uint64 addr, int n)
 		}
 		if (m > n - tot)
 			m = n - tot;
-		for (int i = 0; i < m;) {
-			char *paddr = pi->data + pi->nread % PIPESIZE;
-			int count = (pipebound - paddr < m - i) ? pipebound - paddr : m - i;
+		char *const pipebound = pi->pdata + PIPESIZE(pi);
 
-			if (copyout_nocheck(addr + i, paddr, count) < 0) {
-				n = 0;			// halt the do-while loop
-				break;
+		int mm = m > PIPESIZE(pi) / 2 ? (PIPESIZE(pi) / 2) : m;
+		while (m > 0) {
+			m -= mm;
+			for (int i = 0; i < mm;) {
+				char *paddr = pi->pdata + pi->nread % PIPESIZE(pi);
+				int count = (pipebound - paddr < mm - i) ? pipebound - paddr : mm - i;
+
+				if (copyout_nocheck(addr + i, paddr, count) < 0) {
+					// n = 0;			// halt the do-while loop
+					// break;
+					goto out2;
+				}
+				pi->nread += count;
+				i += count;
+				tot += count;
 			}
-			pi->nread += count;
-			i += count;
-			tot += count;
+			if ((mm = m) > 0) {
+				pipewakeup(pi, PIPE_WRITER);
+			}
 		}
 	}
+out2:
 	acquire(&pi->lock);		// see pipewritable()
 	pipewakeup(pi, PIPE_WRITER);
 	release(&pi->lock);
@@ -314,7 +350,7 @@ out:
 int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 {
 	int ret = 0;
-	char *const pipebound = pi->data + PIPESIZE;
+	char *const pipebound = pi->pdata + PIPESIZE(pi);
 	struct wait_node wait;
 
 	// pwait = waitinit(&wait);
@@ -334,9 +370,9 @@ int pipewritev(struct pipe *pi, struct iovec ioarr[], int count)
 				ret = -EPIPE;
 				goto out2;
 			}
-			m = (PIPESIZE - m < n - j) ? PIPESIZE - m : n - j;		// amount of bytes to write
+			m = (PIPESIZE(pi) - m < n - j) ? PIPESIZE(pi) - m : n - j;		// amount of bytes to write
 			while (m > 0) {							// pipe is a loop in a buf
-				char *paddr = pi->data + pi->nwrite % PIPESIZE;
+				char *paddr = pi->pdata + pi->nwrite % PIPESIZE(pi);
 				int cnt = (pipebound - paddr < m) ? pipebound - paddr : m;
 
 				if (copyin_nocheck(paddr, addr + j, cnt) < 0)
@@ -361,7 +397,7 @@ out2:
 int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 {
 	int ndata, ret = 0;
-	char *const pipebound = pi->data + PIPESIZE;
+	char *const pipebound = pi->pdata + PIPESIZE(pi);
 	struct wait_node wait;
 
 	// pwait = waitinit(&wait);
@@ -381,7 +417,7 @@ int pipereadv(struct pipe *pi, struct iovec ioarr[], int count)
 		if (!rangeinseg(addr, addr + n))
 			break;
 		for (j = 0; j < m;) {
-			char *paddr = pi->data + pi->nread % PIPESIZE;
+			char *paddr = pi->pdata + pi->nread % PIPESIZE(pi);
 			int cnt = (pipebound - paddr < m - j) ? pipebound - paddr : m - j;
 
 			if (copyout_nocheck(addr + j, paddr, cnt) < 0)
@@ -430,7 +466,7 @@ uint32 pipepoll(struct file *fp, struct poll_table *pt)
 	}
 
 	if (fp->writable) {
-		if (pi->nwrite - pi->nread < PIPESIZE)	// has room to write
+		if (pi->nwrite - pi->nread < PIPESIZE(pi))	// has room to write
 			mask |= POLLOUT;
 		if (!pi->readopen)
 			mask |= POLLERR;

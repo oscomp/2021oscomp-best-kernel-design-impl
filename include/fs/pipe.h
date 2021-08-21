@@ -7,7 +7,7 @@
 #include "sync/spinlock.h"
 #include "sync/sleeplock.h"
 
-// #define PIPESIZE 1024
+#define PIPE_SIZE 512
 // #define PIPESIZE 	(1024 + 512 + 256)
 
 struct pipe {
@@ -19,11 +19,14 @@ struct pipe {
 	uint8	readopen;		// read fd is still open
 	uint8	writeopen;		// write fd is still open
 	uint8	writing;
-	// char	data[PIPESIZE];
-	char	data[];
+	uint8 	size_shift;		// shift bit of pipe size
+	char	*pdata;			// used for extended pipe 
+	char	data[PIPE_SIZE];
+	// char	data[];
 };
 
-#define PIPESIZE (PGSIZE - sizeof(struct pipe))
+#define PIPESIZE(pi)	(PIPE_SIZE << (pi->size_shift))
+// #define PIPESIZE (PGSIZE - sizeof(struct pipe))
 
 int pipealloc(struct file **f0, struct file **f1);
 void pipeclose(struct pipe *pi, int writable);

@@ -22,6 +22,7 @@
 #include "mm/vm.h"
 #include "mm/kmalloc.h"
 #include "mm/usrmm.h"
+#include "sbi.h"
 #include "sched/signal.h"
 #include "errno.h"
 #include "sched/signal.h"
@@ -369,8 +370,9 @@ int clone(uint64 flag, uint64 stack) {
 }
 
 // search the hash map to wake up procs 
-static void __wakeup_no_lock(void *chan) {
+static int __wakeup_no_lock(void *chan) {
 	struct proc *p = proc_sleep;
+	int flag = 0;
 	while (NULL != p) {
 		struct proc *next = p->sched_next;
 		if ((uint64)chan == (uint64)p->chan) {
@@ -379,15 +381,25 @@ static void __wakeup_no_lock(void *chan) {
 			p->timer = TIMER_IRQ;
 			p->chan = NULL;
 			__insert_runnable(PRIORITY_IRQ, p);
+			flag = 1;
 		}
 		p = next;
 	}
+
+	return flag;
 }
 
 void wakeup(void *chan) {
 	__enter_proc_cs 
-	__wakeup_no_lock(chan);
+	int flag = __wakeup_no_lock(chan);
+
+	int id = 0 == cpuid() ? 1 : 0;
+	int avail = NULL == cpus[id].proc;
 	__leave_proc_cs
+
+	if (flag && avail) {
+		sbi_send_ipi(1 << id, 0);
+	}
 }
 
 void exit(int xstate) {

@@ -297,7 +297,7 @@ int handle_intr(uint64 scause) {
 		if (irq) plic_complete(irq);
 
 		#ifndef QEMU 
-		w_sip(r_sip() & ~2);	// clear pending bit 
+		sbi_clear_ipi();	// clear pending bit 
 		{
 			sbi_xv6_set_ext();
 		}
