@@ -1,4 +1,4 @@
-# kernel-design-impl
+# 2021oscomp-best-kernel-design-impl
 
 这里放置的是2021年全国大学生操作系统比赛的内核实现和功能挑战赛道的一等奖比赛项目成果：
 
